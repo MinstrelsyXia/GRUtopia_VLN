@@ -14,12 +14,6 @@ from grutopia.core.scene import create_object, create_scene
 from grutopia.core.task.metric import BaseMetric, create_metric
 from grutopia.core.util import log
 
-import omni.usd
-from omni.isaac.lab.sim.spawners.materials import RigidBodyMaterialCfg
-import omni.isaac.core.utils.stage as stage_utils
-import omni.isaac.core.utils.prims as prim_utils
-import omni.isaac.lab.sim as sim_utils
-
 
 class BaseTask(OmniBaseTask, ABC):
     """
@@ -48,44 +42,12 @@ class BaseTask(OmniBaseTask, ABC):
 
     def load(self):
         if self.config.scene_asset_path is not None:
-            # source, prim_path = create_scene(self.config.scene_asset_path,
-            #                                  prim_path_root=f'World/env_{self.config.env_id}/scene')
-            # create_prim(prim_path,
-            #             usd_path=source,
-            #             scale=self.config.scene_scale,
-            #             translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)])
-            prim_path = f"/World/env_{self.config.env_id}/scene"
-            _xform_prim = prim_utils.create_prim(
-                prim_path= f"/World/env_{self.config.env_id}/scene", 
-                translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)], 
-                usd_path=self.config.scene_asset_path
-            )
-
-            # apply collider properties
-            collider_cfg = sim_utils.CollisionPropertiesCfg(collision_enabled=True)
-            sim_utils.define_collision_properties(_xform_prim.GetPrimPath(), collider_cfg)
-
-            # create physics material
-            physics_material = RigidBodyMaterialCfg(
-                static_friction=0.5,
-                dynamic_friction=0.5,
-                restitution=0.0,
-                improve_patch_friction=True,
-                friction_combine_mode='average',
-                restitution_combine_mode='average',
-                compliant_contact_stiffness=0.0,
-                compliant_contact_damping=0.0
-            )
-
-            physics_material_cfg: sim_utils.RigidBodyMaterialCfg = physics_material
-            # spawn the material
-            physics_material_cfg.func(f"{prim_path}/physicsMaterial", physics_material)
-            sim_utils.bind_physics_material(_xform_prim.GetPrimPath(), f"{prim_path}/physicsMaterial")
-
-            # add colliders and physics material
-            ground_plane_cfg = sim_utils.GroundPlaneCfg(physics_material=physics_material)
-            ground_plane = ground_plane_cfg.func(f"{prim_path}/GroundPlane", ground_plane_cfg)
-            ground_plane.visible = False
+            source, prim_path = create_scene(self.config.scene_asset_path,
+                                             prim_path_root=f'World/env_{self.config.env_id}/scene')
+            create_prim(prim_path,
+                        usd_path=source,
+                        scale=self.config.scene_scale,
+                        translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)])
 
         self.robots = init_robots(self.config, self._scene)
         self.objects = {}
