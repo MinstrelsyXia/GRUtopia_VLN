@@ -1,0 +1,21 @@
+k_frames_memory: 10  # Number of historical frames to keep
+verbose: False  # Whether to print detailed information
+map_config:
+  camera_parameters: 
+    camera: "/World/h1/torso_link/h1_camera_high"
+    camera_add: "/World/h1/torso_link/h1_camera_whole_view"
+    resolution: [512, 512]
+  robot_z: [0.2, 2.0]  # Robot's height range on the Z-axis
+  voxel_size: 0.05  # Size of a voxel
+  quadtree_config:
+    width: 50  # Quadtree map size
+    height: 50
+    max_depth: 10  # Maximum depth of the quadtree
+    threshold: 1  # Threshold for node splitting  
+planner_config:
+  agent_radius: 0.25 # Radius of the agent
+  last_scope: 1  # The last scope
+  goal_sampling_rate: 0.2  # Goal sampling rate
+  max_iter: 2000  # Maximum number of iterations
+  extend_length: 1  # Extension length
+  consider_range: 5  # A range parameter, specific meaning depends on context

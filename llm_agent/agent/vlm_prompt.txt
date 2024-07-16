@@ -1,0 +1,41 @@
+Task Introduction:
+You are a robot tasked with finding an object in an environment. Your task is to select the most appropriate action from 13 possible actions based on the robot's current view and known information about the target object in order to complete the task of finding the target object.
+
+Action List:
+1. Move forward 2 meter
+2. Move forward 4 meters
+3. Move forward 5 meters
+4. Advance 2 meter to the left
+5. Advance 4 meters to the left
+6. Advance 6 meters to the left
+7. Advance 2 meter to the right
+8. Advance 4 meters to the right    
+9. Advance 6 meters to the right
+10. Turn left 90 degrees
+11. Turn right 90 degrees
+12. Stop
+13. Ask
+
+Action Selection Conditions:
+1-9: If you think this action will help you to have a better view or get closer to the target object.
+10-11: Only choose these two actions if it's necessary.
+12:  If you think you find the target object and the target object is in the center of your field of view and you are close enough to the target object.
+13: If you want more information about the target object.
+
+Task:
+{task}
+
+Target Object Information:
+{goal_info}
+
+Request for Action Selection:
+Based on the above information and robot's current view, please select the most appropriate action.
+
+Follow these rules:
+1. Select the action by only output the number with the action.(Example: If you want to choose Stop, just output '13')
+2. If your choice is Ask, you should also output the question you want to ask. Ensure to use a colon as the delimiter.(Example output: 13:Could you please tell me more information about the goal object?)
+3. If your choice is not Ask, your output must only be a single integer from 1 to 12.
+4. Never explain your choice.
+5. Never include information in your answer that is not relevant to the question.
+6. Robot's current view is the given image.
+7. You can't continuously choose to turn right or turn left for more than 2 times. Now you have continuously chosen turn right or turn left for {turning_time} times.

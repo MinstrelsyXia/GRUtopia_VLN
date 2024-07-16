@@ -1,0 +1,41 @@
+evaluate: 
+  max_step: 12000
+  max_time: 180
+  fall_threshold: 0.3
+  tolerance: 0.2
+  verbose: True
+simulator:
+  world:
+    physics_dt: 1/240
+    rendering_dt: 1/240
+
+  scene:
+    type: Scene
+    path: /home/pjlab/data/hq/dest_usd/scenes/demo_0000_merge/demo_0000_merge_remove_door_with_semantic.usda
+    scale: [0.01, 0.01, 0.01]
+
+  robots:
+  - name: h1
+    prim_path: "/World/h1"
+    type: "HumanoidRobot"
+    position: [.0, .0, 1.05]
+    scale: [1, 1, 1]
+    capability_params:
+    - name: "move_by_speed"
+    - name: "joint_controller"
+    - name: "move_to_point"
+    - name: "move_along_path"
+    - name: "rotate"
+
+  objects: 
+    []
+    
+  task:
+    name: demo_task
+    type: DemoTask
+    controllers: 
+      - "DemoController"
+    robots:
+      - "jetbot"
+    start_position: [.0, .0, .0]
+    goal_position: [2., 2., 2.]
