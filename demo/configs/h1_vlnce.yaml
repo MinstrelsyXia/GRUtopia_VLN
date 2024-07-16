@@ -15,6 +15,7 @@ tasks:
     type: "HumanoidRobot"
     position: [0, 0, 0]
     scale: [1, 1, 1]
+    orientation: [0,0,0,0]
     controller_params:
     - name: "move_by_speed"
     - name: "joint_controller"
@@ -25,8 +26,14 @@ tasks:
     - name: "web_chat"
     sensor_params:
     - name: "tp_camera"
-      enable: false
-  
+      enable: true
+      size: [640, 480]
+    - name: "camera"
+      enable: true
+      size: [640, 480]
+    - name: "lidar"
+      enable: true
+
 datasets:
   - name: "vlnce"
     base_data_dir: "/wangliuyi/VLN/VLNCE/R2R_VLNCE_v1-3"

@@ -7,6 +7,7 @@ from typing import Any, Dict
 from omni.isaac.core.scenes.scene import Scene
 from omni.isaac.core.tasks import BaseTask as OmniBaseTask
 from omni.isaac.core.utils.prims import create_prim
+from omni.isaac.lab.assets import ArticulationCfg, AssetBaseCfg
 
 from grutopia.core.config import TaskUserConfig
 from grutopia.core.robot import init_robots
@@ -19,6 +20,7 @@ from omni.isaac.lab.sim.spawners.materials import RigidBodyMaterialCfg
 import omni.isaac.core.utils.stage as stage_utils
 import omni.isaac.core.utils.prims as prim_utils
 import omni.isaac.lab.sim as sim_utils
+import omni.kit.actions.core
 
 
 class BaseTask(OmniBaseTask, ABC):
@@ -86,6 +88,12 @@ class BaseTask(OmniBaseTask, ABC):
             ground_plane_cfg = sim_utils.GroundPlaneCfg(physics_material=physics_material)
             ground_plane = ground_plane_cfg.func(f"{prim_path}/GroundPlane", ground_plane_cfg)
             ground_plane.visible = False
+
+            # lights
+            action_registry = omni.kit.actions.core.get_action_registry()
+            # switches to camera lighting
+            action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
+            action.execute()
 
         self.robots = init_robots(self.config, self._scene)
         self.objects = {}

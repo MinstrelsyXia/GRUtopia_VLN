@@ -4,3 +4,4 @@ assets/
 local_model/
 images/
 results/
+logs/
