@@ -1,1 +1,6 @@
+*.pyc
+evaluate_data/
 assets/
+local_model/
+images/
+results/

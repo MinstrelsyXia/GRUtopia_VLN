@@ -44,7 +44,7 @@ data_item, data_scan, start_position, start_rotation = load_data(sim_config.conf
 find_flag = False
 for root, dirs, files in os.walk(sim_config.config_dict['datasets'][0]['mp3d_data_dir']+f"/{data_scan}"):
     for file in files:
-        if file.endswith(".usd") and "non_metric" not in file:
+        if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
             scene_usd_path = os.path.join(root, file)
             find_flag = True
             break
