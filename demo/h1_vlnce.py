@@ -74,7 +74,8 @@ def load_data(file_path, path_id=None, verbose=False):
         target_item = data['episodes'][0]
     scan = target_item['scene_id'].split('/')[1]
     # start_position = [target_item['start_position'][0]-0.1, -target_item['start_position'][2]-0.1, target_item['start_position'][1]+1.5]
-    start_position = [target_item['start_position'][0]+0.2, -target_item['start_position'][2]+0.2, 1.8]
+    # start_position = [target_item['start_position'][0]+0.2, -target_item['start_position'][2]+0.2, 1.8]
+    start_position = [23, -6, 3.3]
     start_rotation = [-target_item['start_rotation'][3], target_item['start_rotation'][0], target_item['start_rotation'][1], target_item['start_rotation'][2]] # [x,y,z,-w] => [w,x,y,z]
     if verbose: 
         log.info(f"Scan: {scan}")
@@ -243,7 +244,7 @@ while env.simulation_app.is_running():
 
     if i % 100 == 0:
         # obs = env._runner.get_obs()
-        obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud'])
+        obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud', "normals"])
         cur_obs = obs[task_name][robot_name]
         # is_fall = check_fall(agent, cur_obs, adjust=True, initial_pose=start_position, initial_rotation=start_rotation)
         get_sensor_info(i, cur_obs, verbose=args.test_verbose)

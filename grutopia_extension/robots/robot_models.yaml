@@ -107,10 +107,10 @@ robots:
     prim_path: "torso_link/TPCamera"
   - name: "camera_high"
     type: "Camera"
-    prim_path: "torso_link/Camera_high"
+    prim_path: "torso_link/h1_camera_high"
   - name: "camera_whole"
     type: "Camera"
-    prim_path: "torso_link/Camera_whole_view"
+    prim_path: "torso_link/h1_camera_whole_view"
 - type: "CylinderRobot"
   usd_path: "GRUtopia/assets/robots/Cylinder/kaya.usd"
   gains: [0, 0]
