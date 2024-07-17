@@ -87,10 +87,10 @@ class SimulatorRunner:
         if render:
             return obs
 
-    def get_obs(self):
+    def get_obs(self, data_type=None):
         obs = {}
         for task_name, task in self.current_tasks.items():
-            obs[task_name] = task.get_observations()
+            obs[task_name] = task.get_observations(data_type=data_type)
         return obs
 
     def get_current_time_step_index(self) -> int:

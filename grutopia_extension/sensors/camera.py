@@ -7,6 +7,8 @@ from grutopia.core.robot.robot_model import SensorModel
 from grutopia.core.robot.sensor import BaseSensor
 from grutopia.core.util import log
 
+from .camera_utils import get_camera_data
+
 
 @BaseSensor.register('Camera')
 class Camera(BaseSensor):
@@ -33,6 +35,7 @@ class Camera(BaseSensor):
             size = self.config.size
 
         prim_path = self._robot.user_config.prim_path + '/' + self.config.prim_path
+        self.prim_path = prim_path
         log.debug('camera_prim_path: ' + prim_path)
         log.debug('name            : ' + self.config.name)
         log.debug(f'size            : {size}')
@@ -47,10 +50,13 @@ class Camera(BaseSensor):
             self._camera.add_instance_id_segmentation_to_frame()
             self._camera.add_bounding_box_2d_tight_to_frame()
 
-    def get_data(self) -> Dict:
-        if self.config.enable:
-            rgba = self._camera.get_rgba()
-            depth = self._camera.get_depth()
-            frame = self._camera.get_current_frame()
-            return {'rgba': rgba, 'depth': depth, 'frame': frame}
-        return {}
+    def get_data(self, data_type:list=None) -> Dict:
+        if data_type is not None:
+            return get_camera_data(self.prim_path, self.config.size, data_type)
+        else:
+            if self.config.enable:
+                rgba = self._camera.get_rgba()
+                depth = self._camera.get_depth()
+                frame = self._camera.get_current_frame()
+                return {'rgba': rgba, 'depth': depth, 'frame': frame}
+            return {}

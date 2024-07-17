@@ -36,7 +36,10 @@ class BaseRobot:
         from grutopia.core.robot.controller import BaseController, create_controllers
         from grutopia.core.robot.sensor import BaseSensor, create_sensors
 
-        self.controllers: Dict[str, BaseController] = create_controllers(config, robot_model, self, scene)
+        if robot_model.controllers is None:
+            self.controllers = {}
+        else:
+            self.controllers: Dict[str, BaseController] = create_controllers(config, robot_model, self, scene)
         self.sensors: Dict[str, BaseSensor] = create_sensors(config, robot_model, self, scene)
 
     def post_reset(self):

@@ -50,6 +50,7 @@ grutopia/core/scene/scene/util/type/type_map.py
 grutopia/core/task/__init__.py
 grutopia/core/task/metric.py
 grutopia/core/task/task.py
+grutopia/core/task/task_bak.py
 grutopia/core/util/__init__.py
 grutopia/core/util/array.py
 grutopia/core/util/assets.py
@@ -96,6 +97,11 @@ grutopia_extension/sensors/__init__.py
 grutopia_extension/sensors/camera.py
 grutopia_extension/tasks/__init__.py
 grutopia_extension/tasks/simple_inference_task.py
+llm_agent/__init__.py
+llm_agent/evaluate.py
+llm_agent/evaluate_debug.py
+llm_agent/npc/__init__.py
+llm_agent/npc/npc.py
 webui/__init__.py
 webui/main.py
 webui/src/__init__.py

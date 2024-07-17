@@ -88,6 +88,17 @@ class BaseEnv:
         self._runner.step(action_after_reshape)
         observations = self.get_observations()
         return observations
+    
+    def wait(self, render=True, get_obs=False):
+        self._runner.render_trigger += 1
+        render = render and self._runner.render_trigger > self._runner.render_interval
+        if self._runner.render_trigger > self._runner.render_interval:
+            self._runner.render_trigger = 0
+        self._runner._world.step(render=render)
+        if get_obs:
+            observations = self.get_observations()
+            return observations
+        return render
 
     def reset(self, envs: List[int] = None):
         """
@@ -106,13 +117,13 @@ class BaseEnv:
         self._runner.reset()
         return self.get_observations(), {}
 
-    def get_observations(self) -> List[Dict[str, Any]]:
+    def get_observations(self, data_type:list=None) -> List[Dict[str, Any]]:
         """
         Get observations from Isaac environment
         Returns:
             List[Dict[str, Any]]: observations
         """
-        _obs = self._runner.get_obs()
+        _obs = self._runner.get_obs(data_type=data_type)
         return _obs
 
     def render(self, mode='human'):

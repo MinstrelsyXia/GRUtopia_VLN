@@ -1,7 +1,7 @@
 # Developer only. User read-only.
 robots:
 - type: "HumanoidRobot"
-  usd_path: "GRUtopia/assets/robots/h1/h1_camera.usd"
+  usd_path: "GRUtopia/assets/robots/h1/h1.usd"
   gains: [0.0, 0.0]
   joint_names:
   - left_hip_yaw_joint
@@ -105,28 +105,3 @@ robots:
   - name: "tp_camera"
     type: "Camera"
     prim_path: "torso_link/TPCamera"
-  - name: "camera_high"
-    type: "Camera"
-    prim_path: "torso_link/Camera_high"
-  - name: "camera_whole"
-    type: "Camera"
-    prim_path: "torso_link/Camera_whole_view"
-- type: "CylinderRobot"
-  usd_path: "GRUtopia/assets/robots/Cylinder/kaya.usd"
-  gains: [0, 0]
-  sensors:
-  - name: "camera_front"
-    type: "Camera"
-    prim_path: "camera_front"
-  - name: "camera_behind"
-    type: "Camera"
-    prim_path: "camera_behind"
-  - name: "camera_left"
-    type: "Camera"
-    prim_path: "camera_left"
-  - name: "camera_right"
-    type: "Camera"
-    prim_path: "camera_right"
-  - name: "camera_tp"
-    type: "Camera"
-    prim_path: "camera_tp" 

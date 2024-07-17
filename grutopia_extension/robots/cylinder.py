@@ -19,7 +19,7 @@ from grutopia.core.robot.robot_model import RobotModel
 from grutopia.core.util import log
 
 
-class Humanoid(IsaacRobot):
+class Cylinder(IsaacRobot):
 
     actuators_cfg = {
         'base_legs':
@@ -96,8 +96,8 @@ class Humanoid(IsaacRobot):
         self._articulation_view.set_enabled_self_collisions(self._articulation_view._backend_utils.expand_dims(True, 0))
 
     def _process_actuators_cfg(self):
-        self.actuators = dict.fromkeys(Humanoid.actuators_cfg.keys())
-        for actuator_name, actuator_cfg in Humanoid.actuators_cfg.items():
+        self.actuators = dict.fromkeys(Cylinder.actuators_cfg.keys())
+        for actuator_name, actuator_cfg in Cylinder.actuators_cfg.items():
             # type annotation for type checkersc
             actuator_cfg: ActuatorBaseCfg
             # create actuator group
@@ -167,8 +167,8 @@ class Humanoid(IsaacRobot):
         return string_utils.resolve_matching_names(name_keys, joint_subset)
 
 
-@BaseRobot.register('HumanoidRobot')
-class HumanoidRobot(BaseRobot):
+@BaseRobot.register('CylinderRobot')
+class CylinderRobot(BaseRobot):
 
     def __init__(self, config: Config, robot_model: RobotModel, scene: Scene):
         super().__init__(config, robot_model, scene)
@@ -186,7 +186,7 @@ class HumanoidRobot(BaseRobot):
 
         log.debug(f'humanoid {config.name}: usd_path         : ' + str(usd_path))
         log.debug(f'humanoid {config.name}: config.prim_path : ' + str(config.prim_path))
-        self.isaac_robot = Humanoid(
+        self.isaac_robot = Cylinder(
             prim_path=config.prim_path,
             name=config.name,
             position=self._start_position,
@@ -204,7 +204,7 @@ class HumanoidRobot(BaseRobot):
 
         self._robot_ik_base = None
 
-        self._robot_base = RigidPrim(prim_path=config.prim_path + '/pelvis', name=config.name + '_base')
+        self._robot_base = RigidPrim(prim_path=config.prim_path, name=config.name + '_base')
 
     def post_reset(self):
         super().post_reset()

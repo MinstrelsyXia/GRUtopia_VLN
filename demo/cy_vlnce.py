@@ -1,6 +1,6 @@
 # Author: w61
-# Date: 2024.7.11
-''' Demo for loading vlnce dataset and intialize the H1 robot
+# Date: 2024.7.17
+''' Demo for loading vlnce dataset and intialize the Cylinder robot
 '''
 import os,sys
 import gzip
@@ -29,7 +29,7 @@ parser.add_argument("--test_verbose", action="store_true", default=False)
 parser.add_argument("--wait", action="store_true", default=False)
 args = parser.parse_args()
 
-file_path = './GRUtopia/demo/configs/h1_vlnce.yaml'
+file_path = './GRUtopia/demo/configs/cy_vlnce.yaml'
 sim_config = SimulatorConfig(file_path)
 
 def euler_angles_to_quat(angles):
@@ -136,68 +136,23 @@ def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, 
 
 def get_sensor_info(step_time, cur_obs, verbose=False):
     # type: rgba, depth, frame
-    camera = cur_obs['camera']
-    tp_camera = cur_obs['tp_camera']
-    camera_whole = cur_obs['camera_whole']
-    
-    
-    camera_rgb = camera['rgba'][...,:3]
-    camera_depth = camera['depth']
-
-    tp_camera_rgb = tp_camera['rgba'][...,:3]
-    tp_camera_depth = tp_camera['depth']
-    
-    camera_whole_rgb = camera_whole['rgba'][...,:3] 
-    camera_whole_depth = camera_whole['depth']
-
-    if verbose:
-        image_save_dir = os.path.join(ROOT_DIR, "logs", "images")
-        if not os.path.exists(image_save_dir):
-            os.mkdir(image_save_dir)
-        c_rgb_path = os.path.join(image_save_dir, f"c_rgb_{str(step_time)}.jpg")
-        try:
-            plt.imsave(c_rgb_path, camera_rgb)
-            plt.imsave(os.path.join(image_save_dir, f"c_depth_{str(step_time)}.jpg"), camera_depth)
-            log.info(f"Images have been saved in {c_rgb_path}.")
-        except Exception as e:
-            log.error(f"Error in saving camera image: {e}")
-
-        try:
-            plt.imsave(os.path.join(image_save_dir, f"tpc_rgb_{str(step_time)}.jpg"), tp_camera_rgb)
-            plt.imsave(os.path.join(image_save_dir, f"tpc_depth_{str(step_time)}.jpg"), tp_camera_depth)
-        except Exception as e: 
-            log.error(f"Error in saving third person camera image: {e}")
-        
-        try:
-            plt.imsave(os.path.join(image_save_dir, f"c_whole_rgb_{str(step_time)}.jpg"), camera_whole_rgb)
-            plt.imsave(os.path.join(image_save_dir, f"c_whole_depth_{str(step_time)}.jpg"), camera_whole_depth)
-        except Exception as e:
-            log.error(f"Error in saving whole camera image: {e}")
-        
-        
-
-def get_occupancy_map(env):
-    # Note that this seems not work!!
-    import omni
-    from omni.isaac.occupancy_map.bindings import _occupancy_map
-
-    physx = omni.physx.acquire_physx_interface()
-    stage_id = omni.usd.get_context().get_stage_id()
-
-    generator = _occupancy_map.Generator(physx, stage_id)
-    # 0.05m cell size, output buffer will have 4 for occupied cells, 5 for unoccupied, and 6 for cells that cannot be seen
-    # this assumes your usd stage units are in m, and not cm
-    generator.update_settings(.05, 4, 5, 6)
-    # Set location to map from and the min and max bounds to map to
-    generator.set_transform((15.22909, -9.-79885, 0.5), (-27.88656, -26.93121, 0), (27.88656, 26.93121, 1.05))
-    generator.generate2d()
-    # Get locations of the occupied cells in the stage
-    points = generator.get_occupied_positions()
-    # Get computed 2d occupancy buffer
-    buffer = generator.get_buffer()
-    # Get dimensions for 2d buffer
-    dims = generator.get_dimensions()
-    print(1)
+    camera_list = ['camera_front', 'camera_behind', 'camera_left', 'camera_right', 'camera_tp']
+    for camera_type in camera_list:
+        camera = cur_obs[camera_type]
+        camera_rgb = camera['rgba'][...,:3]
+        camera_depth = camera['depth']
+        camera_pointcloud = camera['pointcloud']
+        if verbose:
+            image_save_dir = os.path.join(ROOT_DIR, "logs", "images")
+            if not os.path.exists(image_save_dir):
+                os.mkdir(image_save_dir)
+            c_rgb_path = os.path.join(image_save_dir, f"{camera_type}_rgb_{str(step_time)}.jpg")
+            try:
+                plt.imsave(c_rgb_path, camera_rgb)
+                plt.imsave(os.path.join(image_save_dir, f"{camera_type}_depth_{str(step_time)}.jpg"), camera_depth)
+                log.info(f"Images have been saved in {c_rgb_path}.")
+            except Exception as e:
+                log.error(f"Error in saving camera image: {e}")
     
 
 data_item, data_scan, start_position, start_rotation = load_data(sim_config.config_dict['datasets'][0]['base_data_dir']+f"/{args.env}/{args.env}.json.gz", 

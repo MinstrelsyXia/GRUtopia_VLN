@@ -69,8 +69,8 @@ class BaseTask(OmniBaseTask, ABC):
 
             # create physics material
             physics_material = RigidBodyMaterialCfg(
-                static_friction=0.5,
-                dynamic_friction=0.5,
+                static_friction=1, # 0.5
+                dynamic_friction=1, # 0.5
                 restitution=0.0,
                 improve_patch_friction=True,
                 friction_combine_mode='average',
@@ -108,7 +108,7 @@ class BaseTask(OmniBaseTask, ABC):
         self._scene = scene
         self.load()
 
-    def get_observations(self) -> Dict[str, Any]:
+    def get_observations(self, data_type=None) -> Dict[str, Any]:
         """
         Returns current observations from the objects needed for the behavioral layer.
 
@@ -120,7 +120,7 @@ class BaseTask(OmniBaseTask, ABC):
         obs = {}
         for robot_name, robot in self.robots.items():
             try:
-                obs[robot_name] = robot.get_obs()
+                obs[robot_name] = robot.get_obs(data_type=data_type)
             except Exception as e:
                 log.error(self.name)
                 log.error(e)
