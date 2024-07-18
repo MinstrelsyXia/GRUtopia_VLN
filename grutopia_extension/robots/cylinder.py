@@ -68,7 +68,7 @@ class Cylinder(IsaacRobot):
                  orientation: np.ndarray = None,
                  scale: np.ndarray = None):
         add_reference_to_stage(prim_path=prim_path, usd_path=os.path.abspath(usd_path))
-        super().__init__(prim_path=prim_path, name=name, position=position, orientation=orientation, scale=scale)
+        super().__init__(prim_path=prim_path+"/cy_robot/body0", name=name, position=position, orientation=orientation, scale=scale)
         self.actuators: Dict[str, ActuatorBase]
 
     def set_gains(self, gains):
@@ -188,13 +188,19 @@ class CylinderRobot(BaseRobot):
 
         log.debug(f'humanoid {config.name}: usd_path         : ' + str(usd_path))
         log.debug(f'humanoid {config.name}: config.prim_path : ' + str(config.prim_path))
-        self.isaac_robot = Cylinder(
-            prim_path=config.prim_path,
-            name=config.name,
-            position=self._start_position,
-            orientation=self._start_orientation,
-            usd_path=usd_path,
-        )
+        
+        if 'cy' in config.name:
+            # using simple cylinder robot for now
+            add_reference_to_stage(prim_path=config.prim_path, usd_path=os.path.abspath(usd_path))
+            self.isaac_robot = None
+        else:
+            self.isaac_robot = Cylinder(
+                prim_path=config.prim_path,
+                name=config.name,
+                position=self._start_position,
+                orientation=self._start_orientation,
+                usd_path=usd_path,
+            )
 
         if robot_model.joint_names is not None:
             self.joint_subset = ArticulationSubset(self.isaac_robot, robot_model.joint_names)
@@ -202,17 +208,20 @@ class CylinderRobot(BaseRobot):
         self._robot_scale = np.array([1.0, 1.0, 1.0])
         if config.scale is not None:
             self._robot_scale = np.array(config.scale)
-            self.isaac_robot.set_local_scale(self._robot_scale)
+            if 'cy' not in config.name:
+                self.isaac_robot.set_local_scale(self._robot_scale)
 
         self._robot_ik_base = None
 
-        self._robot_base = RigidPrim(prim_path=config.prim_path + '/cy_robot', name=config.name + '_base')
+        self._robot_base = RigidPrim(prim_path=config.prim_path + '/cy_robot/body0', name=config.name + '_base')
+
 
     def post_reset(self):
         super().post_reset()
-        self.isaac_robot._process_actuators_cfg()
-        if self._gains is not None:
-            self.isaac_robot.set_gains(self._gains)
+        if self.isaac_robot is not None:
+            self.isaac_robot._process_actuators_cfg()
+            if self._gains is not None:
+                self.isaac_robot.set_gains(self._gains)
 
     def get_robot_scale(self):
         return self._robot_scale

@@ -62,8 +62,8 @@ class SimulatorRunner:
             task = create_task(config, self._scene)
             self._world.add_task(task)
             
-        # self._world.reset()
-        task.load()
+        self._world.reset()
+        # task.load()
         self._warm_up()
 
     def step(self, actions: dict, render: bool = True):
