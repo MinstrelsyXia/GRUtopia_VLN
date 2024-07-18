@@ -49,6 +49,7 @@ class BaseTask(OmniBaseTask, ABC):
             self.metrics[metric_config.name] = create_metric(metric_config)
 
     def load(self):
+        # load scenes
         if self.config.scene_asset_path is not None:
             # source, prim_path = create_scene(self.config.scene_asset_path,
             #                                  prim_path_root=f'World/env_{self.config.env_id}/scene')
@@ -63,14 +64,15 @@ class BaseTask(OmniBaseTask, ABC):
                 usd_path=self.config.scene_asset_path
             )
 
+            # add colliders and physics material
             # apply collider properties
             collider_cfg = sim_utils.CollisionPropertiesCfg(collision_enabled=True)
             sim_utils.define_collision_properties(_xform_prim.GetPrimPath(), collider_cfg)
 
             # create physics material
             physics_material = RigidBodyMaterialCfg(
-                static_friction=1, # 0.5
-                dynamic_friction=1, # 0.5
+                static_friction=0.5, 
+                dynamic_friction=0.5, 
                 restitution=0.0,
                 improve_patch_friction=True,
                 friction_combine_mode='average',
@@ -83,11 +85,10 @@ class BaseTask(OmniBaseTask, ABC):
             # spawn the material
             physics_material_cfg.func(f"{prim_path}/physicsMaterial", physics_material)
             sim_utils.bind_physics_material(_xform_prim.GetPrimPath(), f"{prim_path}/physicsMaterial")
-
-            # add colliders and physics material
+            
             ground_plane_cfg = sim_utils.GroundPlaneCfg(physics_material=physics_material)
             ground_plane = ground_plane_cfg.func(f"{prim_path}/GroundPlane", ground_plane_cfg)
-            ground_plane.visible = False
+            ground_plane.visible = True
 
             # lights
             action_registry = omni.kit.actions.core.get_action_registry()
@@ -95,7 +96,10 @@ class BaseTask(OmniBaseTask, ABC):
             action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
             action.execute()
 
+        # load robots
         self.robots = init_robots(self.config, self._scene)
+        
+        # load objects
         self.objects = {}
         for obj in self.config.objects:
             _object = create_object(obj)

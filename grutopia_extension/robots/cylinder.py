@@ -18,6 +18,8 @@ from grutopia.core.robot.robot import BaseRobot
 from grutopia.core.robot.robot_model import RobotModel
 from grutopia.core.util import log
 
+from grutopia_extension.utils import get_stage_prim_paths
+
 
 class Cylinder(IsaacRobot):
 
@@ -177,8 +179,8 @@ class CylinderRobot(BaseRobot):
         self._start_position = np.array(config.position) if config.position is not None else None
         self._start_orientation = np.array(config.orientation) if config.orientation is not None else None
 
-        log.debug(f'humanoid {config.name}: position    : ' + str(self._start_position))
-        log.debug(f'humanoid {config.name}: orientation : ' + str(self._start_orientation))
+        log.debug(f'CylinderRobot {config.name}: position    : ' + str(self._start_position))
+        log.debug(f'CylinderRobot {config.name}: orientation : ' + str(self._start_orientation))
 
         usd_path = robot_model.usd_path
         if usd_path.startswith('/Isaac'):
@@ -204,7 +206,7 @@ class CylinderRobot(BaseRobot):
 
         self._robot_ik_base = None
 
-        self._robot_base = RigidPrim(prim_path=config.prim_path, name=config.name + '_base')
+        self._robot_base = RigidPrim(prim_path=config.prim_path + '/cy_robot', name=config.name + '_base')
 
     def post_reset(self):
         super().post_reset()

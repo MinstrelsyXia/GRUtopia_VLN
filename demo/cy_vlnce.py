@@ -14,6 +14,8 @@ from grutopia.core.env import BaseEnv
 from grutopia.core.util.container import is_in_container
 from grutopia.core.util.log import log
 
+# from grutopia_extension.utils import get_stage_prim_paths
+
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
@@ -182,8 +184,8 @@ from llm_agent.utils.utils_omni import get_camera_data, get_face_to_instance_by_
 task_name = env.config.tasks[0].name
 robot_name = env.config.tasks[0].robots[0].name
 agent = env._runner.current_tasks[task_name].robots[robot_name].isaac_robot
-camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['camera']
-tp_camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['tp_camera']
+# camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['camera']
+# tp_camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['tp_camera']
 # agent.set_world_pose
 
 i = 0
@@ -197,11 +199,11 @@ while env.simulation_app.is_running():
         obs = env.step(actions=env_actions)
 
     if i % 100 == 0:
-        # obs = env._runner.get_obs()
+        obs = env._runner.get_obs()
         obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud'])
         cur_obs = obs[task_name][robot_name]
         # is_fall = check_fall(agent, cur_obs, adjust=True, initial_pose=start_position, initial_rotation=start_rotation)
-        get_sensor_info(i, cur_obs, verbose=args.test_verbose)
+        # get_sensor_info(i, cur_obs, verbose=args.test_verbose)
         print(i)
 
 

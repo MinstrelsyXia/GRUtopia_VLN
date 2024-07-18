@@ -37,5 +37,14 @@ def test_pointcloud():
     #
     #     }
     # }
+    return pc_data
 
-test_pointcloud()
+pc_data = test_pointcloud()
+
+count = 0
+while pc_data['data'].shape[0] == 0:
+    pc_data = test_pointcloud()
+    count += 1
+    print(count)
+    
+print(1)

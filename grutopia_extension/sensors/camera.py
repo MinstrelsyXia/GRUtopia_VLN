@@ -37,6 +37,8 @@ class Camera(BaseSensor):
         self.prim_path = prim_path
         
         camera = i_Camera(prim_path=prim_path, resolution=size)
+        camera.initialize()
+        camera.add_distance_to_image_plane_to_frame()
         
         # obtain data from rep
         self.rp = rep.create.render_product(self.prim_path, size)
@@ -54,7 +56,7 @@ class Camera(BaseSensor):
         self.depth_reveiver.attach(self.rp)
         
         # pointcloud
-        self.pointcloud_receiver = rep.AnnotatorRegistry.get_annotator("pointcloud")
+        self.pointcloud_receiver = rep.AnnotatorRegistry.get_annotator("pointcloud", init_params={"includeUnlabelled": True})
         self.pointcloud_receiver.attach(self.rp)
         
         # camera_params

@@ -218,6 +218,10 @@ sim_config.config.tasks[0].scene_asset_path = scene_usd_path
 sim_config.config.tasks[0].robots[0].position = start_position 
 sim_config.config.tasks[0].robots[0].orientation = start_rotation
 
+# sim_config.config.tasks[0].scene_asset_path = "/home/pjlab/w61/GRUtopia/assets/scenes/office.usd"
+# sim_config.config.tasks[0].robots[0].position = [0,0,1.05] 
+# sim_config.config.tasks[0].robots[0].orientation = [1,0,0,0]
+
 headless = args.headless
 webrtc = False
 
