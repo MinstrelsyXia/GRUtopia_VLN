@@ -1,0 +1,23 @@
+simulator:
+  physics_dt: 1/240
+  rendering_dt: 1/240
+
+tasks:
+- type: "SingleInferenceTask"
+  name: "go1_vlnce"
+  scene_asset_path: ""
+  scene_scale: [1, 1, 1]
+  env_num: 1
+  offset_size: 0.0
+  robots:
+  - name: cy
+    prim_path: "/CY"
+    type: "Go1Robot"
+    position: [0, 0, 0]
+    scale: [1, 1, 1]
+    orientation: [0,0,0,0]
+
+datasets:
+  - name: "vlnce"
+    base_data_dir: "VLN/VLNCE/R2R_VLNCE_v1-3"
+    mp3d_data_dir: "Matterport3D/data/v1/scans"

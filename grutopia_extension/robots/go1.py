@@ -21,9 +21,44 @@ from grutopia.core.util import log
 from grutopia_extension.utils import get_stage_prim_paths
 
 
-class Cylinder(IsaacRobot):
+class Go1(IsaacRobot):
 
-    actuators_cfg = {}
+    actuators_cfg = {
+        'base_legs':
+        DCMotorCfg(
+            joint_names_expr=['.*'],
+            effort_limit={
+                '.*hip.*': 200,
+                '.*knee.*': 300,
+                '.*ankle.*': 40,
+                'torso_joint': 200,
+                '.*shoulder_pitch.*': 40,
+                '.*shoulder_roll.*': 40,
+                '.*shoulder_yaw.*': 18,
+                '.*elbow.*': 18
+            },
+            saturation_effort=400.0,
+            velocity_limit=1000.0,
+            stiffness={
+                '.*hip.*': 200,
+                '.*knee.*': 300,
+                '.*ankle.*': 40,
+                'torso_joint': 300,
+                '.*shoulder.*': 100,
+                '.*elbow.*': 100
+            },
+            damping={
+                '.*hip.*': 5,
+                '.*knee.*': 6,
+                '.*ankle.*': 2,
+                'torso_joint': 6,
+                '.*shoulder.*': 2,
+                '.*elbow.*': 2
+            },
+            friction=0.0,
+            armature=0.0,
+        ),
+    }
 
     def __init__(self,
                  prim_path: str,
@@ -33,9 +68,7 @@ class Cylinder(IsaacRobot):
                  orientation: np.ndarray = None,
                  scale: np.ndarray = None):
         add_reference_to_stage(prim_path=prim_path, usd_path=os.path.abspath(usd_path))
-        # super().__init__(prim_path=prim_path+"/cy_robot/body0", name=name, position=position, orientation=orientation, scale=scale)
-        # super().__init__(prim_path=prim_path+"/cy_robot", name=name, position=position, orientation=orientation, scale=scale)
-        super().__init__(prim_path=prim_path+"/base_link", name=name, position=position, orientation=orientation, scale=scale)
+        super().__init__(prim_path=prim_path, name=name, position=position, orientation=orientation, scale=scale) # !!!
         self.actuators: Dict[str, ActuatorBase]
 
     def set_gains(self, gains):
@@ -48,7 +81,7 @@ class Cylinder(IsaacRobot):
         Raises:
             Exception: [description]
         """
-        num_leg_joints = 1
+        num_leg_joints = 19
         kps = np.array([0.] * num_leg_joints)
         kds = np.array([0.] * num_leg_joints)
 
@@ -65,8 +98,8 @@ class Cylinder(IsaacRobot):
         self._articulation_view.set_enabled_self_collisions(self._articulation_view._backend_utils.expand_dims(True, 0))
 
     def _process_actuators_cfg(self):
-        self.actuators = dict.fromkeys(Cylinder.actuators_cfg.keys())
-        for actuator_name, actuator_cfg in Cylinder.actuators_cfg.items():
+        self.actuators = dict.fromkeys(Go1.actuators_cfg.keys())
+        for actuator_name, actuator_cfg in Go1.actuators_cfg.items():
             # type annotation for type checkersc
             actuator_cfg: ActuatorBaseCfg
             # create actuator group
@@ -136,8 +169,8 @@ class Cylinder(IsaacRobot):
         return string_utils.resolve_matching_names(name_keys, joint_subset)
 
 
-@BaseRobot.register('CylinderRobot')
-class CylinderRobot(BaseRobot):
+@BaseRobot.register('Go1Robot')
+class Go1Robot(BaseRobot):
 
     def __init__(self, config: Config, robot_model: RobotModel, scene: Scene):
         super().__init__(config, robot_model, scene)
@@ -146,8 +179,8 @@ class CylinderRobot(BaseRobot):
         self._start_position = np.array(config.position) if config.position is not None else None
         self._start_orientation = np.array(config.orientation) if config.orientation is not None else None
 
-        log.debug(f'CylinderRobot {config.name}: position    : ' + str(self._start_position))
-        log.debug(f'CylinderRobot {config.name}: orientation : ' + str(self._start_orientation))
+        log.debug(f'Go1Robot {config.name}: position    : ' + str(self._start_position))
+        log.debug(f'Go1Robot {config.name}: orientation : ' + str(self._start_orientation))
 
         usd_path = robot_model.usd_path
         if usd_path.startswith('/Isaac'):
@@ -158,10 +191,10 @@ class CylinderRobot(BaseRobot):
         
         if 'cy' in config.name:
             # using simple cylinder robot for now
-            add_reference_to_stage(prim_path=config.prim_path, usd_path=os.path.abspath(usd_path))
+            add_reference_to_stage(prim_path=config.prim_path+"", usd_path=os.path.abspath(usd_path))
             self.isaac_robot = None
         else:
-            self.isaac_robot = Cylinder(
+            self.isaac_robot = Go1(
                 prim_path=config.prim_path,
                 name=config.name,
                 position=self._start_position,
@@ -180,8 +213,7 @@ class CylinderRobot(BaseRobot):
 
         self._robot_ik_base = None
 
-        # self._robot_base = RigidPrim(prim_path=config.prim_path + '/cy_robot/body0', name=config.name + '_base')
-        self._robot_base = self.isaac_robot
+        self._robot_base = RigidPrim(prim_path=config.prim_path, name=config.name + '_base') # !!!
 
 
     def post_reset(self):

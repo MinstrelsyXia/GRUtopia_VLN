@@ -112,8 +112,8 @@ robots:
     type: "Camera"
     prim_path: "torso_link/h1_camera_whole_view"
 - type: "CylinderRobot"
-  usd_path: "GRUtopia/assets/robots/Cylinder/cy_4_cameras_simple.usd"
-  # usd_path: "/home/pjlab/w61/GRUtopia/assets/robots/g1/g1.usd"
+  # usd_path: "GRUtopia/assets/robots/Cylinder/cy_4_cameras_simple.usd"
+  usd_path: "GRUtopia/assets/robots/Cylinder/kaya.usd"
   gains: [0, 0]
   sensors:
   - name: "camera_front"
@@ -131,3 +131,7 @@ robots:
   - name: "camera_tp"
     type: "Camera"
     prim_path: "cy_robot/body0/camera_tp" 
+- type: "Go1Robot"
+  usd_path: "GRUtopia/assets/robots/g1/g1.usd"
+  # usd_path: "/Isaac/Robots/Create3/"
+  gains: [0, 0]

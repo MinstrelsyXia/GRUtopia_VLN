@@ -1,0 +1,17 @@
+datasets:
+  base_data_dir: "VLN/VLNCE/R2R_VLNCE_v1-3"
+  mp3d_data_dir: "Matterport3D/data/v1/scans"
+  splits:
+    - val_seen
+    # - train
+    # - val_unseen
+    # - test
+
+settings:
+  batch_size: 1
+
+robots:
+  - name: "CylinderRobot"
+    z_offset: 4 # !!!
+  - name: "HumanoidRobot"
+    z_offset: 1.05 # !!!

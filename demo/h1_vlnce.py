@@ -77,11 +77,12 @@ def load_data(file_path, path_id=None, verbose=False):
     # start_position = [target_item['start_position'][0]+0.2, -target_item['start_position'][2]+0.2, 1.8]
     start_position = [23, -6, 3.3]
     start_rotation = [-target_item['start_rotation'][3], target_item['start_rotation'][0], target_item['start_rotation'][1], target_item['start_rotation'][2]] # [x,y,z,-w] => [w,x,y,z]
+    paths = target_item['paths']
     if verbose: 
         log.info(f"Scan: {scan}")
         log.info(f"Initial Position: {start_position}")
         log.info(f"Initial Rotation: {start_rotation}")
-    return target_item, scan, start_position, start_rotation
+    return target_item, scan, start_position, start_rotation, paths
 
 def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, initial_pose=None, initial_rotation=None):
     '''
@@ -201,7 +202,7 @@ def get_occupancy_map(env):
     print(1)
     
 
-data_item, data_scan, start_position, start_rotation = load_data(sim_config.config_dict['datasets'][0]['base_data_dir']+f"/{args.env}/{args.env}.json.gz", 
+data_item, data_scan, start_position, start_rotation, paths = load_data(sim_config.config_dict['datasets'][0]['base_data_dir']+f"/{args.env}/{args.env}.json.gz", 
                                                                 args.path_id, verbose=args.test_verbose)
 
 find_flag = False

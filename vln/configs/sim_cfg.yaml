@@ -4,16 +4,17 @@ simulator:
 
 tasks:
 - type: "SingleInferenceTask"
-  name: "cy_vlnce"
+  name: "vln"
   scene_asset_path: ""
   scene_scale: [1, 1, 1]
   env_num: 1
   offset_size: 0.0
   robots:
-  - name: yc # !!!
+  - name: robot_test
     prim_path: "/CY"
     type: "CylinderRobot"
     position: [0, 0, 0]
+    # scale: [0.22, 0.57, 1.7] # this mimics the scale of H1
     scale: [1, 1, 1]
     orientation: [0,0,0,0]
     sensor_params:
@@ -32,8 +33,3 @@ tasks:
     - name: "camera_right"
       enable: true
       size: [512, 512]
-
-datasets:
-  - name: "vlnce"
-    base_data_dir: "VLN/VLNCE/R2R_VLNCE_v1-3"
-    mp3d_data_dir: "Matterport3D/data/v1/scans"
