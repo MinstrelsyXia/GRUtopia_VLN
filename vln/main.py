@@ -83,7 +83,8 @@ def vis_one_path(args, vln_envs):
         obs = env.step(actions=env_actions)
         
         if i % 100 == 0:
-            # obs = env._runner.get_obs()
+            obs = env._runner.get_obs()
+            cur_obs = obs[vln_envs.task_name][vln_envs.robot_name]
             # obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud'])
             # cur_obs = obs[vln_envs.task_name][vln_envs.robot_name]
             print(i)

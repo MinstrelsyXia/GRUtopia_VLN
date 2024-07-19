@@ -157,6 +157,7 @@ class VLNDataLoader(Dataset):
         self.env = BaseEnv(sim_config, headless=headless, webrtc=False)
     
     def init_agents(self):
+        '''call after self.init_env'''
         self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
     
     def init_one_path(self, path_id):
@@ -165,7 +166,6 @@ class VLNDataLoader(Dataset):
             if item['trajectory_id'] == path_id:
                 scene_usd_path = load_scene_usd(self.args, item['scan'])
                 self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
-                # self.sim_config.config.tasks[0].robots[0].position = item["start_position"] + self.robot_offset
                 self.sim_config.config.tasks[0].robots[0].position = item["start_position"] + self.robot_offset
                 self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"]
                 self.init_env(self.sim_config, headless=self.args.headless)
