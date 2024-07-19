@@ -12,6 +12,7 @@ import yaml
 import time
 
 from grutopia.core.config import SimulatorConfig
+from grutopia.core.env import BaseEnv
 from grutopia.core.util.container import is_in_container
 from grutopia.core.util.log import log
 
@@ -69,12 +70,11 @@ def vis_one_path(args, vln_envs):
     
     paths = data_item['reference_path']
     current_point = 0
-    move_interval_seconds = 5 # move along the path every 5 seconds
-    last_move_time = time.time()
+    move_interval = 500 # move along the path every 5 seconds
     
     '''start simulation'''
     i = 0
-    warm_step = 3000
+    warm_step = 1000
     actions = {'h1': {'move_with_keyboard': []}}
     while env.simulation_app.is_running():
         i += 1
@@ -93,14 +93,12 @@ def vis_one_path(args, vln_envs):
             # give me some time to adjust the view position
             continue
         
-        current_time = time.time()
-        if current_time - last_move_time >= move_interval_seconds:
+        if i % move_interval == 0:
             if current_point < len(paths) - 1:
                 current_point += 1
                 # Set the agent's world_pose to the current point in paths
                 vln_envs.move_along_path(paths[current_point-1], paths[current_point])
                 log.info(f'Moving to next point: {current_point}')
-            last_move_time = current_time
 
 
     env.simulation_app.close()

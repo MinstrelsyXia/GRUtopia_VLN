@@ -34,6 +34,11 @@ def load_data(args, splits):
                 item["start_position"] = [item["original_start_position"][0], -item["original_start_position"][2], item["original_start_position"][1]]
                 item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][1], item["original_start_rotation"][2]] # [x,y,z,-w] => [w,x,y,z]
                 item["scan"] = item["scene_id"].split("/")[1]
+                item["c_reference_path"] = []
+                for path in item["reference_path"]:
+                    item["c_reference_path"].append([path[0], -path[2], path[1]])
+                item["reference_path"] = item["c_reference_path"]
+                del item["c_reference_path"]
                 load_data.append(item)
                 total_scans.append(item["scan"])
     log.info("Loaded data with the length of %d", len(load_data))
@@ -43,7 +48,7 @@ def load_scene_usd(args, scan):
     ''' Load scene USD based on the scan
     '''
     find_flag = False
-    for root, dirs, files in os.walk(args.datasets.mp3d_data_dir):
+    for root, dirs, files in os.walk(os.path.join(args.datasets.mp3d_data_dir, scan)):
         for file in files:
             if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
                 scene_usd_path = os.path.join(root, file)
@@ -167,7 +172,7 @@ class VLNDataLoader(Dataset):
                 scene_usd_path = load_scene_usd(self.args, item['scan'])
                 self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
                 self.sim_config.config.tasks[0].robots[0].position = item["start_position"] + self.robot_offset
-                self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"]
+                self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] # TODO: this seems not work
                 self.init_env(self.sim_config, headless=self.args.headless)
                 self.init_agents()
                 log.info("Initialized path id %d", path_id)
@@ -183,10 +188,13 @@ class VLNDataLoader(Dataset):
         ''' Move the agent along the path
         '''
         # Compute the relative orientation between the two positions
-        rel_orientation = compute_rel_orientations(prev_position, current_position, return_quat=True)
+        rel_orientation = compute_rel_orientations(prev_position, current_position, return_quat=True) # TODO: this orientation may be wrong
         # Set the agent's world_pose to the current position
-        # self.agents.set_world_pose(current_position + self.robot_offset, rel_orientation)
-        self.agents.set_world_pose(current_position, rel_orientation)
+        next_position = current_position + self.robot_offset
+        next_orientation = rel_orientation
+        self.agents.set_world_pose(next_position, next_orientation)
+        log.info(f"Target Position: {next_position}, Orientation: {next_orientation}")
+        # self.agents.set_world_pose(current_position, rel_orientation)
 
     def get_batch(self):
         try:

@@ -34,8 +34,8 @@ class Cylinder(IsaacRobot):
                  scale: np.ndarray = None):
         add_reference_to_stage(prim_path=prim_path, usd_path=os.path.abspath(usd_path))
         # super().__init__(prim_path=prim_path+"/cy_robot/body0", name=name, position=position, orientation=orientation, scale=scale)
-        # super().__init__(prim_path=prim_path+"/cy_robot", name=name, position=position, orientation=orientation, scale=scale)
-        super().__init__(prim_path=prim_path+"/base_link", name=name, position=position, orientation=orientation, scale=scale)
+        super().__init__(prim_path=prim_path+"/cy_robot", name=name, position=position, orientation=orientation, scale=scale)
+        # super().__init__(prim_path=prim_path+"/base_link", name=name, position=position, orientation=orientation, scale=scale)
         self.actuators: Dict[str, ActuatorBase]
 
     def set_gains(self, gains):
