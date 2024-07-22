@@ -12,6 +12,6 @@ settings:
 
 robots:
   - name: "CylinderRobot"
-    z_offset: 1.8 # !!!
+    z_offset: 0.7 # !!!
   - name: "HumanoidRobot"
     z_offset: 1.05 # !!!

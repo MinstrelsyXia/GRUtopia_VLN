@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+from grutopia.core.util.log import log
 
 def euler_angles_to_quat(angles):
     """

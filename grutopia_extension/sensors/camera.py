@@ -107,4 +107,8 @@ class Camera(BaseSensor):
         if "camera_params" in data_type:
             output_data["camera_params"] = self.camera_params_receiver.get_data()
         return output_data
+    
+    @property
+    def get_world_pose(self):
+        return self._camera.get_world_pose()
         

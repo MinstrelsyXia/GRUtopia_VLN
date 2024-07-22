@@ -205,6 +205,7 @@ class HumanoidRobot(BaseRobot):
         self._robot_ik_base = None
 
         self._robot_base = RigidPrim(prim_path=config.prim_path + '/pelvis', name=config.name + '_base')
+        self._robot_right_ankle_base = RigidPrim(prim_path=config.prim_path + '/right_ankle_link', name=config.name + '_ankle_base')
 
     def post_reset(self):
         super().post_reset()
@@ -223,6 +224,9 @@ class HumanoidRobot(BaseRobot):
 
     def get_world_pose(self):
         return self._robot_base.get_world_pose()
+    
+    def get_ankle_base(self):
+        return self._robot_right_ankle_base.get_world_pose()
 
     def apply_action(self, action: dict):
         """

@@ -42,6 +42,8 @@ parser.add_argument("--sim_cfg_file", type=str, default="GRUtopia/vln/configs/si
 parser.add_argument("--vln_cfg_file", type=str, default="GRUtopia/vln/configs/vln_cfg.yaml")
 args = parser.parse_args()
 
+args.root_dir = ROOT_DIR
+
 '''Init simulation config'''
 sim_config = SimulatorConfig(args.sim_cfg_file)
 
@@ -74,8 +76,9 @@ def vis_one_path(args, vln_envs):
     
     '''start simulation'''
     i = 0
-    warm_step = 1000
-    actions = {'h1': {'move_with_keyboard': []}}
+    warm_step = 500
+    # actions = {'h1': {'move_with_keyboard': []}}
+    actions = {'h1': {'stand_still': []}}
     while env.simulation_app.is_running():
         i += 1
         env_actions = []
@@ -83,10 +86,10 @@ def vis_one_path(args, vln_envs):
         obs = env.step(actions=env_actions)
         
         if i % 100 == 0:
-            obs = env._runner.get_obs()
-            cur_obs = obs[vln_envs.task_name][vln_envs.robot_name]
             # obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud'])
             # cur_obs = obs[vln_envs.task_name][vln_envs.robot_name]
+            camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params]
+            obs = vln_envs.get_observations(camera_list, data_types=['rgba', 'depth', 'pointcloud'], save_imgs=True)
             print(i)
             
         if i <= warm_step:

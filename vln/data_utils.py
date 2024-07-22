@@ -13,6 +13,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
+import matplotlib.pyplot as plt
 
 from grutopia.core.util.log import log
 from grutopia.core.env import BaseEnv
@@ -195,7 +196,53 @@ class VLNDataLoader(Dataset):
         self.agents.set_world_pose(next_position, next_orientation)
         log.info(f"Target Position: {next_position}, Orientation: {next_orientation}")
         # self.agents.set_world_pose(current_position, rel_orientation)
+    
+    def get_observations(self, camera_list:list, data_types:list, save_imgs=False):
+        ''' Get observations from the agent
+        '''
+        obs = self.env.get_observations(data_type=data_types)
+        if 'pointcloud' in data_types:
+            camera_positions = []
+            camera_orientations = []
+            camera_pc_data = []
+            
+        for camera in camera_list:
+            cur_obs = obs[self.task_name][self.robot_name][camera]
+            for data in data_types:
+                if data == "rgba":
+                    data_info = cur_obs[data][...,:3]
+                    save_img_flag = True
+                elif data == "depth":
+                    data_info = cur_obs[data]
+                    save_img_flag = True
+                elif data == 'pointcloud':
+                    camera_pose = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensor[camera].get_world_pose()
+                    camera_position, camera_orientation = camera_pose[0], camera_pose[1]
+                    camera_positions.append(camera_position)
+                    camera_orientations.append(camera_orientation)
+                    camera_pc_data.append(cur_obs[data]['data'])
+                    save_img_flag = False
+                if save_imgs and save_img_flag:
+                    image_save_dir = os.path.join(self.args.root_dir, "logs", "images")
+                    if not os.path.exists(image_save_dir):
+                        os.mkdir(image_save_dir)
+                    save_path = os.path.join(image_save_dir, f"{camera}_{data}.jpg")
+                    try:
+                        plt.imsave(save_path, data_info)
+                        log.info(f"Images have been saved in {save_path}.")
+                    except Exception as e:
+                        log.error(f"Error in saving camera image: {e}")
+        return obs
 
+    def process_pointcloud(self, camera_name, pc_data):
+        ''' Process pointcloud for combining multiple cameras
+        '''
+
+        camera_pose = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensor[camera_name].get_world_pose()
+        camera_positions, camera_orientations = camera_pose[0], camera_pose[1]
+        return 
+        
+        
     def get_batch(self):
         try:
             return next(self.data_iter)
