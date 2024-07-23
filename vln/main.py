@@ -22,8 +22,8 @@ from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
 
-from vln.data_utils import VLNDataLoader
-from vln.utils import dict_to_namespace
+from vln.src.dataset.data_utils import VLNDataLoader
+from vln.utils.utils import dict_to_namespace
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
@@ -43,6 +43,8 @@ parser.add_argument("--vln_cfg_file", type=str, default="GRUtopia/vln/configs/vl
 args = parser.parse_args()
 
 args.root_dir = ROOT_DIR
+args.log_dir = os.path.join(ROOT_DIR, "logs")
+args.log_image_dir = os.path.join(args.log_dir, "images")
 
 '''Init simulation config'''
 sim_config = SimulatorConfig(args.sim_cfg_file)
@@ -59,6 +61,9 @@ def build_dataset(vln_config, sim_config):
     '''
     vln_dataset = VLNDataLoader(vln_config, 
                                 sim_config=sim_config)
+    camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params]
+    vln_config.camera_list = camera_list
+    
     return vln_dataset
 
 
@@ -77,8 +82,15 @@ def vis_one_path(args, vln_envs):
     '''start simulation'''
     i = 0
     warm_step = 500
-    # actions = {'h1': {'move_with_keyboard': []}}
-    actions = {'h1': {'stand_still': []}}
+
+    # init the action
+    action_name = vln_config.settings.action
+    if action_name == 'move_along_path':
+        actions = {'h1': {action_name: [paths]}}
+        vln_envs.init_BEVMap()
+    else:
+        actions = {'h1': {action_name: []}}
+
     while env.simulation_app.is_running():
         i += 1
         env_actions = []
@@ -89,19 +101,20 @@ def vis_one_path(args, vln_envs):
             # obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud'])
             # cur_obs = obs[vln_envs.task_name][vln_envs.robot_name]
             camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params]
-            obs = vln_envs.get_observations(camera_list, data_types=['rgba', 'depth', 'pointcloud'], save_imgs=True)
+            obs = vln_envs.save_observations(camera_list, data_types=['rgba', 'depth'], save_imgs=True)
+            combined_pc = vln_envs.process_pointcloud(camera_list, draw=True)
             print(i)
             
         if i <= warm_step:
             # give me some time to adjust the view position
             continue
         
-        if i % move_interval == 0:
-            if current_point < len(paths) - 1:
-                current_point += 1
-                # Set the agent's world_pose to the current point in paths
-                vln_envs.move_along_path(paths[current_point-1], paths[current_point])
-                log.info(f'Moving to next point: {current_point}')
+        # if i % move_interval == 0:
+        #     if current_point < len(paths) - 1:
+        #         current_point += 1
+        #         # Set the agent's world_pose to the current point in paths
+        #         vln_envs.move_along_path(paths[current_point-1], paths[current_point])
+        #         log.info(f'Moving to next point: {current_point}')
 
 
     env.simulation_app.close()

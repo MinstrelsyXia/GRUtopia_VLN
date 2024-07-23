@@ -18,7 +18,9 @@ import matplotlib.pyplot as plt
 from grutopia.core.util.log import log
 from grutopia.core.env import BaseEnv
 
-from .utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
+from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
+from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
+from ..local_nav.BEVmap import BEVMap
 
 def load_data(args, splits):
     ''' Load data based on VLN-CE
@@ -166,6 +168,10 @@ class VLNDataLoader(Dataset):
         '''call after self.init_env'''
         self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
     
+    def init_BEVMap(self):
+        '''init BEV map'''
+        self.bev = BEVMap(self.args)
+    
     def init_one_path(self, path_id):
         # Demo for visualizing simply one path
         for item in self.data:
@@ -197,14 +203,15 @@ class VLNDataLoader(Dataset):
         log.info(f"Target Position: {next_position}, Orientation: {next_orientation}")
         # self.agents.set_world_pose(current_position, rel_orientation)
     
-    def get_observations(self, camera_list:list, data_types:list, save_imgs=False):
-        ''' Get observations from the agent
+    def get_observations(self, data_types):
+        ''' GEt observations from the sensors
+        '''
+        return self.env.get_observations(data_type=data_types)
+    
+    def save_observations(self, camera_list:list, data_types:list, save_imgs=False):
+        ''' Save observations from the agent
         '''
         obs = self.env.get_observations(data_type=data_types)
-        if 'pointcloud' in data_types:
-            camera_positions = []
-            camera_orientations = []
-            camera_pc_data = []
             
         for camera in camera_list:
             cur_obs = obs[self.task_name][self.robot_name][camera]
@@ -216,11 +223,6 @@ class VLNDataLoader(Dataset):
                     data_info = cur_obs[data]
                     save_img_flag = True
                 elif data == 'pointcloud':
-                    camera_pose = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensor[camera].get_world_pose()
-                    camera_position, camera_orientation = camera_pose[0], camera_pose[1]
-                    camera_positions.append(camera_position)
-                    camera_orientations.append(camera_orientation)
-                    camera_pc_data.append(cur_obs[data]['data'])
                     save_img_flag = False
                 if save_imgs and save_img_flag:
                     image_save_dir = os.path.join(self.args.root_dir, "logs", "images")
@@ -234,13 +236,30 @@ class VLNDataLoader(Dataset):
                         log.error(f"Error in saving camera image: {e}")
         return obs
 
-    def process_pointcloud(self, camera_name, pc_data):
+    def process_pointcloud(self, camera_list: list, draw=False, convert_to_local=False):
         ''' Process pointcloud for combining multiple cameras
         '''
-
-        camera_pose = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensor[camera_name].get_world_pose()
-        camera_positions, camera_orientations = camera_pose[0], camera_pose[1]
-        return 
+        obs = self.env.get_observations(data_type=['pointcloud', 'camera_params'])
+        camera_positions = []
+        camera_orientations = []
+        camera_pc_data = []
+        
+        for camera in camera_list:
+            cur_obs = obs[self.task_name][self.robot_name][camera]
+            camera_pose = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
+            camera_position, camera_orientation = camera_pose[0], camera_pose[1]
+            camera_positions.append(camera_position)
+            camera_orientations.append(camera_orientation)
+            
+            if convert_to_local:
+                pc_local = pc_to_local_pose(cur_obs)
+                camera_pc_data.append(pc_local)
+            else:
+                camera_pc_data.append(cur_obs['pointcloud']['data'])
+        
+        if draw:
+            combined_pcd = generate_pano_pointcloud_local(camera_positions, camera_orientations, camera_pc_data, draw=draw, log_dir=self.args.log_image_dir)
+        return camera_pc_data, camera_positions, camera_orientations
         
         
     def get_batch(self):

@@ -256,3 +256,9 @@ class HumanoidRobot(BaseRobot):
         for sensor_name, sensor_obs in self.sensors.items():
             obs[sensor_name] = sensor_obs.get_data(data_type=data_type)
         return obs
+    
+    def get_sensors(self, data_type=None):
+        obs = {}
+        for sensor_name, sensor_obs in self.sensors.items():
+            obs[sensor_name] = sensor_obs.get_data(data_type=data_type)
+        return obs

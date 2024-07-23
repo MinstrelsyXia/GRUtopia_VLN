@@ -11,6 +11,29 @@ tasks:
   offset_size: 0.0
   light_on: true
   robots:
+  # - name: robot_test
+  #   prim_path: "/CY"
+  #   type: "CylinderRobot"
+  #   position: [0, 0, 0]
+  #   scale: [0.22, 0.57, 1.3] # this mimics the scale of H1
+  #   # scale: [1, 1, 1]
+  #   orientation: [0,0,0,0]
+  #   sensor_params:
+  #   - name: "camera_tp"
+  #     enable: true
+  #     size: [512, 512]
+  #   - name: "camera_front"
+  #     enable: true
+  #     size: [512, 512]
+  #   - name: "camera_behind"
+  #     enable: true
+  #     size: [512, 512]
+  #   - name: "camera_left"
+  #     enable: true
+  #     size: [512, 512]
+  #   - name: "camera_right"
+  #     enable: true
+  #     size: [512, 512]
   - name: h1
     prim_path: "/World/h1"
     type: "HumanoidRobot"
@@ -45,12 +68,12 @@ tasks:
     - name: "pano_camera_225"
       enable: true
       size: [640, 480]
-    # - name: "pano_camera_270"
-    #   enable: true
-    #   size: [640, 480]
-    # - name: "pano_camera_315"
-    #   enable: true
-    #   size: [640, 480]
+    - name: "pano_camera_270"
+      enable: true
+      size: [640, 480]
+    - name: "pano_camera_315"
+      enable: true
+      size: [640, 480]
     # - name: "camera_front"
     #   enable: true
     #   size: [640, 480]
