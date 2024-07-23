@@ -45,12 +45,12 @@ tasks:
     - name: "pano_camera_225"
       enable: true
       size: [640, 480]
-    # - name: "pano_camera_270"
-    #   enable: true
-    #   size: [640, 480]
-    # - name: "pano_camera_315"
-    #   enable: true
-    #   size: [640, 480]
+    - name: "pano_camera_270"
+      enable: true
+      size: [640, 480]
+    - name: "pano_camera_315"
+      enable: true
+      size: [640, 480]
     # - name: "camera_front"
     #   enable: true
     #   size: [640, 480]

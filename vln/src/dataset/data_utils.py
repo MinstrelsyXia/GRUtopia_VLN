@@ -184,6 +184,7 @@ class VLNDataLoader(Dataset):
                 self.init_agents()
                 log.info("Initialized path id %d", path_id)
                 log.info("Scan: %s", item['scan'])
+                log.info("Instruction: %s", item['instruction']['instruction_text'])
                 return item
         log.error("Path id %d not found in the dataset", path_id)
         return None
@@ -208,7 +209,7 @@ class VLNDataLoader(Dataset):
         '''
         return self.env.get_observations(data_type=data_types)
     
-    def save_observations(self, camera_list:list, data_types:list, save_imgs=False):
+    def save_observations(self, camera_list:list, data_types:list, save_imgs=True, step_time=0):
         ''' Save observations from the agent
         '''
         obs = self.env.get_observations(data_type=data_types)
@@ -228,7 +229,7 @@ class VLNDataLoader(Dataset):
                     image_save_dir = os.path.join(self.args.root_dir, "logs", "images")
                     if not os.path.exists(image_save_dir):
                         os.mkdir(image_save_dir)
-                    save_path = os.path.join(image_save_dir, f"{camera}_{data}.jpg")
+                    save_path = os.path.join(image_save_dir, f"{camera}_{data}_{step_time}.jpg")
                     try:
                         plt.imsave(save_path, data_info)
                         log.info(f"Images have been saved in {save_path}.")
