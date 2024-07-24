@@ -43,7 +43,7 @@ class MoveAlongPathPointsController(BaseController):
             self.current_path_point[-1] = 0
 
         # Just make sure we ignore z components
-        start_position[-1] = 0
+        start_position[-1] = 0 # The robot's actual current position
         dist_from_goal = np.linalg.norm(start_position - self.current_path_point)
         if dist_from_goal < threshold:
             if self.path_point_idx < len(self.path_points) - 1:

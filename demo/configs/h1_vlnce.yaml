@@ -9,6 +9,7 @@ tasks:
   scene_scale: [1, 1, 1]
   env_num: 1
   offset_size: 0.0
+  light_on: true
   robots:
   - name: h1
     prim_path: "/World/h1"

@@ -73,16 +73,16 @@ def load_data(file_path, path_id=None, verbose=False):
         print(f"Path ID {path_id} is invalid and randomly set a path id")
         target_item = data['episodes'][0]
     scan = target_item['scene_id'].split('/')[1]
-    # start_position = [target_item['start_position'][0]-0.1, -target_item['start_position'][2]-0.1, target_item['start_position'][1]+1.5]
+    start_position = [target_item['start_position'][0], -target_item['start_position'][2], target_item['start_position'][1]+0.7]
     # start_position = [target_item['start_position'][0]+0.2, -target_item['start_position'][2]+0.2, 1.8]
-    start_position = [23, -6, 3.3]
+    # start_position = [23, -6, 3.3]
     start_rotation = [-target_item['start_rotation'][3], target_item['start_rotation'][0], target_item['start_rotation'][1], target_item['start_rotation'][2]] # [x,y,z,-w] => [w,x,y,z]
-    paths = target_item['paths']
+    # paths = target_item['paths']
     if verbose: 
         log.info(f"Scan: {scan}")
         log.info(f"Initial Position: {start_position}")
         log.info(f"Initial Rotation: {start_rotation}")
-    return target_item, scan, start_position, start_rotation, paths
+    return target_item, scan, start_position, start_rotation
 
 def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, initial_pose=None, initial_rotation=None):
     '''
@@ -202,7 +202,7 @@ def get_occupancy_map(env):
     print(1)
     
 
-data_item, data_scan, start_position, start_rotation, paths = load_data(sim_config.config_dict['datasets'][0]['base_data_dir']+f"/{args.env}/{args.env}.json.gz", 
+data_item, data_scan, start_position, start_rotation = load_data(sim_config.config_dict['datasets'][0]['base_data_dir']+f"/{args.env}/{args.env}.json.gz", 
                                                                 args.path_id, verbose=args.test_verbose)
 
 find_flag = False
@@ -230,11 +230,11 @@ env = BaseEnv(sim_config, headless=headless, webrtc=webrtc)
 
 from llm_agent.utils.utils_omni import get_camera_data, get_face_to_instance_by_2d_bbox
 
-task_name = env.config.tasks[0].name
-robot_name = env.config.tasks[0].robots[0].name
-agent = env._runner.current_tasks[task_name].robots[robot_name].isaac_robot
-camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['camera']
-tp_camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['tp_camera']
+# task_name = env.config.tasks[0].name
+# robot_name = env.config.tasks[0].robots[0].name
+# agent = env._runner.current_tasks[task_name].robots[robot_name].isaac_robot
+# camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['camera']
+# tp_camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['tp_camera']
 # agent.set_world_pose
 
 i = 0
@@ -249,10 +249,10 @@ while env.simulation_app.is_running():
 
     if i % 100 == 0:
         # obs = env._runner.get_obs()
-        obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud', "normals"])
-        cur_obs = obs[task_name][robot_name]
+        # obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud', "normals"])
+        # cur_obs = obs[task_name][robot_name]
         # is_fall = check_fall(agent, cur_obs, adjust=True, initial_pose=start_position, initial_rotation=start_rotation)
-        get_sensor_info(i, cur_obs, verbose=args.test_verbose)
+        # get_sensor_info(i, cur_obs, verbose=args.test_verbose)
         print(i)
 
 

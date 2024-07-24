@@ -18,11 +18,12 @@ robots:
     z_offset: 1.05 # !!!
   
 maps:
-  robot_z: [0.2, 2.0]  # Robot's height range on the Z-axis
+  robot_z: [0.2, 1.7]  # Robot's height range on the Z-axis
+  robot_radius: 0.1 # Robot's radius
   voxel_size: 0.05  # Size of a voxel
   quadtree_config:
-    width: 50  # Quadtree map size
-    height: 50
+    width: 20  # Quadtree map size
+    height: 20
     max_depth: 10  # Maximum depth of the quadtree
     threshold: 1  # Threshold for node splitting  
     

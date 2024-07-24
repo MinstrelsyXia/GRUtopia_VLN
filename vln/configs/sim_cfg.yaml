@@ -17,6 +17,7 @@ tasks:
     position: [0, 0, 0]
     scale: [1, 1, 1]
     orientation: [0,0,0,0]
+    ankle_height: 0.0758
     controller_params:
     - name: "move_by_speed"
     - name: "joint_controller"
@@ -28,28 +29,28 @@ tasks:
     - name: "stand_still"
     sensor_params:
     - name: "pano_camera_0"
-      enable: true
+      enable: false
       size: [640, 480]
     - name: "pano_camera_45"
-      enable: true
+      enable: false
       size: [640, 480]
     - name: "pano_camera_90"
-      enable: true
+      enable: false
       size: [640, 480]
     - name: "pano_camera_135"
-      enable: true
+      enable: false
       size: [640, 480]
     - name: "pano_camera_180"
-      enable: true
+      enable: false
       size: [640, 480]
     - name: "pano_camera_225"
-      enable: true
+      enable: false
       size: [640, 480]
     - name: "pano_camera_270"
-      enable: true
+      enable: false
       size: [640, 480]
     - name: "pano_camera_315"
-      enable: true
+      enable: false
       size: [640, 480]
     # - name: "camera_front"
     #   enable: true

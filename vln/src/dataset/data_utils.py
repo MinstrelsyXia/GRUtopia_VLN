@@ -168,9 +168,13 @@ class VLNDataLoader(Dataset):
         '''call after self.init_env'''
         self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
     
-    def init_BEVMap(self):
+    def init_BEVMap(self, robot_init_pose=(0,0,0)):
         '''init BEV map'''
-        self.bev = BEVMap(self.args)
+        self.bev = BEVMap(self.args, robot_init_pose=robot_init_pose)
+    
+    def get_robot_bottom_z(self):
+        '''get robot bottom z'''
+        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base()[0][2]-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
     
     def init_one_path(self, path_id):
         # Demo for visualizing simply one path
@@ -261,7 +265,13 @@ class VLNDataLoader(Dataset):
         if draw:
             combined_pcd = generate_pano_pointcloud_local(camera_positions, camera_orientations, camera_pc_data, draw=draw, log_dir=self.args.log_image_dir)
         return camera_pc_data, camera_positions, camera_orientations
-        
+    
+    def update_occupancy_map(self, verbose=False):
+        '''Use BEVMap to update the occupancy map based on pointcloud
+        '''
+        pointclouds, _, _ = self.process_pointcloud(self.args.camera_list)
+        robot_ankle_z = self.get_robot_bottom_z()
+        self.bev.update_occupancy_map(pointclouds, robot_ankle_z, verbose=verbose)
         
     def get_batch(self):
         try:
