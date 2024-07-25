@@ -15,12 +15,14 @@ from torchvision import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 
+
 from grutopia.core.util.log import log
 from grutopia.core.env import BaseEnv
 
 from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
 from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
 from ..local_nav.BEVmap import BEVMap
+
 
 def load_data(args, splits):
     ''' Load data based on VLN-CE
@@ -35,7 +37,7 @@ def load_data(args, splits):
                 item["original_start_position"] = copy.copy(item["start_position"])
                 item["original_start_rotation"] = copy.copy(item["start_rotation"])
                 item["start_position"] = [item["original_start_position"][0], -item["original_start_position"][2], item["original_start_position"][1]]
-                item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][1], item["original_start_rotation"][2]] # [x,y,z,-w] => [w,x,y,z]
+                item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][2], -item["original_start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
                 item["scan"] = item["scene_id"].split("/")[1]
                 item["c_reference_path"] = []
                 for path in item["reference_path"]:
@@ -149,6 +151,14 @@ class VLNDataLoader(Dataset):
                 break
         if self.robot_offset is None:
             log.error("Robot offset not found for robot type %s", self.robot_type)
+            raise ValueError("Robot offset not found for robot type")
+        
+        # process paths offset
+        for item in self.data:
+            item["start_position"] += self.robot_offset
+            for i, path in enumerate(item["reference_path"]):
+                item["reference_path"][i] += self.robot_offset
+
         
         self.task_name = sim_config.config.tasks[0].name # only one task
         self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot type
@@ -172,9 +182,22 @@ class VLNDataLoader(Dataset):
         '''init BEV map'''
         self.bev = BEVMap(self.args, robot_init_pose=robot_init_pose)
     
+    def init_isaac_occupancy_map(self):
+        '''init Isaac Occupancy map'''
+        from ..local_nav.isaac_occupancy_map import IsaacOccupancyMap
+        self.isaac_occupancy_map = IsaacOccupancyMap(self.args)
+    
+    def init_cam_occunpancy_map(self):
+        from ..local_nav.camera_occupancy_map import CamOccupancyMap
+        self.cam_occupancy_map = CamOccupancyMap(self.args)
+    
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
         return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base()[0][2]-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+    
+    @property
+    def current_task_stage(self):
+        return self.env._runner.current_tasks[self.task_name]._scene.stage
     
     def init_one_path(self, path_id):
         # Demo for visualizing simply one path
@@ -182,16 +205,24 @@ class VLNDataLoader(Dataset):
             if item['trajectory_id'] == path_id:
                 scene_usd_path = load_scene_usd(self.args, item['scan'])
                 self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
-                self.sim_config.config.tasks[0].robots[0].position = item["start_position"] + self.robot_offset
-                self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] # TODO: this seems not work
+                self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
+                # self.sim_config.config.tasks[0].robots[0].position = [-9.9, 4.7494, 1.1662]
+                self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
+                # self.sim_config.config.tasks[0].robots[0].orientation = [-1,0,0,0]
+                # self.sim_config.config.tasks[0].robots[0].orientation = euler_angles_to_quat([0,0,160.6573657])
                 self.init_env(self.sim_config, headless=self.args.headless)
                 self.init_agents()
+                self.init_cam_occunpancy_map() # !!!
                 log.info("Initialized path id %d", path_id)
                 log.info("Scan: %s", item['scan'])
                 log.info("Instruction: %s", item['instruction']['instruction_text'])
+                log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
                 return item
         log.error("Path id %d not found in the dataset", path_id)
         return None
+    
+    def get_agent_pose(self):
+        return self.agents.get_world_pose()
 
     def set_agent_pose(self, position, rotation):
         self.agents.set_world_pose(position, rotation)
@@ -202,7 +233,7 @@ class VLNDataLoader(Dataset):
         # Compute the relative orientation between the two positions
         rel_orientation = compute_rel_orientations(prev_position, current_position, return_quat=True) # TODO: this orientation may be wrong
         # Set the agent's world_pose to the current position
-        next_position = current_position + self.robot_offset
+        next_position = current_position 
         next_orientation = rel_orientation
         self.agents.set_world_pose(next_position, next_orientation)
         log.info(f"Target Position: {next_position}, Orientation: {next_orientation}")

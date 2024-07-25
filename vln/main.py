@@ -11,6 +11,7 @@ import argparse
 import yaml
 import time
 
+
 from grutopia.core.config import SimulatorConfig
 from grutopia.core.env import BaseEnv
 from grutopia.core.util.container import is_in_container
@@ -24,6 +25,7 @@ import matplotlib.pyplot as plt
 
 from vln.src.dataset.data_utils import VLNDataLoader
 from vln.src.utils.utils import dict_to_namespace
+
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
@@ -107,6 +109,10 @@ def vis_one_path(args, vln_envs):
 
         if i % 100 == 0:
             print(i)
+            # agent_current_pose = vln_envs.get_agent_pose()[0]
+            # agent_bottom_z = vln_envs.get_robot_bottom_z()
+            # vln_envs.cam_occupancy_map.generate_occupancy_map(agent_current_pose, agent_bottom_z, verbose=True) # !!!
+            
             if args.save_obs:
                 vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
 
