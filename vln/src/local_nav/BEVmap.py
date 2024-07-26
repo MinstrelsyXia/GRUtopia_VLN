@@ -48,6 +48,9 @@ class BEVMap:
     def convert_world_to_map(self, point_cloud):
         # Note that the pointclouds have the world corrdinates that some values are very negative
         # We need to convert it into the map coordinates
+        if len(point_cloud)==0:
+            log.error(f"The shape of point cloud is not correct. The shape is {point_cloud.shape}.")
+            return None
         point_cloud = point_cloud - self.init_world_pos
 
         return point_cloud
@@ -79,6 +82,7 @@ class BEVMap:
         if point_cloud is not None:
             if isinstance(point_cloud, list):
                 pos_point_cloud = [self.convert_world_to_map(p) for p in point_cloud]
+                pos_point_cloud = [p for p in pos_point_cloud if p is not None]
                 pos_point_cloud = np.vstack(pos_point_cloud)
             pos_point_cloud = pd.DataFrame(pos_point_cloud)
             if not pos_point_cloud.isna().all().all():

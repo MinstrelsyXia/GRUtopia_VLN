@@ -22,8 +22,8 @@ maps:
   robot_radius: 0.1 # Robot's radius
   voxel_size: 0.05  # Size of a voxel
   quadtree_config:
-    width: 20  # Quadtree map size
-    height: 20
+    width: 30  # Quadtree map size
+    height: 30
     max_depth: 10  # Maximum depth of the quadtree
     threshold: 1  # Threshold for node splitting  
     
