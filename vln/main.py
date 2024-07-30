@@ -22,7 +22,6 @@ from grutopia.core.util.log import log
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
-
 from vln.src.dataset.data_utils import VLNDataLoader
 from vln.src.utils.utils import dict_to_namespace
 
@@ -40,8 +39,8 @@ parser.add_argument("--headless", action="store_true", default=False)
 parser.add_argument("--test_verbose", action="store_true", default=False)
 parser.add_argument("--wait", action="store_true", default=False)
 parser.add_argument("--mode", type=str, default="vis_one_path", help="The mode of the program")
-parser.add_argument("--sim_cfg_file", type=str, default="GRUtopia/vln/configs/sim_cfg.yaml")
-parser.add_argument("--vln_cfg_file", type=str, default="GRUtopia/vln/configs/vln_cfg.yaml")
+parser.add_argument("--sim_cfg_file", type=str, default="vln/configs/sim_cfg.yaml")
+parser.add_argument("--vln_cfg_file", type=str, default="vln/configs/vln_cfg.yaml")
 parser.add_argument("--save_obs", action="store_true", default=False)
 args = parser.parse_args()
 

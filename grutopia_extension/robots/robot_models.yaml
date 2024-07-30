@@ -1,7 +1,8 @@
 # Developer only. User read-only.
 robots:
 - type: "HumanoidRobot"
-  usd_path: "GRUtopia/assets/robots/h1/h1_vln_pano_cameras.usd"
+  # usd_path: "GRUtopia/assets/robots/h1/h1_vln_pano_cameras.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
   gains: [0.0, 0.0]
   joint_names:
   - left_hip_yaw_joint
@@ -26,7 +27,7 @@ robots:
   controllers:
   - name: "move_by_speed"
     type: HumanoidMoveBySpeedController
-    policy_weights_path: GRUtopia/assets/policy/weights/h1_loco_model_20000.pt
+    policy_weights_path: assets/policy/weights/h1_loco_model_20000.pt
     joint_names:
     - left_hip_yaw_joint
     - right_hip_yaw_joint

@@ -1,4 +1,5 @@
 *.pyc
+**/__pycache__
 evaluate_data/
 assets/
 local_model/

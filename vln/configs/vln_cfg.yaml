@@ -1,6 +1,6 @@
 datasets:
-  base_data_dir: "VLN/VLNCE/R2R_VLNCE_v1-3"
-  mp3d_data_dir: "Matterport3D/data/v1/scans"
+  base_data_dir: "../VLN/VLNCE/R2R_VLNCE_v1-3"
+  mp3d_data_dir: "../Matterport3D/data/v1/scans"
   splits:
     - val_seen
     # - train
