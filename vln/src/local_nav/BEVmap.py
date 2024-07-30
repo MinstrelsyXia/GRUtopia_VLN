@@ -23,6 +23,7 @@ class BEVMap:
         self.quadtree_config = quadtree_config
         self.quadtree_width = self.quadtree_config.width
         self.quadtree_height = self.quadtree_config.height
+        print(f"quadtree width: {self.quadtree_width}, quadtree height: {self.quadtree_height}")
         self.occupancy_map = np.ones((self.quadtree_height, self.quadtree_width))  # 2D occupancy map
         self.quad_tree_root = QuadTreeNode(x=0, y=0, width=self.quadtree_width, height=self.quadtree_height,
                                            map_data = self.occupancy_map, 

@@ -116,8 +116,8 @@ def vis_one_path(args, vln_envs):
             # agent_bottom_z = vln_envs.get_robot_bottom_z()
             # vln_envs.cam_occupancy_map.generate_occupancy_map(agent_current_pose, agent_bottom_z, verbose=True) # !!!
             
-            if args.save_obs:
-                vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
+            # if args.save_obs:
+            #     vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
 
             # init BEVMap
             if current_point == 0:
@@ -155,6 +155,9 @@ def vis_one_path(args, vln_envs):
         
         
         if i % 500 == 0 and not agent_action_state['finished']:
+            if args.save_obs:
+                vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
+        
             # update BEVMap every specific intervals
             vln_envs.update_occupancy_map(verbose=True)
             vln_envs.bev.step_time = i

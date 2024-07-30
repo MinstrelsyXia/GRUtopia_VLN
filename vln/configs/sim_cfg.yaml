@@ -29,29 +29,32 @@ tasks:
     - name: "stand_still"
     sensor_params:
     - name: "pano_camera_0"
-      enable: false
-      size: [640, 480]
+      enable: true
+      size: [224, 224]
     - name: "pano_camera_45"
-      enable: false
-      size: [640, 480]
+      enable: true
+      size: [224, 224]
     - name: "pano_camera_90"
-      enable: false
-      size: [640, 480]
+      enable: true
+      size: [224, 224]
     - name: "pano_camera_135"
-      enable: false
-      size: [640, 480]
+      enable: true
+      size: [224, 224]
     - name: "pano_camera_180"
-      enable: false
-      size: [640, 480]
+      enable: true
+      size: [224, 224]
     - name: "pano_camera_225"
-      enable: false
-      size: [640, 480]
+      enable: true
+      size: [224, 224]
     - name: "pano_camera_270"
-      enable: false
-      size: [640, 480]
+      enable: true
+      size: [224, 224]
     - name: "pano_camera_315"
-      enable: false
-      size: [640, 480]
+      enable: true
+      size: [224, 224]
+    # - name: "camera_lookdown"
+    #   enable: true
+    #   size: [224, 224]
     # - name: "camera_front"
     #   enable: true
     #   size: [640, 480]

@@ -163,6 +163,8 @@ class VLNDataLoader(Dataset):
         self.task_name = sim_config.config.tasks[0].name # only one task
         self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot type
         
+        self.bev = None
+        
     
     def __len__(self):
         return len(self.data)
@@ -212,7 +214,7 @@ class VLNDataLoader(Dataset):
                 # self.sim_config.config.tasks[0].robots[0].orientation = euler_angles_to_quat([0,0,160.6573657])
                 self.init_env(self.sim_config, headless=self.args.headless)
                 self.init_agents()
-                self.init_cam_occunpancy_map() # !!!
+                # self.init_cam_occunpancy_map() # !!!
                 log.info("Initialized path id %d", path_id)
                 log.info("Scan: %s", item['scan'])
                 log.info("Instruction: %s", item['instruction']['instruction_text'])
@@ -244,7 +246,7 @@ class VLNDataLoader(Dataset):
         '''
         return self.env.get_observations(data_type=data_types)
     
-    def save_observations(self, camera_list:list, data_types:list, save_imgs=True, step_time=0):
+    def save_observations(self, camera_list:list, data_types:list, save_image_list=None, save_imgs=True, step_time=0):
         ''' Save observations from the agent
         '''
         obs = self.env.get_observations(data_type=data_types)
@@ -257,14 +259,16 @@ class VLNDataLoader(Dataset):
                     save_img_flag = True
                 elif data == "depth":
                     data_info = cur_obs[data]
+                    max_depth = 10
+                    data_info[data_info > max_depth] = max_depth
                     save_img_flag = True
                 elif data == 'pointcloud':
                     save_img_flag = False
                 if save_imgs and save_img_flag:
-                    image_save_dir = os.path.join(self.args.root_dir, "logs", "images")
-                    if not os.path.exists(image_save_dir):
-                        os.mkdir(image_save_dir)
-                    save_path = os.path.join(image_save_dir, f"{camera}_{data}_{step_time}.jpg")
+                    save_dir = os.path.join(self.args.log_image_dir, "obs")
+                    if not os.path.exists(save_dir):
+                        os.mkdir(save_dir)
+                    save_path = os.path.join(save_dir, f"{camera}_{data}_{step_time}.jpg")
                     try:
                         plt.imsave(save_path, data_info)
                         log.info(f"Images have been saved in {save_path}.")
