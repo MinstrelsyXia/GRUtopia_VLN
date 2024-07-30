@@ -4,7 +4,7 @@ from scipy.spatial.transform import Rotation as R
 
 from grutopia.core.util.log import log
 
-def euler_angles_to_quat(angles):
+def euler_angles_to_quat(angles, degrees=False):
     """
     Convert Euler angles (roll, pitch, yaw) to quaternion.
 
@@ -14,8 +14,9 @@ def euler_angles_to_quat(angles):
     Returns:
         np.array: Quaternion [x, y, z, w].
     """
-    r = R.from_euler('xyz', angles, degrees=True)
-    return r.as_quat()
+    r = R.from_euler('xyz', angles, degrees=degrees)
+    quat = r.as_quat()
+    return [quat[3], quat[0], quat[1], quat[2]]
 
 def quat_to_euler_angles(quat):
     """
