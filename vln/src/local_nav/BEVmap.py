@@ -71,7 +71,7 @@ class BEVMap:
         return dilation_structure
         
     ######################## update_occupancy_map ########################
-    def update_occupancy_map(self, point_cloud, robot_bottom_z, add_dilation=False, verbose = False):
+    def update_occupancy_map(self, point_cloud, robot_bottom_z, add_dilation=False, verbose = False, global_bev=False):
         """
         Updates the occupancy map based on the new point cloud data.
         Args:
@@ -85,6 +85,8 @@ class BEVMap:
                 pos_point_cloud = [self.convert_world_to_map(p) for p in point_cloud]
                 pos_point_cloud = [p for p in pos_point_cloud if p is not None]
                 pos_point_cloud = np.vstack(pos_point_cloud)
+            else:
+                pos_point_cloud = point_cloud
             pos_point_cloud = pd.DataFrame(pos_point_cloud)
             if not pos_point_cloud.isna().all().all():
                 pos_point_cloud = pos_point_cloud.dropna().to_numpy()
@@ -122,7 +124,10 @@ class BEVMap:
                 quadtree_map = 1 - (self.occupancy_map == 0) # This makes all 0 to 0, and other values to 1
                 self.quad_tree_root.update(quadtree_map, x, y, width, height) # !!!
                 if verbose:
-                    img_save_path = os.path.join(self.args.log_image_dir, "occupancy_"+str(self.step_time)+".jpg")
+                    if global_bev:
+                        img_save_path = os.path.join(self.args.log_image_dir, "global_occupancy_"+str(self.step_time)+".jpg")
+                    else:
+                        img_save_path = os.path.join(self.args.log_image_dir, "occupancy_"+str(self.step_time)+".jpg")
                     plt.imsave(img_save_path, self.occupancy_map, cmap = "gray")
                     log.info(f"Occupancy map saved at {img_save_path}")
     

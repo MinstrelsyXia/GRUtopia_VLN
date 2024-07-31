@@ -14,12 +14,19 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
+import importlib
+from scipy.ndimage import convolve
 
+try:
+    from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
+except:
+    pass
 
 from grutopia.core.util.log import log
 from grutopia.core.env import BaseEnv
 
 from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
+
 from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
 from ..local_nav.BEVmap import BEVMap
 
@@ -179,6 +186,9 @@ class VLNDataLoader(Dataset):
     def init_agents(self):
         '''call after self.init_env'''
         self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
+        self.agent_last_pose = None
+        self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
+        self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
     
     def init_BEVMap(self, robot_init_pose=(0,0,0)):
         '''init BEV map'''
@@ -189,9 +199,9 @@ class VLNDataLoader(Dataset):
         from ..local_nav.isaac_occupancy_map import IsaacOccupancyMap
         self.isaac_occupancy_map = IsaacOccupancyMap(self.args)
     
-    def init_cam_occunpancy_map(self):
+    def init_cam_occunpancy_map(self, robot_prim="/World/env_0/robots/World/h1",start_point=[0,0,0]):
         from ..local_nav.camera_occupancy_map import CamOccupancyMap
-        self.cam_occupancy_map = CamOccupancyMap(self.args)
+        self.cam_occupancy_map = CamOccupancyMap(self.args, robot_prim, start_point)
     
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
@@ -200,7 +210,13 @@ class VLNDataLoader(Dataset):
     @property
     def current_task_stage(self):
         return self.env._runner.current_tasks[self.task_name]._scene.stage
-    
+
+    def init_omni_env(self):
+        rotations_utils = importlib.import_module("omni.isaac.core.utils.rotations")
+        self.quat_to_euler_angles = rotations_utils.quat_to_euler_angles
+        self.euler_angles_to_quat = rotations_utils.euler_angles_to_quat
+        # from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
+
     def init_one_path(self, path_id):
         # Demo for visualizing simply one path
         for item in self.data:
@@ -208,13 +224,11 @@ class VLNDataLoader(Dataset):
                 scene_usd_path = load_scene_usd(self.args, item['scan'])
                 self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
                 self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
-                # self.sim_config.config.tasks[0].robots[0].position = [-9.9, 4.7494, 1.1662]
                 self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
-                # self.sim_config.config.tasks[0].robots[0].orientation = [-1,0,0,0]
-                # self.sim_config.config.tasks[0].robots[0].orientation = euler_angles_to_quat([0,0,160.6573657])
                 self.init_env(self.sim_config, headless=self.args.headless)
+                self.init_omni_env()
                 self.init_agents()
-                # self.init_cam_occunpancy_map() # !!!
+                self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
                 log.info("Initialized path id %d", path_id)
                 log.info("Scan: %s", item['scan'])
                 log.info("Instruction: %s", item['instruction']['instruction_text'])
@@ -301,82 +315,164 @@ class VLNDataLoader(Dataset):
             combined_pcd = generate_pano_pointcloud_local(camera_positions, camera_orientations, camera_pc_data, draw=draw, log_dir=self.args.log_image_dir)
         return camera_pc_data, camera_positions, camera_orientations
     
+    def get_surrounding_free_map(self, verbose=False):
+        ''' Use top-down orthogonal camera to get the ground-truth surrounding free map
+            This is useful to reset the robot's location when it get stuck or falling down.
+        '''
+        # agent_current_pose = self.get_agent_pose()[0]
+        # agent_bottom_z = self.get_robot_bottom_z()
+        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map.get_surrounding_free_map(robot_prim=self.agents.prim, robot_height=1.7, verbose=verbose)
+        self.surrounding_freemap_camera_pose = self.cam_occupancy_map.topdown_camera.get_world_pose()[0]
+    
     def update_occupancy_map(self, verbose=False):
         '''Use BEVMap to update the occupancy map based on pointcloud
         '''
         pointclouds, _, _ = self.process_pointcloud(self.args.camera_list)
         robot_ankle_z = self.get_robot_bottom_z()
         self.bev.update_occupancy_map(pointclouds, robot_ankle_z, verbose=verbose)
+
+    def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, adjust=False, initial_pose=None, initial_rotation=None):
+        '''
+        Determine if the robot is falling based on its rotation quaternion.
+        '''
+        # current_quaternion = obs['orientation']
+        current_position, current_quaternion = agent.get_world_pose() # orientation
+        # Convert quaternion to Euler angles (roll, pitch, yaw)
+        roll, pitch, yaw = self.quat_to_euler_angles(current_quaternion,degrees=True)
+
+        # Check if the pitch or roll exceeds the thresholds
+        if abs(pitch) > pitch_threshold or abs(roll) > roll_threshold:
+            is_fall = True
+            log.info(f"Robot falls down!!!")
+            log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
+        else:
+            is_fall = False
+
+        # if is_fall and adjust:
+        #     # randomly adjust the pose to avoid falling
+        #     # NOTE: This does not work since it could lead the robot be caught in the colliders
+        #     if initial_pose is None:
+        #         initial_pose = obs['position']
+        #     if not isinstance(initial_pose, np.ndarray):
+        #         initial_pose = np.array(initial_pose)
+            
+        #     if initial_rotation is None:
+        #         initial_rotation = euler_angles_to_quat(np.array([0,0,0]))
+        #     if not isinstance(initial_rotation, np.ndarray):
+        #         initial_rotation = np.array(initial_rotation)
+        #         initial_rotation_euler = quat_to_euler_angles(initial_rotation)
+
+        #     # randomly sample offset
+        #     position_offset = np.array([np.random.uniform(low=-1, high=1), np.random.uniform(low=-1, high=1), 0])
+        #     rotation_y_offset = np.array([0, np.random.uniform(low=-30, high=30), 0])
+
+        #     adjust_position = initial_pose + position_offset
+        #     adjust_rotation = initial_rotation + euler_angles_to_quat(rotation_y_offset)
+
+        #     log.info(f"Target adjust position: {adjust_position}, adjust rotation: {adjust_rotation}")
+
+        #     agent.set_world_pose(position=adjust_position, 
+        #                         orientation=adjust_rotation)
+            # agent.set_joint_velocities(np.zeros(len(agent.dof_names)))
+            # agent.set_joint_positions(np.zeros(len(agent.dof_names)))
         
-    def get_batch(self):
-        try:
-            return next(self.data_iter)
-        except StopIteration:
-            self.data_iter = self.env.__iter__()
-            return next(self.data_iter)
+        # if not is_fall:
+        #     log.info(f"Robot does not fall")
+        #     cur_pos, cur_rot = obs["position"], quat_to_euler_angles(obs["orientation"])
+        #     log.info(f"Current Position: {cur_pos}, Orientation: {cur_rot}")
 
-    def reset_epoch(self):
-        self.data_iter = self.env.__iter__()
+        return is_fall
+    
+    def check_robot_stuck(self, cur_iter, max_iter=500, threshold=0.2):
+        ''' Check if the robot is stuck
+        '''
+        is_stuck = False
+        if self.agent_last_pose is None:
+            self.agent_last_valid_pose = self.get_agent_pose()[0]
+            self.agent_last_pose, self.agent_last_rotation = self.get_agent_pose()
+            self.agent_last_valid_pose = self.agent_last_pose
+            self.agent_last_valid_rotation = self.agent_last_rotation
+            self.stuck_threshold = 0
+            self.stuck_last_iter = cur_iter
+            return is_stuck
 
-    def get_vocab_size(self):
-        return len(self.vocab)
+        current_pose, current_rotation = self.get_agent_pose()
+        diff = np.linalg.norm(current_pose - self.agent_last_pose)
+        self.stuck_threshold += diff
 
-    def get_tokenizer(self):
-        return self.tokenizer
+        if (cur_iter - self.stuck_last_iter) >= max_iter:
+            if self.stuck_threshold < threshold:
+                is_stuck = True
+            else:
+                self.stuck_threshold = 0
+                self.stuck_last_iter = cur_iter
+                self.agent_last_valid_pose = current_pose
+                self.agent_last_valid_rotation = current_rotation
 
-    def get_reward_path(self):
-        return self.reward_path
+        self.agent_last_pose = current_pose
 
-    def get_vocab(self):
-        return self.vocab
+        return is_stuck
+    
+    def randomly_pick_position_from_freemap(self, verbose=False):
+        ''' Randomly pick a position from the free map
+        '''
+        if self.surrounding_freemap_connected is None:
+            self.get_surrounding_free_map(verbose=verbose)
+            return None
+        
+        free_map = self.surrounding_freemap_connected
+        camera_pose = self.surrounding_freemap_camera_pose
 
-    def get_env(self):
-        return self.env
+        freemap_center = np.array(free_map.shape) // 2
+        free_indices = np.argwhere(free_map == 1)
 
-    def get_splits(self):
-        return self.split
+        # Calculate distances from the center
+        distances = np.linalg.norm(free_indices - freemap_center, axis=1)
 
-    def get_batch_size(self):
-        return self.args.batch_size
+        # Compute weights using a Gaussian function
+        sigma = np.std(distances)  # Standard deviation as a parameter for the Gaussian function
+        distance_weights = np.exp(-distances**2 / (2 * sigma**2))
 
-    def get_max_episode_len(self):
-        return self.args.max_episode_len
+        # Compute density of free space around each free position
+        kernel = np.ones((5, 5))  # Example kernel size, adjust as needed
+        density_map = convolve(free_map.astype(float), kernel, mode='constant', cval=0.0)
+        density_weights = density_map[free_indices[:, 0], free_indices[:, 1]]
 
-    def get_max_instruction_len(self):
-        return self.args.max_instruction_len
+        # Combine distance-based weights with density-based weights
+        combined_weights = distance_weights * density_weights
 
-    def get_max_path_len(self):
-        return self.args.max_path_len
+        # Normalize weights to sum to 1
+        combined_weights /= combined_weights.sum()
 
-    def get_max_actions(self):
-        return self.args.max_actions
+        random_index = np.random.choice(free_indices.shape[0], p=combined_weights)
+        random_position = free_indices[random_index]
 
-    def get_max_follower(self):
-        return self.args.max_follower
+        random_position = self.cam_occupancy_map.pixel_to_world(random_position, camera_pose)
+        # random_position = [random_position[0], random_position[1], self.agent_last_valid_pose[2]]
+        random_position = [random_position[0], random_position[1], self.agent_init_pose[2]]
 
-    def get_max_follower_len(self):
-        return self.args.max_follower_len
+        return random_position
 
-    def get_max_follower_actions(self):
-        return self.args.max_follower_actions
-
-    def get_max_follower_offset(self):
-        return self.args.max_follower_offset
-
-    def get_max_follower_angle(self):
-        return self.args.max_follower_angle
-
-    def get_max_follower_distance(self):
-        return self.args.max_follower_distance
-
-    def get_max_follower_rotations(self):
-        return self.args.max_follower_rotations
-
-    def get_max_follower_looks(self):
-        return self.args.max_follower_looks
-
-    def get_max_follower_exploration(self):
-        return self.args.max_follower_exploration
-
-    def get_max_follower_exploration_distance(self):
-        return self.args.max_follower_exploration_distance
+    def reset_robot(self, position, rotation):
+        ''' Reset the robot's pose
+        '''
+        self.agents.set_world_pose(position, rotation)
+        self.agent_last_pose = position
+        self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
+        self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))
+    
+    def check_and_reset_robot(self, cur_iter, verbose=False):
+        is_fall = self.check_robot_fall(self.agents, adjust=False)
+        is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=500, threshold=0.2)
+        if (not is_fall) and (not is_stuck):
+            self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
+            return False
+        else:
+            if is_fall:
+                log.info("Robot falls down. Reset robot pose.")
+            if is_stuck:
+                log.info("Robot is stuck. Reset robot pose.")
+            random_position = self.randomly_pick_position_from_freemap()
+            self.reset_robot(random_position, self.agent_last_valid_rotation)
+            log.info(f"Reset robot pose to {random_position}.")
+            return True

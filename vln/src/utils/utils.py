@@ -12,7 +12,7 @@ def euler_angles_to_quat(angles, degrees=False):
         angles (list or np.array): Euler angles [roll, pitch, yaw] in degrees.
 
     Returns:
-        np.array: Quaternion [x, y, z, w].
+        np.array: Quaternion [w, x, y, z].
     """
     r = R.from_euler('xyz', angles, degrees=degrees)
     quat = r.as_quat()
@@ -23,12 +23,13 @@ def quat_to_euler_angles(quat):
     Convert quaternion to Euler angles (roll, pitch, yaw).
 
     Args:
-        quat (list or np.array): Quaternion [x, y, z, w].
+        quat (list or np.array): Quaternion [w, x, y, z].
 
     Returns:
         np.array: Euler angles [roll, pitch, yaw] in degrees.
     """
-    r = R.from_quat(quat)
+    reordered_quat = [quat[1], quat[2], quat[3], quat[0]]
+    r = R.from_quat(reordered_quat)
     angles = r.as_euler('xyz', degrees=True)
     return angles
 

@@ -1,6 +1,8 @@
 datasets:
   base_data_dir: "../VLN/VLNCE/R2R_VLNCE_v1-3"
   mp3d_data_dir: "../Matterport3D/data/v1/scans"
+  mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
+  mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
   splits:
     - val_seen
     # - train
@@ -10,6 +12,7 @@ datasets:
 settings:
   batch_size: 1
   action: "move_along_path"
+  check_and_reset_robot: true
 
 robots:
   - name: "CylinderRobot"
@@ -19,11 +22,14 @@ robots:
   
 maps:
   robot_z: [0.2, 0.5]  # Robot's height range on the Z-axis
+  global_robot_z: [0, 1.7]
   robot_radius: 0.1 # Robot's radius
   voxel_size: 0.05  # Size of a voxel
   quadtree_config:
     width: 30  # Quadtree map size
     height: 30
+    global_width: 60 # for global map
+    global_height: 60
     max_depth: 10  # Maximum depth of the quadtree
     threshold: 1  # Threshold for node splitting  
     

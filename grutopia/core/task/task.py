@@ -22,6 +22,8 @@ import omni.isaac.core.utils.prims as prim_utils
 import omni.isaac.lab.sim as sim_utils
 import omni.kit.actions.core
 
+from pxr import PhysxSchema
+
 
 class BaseTask(OmniBaseTask, ABC):
     """
@@ -53,10 +55,15 @@ class BaseTask(OmniBaseTask, ABC):
         if self.config.scene_asset_path is not None:
             source, prim_path = create_scene(self.config.scene_asset_path,
                                              prim_path_root=f'World/env_{self.config.env_id}/scene')
-            create_prim(prim_path,
+            physics_scene_prim = create_prim(prim_path,
                         usd_path=source,
                         scale=self.config.scene_scale,
                         translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)])
+            
+            # increase the GPU capacity according to https://forums.developer.nvidia.com/t/is-there-a-solution-to-the-buffer-overflow/299449/4
+            physxSceneAPI = PhysxSchema.PhysxSceneAPI.Apply(physics_scene_prim)
+            physxSceneAPI.CreateGpuTempBufferCapacityAttr(16 * 1024 * 1024 * 2)        
+            physxSceneAPI.CreateGpuHeapCapacityAttr(64 * 1024 * 1024 * 2)
             # prim_path = f"/World/env_{self.config.env_id}/scene"
             # _xform_prim = prim_utils.create_prim(
             #     prim_path= f"/World/env_{self.config.env_id}/scene", 

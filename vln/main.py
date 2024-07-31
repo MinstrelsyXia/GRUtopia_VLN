@@ -82,10 +82,11 @@ def vis_one_path(args, vln_envs):
     paths = data_item['reference_path']
     current_point = 0
     move_interval = 500 # move along the path every 5 seconds
+    reset_robot = False
     
     '''start simulation'''
     i = 0
-    warm_step = 100 if args.headless else 1000
+    warm_step = 100 if args.headless else 500
 
     # init the action
     action_name = vln_config.settings.action
@@ -111,63 +112,62 @@ def vis_one_path(args, vln_envs):
 
         if i % 100 == 0:
             print(i)
-            # agent_current_pose = vln_envs.get_agent_pose()[0]
-            # agent_bottom_z = vln_envs.get_robot_bottom_z()
-            # vln_envs.cam_occupancy_map.generate_occupancy_map(agent_current_pose, agent_bottom_z, verbose=True) # !!!
-            
-            # if args.save_obs:
-            #     vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
+            if vln_config.settings.check_and_reset_robot:
+                reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, verbose=True)
+                if not reset_robot:
+                    # if args.save_obs:
+                    #     vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
 
-            # init BEVMap
-            if current_point == 0:
-                agent_current_pose = vln_envs.agents.get_world_pose()[0]
-                vln_envs.init_BEVMap(robot_init_pose=agent_current_pose)
+                    # init BEVMap
+                    if current_point == 0:
+                        agent_current_pose = vln_envs.agents.get_world_pose()[0]
+                        vln_envs.init_BEVMap(robot_init_pose=agent_current_pose)
 
-            # move to next waypoint
-            if current_point == 0:
-                log.info(f"===The robot starts navigating===")
-                log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
-                if args.save_obs:
-                    vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
-                vln_envs.update_occupancy_map(verbose=True)
-                exe_path, node_type = vln_envs.bev.navigate_p2p(paths[current_point], paths[current_point+1], verbose=True)
-                current_point += 1
-                actions = {'h1': {'move_along_path': [exe_path]}}
-            else:
-                if agent_action_state['finished']:
-                    log.info("***The robot has finished the action.***")
-                    if current_point < len(paths)-1:
+                    # move to next waypoint
+                    if current_point == 0:
+                        log.info(f"===The robot starts navigating===")
+                        log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
                         if args.save_obs:
                             vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
                         vln_envs.update_occupancy_map(verbose=True)
-                        robot_current_pos = vln_envs.agents.get_world_pose()[0]
-                        exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point+1], verbose=True)
+                        exe_path, node_type = vln_envs.bev.navigate_p2p(paths[current_point], paths[current_point+1], verbose=True)
                         current_point += 1
-
-                        actions = {'h1': {'move_along_path': [exe_path]}} 
-                        log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
+                        actions = {'h1': {'move_along_path': [exe_path]}}
                     else:
-                        actions = {'h1': {'stand_still': []}}
-                        log.info("===The robot has achieved the target place.===")
-                else:
-                    log.info("===The robot has not finished the action yet.===")
-        
-        
-        if i % 500 == 0 and not agent_action_state['finished']:
-            if args.save_obs:
-                vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
-        
-            # update BEVMap every specific intervals
-            vln_envs.update_occupancy_map(verbose=True)
-            vln_envs.bev.step_time = i
+                        if agent_action_state['finished']:
+                            log.info("***The robot has finished the action.***")
+                            if current_point < len(paths)-1:
+                                if args.save_obs:
+                                    vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
+                                vln_envs.update_occupancy_map(verbose=True)
+                                robot_current_pos = vln_envs.agents.get_world_pose()[0]
+                                exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point+1], verbose=True)
+                                current_point += 1
 
-            # after BEVMap's update, determine whether the robot's path is blocked
-            if current_point > 0:
-                agent_current_pose = vln_envs.agents.get_world_pose()[0]
-                next_action_pose = exe_path[agent_action_state['current_index']+1] if len(exe_path)>agent_action_state['current_index']+1 else agent_action_state['current_point']
-                if vln_envs.bev.is_collision(agent_current_pose, next_action_pose):
-                    log.info("===The robot's path is blocked. Replanning now.===")
-                    exe_path, _ = vln_envs.bev.navigate_p2p(agent_current_pose, paths[current_point], verbose=True)
+                                actions = {'h1': {'move_along_path': [exe_path]}} 
+                                log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
+                            else:
+                                actions = {'h1': {'stand_still': []}}
+                                log.info("===The robot has achieved the target place.===")
+                        else:
+                            log.info("===The robot has not finished the action yet.===")
+            
+            
+                    if i % 500 == 0 and not agent_action_state['finished']:
+                        if args.save_obs:
+                            vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
+                    
+                        # update BEVMap every specific intervals
+                        vln_envs.update_occupancy_map(verbose=True)
+                        vln_envs.bev.step_time = i
+
+                        # after BEVMap's update, determine whether the robot's path is blocked
+                        if current_point > 0:
+                            agent_current_pose = vln_envs.agents.get_world_pose()[0]
+                            next_action_pose = exe_path[agent_action_state['current_index']+1] if len(exe_path)>agent_action_state['current_index']+1 else agent_action_state['current_point']
+                            if vln_envs.bev.is_collision(agent_current_pose, next_action_pose):
+                                log.info("===The robot's path is blocked. Replanning now.===")
+                                exe_path, _ = vln_envs.bev.navigate_p2p(agent_current_pose, paths[current_point], verbose=True)
             
         env_actions.append(actions)
         obs = env.step(actions=env_actions)
