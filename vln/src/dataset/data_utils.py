@@ -274,7 +274,7 @@ class VLNDataLoader(Dataset):
                 elif data == "depth":
                     data_info = cur_obs[data]
                     max_depth = 10
-                    data_info[data_info > max_depth] = max_depth
+                    data_info[data_info > max_depth] = 0
                     save_img_flag = True
                 elif data == 'pointcloud':
                     save_img_flag = False
@@ -329,7 +329,7 @@ class VLNDataLoader(Dataset):
         '''
         pointclouds, _, _ = self.process_pointcloud(self.args.camera_list)
         robot_ankle_z = self.get_robot_bottom_z()
-        self.bev.update_occupancy_map(pointclouds, robot_ankle_z, verbose=verbose)
+        self.bev.update_occupancy_map(pointclouds, robot_ankle_z, verbose=verbose, robot_coords=self.get_agent_pose()[0])
 
     def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, adjust=False, initial_pose=None, initial_rotation=None):
         '''

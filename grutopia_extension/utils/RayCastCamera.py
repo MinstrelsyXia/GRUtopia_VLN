@@ -22,7 +22,6 @@ from omni.isaac.lab.utils.warp import raycast_mesh
 from tensordict import TensorDict
 
 from grutopia.core.robot.sensor import BaseSensor
-
 # TODO: Adapt this to the baseSensor class?
 
 @BaseSensor.register('Camera')

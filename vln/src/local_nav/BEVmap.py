@@ -52,7 +52,7 @@ class BEVMap:
         if len(point_cloud)==0:
             log.error(f"The shape of point cloud is not correct. The shape is {point_cloud.shape}.")
             return None
-        point_cloud = point_cloud - self.init_world_pos
+        point_cloud[...,:2] = point_cloud[..., :2] - self.init_world_pos[:2]
 
         return point_cloud
     
@@ -71,7 +71,7 @@ class BEVMap:
         return dilation_structure
         
     ######################## update_occupancy_map ########################
-    def update_occupancy_map(self, point_cloud, robot_bottom_z, add_dilation=False, verbose = False, global_bev=False):
+    def update_occupancy_map(self, point_cloud, robot_bottom_z, add_dilation=False, verbose = False, global_bev=False, robot_coords=None):
         """
         Updates the occupancy map based on the new point cloud data.
         Args:
@@ -86,7 +86,7 @@ class BEVMap:
                 pos_point_cloud = [p for p in pos_point_cloud if p is not None]
                 pos_point_cloud = np.vstack(pos_point_cloud)
             else:
-                pos_point_cloud = point_cloud
+                pos_point_cloud = self.convert_world_to_map(point_cloud)
             pos_point_cloud = pd.DataFrame(pos_point_cloud)
             if not pos_point_cloud.isna().all().all():
                 pos_point_cloud = pos_point_cloud.dropna().to_numpy()
@@ -98,17 +98,19 @@ class BEVMap:
                 adjusted_coords_with_z = np.hstack((adjusted_coords, downsampled_cloud[:,2].reshape(-1,1)))
                 point_to_consider = adjusted_coords_with_z[(adjusted_coords_with_z[:, 0] < self.quadtree_width) & (adjusted_coords_with_z[:, 1] < self.quadtree_height)] # !!! there seems that 0 and 1 are reversed
 
-                point_within_robot_z = point_to_consider[(point_to_consider[:,2]>(robot_bottom_z+self.robot_z[0])) & (point_to_consider[:,2]<(robot_bottom_z+self.robot_z[1]))].astype(int)
+                point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z-self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))].astype(int) # points that are within the robot's height range (occupancy)
+
+                # point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z-1)) & (point_to_consider[:,2]<=(robot_bottom_z+2))].astype(int) # points that are within the robot's height range (occupancy)
 
                 unique_data_0 = np.unique(point_within_robot_z[:, :2], axis=0)
                 unique_data_all = np.unique(point_to_consider[:, :2], axis=0).astype(int)
-                unique_data_1 = np.array(list(set(map(tuple, unique_data_all)) - set(map(tuple, unique_data_0)))).astype(int)
+                unique_data_1 = np.array(list(set(map(tuple, unique_data_all)) - set(map(tuple, unique_data_0)))).astype(int) # points that are not within the robot's height range (free)
 
                 last_map = 1 - (self.occupancy_map == 0)
                 if unique_data_1.size > 0:
-                    self.occupancy_map[unique_data_1[:,1], unique_data_1[:,0]]=2 # !!!
+                    self.occupancy_map[unique_data_1[:,1], unique_data_1[:,0]]=2 # free or unknown
                 if unique_data_0.size > 0: 
-                    self.occupancy_map[unique_data_0[:,1],unique_data_0[:,0]]=0
+                    self.occupancy_map[unique_data_0[:,1],unique_data_0[:,0]]=0 # occupied
                     if add_dilation:
                         # Create a mask for the free positions and dilate it
                         free_mask = np.zeros_like(self.occupancy_map, dtype=bool)
@@ -128,7 +130,22 @@ class BEVMap:
                         img_save_path = os.path.join(self.args.log_image_dir, "global_occupancy_"+str(self.step_time)+".jpg")
                     else:
                         img_save_path = os.path.join(self.args.log_image_dir, "occupancy_"+str(self.step_time)+".jpg")
-                    plt.imsave(img_save_path, self.occupancy_map, cmap = "gray")
+                
+                    if robot_coords is not None:
+                        # draw the robot's position using the red 'x' mark
+                        convert_robot_coords = ((robot_coords[:2]- self.init_world_pos[:2])/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2]).astype(int)
+
+                        occupancy_map_with_robot = self.occupancy_map.copy()
+
+                        # Draw the robot's position using a red 'x' mark
+                        plt.figure()
+                        plt.imshow(occupancy_map_with_robot, cmap='gray')
+                        plt.scatter(convert_robot_coords[1], convert_robot_coords[0], color='red', marker='x')
+                        plt.savefig(img_save_path)
+                        plt.close() 
+                    else:
+                        plt.imsave(img_save_path, self.occupancy_map, cmap = "gray")
+
                     log.info(f"Occupancy map saved at {img_save_path}")
     
     @property

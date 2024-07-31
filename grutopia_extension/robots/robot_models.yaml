@@ -128,9 +128,9 @@ robots:
   - name: "pano_camera_315"
     type: "Camera"
     prim_path: "torso_link/h1_pano_camera_315"
-  # - name: "camera_lookdown"
-  #   type: "Camera"
-  #   prim_path: "torso_link/h1_camera_lookdown"
+  - name: "camera_lookdown"
+    type: "Camera"
+    prim_path: "torso_link/h1_camera_lookdown"
 - type: "CylinderRobot"
   usd_path: "GRUtopia/assets/robots/Cylinder/cy_4_cameras_simple.usd"
   gains: [0, 0]

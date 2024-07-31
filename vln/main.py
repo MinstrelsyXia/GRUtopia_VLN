@@ -65,7 +65,8 @@ def build_dataset(vln_config, sim_config):
     '''
     vln_dataset = VLNDataLoader(vln_config, 
                                 sim_config=sim_config)
-    camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params]
+    camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params if x.enable]
+    camera_list = ["pano_camera_0", "camera_lookdown"] # !!! for debugging
     vln_config.camera_list = camera_list
     
     return vln_dataset
