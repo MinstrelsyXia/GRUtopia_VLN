@@ -83,7 +83,7 @@
                 // "--headless",
                 "--path_id", "1726",
                 // "--path_id", "2234"
-                "--save_obs"
+                // "--save_obs"
             ]
         },
         {

@@ -98,7 +98,7 @@ class BEVMap:
                 adjusted_coords_with_z = np.hstack((adjusted_coords, downsampled_cloud[:,2].reshape(-1,1)))
                 point_to_consider = adjusted_coords_with_z[(adjusted_coords_with_z[:, 0] < self.quadtree_width) & (adjusted_coords_with_z[:, 1] < self.quadtree_height)] # !!! there seems that 0 and 1 are reversed
 
-                point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z-self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))].astype(int) # points that are within the robot's height range (occupancy)
+                point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z+self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))].astype(int) # points that are within the robot's height range (occupancy)
 
                 # point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z-1)) & (point_to_consider[:,2]<=(robot_bottom_z+2))].astype(int) # points that are within the robot's height range (occupancy)
 
@@ -140,7 +140,7 @@ class BEVMap:
                         # Draw the robot's position using a red 'x' mark
                         plt.figure()
                         plt.imshow(occupancy_map_with_robot, cmap='gray')
-                        plt.scatter(convert_robot_coords[1], convert_robot_coords[0], color='red', marker='x')
+                        plt.scatter(convert_robot_coords[0], convert_robot_coords[1], color='red', marker='x')
                         plt.savefig(img_save_path)
                         plt.close() 
                     else:

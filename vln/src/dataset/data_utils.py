@@ -473,6 +473,7 @@ class VLNDataLoader(Dataset):
             if is_stuck:
                 log.info("Robot is stuck. Reset robot pose.")
             random_position = self.randomly_pick_position_from_freemap()
-            self.reset_robot(random_position, self.agent_last_valid_rotation)
+            # self.reset_robot(random_position, self.agent_last_valid_rotation)
+            self.reset_robot(random_position, self.agent_init_rotation)
             log.info(f"Reset robot pose to {random_position}.")
             return True

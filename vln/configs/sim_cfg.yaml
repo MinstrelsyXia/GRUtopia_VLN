@@ -52,9 +52,9 @@ tasks:
     - name: "pano_camera_315"
       enable: true
       size: [224, 224]
-    - name: "camera_lookdown"
-      enable: true
-      size: [224, 224]
+    # - name: "camera_lookdown"
+    #   enable: true
+    #   size: [224, 224]
     # - name: "camera_front"
     #   enable: true
     #   size: [640, 480]
