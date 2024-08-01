@@ -66,7 +66,7 @@ def build_dataset(vln_config, sim_config):
     vln_dataset = VLNDataLoader(vln_config, 
                                 sim_config=sim_config)
     camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params if x.enable]
-    camera_list = ["pano_camera_0"] # !!! for debugging
+    # camera_list = ["pano_camera_0"] # !!! for debugging
     vln_config.camera_list = camera_list
     
     return vln_dataset
@@ -100,6 +100,7 @@ def vis_one_path(args, vln_envs):
 
     while env.simulation_app.is_running():
         i += 1
+        reset_flag = False
         env_actions = []
         # env_actions.append(actions)
         
@@ -110,11 +111,17 @@ def vis_one_path(args, vln_envs):
             obs = env.step(actions=env_actions)
             agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
             continue
+        
+        if i % 10 == 0:
+            print(i)
+            if vln_config.settings.check_and_reset_robot:
+                reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=vln_config.test_verbose)
+                reset_flag = reset_robot
 
         if i % 100 == 0:
             print(i)
-            if vln_config.settings.check_and_reset_robot:
-                reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, verbose=True)
+            if (not reset_flag) and vln_config.settings.check_and_reset_robot:
+                reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=True, verbose=vln_config.test_verbose)
                 if not reset_robot:
                     # if args.save_obs:
                     #     vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
@@ -130,8 +137,10 @@ def vis_one_path(args, vln_envs):
                         log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
                         if args.save_obs:
                             vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
-                        vln_envs.update_occupancy_map(verbose=True)
-                        exe_path, node_type = vln_envs.bev.navigate_p2p(paths[current_point], paths[current_point+1], verbose=True)
+                        vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
+                        exe_path, node_type = vln_envs.bev.navigate_p2p(paths[current_point], paths[current_point+1], verbose=vln_config.test_verbose)
+                        if node_type == 2:
+                            log.info("Path planning fails to find the path from the current point to the next point.")
                         current_point += 1
                         actions = {'h1': {'move_along_path': [exe_path]}}
                     else:
@@ -140,9 +149,9 @@ def vis_one_path(args, vln_envs):
                             if current_point < len(paths)-1:
                                 if args.save_obs:
                                     vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
-                                vln_envs.update_occupancy_map(verbose=True)
+                                vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
                                 robot_current_pos = vln_envs.agents.get_world_pose()[0]
-                                exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point+1], verbose=True)
+                                exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point+1], verbose=vln_config.test_verbose)
                                 current_point += 1
 
                                 actions = {'h1': {'move_along_path': [exe_path]}} 
@@ -159,7 +168,7 @@ def vis_one_path(args, vln_envs):
                             vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
                     
                         # update BEVMap every specific intervals
-                        vln_envs.update_occupancy_map(verbose=True)
+                        vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
                         vln_envs.bev.step_time = i
 
                         # after BEVMap's update, determine whether the robot's path is blocked
@@ -168,7 +177,7 @@ def vis_one_path(args, vln_envs):
                             next_action_pose = exe_path[agent_action_state['current_index']+1] if len(exe_path)>agent_action_state['current_index']+1 else agent_action_state['current_point']
                             if vln_envs.bev.is_collision(agent_current_pose, next_action_pose):
                                 log.info("===The robot's path is blocked. Replanning now.===")
-                                exe_path, _ = vln_envs.bev.navigate_p2p(agent_current_pose, paths[current_point], verbose=True)
+                                exe_path, _ = vln_envs.bev.navigate_p2p(agent_current_pose, paths[current_point], verbose=vln_config.test_verbose)
             
         env_actions.append(actions)
         obs = env.step(actions=env_actions)

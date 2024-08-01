@@ -21,22 +21,24 @@ robots:
     z_offset: 1.05 # !!!
   
 maps:
-  robot_z: [0.2, 1.7]  # Robot's height range on the Z-axis
+  robot_z: [0.1, 1.7]  # Robot's height range on the Z-axis
   global_robot_z: [0, 1.7]
-  robot_radius: 0.1 # Robot's radius
+  agent_radius: 0.2 # Robot's radius
   voxel_size: 0.05  # Size of a voxel
+  add_dilation: true # Add dilation to the map
   quadtree_config:
     width: 25 # Quadtree map size
     height: 25
     global_width: 30 # for global map
     global_height: 30
-    max_depth: 10  # Maximum depth of the quadtree
+    max_depth: 8  # Maximum depth of the quadtree
     threshold: 1  # Threshold for node splitting  
     
 planners:
-  agent_radius: 0.25 # Radius of the agent
+  method: "rrt_star" # The method used for planning (a_star or rrt_star)
+  agent_radius: 0 # Radius of the agent
   last_scope: 1  # The last scope
   goal_sampling_rate: 0.2  # Goal sampling rate
-  max_iter: 2000  # Maximum number of iterations
+  max_iter: 3000  # Maximum number of iterations
   extend_length: 1  # Extension length
-  consider_range: 5  # A range parameter, specific meaning depends on context
+  consider_range: 3  # A range parameter, specific meaning depends on context

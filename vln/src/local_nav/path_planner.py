@@ -1,11 +1,15 @@
 import numpy as np
-np.random.seed(2024)
+import math
+# np.random.seed(2024)
 import matplotlib.pyplot as plt
 import matplotlib.path as mpath
 from matplotlib.patches import Polygon
 from scipy.ndimage import distance_transform_edt
+from shapely.geometry import LineString
 
 from collections import deque
+
+from grutopia.core.util.log import log
 ######################## find nearest unoccupied ###############################################
 def is_valid(occupancy_map, x, y, r):
     return np.all(occupancy_map[max(y-r, 0): min(y+r, occupancy_map.shape[0]), max(x-r, 0): min(x+r, occupancy_map.shape[1])])==0
@@ -244,11 +248,12 @@ class QuadTreeNode:
         plt.close()
         # plt.show()
 
-class PathPlanning:
-    def __init__(self, occupy_map: QuadTreeNode, origin_map, agent_radius=10, last_scope = 100, goal_sampling_rate=0.2, extend_length = 5, max_iter=2000, consider_range = 30):
+class RRTstarPathPlanning:
+    def __init__(self, occupy_map: QuadTreeNode, origin_map, agent_radius=10, last_scope = 100, goal_sampling_rate=0.2, extend_length = 5, max_iter=2000, consider_range = 30,
+                 random_range=None):
         self.occupy_map = occupy_map
-        self.origin_map = origin_map
-        self.distance_map = distance_transform_edt(origin_map)
+        self.origin_map = origin_map # 0: obstacle, 1: free
+        # self.distance_map = distance_transform_edt(origin_map) # the distance from all free(or unknown) nodes to the nearest obstacle spaces
         self.agent_radius = agent_radius
         self.last_scope = last_scope
         self.nodes = []
@@ -256,6 +261,16 @@ class PathPlanning:
         self.extend_length = extend_length
         self.max_iter = max_iter
         self.consider_range = consider_range
+        self.random_range = random_range
+        # if self.random_range is not None:
+        #     x_min, y_min, x_max, y_max = self.random_range
+        #     mask = np.zeros_like(self.origin_map, dtype=bool)
+        #     mask[y_min:y_max, x_min:x_max] = True
+        #     # Set values outside the range to 0
+        #     origin_map[~mask] = 0
+        #     self.distance_map = distance_transform_edt(origin_map)
+        # else:
+        self.distance_map = distance_transform_edt(origin_map)
 
     def get_random_node(self, goal):
         if np.random.rand() < self.goal_sampling_rate:
@@ -264,7 +279,7 @@ class PathPlanning:
         else:
             probability_distribution = self.distance_map ** 2
             normalized_distribution = probability_distribution / np.sum(probability_distribution)
-            flat_index = np.random.choice(len(probability_distribution.ravel()), p=normalized_distribution.ravel())
+            flat_index = np.random.choice(len(probability_distribution.ravel()), p=normalized_distribution.ravel()) # 
             rows, cols = self.distance_map.shape
             row_index = flat_index // cols
             col_index = flat_index % cols
@@ -274,6 +289,8 @@ class PathPlanning:
         return min(nodes, key=lambda node: np.hypot(node.x - random_node.x, node.y - random_node.y))
 
     def steer(self, from_node, to_node):
+        ''' 判断起点到终点的距离是否大于extend_length，如果大于则在from_node和to_node之间插入一个新的节点，否则直接返回to_node。cost是当前节点的cost加到下一个节点的距离。
+        '''
         if from_node == to_node:
             return from_node
         dist = np.hypot(to_node.x - from_node.x, to_node.y - from_node.y)
@@ -348,15 +365,11 @@ class PathPlanning:
         Returns:
         The node chosen as the best parent. If no suitable parent is found, returns None.
         """
-        if new_node.x == 104 and new_node.y ==532 and new_node.parent==new_node:
-            print('')
         if not near_nodes:
             return new_node.parent
         
         costs = []
         for node in near_nodes:
-            if node.x == 104 and node.y ==532 and node==new_node:
-                print('')
             if self.collision_free(node, new_node, mode='rrt'):
                 # Calculate the cost to reach new_node from the current near node
                 costs.append(node.cost + np.hypot(node.x - new_node.x, node.y - new_node.y))
@@ -374,8 +387,7 @@ class PathPlanning:
         best_parent_node = near_nodes[min_index]
         
         new_node.parent = best_parent_node
-        if best_parent_node.x == 104 and best_parent_node.y ==532 and best_parent_node == new_node:
-            print('')
+
         return best_parent_node
 
     def reconnect(self, near_nodes, new_node):
@@ -396,17 +408,17 @@ class PathPlanning:
     def rrt_star(self, start, goal):
         self.nodes = [start]
         for _ in range(self.max_iter):
-            random_node = self.get_random_node(goal)
-            nearest = self.nearest_node(self.nodes, random_node)
+            random_node = self.get_random_node(goal) # 随机采点，会先将所有的free space处理成距离最近障碍物的距离数值，然后根据这个数值的平方的倒数的归一化作为概率分布，随机采点
+            nearest = self.nearest_node(self.nodes, random_node) # 从现有路径中找到距离这个随机点最近的点
             new_node = self.steer(nearest, random_node)
             if self.collision_free(nearest, new_node, mode='rrt'):
-                near_nodes = self.find_near_nodes(new_node)
-                parent_node = self.choose_parent(near_nodes, new_node)
+                near_nodes = self.find_near_nodes(new_node) # 找到距离new_node最近的一些点
+                parent_node = self.choose_parent(near_nodes, new_node) # 从这些点中选择一个作为new_node的parent。如果返回None，说明没有找到合适的parent(都有碰撞)
                 if parent_node:
                     new_node.parent = parent_node
                     new_node.cost = parent_node.cost + np.hypot(new_node.x - parent_node.x, new_node.y - parent_node.y)
                     self.nodes.append(new_node)
-                    self.reconnect(near_nodes, new_node)
+                    self.reconnect(near_nodes, new_node) # 以更小的代价更所所有点的连接
 
                 if np.hypot(new_node.x - goal.x, new_node.y - goal.y) < self.last_scope-1:
                     final_node = self.steer(new_node, goal)  # Attempt to connect directly to goal
@@ -467,6 +479,230 @@ class PathPlanning:
         plt.savefig(name)
         plt.close()
         # plt.show()
+
+class AStarPlanner:
+    def __init__(self, occupy_map, obs_map, agent_radius=1, resolution=1, max_step=10000, show_animation=False, verbose=False):
+        """
+        Initialize grid map for a star planning.
+        Note that this class does not consider the robot's radius. So the given obs_map should be expanded
+        """
+        self.occupy_map = occupy_map
+        self.resolution = resolution
+        self.agent_radius = agent_radius
+        self.min_x, self.min_y = 0, 0
+        self.max_x, self.max_y = obs_map.shape[0], obs_map.shape[1]
+        self.x_width = round((self.max_x - self.min_x) / self.resolution)
+        self.y_width = round((self.max_y - self.min_y) / self.resolution)
+        self.motion = self.get_motion_model()
+        self.obstacle_map = obs_map # 1 if obstacle, 0 if free
+        self.show_animation = show_animation # draw animation
+        self.verbose = verbose # show the path planning result
+        self.max_step = max_step
+
+    class Node:
+        def __init__(self, x, y, cost, parent_index):
+            self.x = x  # index of grid
+            self.y = y  # index of grid
+            self.cost = cost
+            self.parent_index = parent_index
+
+        def __str__(self):
+            return str(self.x) + "," + str(self.y) + "," + str(
+                self.cost) + "," + str(self.parent_index)
+
+    def planning(self, sx, sy, gx, gy, min_final_meter=1, img_save_path='a_star.png'):
+        """
+        A star path search
+
+        input:
+            s_x: start x position [m]
+            s_y: start y position [m]
+            gx: goal x position [m]
+            gy: goal y position [m]
+
+        output:
+            rx: x position list of the final path
+            ry: y position list of the final path
+        """
+
+        start_node = self.Node(self.calc_xy_index(sx, self.min_x),
+                               self.calc_xy_index(sy, self.min_y), 0.0, -1)
+        goal_node = self.Node(self.calc_xy_index(gx, self.min_x),
+                              self.calc_xy_index(gy, self.min_y), 0.0, -1)
+
+        open_set, closed_set = dict(), dict()
+        open_set[self.calc_grid_index(start_node)] = start_node
+
+        if self.show_animation or self.verbose:
+            # xlim and ylim let the plot (0,0) begin from the bottom left
+            plt.xlim(0, self.obstacle_map.shape[0]) 
+            plt.ylim(0, self.obstacle_map.shape[1]) 
+            obs_map_draw = self.obstacle_map.transpose(1,0) # transpose the map to match the plot
+            plt.imshow(obs_map_draw, cmap='gray')
+            plt.plot(sx, sy, "og", label="start")
+            plt.plot(gx, gy, "xb", label="end")
+            plt.legend()
+            plt.grid(True)
+            plt.axis("equal")
+
+        step = 0
+        while step < self.max_step:
+            step += 1
+            if len(open_set) == 0:
+                log.info("Path Planning failed! Open set is empty..")
+                break
+
+            c_id = min(
+                open_set,
+                key=lambda o: open_set[o].cost + self.calc_heuristic(goal_node,
+                                                                     open_set[
+                                                                         o]))
+            current = open_set[c_id]
+
+            # show graph
+            if self.show_animation:  # pragma: no cover
+                plt.plot(self.calc_grid_position(current.x, self.min_x),
+                         self.calc_grid_position(current.y, self.min_y), "xc")
+                # for stopping simulation with the esc key.
+                plt.gcf().canvas.mpl_connect('key_release_event',
+                                             lambda event: [exit(
+                                                 0) if event.key == 'escape' else None])
+                if len(closed_set.keys()) % 10 == 0:
+                    plt.pause(0.001)
+
+            # if current.x == goal_node.x and current.y == goal_node.y:
+            to_final_dis = self.calc_heuristic(current, goal_node)
+            if to_final_dis <= min_final_meter:
+                print("Find goal")
+                goal_node.parent_index = current.parent_index
+                goal_node.cost = current.cost
+                break
+
+            # Remove the item from the open set
+            del open_set[c_id]
+
+            # Add it to the closed set
+            closed_set[c_id] = current
+
+            # expand_grid search grid based on motion model
+            for i, _ in enumerate(self.motion):
+                node = self.Node(current.x + self.motion[i][0],
+                                 current.y + self.motion[i][1],
+                                 current.cost + self.motion[i][2], c_id)
+                n_id = self.calc_grid_index(node)
+
+                # If the node is not safe, do nothing
+                if not self.verify_node(node):
+                    continue
+
+                if n_id in closed_set:
+                    continue
+
+                if n_id not in open_set:
+                    open_set[n_id] = node  # discovered a new node
+                else:
+                    if open_set[n_id].cost > node.cost:
+                        # This path is the best until now. record it
+                        open_set[n_id] = node
+
+        find_flag = True
+        if step == self.max_step:
+            log.info("Cannot find path. Return the path to the nearest node")
+            goal_node = current
+            find_flag = False
+
+        rx, ry = self.calc_final_path(goal_node, closed_set)
+
+        points = self.simplify_path(list(zip(rx, ry)))
+        points.append((gx, gy))
+
+        if self.verbose:
+            # show the path planning result
+            # plt.plot(rx, ry, "-r")
+            plt.plot([x for x, y in points], [y for x, y in points], "-r")
+            plt.savefig(img_save_path)
+            plt.close()
+            
+            log.info("Path has been saved to {}".format(img_save_path))
+
+        return points, find_flag
+
+    def calc_final_path(self, goal_node, closed_set):
+        # generate final course
+        rx, ry = [self.calc_grid_position(goal_node.x, self.min_x)], [
+            self.calc_grid_position(goal_node.y, self.min_y)]
+        parent_index = goal_node.parent_index
+        while parent_index != -1:
+            n = closed_set[parent_index]
+            rx.append(self.calc_grid_position(n.x, self.min_x))
+            ry.append(self.calc_grid_position(n.y, self.min_y))
+            parent_index = n.parent_index
+
+        return rx, ry
+
+    @staticmethod
+    def calc_heuristic(n1, n2):
+        w = 1.0  # weight of heuristic
+        d = w * math.hypot(n1.x - n2.x, n1.y - n2.y)
+        return d
+
+    def calc_grid_position(self, index, min_position):
+        """
+        calc grid position
+
+        :param index:
+        :param min_position:
+        :return:
+        """
+        pos = index * self.resolution + min_position
+        return pos
+
+    def calc_xy_index(self, position, min_pos):
+        return round((position - min_pos) / self.resolution)
+
+    def calc_grid_index(self, node):
+        return (node.y - self.min_y) * self.x_width + (node.x - self.min_x)
+
+    def verify_node(self, node):
+        px = self.calc_grid_position(node.x, self.min_x)
+        py = self.calc_grid_position(node.y, self.min_y)
+
+        if px < self.min_x:
+            return False
+        elif py < self.min_y:
+            return False
+        elif px >= self.max_x:
+            return False
+        elif py >= self.max_y:
+            return False
+
+        # collision check
+        if self.obstacle_map[node.x][node.y]:
+            return False
+
+        return True
+    
+    @staticmethod
+    def get_motion_model():
+        # dx, dy, cost
+        motion = [[1, 0, 1],
+                  [0, 1, 1],
+                  [-1, 0, 1],
+                  [0, -1, 1],
+                  [-1, -1, math.sqrt(2)],
+                  [-1, 1, math.sqrt(2)],
+                  [1, -1, math.sqrt(2)],
+                  [1, 1, math.sqrt(2)]]
+
+        return motion
+
+    def simplify_path(self, points, tolerance=0.01):
+        ''' The tolerance sets sampling distance. The smaller the tolerance, the more points in the simplified line.
+        '''
+        line = LineString(points)
+        simplified_line = line.simplify(tolerance, preserve_topology=False)
+        return list(simplified_line.coords)
+    
 
 if __name__ == "__main__":
     import yaml

@@ -129,8 +129,8 @@ class HumanoidMoveBySpeedController(BaseController):
 
         joint_pos -= default_dof_pos
 
-        right_ankle_height = self.robot.get_ankle_base()[0][2]
-        base_height = base_pose_w[0][2] - right_ankle_height + 0.0758 # 0.0758 is the height of the right ankle from the ground. # !!!
+        ankle_height = self.robot.get_ankle_base_z()
+        base_height = base_pose_w[0][2] - ankle_height + 0.0758 # 0.0758 is the height of the right ankle from the ground. # !!!
         # base_height = 1.05
         
         # base_height = base_pose_w[0][2] # This value should be replaced by a relative height (from pelves to ground).

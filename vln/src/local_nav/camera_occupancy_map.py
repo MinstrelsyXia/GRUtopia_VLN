@@ -218,10 +218,14 @@ class CamOccupancyMap:
 
         # Normalize the normal vectors (ignoring the last component if it exists)
         norm_magnitudes = np.linalg.norm(normals[..., :3], axis=2)
-        normalized_normals = normals[..., :3] / norm_magnitudes[..., np.newaxis]
-
-        # Generate mask for flat surfaces based on normal vectors
-        flat_surface_mask = np.abs(normalized_normals[..., 2] - 1) < normal_threshold
+        try:
+            normalized_normals = normals[..., :3] / norm_magnitudes[..., np.newaxis]
+            # Generate mask for flat surfaces based on normal vectors
+            flat_surface_mask = np.abs(normalized_normals[..., 2] - 1) < normal_threshold
+        except Exception:
+            # NOTE: Sometimes the normal vectors are not available? 
+            # the issue is: RuntimeWarning: invalid value encountered in divide
+            flat_surface_mask = np.zeros_like(depth, dtype=bool)
 
         # Generate mask for depth within the acceptable range
         depth_mask = (depth >= min_height) & (depth < max_height)

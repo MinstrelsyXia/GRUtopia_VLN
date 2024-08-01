@@ -78,11 +78,11 @@
             "justMyCode": false,
             "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
             "args":[
-                // "--test_verbose",
+                "--test_verbose",
                 // "--wait"
                 // "--headless",
-                "--path_id", "1726",
-                // "--path_id", "2234"
+                "--path_id", "5593",
+                // "--path_id", "1726"
                 // "--save_obs"
             ]
         },

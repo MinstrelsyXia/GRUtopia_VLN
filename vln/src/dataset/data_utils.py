@@ -15,7 +15,7 @@ from torchvision import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 import importlib
-from scipy.ndimage import convolve
+from scipy.ndimage import convolve, gaussian_filter
 
 try:
     from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
@@ -171,7 +171,7 @@ class VLNDataLoader(Dataset):
         self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot type
         
         self.bev = None
-        
+        self.surrounding_freemap_connected = None
     
     def __len__(self):
         return len(self.data)
@@ -205,7 +205,7 @@ class VLNDataLoader(Dataset):
     
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
-        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base()[0][2]-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
     
     @property
     def current_task_stage(self):
@@ -329,7 +329,7 @@ class VLNDataLoader(Dataset):
         '''
         pointclouds, _, _ = self.process_pointcloud(self.args.camera_list)
         robot_ankle_z = self.get_robot_bottom_z()
-        self.bev.update_occupancy_map(pointclouds, robot_ankle_z, verbose=verbose, robot_coords=self.get_agent_pose()[0])
+        self.bev.update_occupancy_map(pointclouds, robot_ankle_z, add_dilation=self.args.maps.add_dilation, verbose=verbose, robot_coords=self.get_agent_pose()[0])
 
     def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, adjust=False, initial_pose=None, initial_rotation=None):
         '''
@@ -430,16 +430,20 @@ class VLNDataLoader(Dataset):
         distances = np.linalg.norm(free_indices - freemap_center, axis=1)
 
         # Compute weights using a Gaussian function
-        sigma = np.std(distances)  # Standard deviation as a parameter for the Gaussian function
-        distance_weights = np.exp(-distances**2 / (2 * sigma**2))
+        # sigma = 10 * np.std(distances)  # Standard deviation as a parameter for the Gaussian function
+        # distance_weights = np.exp(-distances**2 / (2 * sigma**2))
+        distance_weights = 1 / (1 + distances)
 
         # Compute density of free space around each free position
-        kernel = np.ones((5, 5))  # Example kernel size, adjust as needed
-        density_map = convolve(free_map.astype(float), kernel, mode='constant', cval=0.0)
-        density_weights = density_map[free_indices[:, 0], free_indices[:, 1]]
+        # kernel = np.ones((7, 7))  # Example kernel size, adjust as needed
+        # density_map = convolve(free_map.astype(float), kernel, mode='constant', cval=0.0)
+        # kernel_size = 200  # Increase kernel size for smoother density map
+        # density_map = gaussian_filter(free_map.astype(float), sigma=kernel_size/2)
+        # density_weights = density_map[free_indices[:, 0], free_indices[:, 1]]
 
         # Combine distance-based weights with density-based weights
-        combined_weights = distance_weights * density_weights
+        # combined_weights = distance_weights * density_weights
+        combined_weights = distance_weights
 
         # Normalize weights to sum to 1
         combined_weights /= combined_weights.sum()
@@ -461,11 +465,12 @@ class VLNDataLoader(Dataset):
         self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
         self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))
     
-    def check_and_reset_robot(self, cur_iter, verbose=False):
+    def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False):
         is_fall = self.check_robot_fall(self.agents, adjust=False)
         is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=500, threshold=0.2)
         if (not is_fall) and (not is_stuck):
-            self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
+            if update_freemap:
+                self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
             return False
         else:
             if is_fall:

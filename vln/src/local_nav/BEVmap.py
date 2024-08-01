@@ -9,7 +9,7 @@ from scipy.ndimage import binary_dilation
 
 from grutopia.core.util.log import log
 
-from .path_planner import QuadTreeNode, Node, PathPlanning
+from .path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
 
 class BEVMap:
     def __init__(self, args, robot_init_pose=(0, 0, 0)):
@@ -32,8 +32,8 @@ class BEVMap:
         # let the agent's initial point to be the origin of the map
         self.init_world_pos = np.array(robot_init_pose)
         self.robot_z = args.maps.robot_z  # The height(m) range of robot
-        self.robot_radius = args.maps.robot_radius  # The radius(m) of robot
-        self.dilation_structure = self.create_dilation_structure(self.robot_radius)
+        self.agent_radius = args.maps.agent_radius  # The radius(m) of robot
+        self.dilation_structure = self.create_dilation_structure(self.agent_radius)
 
         # Attributes for path_planner
         self.planner_config = args.planners
@@ -100,8 +100,6 @@ class BEVMap:
 
                 point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z+self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))].astype(int) # points that are within the robot's height range (occupancy)
 
-                # point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z-1)) & (point_to_consider[:,2]<=(robot_bottom_z+2))].astype(int) # points that are within the robot's height range (occupancy)
-
                 unique_data_0 = np.unique(point_within_robot_z[:, :2], axis=0)
                 unique_data_all = np.unique(point_to_consider[:, :2], axis=0).astype(int)
                 unique_data_1 = np.array(list(set(map(tuple, unique_data_all)) - set(map(tuple, unique_data_0)))).astype(int) # points that are not within the robot's height range (free)
@@ -130,16 +128,15 @@ class BEVMap:
                         img_save_path = os.path.join(self.args.log_image_dir, "global_occupancy_"+str(self.step_time)+".jpg")
                     else:
                         img_save_path = os.path.join(self.args.log_image_dir, "occupancy_"+str(self.step_time)+".jpg")
-                
+
+                    robot_coords = None
                     if robot_coords is not None:
+                        # NOTE: this coordinate is incorrect for now...
                         # draw the robot's position using the red 'x' mark
-                        convert_robot_coords = ((robot_coords[:2]- self.init_world_pos[:2])/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2]).astype(int)
-
+                        convert_robot_coords = ((robot_coords[:2]- self.init_world_pos[:2])/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2])
                         occupancy_map_with_robot = self.occupancy_map.copy()
-
-                        # Draw the robot's position using a red 'x' mark
-                        plt.figure()
-                        plt.imshow(occupancy_map_with_robot, cmap='gray')
+                        plt.figure(figsize=(10, 10))
+                        plt.imshow(occupancy_map_with_robot, cmap='gray_r', origin='lower', extent=[0, occupancy_map_with_robot.shape[1], 0, occupancy_map_with_robot.shape[0]])
                         plt.scatter(convert_robot_coords[0], convert_robot_coords[1], color='red', marker='x')
                         plt.savefig(img_save_path)
                         plt.close() 
@@ -162,22 +159,29 @@ class BEVMap:
         # if update_candidates:
         #     self.update_candidates(rgb_image, depth_image, verbose)
 
-    def node_to_sim(self, node):
+    def node_to_sim(self, node, z=0, reverse_x_and_y=False):
         if isinstance(node, Node):
             return [(node.x-self.quadtree_width/2)*self.voxel_size + self.init_world_pos[0], 
                     (node.y-self.quadtree_height/2)*self.voxel_size + self.init_world_pos[1], 
                     node.z] 
         if len(list(node))==2:
-            return [(node[1]-self.quadtree_width/2)*self.voxel_size, (node[0]-self.quadtree_height/2)*self.voxel_size, node.z]
+            if reverse_x_and_y:
+                return [(node[1]-self.quadtree_height/2)*self.voxel_size + self.init_world_pos[1], (node[0]-self.quadtree_width/2)*self.voxel_size + self.init_world_pos[0], z]
+            else:
+                return [(node[0]-self.quadtree_width/2)*self.voxel_size + self.init_world_pos[0], (node[1]-self.quadtree_height/2)*self.voxel_size + self.init_world_pos[1], z]
         else:
             raise TypeError(f"Point must be a Node or has length of 2 or 3, but got {type(node).__name__}")
 
-    def transfer_to_node(self, point):
+    def transfer_to_node(self, point, reverse_x_and_y=False):
         if isinstance(point, Node):
             return point
         elif len(list(point))==3:
-            return Node((point[0]-self.init_world_pos[0])/self.voxel_size+self.quadtree_width/2, 
-                        (point[1]-self.init_world_pos[1])/self.voxel_size+self.quadtree_height/2, 
+            if reverse_x_and_y:
+                x_dim, y_dim = 1, 0
+            else:
+                x_dim, y_dim = 0, 1
+            return Node((point[x_dim]-self.init_world_pos[x_dim])/self.voxel_size+self.quadtree_width/2, 
+                        (point[y_dim]-self.init_world_pos[y_dim])/self.voxel_size+self.quadtree_height/2, 
                         point[2])
         else:
             raise TypeError(f"Point must be a Node or has length of 2 or 3, but got {type(point).__name__}")
@@ -196,10 +200,69 @@ class BEVMap:
          ] for n in range(num_samples + 1)]
 
         return sampled_points
+
+    def find_non_zero_range(self, array):
+        length = len(array)
+        l = 0
+        r = length - 1
+        while l < length:
+            if array[l] != 0:
+                break
+            l += 1
+        while r >= 0:
+            if array[r] != 0:
+                break
+            r -= 1
+        
+        return l, r
     
-    def navigate_p2p(self, current, target, verbose = False) -> list:
+    def navigate_p2p(self, current, target, verbose=False):
+        if self.args.planners.method == 'rrt_star':
+            return self.navigate_p2p_rrt_star(current, target, verbose=verbose)
+        elif self.args.planners.method == 'a_star':
+            return self.navigate_p2p_a_star(current, target, verbose=verbose)
+        else:
+            raise NotImplementedError(f"Navigation method {self.args.planners.method} is not implemented.")
+    
+    def navigate_p2p_a_star(self, start, goal, verbose = False) -> list:
         """
         Sends the target to P2P Navigation for pathfinding.
+        return final_path, result_type. result_type: 0->success, 1->path found but goal occupied, 2->no path found
+        """
+        # Code to navigate to the next target point
+        current = self.transfer_to_node(start, reverse_x_and_y=True)
+        target = self.transfer_to_node(goal, reverse_x_and_y=True)
+        
+        # refresh the map before navigation
+        quad_tree = deepcopy(self.quad_tree_root)
+        radius = int(np.ceil(self.planner_config.agent_radius))
+        area_bottom_left_x, area_bottom_left_y = int(current.x - radius), int(current.y - radius)
+        area_width, area_height = int(2*radius), int(2*radius)
+        quadtree_map = 1 - (self.occupancy_map == 0)
+
+        quadtree_map[area_bottom_left_y: area_bottom_left_y + area_height, area_bottom_left_x: area_bottom_left_x + area_width] = np.ones((area_height, area_width)) # !!!
+
+        quad_tree.update(quadtree_map, area_bottom_left_x, area_bottom_left_y, area_width, area_height)
+
+        path_planner = AStarPlanner(occupy_map=quad_tree,
+                                    obs_map=np.logical_not(quadtree_map),
+                                    max_step=self.planner_config.max_iter,
+                                    verbose=verbose)
+        
+        paths, find_flag = path_planner.planning(current.x, current.y, target.x, target.y,
+                                      min_final_meter=self.planner_config.last_scope,
+                                      img_save_path=os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg"))
+        
+        transfer_paths = []
+        for node in paths:
+            transfer_paths.append(self.node_to_sim(node, current.z, reverse_x_and_y=True))
+        
+        return transfer_paths, find_flag
+
+    def navigate_p2p_rrt_star(self, current, target, verbose = False) -> list:
+        """
+        Sends the target to P2P Navigation for pathfinding.
+        return final_path, result_type. result_type: 0->success, 1->path found but goal occupied, 2->no path found
         """
         # Code to navigate to the next target point
         current = self.transfer_to_node(current)
@@ -209,7 +272,7 @@ class BEVMap:
         radius = int(np.ceil(self.planner_config.agent_radius))
         area_bottom_left_x, area_bottom_left_y = int(current.x - radius), int(current.y - radius)
         area_width, area_height = int(2*radius), int(2*radius)
-        quadtree_map = 1 - (self.occupancy_map == 0)
+        quadtree_map = 1 - (self.occupancy_map == 0) # 0->0, others -> 1
 
         quadtree_map[area_bottom_left_y: area_bottom_left_y + area_height, area_bottom_left_x: area_bottom_left_x + area_width] = np.ones((area_height, area_width)) # !!!
         # quadtree_map[area_bottom_left_x: area_bottom_left_x + area_width, area_bottom_left_y: area_bottom_left_y + area_height] = np.ones((area_width, area_height))
@@ -220,7 +283,7 @@ class BEVMap:
         # quadtree_map[y: y + height, x: x + width] = np.ones((height, width))
         quad_tree.update(quadtree_map, area_bottom_left_x, area_bottom_left_y, area_width, area_height)
 
-        path_planner = PathPlanning(quad_tree, quadtree_map, 
+        path_planner = RRTstarPathPlanning(occupy_map=quad_tree, origin_map=quadtree_map, 
                             agent_radius=self.planner_config.agent_radius,
                             last_scope=self.planner_config.last_scope,
                             goal_sampling_rate=self.planner_config.goal_sampling_rate,
@@ -229,6 +292,8 @@ class BEVMap:
                             consider_range=self.planner_config.consider_range) # Navigation method
         # path_planner = PathPlanning(self.bev_map.quad_tree_root, 1-(self.bev_map.occupancy_map==0), **self.planner_config) # Navigation method
         node, node_type= path_planner.rrt_star(current, target)
+        if node_type == 2:
+            log.info("Path planning fails to find the path from the current point to the next point.")
         if verbose:
             path_save_path = os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg")
             path_planner.plot_path(node, current, target, path_save_path)
@@ -263,14 +328,63 @@ class BEVMap:
         # format input
         current = self.transfer_to_node(current)
         target = self.transfer_to_node(target)
-        
-        path_planner = PathPlanning(self.quad_tree_root, self.occupancy_map==2, # ??? why 2 
-                            agent_radius=self.planner_config.agent_radius,
-                            last_scope=self.planner_config.last_scope,
-                            goal_sampling_rate=self.planner_config.goal_sampling_rate,
-                            max_iter=self.planner_config.max_iter,
-                            extend_length=self.planner_config.extend_length,
-                            consider_range=self.planner_config.consider_range) # Navigation method
+        return not self.collision_free(current, target, self.planner_config.agent_radius, self.quad_tree_root)
+
+        if self.args.planners.method == 'rrt_star':
+            path_planner = RRTstarPathPlanning(self.quad_tree_root, self.occupancy_map==2, # ??? why 2 
+                                agent_radius=self.planner_config.agent_radius,
+                                last_scope=self.planner_config.last_scope,
+                                goal_sampling_rate=self.planner_config.goal_sampling_rate,
+                                max_iter=self.planner_config.max_iter,
+                                extend_length=self.planner_config.extend_length,
+                                consider_range=self.planner_config.consider_range) # Navigation method
+        elif self.args.planners.method == 'a_star':
+            path_planner = AStarPlanner(occupy_map=self.quad_tree_root,
+                                    obs_map=self.occupancy_map==2,
+                                    max_step=self.planner_config.max_iter)
         # path_planner = PathPlanning(self.bev_map.quad_tree_root, 1-(self.bev_map.occupancy_map==0), **self.planner_config) # Navigation method
         return not path_planner.collision_free(current, target)
+    
+    def collision_free(self, from_node, to_node, agent_radius, occupy_map):
+        """
+        Check if the path from from_node to to_node collides with any obstacles in the environment.
+        
+        Parameters:
+        from_node -- The starting Node object with coordinates (x, y)
+        to_node -- The ending Node object with coordinates (x, y)
+        
+        Returns:
+        True if no collision occurs, otherwise False
+        """
+        if from_node == to_node or (from_node.x==to_node.x and from_node.y==to_node.y):
+            return False
+        # Calculate direction vector from from_node to to_node
+        direction_vector = np.array([to_node.y - from_node.y, to_node.x - from_node.x])
+        
+        # Normalize the direction vector
+        norm_direction_vector = direction_vector / np.linalg.norm(direction_vector)
+        
+        # Extend to_node by agent_radius in the direction of to_node
+        extended_to_node = np.array([to_node.y, to_node.x]) + norm_direction_vector * agent_radius
+        
+        # Calculate perpendicular (normal) vector to the direction
+        norm_vector = np.array([-norm_direction_vector[1], norm_direction_vector[0]])
+        
+        # Calculate the four vertices of the parallelogram, ordered clockwise
+        vertices = [
+            (from_node.y + norm_vector[0] * agent_radius, from_node.x + norm_vector[1] * agent_radius),
+            (extended_to_node[0] + norm_vector[0] * agent_radius, extended_to_node[1] + norm_vector[1] * agent_radius),
+            (extended_to_node[0] - norm_vector[0] * agent_radius, extended_to_node[1] - norm_vector[1] * agent_radius),
+            (from_node.y - norm_vector[0] * agent_radius, from_node.x - norm_vector[1] * agent_radius),
+            (from_node.y + norm_vector[0] * agent_radius, from_node.x + norm_vector[1] * agent_radius)
+        ]
+
+        # Step 2: Use quadtree for coarse collision detection
+        # self.occupy_map.draw_polygon_on_map(self.origin_map, vertices)
+        collision_free, bounding_box = occupy_map.query(vertices)
+        # print(collision_free)
+        if collision_free:
+            # Quadtree query indicates no collision will occur
+            return True
+        return False
     
