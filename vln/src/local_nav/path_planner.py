@@ -4,6 +4,7 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.path as mpath
 from matplotlib.patches import Polygon
+import matplotlib.colors as mcolors
 from scipy.ndimage import distance_transform_edt
 from shapely.geometry import LineString
 
@@ -170,7 +171,7 @@ class QuadTreeNode:
         
         return not collision, (min_x, min_y, width, height)
 
-    def check_collision(self, path):
+    def check_collision(self, path):# -> bool | Any:
         """
         Recursively check if the given path collides with any occupied node.
         This optimized version first checks if the path intersects the current node's area.
@@ -481,12 +482,11 @@ class RRTstarPathPlanning:
         # plt.show()
 
 class AStarPlanner:
-    def __init__(self, occupy_map, obs_map, agent_radius=1, resolution=1, max_step=10000, show_animation=False, verbose=False):
+    def __init__(self, obs_map, agent_radius=1, resolution=1, max_step=10000, show_animation=False, windows_head=False, verbose=False):
         """
         Initialize grid map for a star planning.
         Note that this class does not consider the robot's radius. So the given obs_map should be expanded
         """
-        self.occupy_map = occupy_map
         self.resolution = resolution
         self.agent_radius = agent_radius
         self.min_x, self.min_y = 0, 0
@@ -494,10 +494,14 @@ class AStarPlanner:
         self.x_width = round((self.max_x - self.min_x) / self.resolution)
         self.y_width = round((self.max_y - self.min_y) / self.resolution)
         self.motion = self.get_motion_model()
-        self.obstacle_map = obs_map # 1 if obstacle, 0 if free
+        self.obstacle_map = obs_map # 255: obstacle, 0: free, 2: unknown, 255-2: dilation
         self.show_animation = show_animation # draw animation
         self.verbose = verbose # show the path planning result
         self.max_step = max_step
+        self.windows_head = windows_head
+        
+        if verbose:
+            self.visualize_init()
 
     class Node:
         def __init__(self, x, y, cost, parent_index):
@@ -510,7 +514,43 @@ class AStarPlanner:
             return str(self.x) + "," + str(self.y) + "," + str(
                 self.cost) + "," + str(self.parent_index)
 
-    def planning(self, sx, sy, gx, gy, min_final_meter=1, img_save_path='a_star.png'):
+    def visualize_init(self):
+        """
+        Visualizes the current state of the A* exploration.
+        """
+        self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
+        bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
+        self.norm = mcolors.BoundaryNorm(bounds, self.cmap.N)
+        
+        self.fig = plt.figure(2)  # Create and store a specific figure
+        self.ax = self.fig.add_subplot(111)  # Add a subplot to the figure
+        self.ax.set_title("A* Path Planning")
+        self.ax.grid(True)
+        self.ax.axis("equal")
+        self.ax.set_xlim(0, self.obstacle_map.shape[0]) 
+        self.ax.set_ylim(0, self.obstacle_map.shape[1]) 
+        # self.image_display = self.ax.imshow(np.zeros((10, 10, 3)), aspect='auto', cmap=self.cmap, norm=self.norm)
+    
+    def vis_path(self, obs_map, sx, sy, gx, gy, points, img_save_path, legend=False,):
+        obs_map_draw = obs_map.transpose(1,0) # transpose the map to match the plot
+        # self.image_display.set_data(obs_map_draw)
+        self.ax.imshow(obs_map_draw, cmap=self.cmap, norm=self.norm, aspect='auto')
+        self.ax.plot(sx, sy, "og", label="start")
+        self.ax.plot(gx, gy, "xb", label="end")
+        self.ax.plot([x for x, y in points], [y for x, y in points], "-r")
+        
+        if legend:
+            self.ax.legend()
+        # self.ax.draw_artist(self.ax.patch)  # Efficiently redraw the background
+        # self.ax.draw_artist(self.image_display)  # Efficiently redraw the image
+        
+        self.ax.figure.savefig(img_save_path)
+        log.info("Path has been saved to {}".format(img_save_path))
+        if self.windows_head:
+            plt.show(block=False)
+            plt.pause(0.001)
+
+    def planning(self, sx, sy, gx, gy, min_final_meter=1, img_save_path='a_star.png', obs_map=None, path_legend=False):
         """
         A star path search
 
@@ -524,6 +564,8 @@ class AStarPlanner:
             rx: x position list of the final path
             ry: y position list of the final path
         """
+        if obs_map is not None:
+            self.obstacle_map = obs_map
 
         start_node = self.Node(self.calc_xy_index(sx, self.min_x),
                                self.calc_xy_index(sy, self.min_y), 0.0, -1)
@@ -533,17 +575,9 @@ class AStarPlanner:
         open_set, closed_set = dict(), dict()
         open_set[self.calc_grid_index(start_node)] = start_node
 
-        if self.show_animation or self.verbose:
+        # if self.show_animation or self.verbose:
             # xlim and ylim let the plot (0,0) begin from the bottom left
-            plt.xlim(0, self.obstacle_map.shape[0]) 
-            plt.ylim(0, self.obstacle_map.shape[1]) 
-            obs_map_draw = self.obstacle_map.transpose(1,0) # transpose the map to match the plot
-            plt.imshow(obs_map_draw, cmap='gray')
-            plt.plot(sx, sy, "og", label="start")
-            plt.plot(gx, gy, "xb", label="end")
-            plt.legend()
-            plt.grid(True)
-            plt.axis("equal")
+            # self.vis_obs_map(self.obstacle_map, sx, sy, gx, gy)
 
         step = 0
         while step < self.max_step:
@@ -586,9 +620,14 @@ class AStarPlanner:
 
             # expand_grid search grid based on motion model
             for i, _ in enumerate(self.motion):
-                node = self.Node(current.x + self.motion[i][0],
-                                 current.y + self.motion[i][1],
-                                 current.cost + self.motion[i][2], c_id)
+                x = current.x + self.motion[i][0]
+                y = current.y + self.motion[i][1]
+                obs_cost = self.get_cost(x,y)
+
+                node = self.Node(x,
+                                 y,
+                                 current.cost + self.motion[i][2] + obs_cost,
+                                 c_id)
                 n_id = self.calc_grid_index(node)
 
                 # If the node is not safe, do nothing
@@ -618,13 +657,16 @@ class AStarPlanner:
 
         if self.verbose:
             # show the path planning result
-            # plt.plot(rx, ry, "-r")
-            plt.plot([x for x, y in points], [y for x, y in points], "-r")
-            plt.savefig(img_save_path)
-            plt.close()
-            log.info("Path has been saved to {}".format(img_save_path))
-
+            self.vis_path(self.obstacle_map, sx, sy, gx, gy, points, img_save_path, legend=path_legend)
+            
         return points, find_flag
+
+    def get_cost(self,x,y):
+        if self.obstacle_map[x][y] in [0,2]:
+            cost = 0
+        else:
+            cost = self.obstacle_map[x][y]
+        return cost
 
     def calc_final_path(self, goal_node, closed_set):
         # generate final course
@@ -679,7 +721,7 @@ class AStarPlanner:
             return False
 
         # collision check
-        if self.obstacle_map[node.x][node.y]:
+        if self.obstacle_map[node.x][node.y] == 255:
             return False
 
         return True

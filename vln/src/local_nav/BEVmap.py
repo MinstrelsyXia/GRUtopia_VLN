@@ -4,6 +4,7 @@ import pandas as pd
 import open3d as o3d
 from PIL import Image
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from copy import deepcopy
 from scipy.ndimage import binary_dilation
 import json
@@ -25,7 +26,8 @@ class BEVMap:
         self.quadtree_width = self.quadtree_config.width
         self.quadtree_height = self.quadtree_config.height
         print(f"quadtree width: {self.quadtree_width}, quadtree height: {self.quadtree_height}")
-        self.occupancy_map = np.ones((self.quadtree_height, self.quadtree_width))  # 2D occupancy map
+        # self.occupancy_map = np.ones((self.quadtree_height, self.quadtree_width)) * 255  # 2D occupancy map
+        self.occupancy_map = np.zeros((self.quadtree_height, self.quadtree_width)) # 0 for Unknown, 2 for free, 255 for occupied, 255-2 for dilation
         self.quad_tree_root = QuadTreeNode(x=0, y=0, width=self.quadtree_width, height=self.quadtree_height,
                                            map_data = self.occupancy_map, 
                                            max_depth=self.quadtree_config.max_depth, threshold=self.quadtree_config.threshold)  # quadtrees
@@ -35,14 +37,16 @@ class BEVMap:
         self.robot_z = args.maps.robot_z  # The height(m) range of robot
         self.agent_radius = args.maps.agent_radius  # The radius(m) of robot
         self.dilation_structure = self.create_dilation_structure(self.agent_radius)
+        self.last_obmap_pure = None
 
         # Attributes for path_planner
         self.planner_config = args.planners
+        self.path_planner = None
         
         log.info("BEVMap initialized")
     
     def reset(self):
-        self.occupancy_map = np.ones((self.quadtree_height, self.quadtree_width))
+        self.occupancy_map = np.zeros((self.quadtree_height, self.quadtree_width))
         self.quad_tree_root = QuadTreeNode(0, 0, map_data = self.occupancy_map, **self.quadtree_config)
         self.step_time = 0
         self.world_min_x, self.world_min_y = 0, 0
@@ -105,21 +109,27 @@ class BEVMap:
                 unique_data_all = np.unique(point_to_consider[:, :2], axis=0).astype(int)
                 unique_data_1 = np.array(list(set(map(tuple, unique_data_all)) - set(map(tuple, unique_data_0)))).astype(int) # points that are not within the robot's height range (free)
 
-                last_map = 1 - (self.occupancy_map == 0)
+                occupancy_map = np.zeros((self.quadtree_height, self.quadtree_width))
                 if unique_data_1.size > 0:
-                    self.occupancy_map[unique_data_1[:,1], unique_data_1[:,0]]=2 # free or unknown
+                    occupancy_map[unique_data_1[:,1], unique_data_1[:,0]] = 2 # free
                 if unique_data_0.size > 0: 
-                    self.occupancy_map[unique_data_0[:,1],unique_data_0[:,0]]=0 # occupied
+                    occupancy_map[unique_data_0[:,1],unique_data_0[:,0]] = 255 # occupied
                     if add_dilation:
                         # Create a mask for the free positions and dilate it
-                        free_mask = np.zeros_like(self.occupancy_map, dtype=bool)
-                        free_mask[unique_data_0[:, 1], unique_data_0[:, 0]] = True
-                        expanded_free_mask = binary_dilation(free_mask, structure=self.dilation_structure)
-                        
-                        # Set the expanded free positions to 0
-                        self.occupancy_map[expanded_free_mask] = 0
-
-                self.occupancy_map = self.occupancy_map*last_map
+                        if self.last_obmap_pure is None:
+                            self.last_obmap_pure = occupancy_map.copy() # pure obs_map without any dilation
+                            self.occupancy_map = occupancy_map
+                        else:
+                            # combine the current occupancy with the last one
+                            self.occupancy_map = np.maximum(self.last_obmap_pure,occupancy_map)
+                            self.last_obmap_pure = self.occupancy_map.copy()
+                        for i in range(1, self.args.maps.dilation_iterations):
+                            ob_mask = np.logical_and(self.occupancy_map!=0, self.occupancy_map!=2)
+                            expanded_ob_mask = binary_dilation(ob_mask, structure=self.dilation_structure, iterations=1)
+                            self.occupancy_map[expanded_ob_mask&(np.logical_or(self.occupancy_map==0,self.occupancy_map==2))] = 255 - i*10
+                    else:
+                        last_obmap_pure = self.occupancy_map
+                        self.occupancy_map = np.maximum(occupancy_map, last_obmap_pure)
                 x, y = np.min(adjusted_coords, axis = 0)
                 width, height = 1 + np.max(adjusted_coords, axis = 0) - (x, y)
                 quadtree_map = 1 - (self.occupancy_map == 0) # This makes all 0 to 0, and other values to 1
@@ -130,21 +140,26 @@ class BEVMap:
                     else:
                         img_save_path = os.path.join(self.args.log_image_dir, "occupancy_"+str(self.step_time)+".jpg")
 
-                    robot_coords = None
-                    if robot_coords is not None:
-                        # NOTE: this coordinate is incorrect for now...
-                        # draw the robot's position using the red 'x' mark
-                        convert_robot_coords = ((robot_coords[:2]- self.init_world_pos[:2])/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2])
-                        occupancy_map_with_robot = self.occupancy_map.copy()
-                        plt.figure(figsize=(10, 10))
-                        plt.imshow(occupancy_map_with_robot, cmap='gray_r', origin='lower', extent=[0, occupancy_map_with_robot.shape[1], 0, occupancy_map_with_robot.shape[0]])
-                        plt.scatter(convert_robot_coords[0], convert_robot_coords[1], color='red', marker='x')
-                        plt.savefig(img_save_path)
-                        plt.close() 
-                    else:
-                        plt.imsave(img_save_path, self.occupancy_map, cmap = "gray")
-
+                    # draw the robot's position using the red 'x' mark
+                    self.plot_occupancy_map(self.occupancy_map, robot_coords, img_save_path)
                     log.info(f"Occupancy map saved at {img_save_path}")
+                return True
+    
+    def plot_occupancy_map(self, occupancy_map, robot_coords, img_save_path):
+        # Define the color map
+        cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
+        bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
+        norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
+        convert_robot_coords = ((robot_coords[:2]- self.init_world_pos[:2])/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2])
+
+        plt.figure(figsize=(10, 10))
+        plt.xlim(0, occupancy_map.shape[1])  # Fix: should be 0 to width
+        plt.ylim(0, occupancy_map.shape[0])  # Fix: should be 0 to height
+        plt.imshow(occupancy_map, cmap=cmap, norm=norm)
+        plt.scatter(convert_robot_coords[0], convert_robot_coords[1], color='red', marker='x')
+        plt.savefig(img_save_path)
+        plt.close()
     
     @property
     def free_points(self, occupancy_map):
@@ -232,20 +247,26 @@ class BEVMap:
         radius = int(np.ceil(self.args.maps.agent_radius))
         area_bottom_left_x, area_bottom_left_y = int(current.x - radius), int(current.y - radius)
         area_width, area_height = int(2*radius), int(2*radius)
-        quadtree_map = 1 - (self.occupancy_map == 0)
+        quadtree_map = self.occupancy_map
 
-        quadtree_map[area_bottom_left_y: area_bottom_left_y + area_height, area_bottom_left_x: area_bottom_left_x + area_width] = np.ones((area_height, area_width)) # !!!
+        quadtree_map[area_bottom_left_y: area_bottom_left_y + area_height, area_bottom_left_x: area_bottom_left_x + area_width] = np.zeros((area_height, area_width)) 
 
         quad_tree.update(quadtree_map, area_bottom_left_x, area_bottom_left_y, area_width, area_height)
-
-        path_planner = AStarPlanner(occupy_map=quad_tree,
-                                    obs_map=np.logical_not(quadtree_map),
-                                    max_step=self.planner_config.a_star_max_iter,
-                                    verbose=verbose)
         
-        paths, find_flag = path_planner.planning(current.y, current.x, target.y, target.x, # x and y are reversed in AStarPlanner
+        if self.path_planner is None:        
+            self.path_planner = AStarPlanner(obs_map=quadtree_map,
+                                        max_step=self.planner_config.a_star_max_iter,
+                                        windows_head=self.args.windows_head,
+                                        verbose=verbose)
+            path_legend = True
+        else:
+            path_legend = False
+        
+        paths, find_flag = self.path_planner.planning(current.y, current.x, target.y, target.x, # x and y are reversed in AStarPlanner
+                                      obs_map=quadtree_map,
                                       min_final_meter=self.planner_config.last_scope,
-                                      img_save_path=os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg"))
+                                      img_save_path=os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg"),
+                                      path_legend=path_legend)
         
         transfer_paths = []
         for node in paths:
@@ -325,21 +346,6 @@ class BEVMap:
         current = self.transfer_to_node(current)
         target = self.transfer_to_node(target)
         return not self.collision_free(current, target, self.planner_config.agent_radius, self.quad_tree_root)
-
-        if self.args.planners.method == 'rrt_star':
-            path_planner = RRTstarPathPlanning(self.quad_tree_root, self.occupancy_map==2, # ??? why 2 
-                                agent_radius=self.planner_config.agent_radius,
-                                last_scope=self.planner_config.last_scope,
-                                goal_sampling_rate=self.planner_config.goal_sampling_rate,
-                                max_iter=self.planner_config.max_iter,
-                                extend_length=self.planner_config.extend_length,
-                                consider_range=self.planner_config.consider_range) # Navigation method
-        elif self.args.planners.method == 'a_star':
-            path_planner = AStarPlanner(occupy_map=self.quad_tree_root,
-                                    obs_map=self.occupancy_map==2,
-                                    max_step=self.planner_config.max_iter)
-        # path_planner = PathPlanning(self.bev_map.quad_tree_root, 1-(self.bev_map.occupancy_map==0), **self.planner_config) # Navigation method
-        return not path_planner.collision_free(current, target)
     
     def collision_free(self, from_node, to_node, agent_radius, occupy_map):
         """

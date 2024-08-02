@@ -199,18 +199,23 @@ class CamOccupancyMap:
         return robot_mask
     
     def open_windows_head(self):
-        plt.ion() # open the interactive mode
+        # plt.ion()  # Turn on interactive mode
+        self.window_fig = plt.figure(1)  # Create and store a specific figure
+        self.ax = self.window_fig.add_subplot(111)  # Add a subplot to the figure
+        self.image_display = self.ax.imshow(np.zeros((10, 10, 3)), aspect='auto')  # Placeholder for the image
+        self.ax.set_title('Top-down RGB Image')
 
     def update_windows_head(self, robot_pos):
         rgb_data = self.get_camera_data(["rgba"])["rgba"]
-        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
-        plt.title('Top-down RGB Image')
-        plt.imshow(rgb_data)
+        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
+        self.image_display.set_data(rgb_data)  # Update the image data
+        self.ax.draw_artist(self.ax.patch)  # Efficiently redraw the background
+        self.ax.draw_artist(self.image_display)  # Efficiently redraw the image
         plt.show(block=False)
-        plt.pause(0.001) # !!! This is necessary to update the window
-    
+        plt.pause(0.001)  # This is necessary to update the window
+
     def close_windows_head(self):
-        plt.close('all')
+        plt.close('all')  # Close all figures
 
     def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, verbose=False):
         # Define height range for free map

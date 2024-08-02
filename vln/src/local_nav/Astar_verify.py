@@ -128,9 +128,12 @@ class AStarPlanner:
 
             # expand_grid search grid based on motion model
             for i, _ in enumerate(self.motion):
-                node = self.Node(current.x + self.motion[i][0],
-                                 current.y + self.motion[i][1],
-                                 current.cost + self.motion[i][2], c_id)
+                x = current.x + self.motion[i][0]
+                y = current.y + self.motion[i][1]
+                node = self.Node(x,
+                                 y,
+                                 current.cost + self.motion[i][2] + self.obstacle_map[x][y],
+                                 c_id)
                 n_id = self.calc_grid_index(node)
 
                 # If the node is not safe, do nothing
@@ -201,7 +204,7 @@ class AStarPlanner:
             return False
 
         # collision check
-        if self.obstacle_map[node.x][node.y]:
+        if self.obstacle_map[node.x][node.y] == 255:
             return False
 
         return True

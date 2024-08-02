@@ -122,7 +122,6 @@ def vis_one_path(args, vln_envs):
             if vln_config.windows_head:
                 # show the topdown camera
                 vln_envs.cam_occupancy_map.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
-                # plt.pause(0.001)
 
         if i % 100 == 0:
             print(i)
@@ -143,6 +142,7 @@ def vis_one_path(args, vln_envs):
                         log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
                         if args.save_obs:
                             vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
+                        vln_envs.bev.step_time = i
                         vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
                         exe_path, node_type = vln_envs.bev.navigate_p2p(paths[current_point], paths[current_point+1], verbose=vln_config.test_verbose)
                         if node_type == 2:
@@ -174,9 +174,9 @@ def vis_one_path(args, vln_envs):
                             vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
                     
                         # update BEVMap every specific intervals
-                        vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
                         vln_envs.bev.step_time = i
-
+                        vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
+                        
                         # after BEVMap's update, determine whether the robot's path is blocked
                         if current_point > 0:
                             agent_current_pose = vln_envs.agents.get_world_pose()[0]
