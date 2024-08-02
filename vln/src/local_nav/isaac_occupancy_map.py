@@ -1,6 +1,7 @@
 '''
 Author: w61
 Date: 2024.7.25
+NOTE: This method does not work!
 '''
 import os
 import numpy as np
@@ -13,8 +14,6 @@ from pxr import UsdGeom, Usd, Sdf, Gf, UsdPhysics, UsdUtils
 
 from grutopia.core.util.log import log
 
-''' NOTE: This method does not work!
-'''
 class IsaacOccupancyMap:
     def __init__(self, args):
         self.args = args

@@ -197,8 +197,22 @@ class CamOccupancyMap:
         robot_mask = np.zeros((self.width, self.height), dtype=np.uint8)
         robot_mask[top_left_y:bottom_right_y, top_left_x:bottom_right_x] = 1
         return robot_mask
+    
+    def open_windows_head(self):
+        plt.ion() # open the interactive mode
 
-    def get_surrounding_free_map(self, robot_prim, robot_height=1.05+0.8, verbose=False):
+    def update_windows_head(self, robot_pos):
+        rgb_data = self.get_camera_data(["rgba"])["rgba"]
+        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+        plt.title('Top-down RGB Image')
+        plt.imshow(rgb_data)
+        plt.show(block=False)
+        plt.pause(0.001) # !!! This is necessary to update the window
+    
+    def close_windows_head(self):
+        plt.close('all')
+
+    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, verbose=False):
         # Define height range for free map
         # free_map: 1 for free space, 0 for occupied space
 
@@ -219,7 +233,7 @@ class CamOccupancyMap:
         # Normalize the normal vectors (ignoring the last component if it exists)
         norm_magnitudes = np.linalg.norm(normals[..., :3], axis=2)
         try:
-            normalized_normals = normals[..., :3] / norm_magnitudes[..., np.newaxis]
+            normalized_normals = normals[..., :3] / (norm_magnitudes[..., np.newaxis]+1e-8)
             # Generate mask for flat surfaces based on normal vectors
             flat_surface_mask = np.abs(normalized_normals[..., 2] - 1) < normal_threshold
         except Exception:
@@ -244,27 +258,28 @@ class CamOccupancyMap:
                 os.makedirs(self.args.log_image_dir+"/cam_free")
             img_path = os.path.join(self.args.log_image_dir, "cam_free","rgb_scene_center.png")
             img.save(img_path)
-            print("Image saved at", img_path)
+            # print("Image saved at", img_path)
 
             depth_img = self.vis_depth(depth, robot_height)
             depth_img_path = os.path.join(self.args.log_image_dir, "cam_free", "depth_scene_center.png")
             depth_img.save(depth_img_path)
-            print("Depth saved at", depth_img_path)
+            # print("Depth saved at", depth_img_path)
         
             # Visualize the free map
-            plt.clf()
-            plt.imshow(free_map, cmap='gray')
-            plt.title('Free Map')
-            plt.xlabel('X-axis')
-            plt.ylabel('Y-axis')
-            # plt.show()
+            free_map_normalized = free_map.astype(bool)
+            # free_map_normalized = ((free_map - free_map.min()) * (1/(free_map.max() - free_map.min()) * 255)).astype('uint8')
+            free_map_image = Image.fromarray(free_map_normalized)
+            # Save the image
             free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "cam_global_free_map.png")
-            plt.savefig(free_map_path)
-            print("Free map saved at", free_map_path)
+            free_map_image.save(free_map_path)
+            # print("Free map saved at", free_map_path)
         
         # extract connectd free area
         connected_free_area = self.extract_connected_free_area(free_map, verbose=verbose)
-        # print("Update the topdown camera pose:", self.topdown_camera.get_world_pose())
+
+        # update the pose of the camera based on robot's pose
+        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+
         return free_map, connected_free_area
         
     def extract_connected_free_area(self, free_map, verbose=False):
@@ -293,14 +308,9 @@ class CamOccupancyMap:
         connected_free_area = (labeled_map == center_label)
         if verbose:
             # Visualize the connected free area
-            plt.clf()
-            plt.imshow(connected_free_area, cmap='gray')
-            plt.title('Connected Free Area')
-            plt.xlabel('X-axis')
-            plt.ylabel('Y-axis')
-            # plt.show()
+            connected_free_area_image = Image.fromarray(connected_free_area)
             connected_free_area_path = os.path.join(self.args.log_image_dir, "cam_free", "connected_free_area.png")
-            plt.savefig(connected_free_area_path)
+            connected_free_area_image.save(connected_free_area_path)
             print("Connected free area saved at", connected_free_area_path)
 
         return connected_free_area

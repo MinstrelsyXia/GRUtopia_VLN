@@ -321,7 +321,7 @@ class VLNDataLoader(Dataset):
         '''
         # agent_current_pose = self.get_agent_pose()[0]
         # agent_bottom_z = self.get_robot_bottom_z()
-        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map.get_surrounding_free_map(robot_prim=self.agents.prim, robot_height=1.7, verbose=verbose)
+        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.7, verbose=verbose)
         self.surrounding_freemap_camera_pose = self.cam_occupancy_map.topdown_camera.get_world_pose()[0]
     
     def update_occupancy_map(self, verbose=False):
@@ -347,39 +347,6 @@ class VLNDataLoader(Dataset):
             log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
         else:
             is_fall = False
-
-        # if is_fall and adjust:
-        #     # randomly adjust the pose to avoid falling
-        #     # NOTE: This does not work since it could lead the robot be caught in the colliders
-        #     if initial_pose is None:
-        #         initial_pose = obs['position']
-        #     if not isinstance(initial_pose, np.ndarray):
-        #         initial_pose = np.array(initial_pose)
-            
-        #     if initial_rotation is None:
-        #         initial_rotation = euler_angles_to_quat(np.array([0,0,0]))
-        #     if not isinstance(initial_rotation, np.ndarray):
-        #         initial_rotation = np.array(initial_rotation)
-        #         initial_rotation_euler = quat_to_euler_angles(initial_rotation)
-
-        #     # randomly sample offset
-        #     position_offset = np.array([np.random.uniform(low=-1, high=1), np.random.uniform(low=-1, high=1), 0])
-        #     rotation_y_offset = np.array([0, np.random.uniform(low=-30, high=30), 0])
-
-        #     adjust_position = initial_pose + position_offset
-        #     adjust_rotation = initial_rotation + euler_angles_to_quat(rotation_y_offset)
-
-        #     log.info(f"Target adjust position: {adjust_position}, adjust rotation: {adjust_rotation}")
-
-        #     agent.set_world_pose(position=adjust_position, 
-        #                         orientation=adjust_rotation)
-            # agent.set_joint_velocities(np.zeros(len(agent.dof_names)))
-            # agent.set_joint_positions(np.zeros(len(agent.dof_names)))
-        
-        # if not is_fall:
-        #     log.info(f"Robot does not fall")
-        #     cur_pos, cur_rot = obs["position"], quat_to_euler_angles(obs["orientation"])
-        #     log.info(f"Current Position: {cur_pos}, Orientation: {cur_rot}")
 
         return is_fall
     

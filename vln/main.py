@@ -42,6 +42,7 @@ parser.add_argument("--mode", type=str, default="vis_one_path", help="The mode o
 parser.add_argument("--sim_cfg_file", type=str, default="vln/configs/sim_cfg.yaml")
 parser.add_argument("--vln_cfg_file", type=str, default="vln/configs/vln_cfg.yaml")
 parser.add_argument("--save_obs", action="store_true", default=False)
+parser.add_argument("--windows_head", default=False, action="store_true", help="Open a matplotlib window to show the topdown camera for view the robot's action")
 args = parser.parse_args()
 
 args.root_dir = ROOT_DIR
@@ -84,6 +85,7 @@ def vis_one_path(args, vln_envs):
     current_point = 0
     move_interval = 500 # move along the path every 5 seconds
     reset_robot = False
+    vln_envs.cam_occupancy_map.open_windows_head()
     
     '''start simulation'''
     i = 0
@@ -113,10 +115,14 @@ def vis_one_path(args, vln_envs):
             continue
         
         if i % 10 == 0:
-            print(i)
+            # print(i)
             if vln_config.settings.check_and_reset_robot:
                 reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=vln_config.test_verbose)
                 reset_flag = reset_robot
+            if vln_config.windows_head:
+                # show the topdown camera
+                vln_envs.cam_occupancy_map.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
+                # plt.pause(0.001)
 
         if i % 100 == 0:
             print(i)
@@ -186,6 +192,9 @@ def vis_one_path(args, vln_envs):
         agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
 
     env.simulation_app.close()
+    if vln_config.windows_head:
+        # close the topdown camera
+        vln_envs.cam_occupancy_map.close_windows_head()
 
 def keyboard_control(args, vln_envs):
     if args.path_id == -1:

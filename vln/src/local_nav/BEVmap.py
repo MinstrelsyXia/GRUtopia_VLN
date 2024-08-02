@@ -6,6 +6,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from copy import deepcopy
 from scipy.ndimage import binary_dilation
+import json
 
 from grutopia.core.util.log import log
 
@@ -159,30 +160,23 @@ class BEVMap:
         # if update_candidates:
         #     self.update_candidates(rgb_image, depth_image, verbose)
 
-    def node_to_sim(self, node, z=0, reverse_x_and_y=False):
+    def node_to_sim(self, node, z=0):
         if isinstance(node, Node):
             return [(node.x-self.quadtree_width/2)*self.voxel_size + self.init_world_pos[0], 
                     (node.y-self.quadtree_height/2)*self.voxel_size + self.init_world_pos[1], 
                     node.z] 
         if len(list(node))==2:
-            if reverse_x_and_y:
-                return [(node[1]-self.quadtree_height/2)*self.voxel_size + self.init_world_pos[1], (node[0]-self.quadtree_width/2)*self.voxel_size + self.init_world_pos[0], z]
-            else:
-                return [(node[0]-self.quadtree_width/2)*self.voxel_size + self.init_world_pos[0], (node[1]-self.quadtree_height/2)*self.voxel_size + self.init_world_pos[1], z]
+            return [(node[0]-self.quadtree_width/2)*self.voxel_size + self.init_world_pos[0], (node[1]-self.quadtree_height/2)*self.voxel_size + self.init_world_pos[1], z]
         else:
             raise TypeError(f"Point must be a Node or has length of 2 or 3, but got {type(node).__name__}")
 
-    def transfer_to_node(self, point, reverse_x_and_y=False):
+    def transfer_to_node(self, point):
         if isinstance(point, Node):
             return point
         elif len(list(point))==3:
-            if reverse_x_and_y:
-                x_dim, y_dim = 1, 0
-            else:
-                x_dim, y_dim = 0, 1
-            return Node((point[x_dim]-self.init_world_pos[x_dim])/self.voxel_size+self.quadtree_width/2, 
-                        (point[y_dim]-self.init_world_pos[y_dim])/self.voxel_size+self.quadtree_height/2, 
-                        point[2])
+            x = (point[0]-self.init_world_pos[0])/self.voxel_size+self.quadtree_width/2
+            y = (point[1]-self.init_world_pos[1])/self.voxel_size+self.quadtree_height/2
+            return Node(x, y, point[2])
         else:
             raise TypeError(f"Point must be a Node or has length of 2 or 3, but got {type(point).__name__}")
 
@@ -230,12 +224,12 @@ class BEVMap:
         return final_path, result_type. result_type: 0->success, 1->path found but goal occupied, 2->no path found
         """
         # Code to navigate to the next target point
-        current = self.transfer_to_node(start, reverse_x_and_y=True)
-        target = self.transfer_to_node(goal, reverse_x_and_y=True)
+        current = self.transfer_to_node(start)
+        target = self.transfer_to_node(goal)
         
         # refresh the map before navigation
         quad_tree = deepcopy(self.quad_tree_root)
-        radius = int(np.ceil(self.planner_config.agent_radius))
+        radius = int(np.ceil(self.args.maps.agent_radius))
         area_bottom_left_x, area_bottom_left_y = int(current.x - radius), int(current.y - radius)
         area_width, area_height = int(2*radius), int(2*radius)
         quadtree_map = 1 - (self.occupancy_map == 0)
@@ -246,16 +240,24 @@ class BEVMap:
 
         path_planner = AStarPlanner(occupy_map=quad_tree,
                                     obs_map=np.logical_not(quadtree_map),
-                                    max_step=self.planner_config.max_iter,
+                                    max_step=self.planner_config.a_star_max_iter,
                                     verbose=verbose)
         
-        paths, find_flag = path_planner.planning(current.x, current.y, target.x, target.y,
+        paths, find_flag = path_planner.planning(current.y, current.x, target.y, target.x, # x and y are reversed in AStarPlanner
                                       min_final_meter=self.planner_config.last_scope,
                                       img_save_path=os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg"))
         
         transfer_paths = []
         for node in paths:
-            transfer_paths.append(self.node_to_sim(node, current.z, reverse_x_and_y=True))
+            world_coords = self.node_to_sim([node[1], node[0]], current.z)
+            transfer_paths.append([world_coords[0], world_coords[1], current.z])
+        
+        if verbose:
+            # save the occupancy and coordinates for verification
+            coord_data = {'start_point':[current.y,current.x], 'end_point':[target.y,target.x]}
+            with open(self.args.root_dir+'/vln/src/local_nav/coords.json', 'w') as f:
+                json.dump(coord_data, f)
+            np.save(self.args.root_dir+'/vln/src/local_nav/obs_map.npy', np.logical_not(quadtree_map))
         
         return transfer_paths, find_flag
 
@@ -275,19 +277,13 @@ class BEVMap:
         quadtree_map = 1 - (self.occupancy_map == 0) # 0->0, others -> 1
 
         quadtree_map[area_bottom_left_y: area_bottom_left_y + area_height, area_bottom_left_x: area_bottom_left_x + area_width] = np.ones((area_height, area_width)) # !!!
-        # quadtree_map[area_bottom_left_x: area_bottom_left_x + area_width, area_bottom_left_y: area_bottom_left_y + area_height] = np.ones((area_width, area_height))
-
-        # x, y = int(max(current.x - radius, 0)), int(max(current.y - radius, 0))
-        # width, height = int(current.x + radius - x), int(current.y + radius - y)
-        # quadtree_map = 1 - (self.occupancy_map == 0)
-        # quadtree_map[y: y + height, x: x + width] = np.ones((height, width))
         quad_tree.update(quadtree_map, area_bottom_left_x, area_bottom_left_y, area_width, area_height)
 
         path_planner = RRTstarPathPlanning(occupy_map=quad_tree, origin_map=quadtree_map, 
                             agent_radius=self.planner_config.agent_radius,
                             last_scope=self.planner_config.last_scope,
                             goal_sampling_rate=self.planner_config.goal_sampling_rate,
-                            max_iter=self.planner_config.max_iter,
+                            max_iter=self.planner_config.rrt_star_max_iter,
                             extend_length=self.planner_config.extend_length,
                             consider_range=self.planner_config.consider_range) # Navigation method
         # path_planner = PathPlanning(self.bev_map.quad_tree_root, 1-(self.bev_map.occupancy_map==0), **self.planner_config) # Navigation method

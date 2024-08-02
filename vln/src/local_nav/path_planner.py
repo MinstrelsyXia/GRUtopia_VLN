@@ -622,7 +622,6 @@ class AStarPlanner:
             plt.plot([x for x, y in points], [y for x, y in points], "-r")
             plt.savefig(img_save_path)
             plt.close()
-            
             log.info("Path has been saved to {}".format(img_save_path))
 
         return points, find_flag
@@ -637,6 +636,9 @@ class AStarPlanner:
             rx.append(self.calc_grid_position(n.x, self.min_x))
             ry.append(self.calc_grid_position(n.y, self.min_y))
             parent_index = n.parent_index
+
+        rx.reverse() # from begin to end
+        ry.reverse()
 
         return rx, ry
 

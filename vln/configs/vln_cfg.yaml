@@ -35,10 +35,11 @@ maps:
     threshold: 1  # Threshold for node splitting  
     
 planners:
-  method: "rrt_star" # The method used for planning (a_star or rrt_star)
+  method: "a_star" # The method used for planning (a_star or rrt_star)
   agent_radius: 0 # Radius of the agent
   last_scope: 1  # The last scope
   goal_sampling_rate: 0.2  # Goal sampling rate
-  max_iter: 3000  # Maximum number of iterations
+  a_star_max_iter: 30000  # Maximum number of iterations
+  rrt_star_max_iter: 3000  # Maximum number of iterations
   extend_length: 1  # Extension length
   consider_range: 3  # A range parameter, specific meaning depends on context
