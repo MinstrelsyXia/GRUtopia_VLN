@@ -525,8 +525,8 @@ class AStarPlanner:
         self.fig = plt.figure(2)  # Create and store a specific figure
         self.ax = self.fig.add_subplot(111)  # Add a subplot to the figure
         self.ax.set_title("A* Path Planning")
-        self.ax.grid(True)
-        self.ax.axis("equal")
+        # self.ax.grid(True)
+        # self.ax.axis("equal")
         self.ax.set_xlim(0, self.obstacle_map.shape[0]) 
         self.ax.set_ylim(0, self.obstacle_map.shape[1]) 
         # self.image_display = self.ax.imshow(np.zeros((10, 10, 3)), aspect='auto', cmap=self.cmap, norm=self.norm)
@@ -535,7 +535,7 @@ class AStarPlanner:
         obs_map_draw = obs_map.transpose(1,0) # transpose the map to match the plot
         # self.image_display.set_data(obs_map_draw)
         self.ax.imshow(obs_map_draw, cmap=self.cmap, norm=self.norm, aspect='auto')
-        self.ax.plot(sx, sy, "og", label="start")
+        self.ax.plot(sx, sy, "ob", label="start")
         self.ax.plot(gx, gy, "xb", label="end")
         self.ax.plot([x for x, y in points], [y for x, y in points], "-r")
         

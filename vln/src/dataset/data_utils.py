@@ -331,7 +331,7 @@ class VLNDataLoader(Dataset):
         robot_ankle_z = self.get_robot_bottom_z()
         self.bev.update_occupancy_map(pointclouds, robot_ankle_z, add_dilation=self.args.maps.add_dilation, verbose=verbose, robot_coords=self.get_agent_pose()[0])
 
-    def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, adjust=False, initial_pose=None, initial_rotation=None):
+    def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, height_threshold=0.5, adjust=False, initial_pose=None, initial_rotation=None):
         '''
         Determine if the robot is falling based on its rotation quaternion.
         '''
@@ -347,10 +347,18 @@ class VLNDataLoader(Dataset):
             log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
         else:
             is_fall = False
+        
+        # Check if the height between the robot base and the robot ankle is smaller than a threshold
+        robot_ankle_z = self.get_robot_bottom_z()
+        robot_base_z = self.get_agent_pose()[0][2]
+        if robot_base_z - robot_ankle_z < height_threshold:
+            is_fall = True
+            log.info(f"Robot falls down!!!")
+            log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
 
         return is_fall
     
-    def check_robot_stuck(self, cur_iter, max_iter=500, threshold=0.2):
+    def check_robot_stuck(self, cur_iter, max_iter=300, threshold=0.2):
         ''' Check if the robot is stuck
         '''
         is_stuck = False
@@ -434,7 +442,7 @@ class VLNDataLoader(Dataset):
     
     def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False):
         is_fall = self.check_robot_fall(self.agents, adjust=False)
-        is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=500, threshold=0.2)
+        is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=300, threshold=0.2)
         if (not is_fall) and (not is_stuck):
             if update_freemap:
                 self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map

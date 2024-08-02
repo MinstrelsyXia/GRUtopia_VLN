@@ -198,18 +198,23 @@ class CamOccupancyMap:
         robot_mask[top_left_y:bottom_right_y, top_left_x:bottom_right_x] = 1
         return robot_mask
     
-    def open_windows_head(self):
+    def open_windows_head(self, text_info=None):
         # plt.ion()  # Turn on interactive mode
-        self.window_fig = plt.figure(1)  # Create and store a specific figure
+        # self.window_fig = plt.figure(1)  # Create and store a specific figure
+        self.window_fig, self.ax = plt.subplots(figsize=(5, 5))  # Create a figure and a subplot
         self.ax = self.window_fig.add_subplot(111)  # Add a subplot to the figure
         self.image_display = self.ax.imshow(np.zeros((10, 10, 3)), aspect='auto')  # Placeholder for the image
+        if text_info is not None:
+            self.ax.text(4, 11, text_info, fontsize=10, ha='center', va='bottom', wrap=True)
         self.ax.set_title('Top-down RGB Image')
 
-    def update_windows_head(self, robot_pos):
+    def update_windows_head(self, robot_pos, text_info=None):
         rgb_data = self.get_camera_data(["rgba"])["rgba"]
         self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
         self.image_display.set_data(rgb_data)  # Update the image data
-        self.ax.draw_artist(self.ax.patch)  # Efficiently redraw the background
+        if text_info is not None:
+            self.ax.text(0.5, 0.01, text_info, fontsize=10, ha='left', va='bottom', wrap=True)
+        # self.ax.draw_artist(self.ax.patch)  # Efficiently redraw the background
         self.ax.draw_artist(self.image_display)  # Efficiently redraw the image
         plt.show(block=False)
         plt.pause(0.001)  # This is necessary to update the window

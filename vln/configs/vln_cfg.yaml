@@ -23,7 +23,7 @@ robots:
 maps:
   robot_z: [0.1, 1.7]  # Robot's height range on the Z-axis
   global_robot_z: [0, 1.7]
-  agent_radius: 0.2 # Robot's radius
+  agent_radius: 0.25 # Robot's radius
   voxel_size: 0.05  # Size of a voxel
   add_dilation: true # Add dilation to the map
   dilation_iterations: 2 # Number of dilation iterations
