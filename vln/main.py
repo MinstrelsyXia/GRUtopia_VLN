@@ -11,6 +11,12 @@ import argparse
 import yaml
 import time
 
+# enable multiple gpus
+# import isaacsim
+# import carb.settings
+# settings = carb.settings.get_settings()
+# settings.set("/renderer/multiGPU/enabled", True)
+
 
 from grutopia.core.config import SimulatorConfig
 from grutopia.core.env import BaseEnv
@@ -113,7 +119,7 @@ def vis_one_path(args, vln_envs):
             # let the robot stand still during the first warm steps.
             env_actions.append({'h1': {'stand_still': []}})
             obs = env.step(actions=env_actions)
-            agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
+            agent_action_state = {'finished': True}
             continue
         
         if i % 10 == 0:
@@ -196,7 +202,10 @@ def vis_one_path(args, vln_envs):
         obs = env.step(actions=env_actions)
 
         # get the action state
-        agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
+        if len(obs[vln_envs.task_name]) > 0:
+            agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
+        else:
+            agent_action_state['finished'] = False
 
     env.simulation_app.close()
     if vln_config.windows_head:
