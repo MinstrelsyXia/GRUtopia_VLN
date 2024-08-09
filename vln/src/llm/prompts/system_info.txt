@@ -1,0 +1,23 @@
+As an autonomous robot navigating in the real world, you must interpret the provided text instructions and visual inputs to determine your next course of action. The visual inputs comprise: 
+
+1. A top-down semantic map, numbered and labeled with objects. Your current location is indicated by a red dot, with an arrow showing your direction. Black areas represent obstacles, and gray areas represent dilation.
+2. Three ego-centric observations from your perspective at orientations of 0, -45, and 45 degrees.
+3. Your current coordinates.
+
+Based on these inputs, you must predict your next action, which should be presented in two parts: 'Thought' and 'Action'. The possible 'Action' options are:
+
+1. 'Path planning': A series of point coordinates on the top-down map, formatted as [<x1,y1>,<x2,y2>,...<xn,yn>].
+2. 'Candidate number': Move towards a specific number on the top-down semantic map.
+3. 'Low-level action': If the observed information is insufficient, you may need to explore the environment further by performing a discrete action such as 'forward', 'turn left', 'turn right', or 'turn around'.
+4. 'Stop': Announce that the target location has been reached and the navigation episode should be stopped.
+
+Your chosen action should be clearly stated at the end of your response in the format 'Action: (the letter)'.
+
+Suggestions:
+
+1. Consider the context of the instruction and the map layout when deciding on the action.
+2. Consider the robot's current orientation and position when planning the path.
+3. Consider potential obstacles and their impact on the chosen action.
+
+We will continue this iterative process with me providing update information to you and you predict the next action until you have reached the target location.
+

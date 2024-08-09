@@ -13,6 +13,7 @@ settings:
   batch_size: 1
   action: "move_along_path"
   check_and_reset_robot: true
+  use_llm: true
 
 robots:
   - name: "CylinderRobot"
@@ -44,3 +45,13 @@ planners:
   rrt_star_max_iter: 3000  # Maximum number of iterations
   extend_length: 1  # Extension length
   consider_range: 3  # A range parameter, specific meaning depends on context
+
+llms:
+  azure: false
+  model_name: "gpt-4o-mini"
+  api_key: "sk-uxafF08zHYhVtHbw570c530d266847B7AfFcF04cBc5b60F3"
+  api_url: "https://api.openai120.com/v1/chat/completions"
+  image_detail: "high" # auto is by-default. low: 512x512. high: 768x2000.
+  max_tokens: 2048
+  system_prompt_file: "vln/src/llm/prompts/system_info.txt"
+  interactive: true

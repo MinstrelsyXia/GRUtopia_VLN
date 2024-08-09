@@ -53,6 +53,7 @@ class BaseTask(OmniBaseTask, ABC):
     def load(self):
         # load scenes
         if self.config.scene_asset_path is not None:
+            log.info(f"scene_path: {self.config.scene_asset_path}")
             source, prim_path = create_scene(self.config.scene_asset_path,
                                              prim_path_root=f'World/env_{self.config.env_id}/scene')
             physics_scene_prim = create_prim(prim_path,

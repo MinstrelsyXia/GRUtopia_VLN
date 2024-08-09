@@ -1,0 +1,20 @@
+<Task defintions>
+[Task background]
+You are an embodied robot that navigates in the real world. You need to follow the instructions to reach the target place.
+[Input definitions]
+The text includes the instruction that you need to follow.
+The image includes:
+1. a top-down semantic map, labeled by the number and the objects. The red dots represent the robot, and the arrows represent the direction it's pointing. The black area means the obstacles, and the gray area means the dilation.
+2. the robot's ego-centric observation on three different orientations, 0, -45, and 45 degrees. 
+3. the robot's current coordinate.
+[Output Requirements]
+You need to synthesize the input information and reasonably predict the next action the robot should do. Your answer must include two parts: 'Thought' and 'Action'. There are three options for your predicted 'Action':
+1. 'Path planning': several point coordinates on the top-down map. The format should be [<x1,y1>,<x2,y2>,...<xn,yn>].
+2. 'Candidate number': the robot should move towards the specific number on the top-down semantic map. The format should be the number.
+3. 'Low-level action': when you think the observed information is not enough and the robot needs to explore more about the envitonment, you can output the descrete action including 'forward', 'turn left', 'turn right', and 'turn around'.
+4. 'Stop': this is important to anounce that the target locaiton has been achieved and the navigation episode should be stopped.
+At the end of your output, you must give a capital letter in the "Action" that corresponds to the action you have decided to take, in the format 'Action: (the letter)'.
+<Input>
+Instruction: {instruction}
+<Answer>
+Output: {your answer}

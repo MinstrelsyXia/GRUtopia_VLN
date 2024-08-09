@@ -83,6 +83,7 @@ grutopia_extension/controllers/move_along_path_points_controller.py
 grutopia_extension/controllers/move_to_point_by_speed_controller.py
 grutopia_extension/controllers/move_with_keyboard_controller.py
 grutopia_extension/controllers/rotate_controller.py
+grutopia_extension/controllers/stand_still.py
 grutopia_extension/controllers/web_chat_box_controller.py
 grutopia_extension/interactions/__init__.py
 grutopia_extension/interactions/keyboard.py
@@ -92,11 +93,17 @@ grutopia_extension/objects/dynamic_cube.py
 grutopia_extension/objects/usd_object.py
 grutopia_extension/objects/visual_cube.py
 grutopia_extension/robots/__init__.py
+grutopia_extension/robots/cylinder.py
+grutopia_extension/robots/go1.py
 grutopia_extension/robots/humanoid.py
 grutopia_extension/sensors/__init__.py
 grutopia_extension/sensors/camera.py
+grutopia_extension/sensors/camera_utils.py
 grutopia_extension/tasks/__init__.py
 grutopia_extension/tasks/simple_inference_task.py
+grutopia_extension/utils/RayCastCamera.py
+grutopia_extension/utils/__init__.py
+grutopia_extension/utils/get_stage_prim_paths.py
 llm_agent/__init__.py
 llm_agent/evaluate.py
 llm_agent/evaluate_debug.py

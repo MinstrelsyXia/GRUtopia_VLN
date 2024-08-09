@@ -651,9 +651,13 @@ class AStarPlanner:
             find_flag = False
 
         rx, ry = self.calc_final_path(goal_node, closed_set)
+        points_list = list(zip(rx, ry))
 
-        points = self.simplify_path(list(zip(rx, ry)))
-        points.append((gx, gy))
+        if len(points_list) > 0:
+            points = self.simplify_path(points_list)
+            points.append((gx, gy))
+        else:
+            log.warning(f"Path planning results only contain {len(points_list)} points.")
 
         if self.verbose:
             # show the path planning result
