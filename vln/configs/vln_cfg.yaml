@@ -53,5 +53,7 @@ llms:
   api_url: "https://api.openai120.com/v1/chat/completions"
   image_detail: "high" # auto is by-default. low: 512x512. high: 768x2000.
   max_tokens: 2048
-  system_prompt_file: "vln/src/llm/prompts/system_info.txt"
+  system_prompt_file: "vln/src/llm/prompts/system_prompt.txt"
+  user_prompt_file: "vln/src/llm/prompts/user_prompt.txt"
   interactive: true
+  add_history: true

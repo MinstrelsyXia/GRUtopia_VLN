@@ -8,7 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "python": "/home/wangliuyi/miniforge3/envs/isaaclab/bin/python",
+            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
             "args":[
                 // "--headless"
                 // "--env", "val_seen",
@@ -22,7 +22,7 @@
             "program": "${workspaceFolder}/llm_agent/evaluate_debug.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "python": "/home/wangliuyi/miniforge3/envs/isaaclab/bin/python",
+            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
             "args":[
                 "--agent-type", "agent_random"
             ]
@@ -35,7 +35,7 @@
             // "program": "${workspaceFolder}/GRUtopia_wensi/test_61.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python": "/home/wangliuyi/miniforge3/envs/isaaclab/bin/python",
+            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
             "args":[
                 // "--test_verbose",
                 // "--wait"
@@ -49,7 +49,7 @@
             // "program": "${workspaceFolder}/GRUtopia_wensi/test_61.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python": "/home/wangliuyi/miniforge3/envs/isaaclab/bin/python",
+            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
             "args":[
                 // "--test_verbose",
                 // "--wait"
@@ -62,7 +62,7 @@
             "program": "${workspaceFolder}/simple_demo/simple_demo.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python": "/home/wangliuyi/miniforge3/envs/isaaclab/bin/python",
+            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
             "args":[
                 // "--test_verbose",
                 // "--wait"
@@ -76,7 +76,7 @@
             // "program": "${workspaceFolder}/GRUtopia/vln/main_very_simple.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
+            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
             "args":[
                 "--test_verbose",
                 // "--wait"
@@ -96,7 +96,7 @@
             // "program": "${workspaceFolder}/GRUtopia/vln/main_very_simple.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
+            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
             "args":[
                 // "--test_verbose",
                 // "--wait"

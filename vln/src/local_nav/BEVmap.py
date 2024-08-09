@@ -164,6 +164,9 @@ class BEVMap:
             # y_coord = convert_robot_coords[1]
             # plt.text(x_coord, y_coord, f'({x_coord}, {y_coord})', fontsize=12, color='black', ha='right')
             plt.grid()
+            # Customize the appearance of the grid
+            plt.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
+            plt.grid(which='major', linestyle='-', linewidth='0.75', color='black')
             plt.legend()
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
         plt.close()

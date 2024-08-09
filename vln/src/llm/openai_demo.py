@@ -15,7 +15,7 @@ def encode_image(image_path):
 test_prompt = '''I need you to guide a robot to follow the given instructions to navigate indoor. I would provide you an image with full semantic information, and a top-down map with the robot's current position, and its ego-centric observation. You need to first describe the robot's current state, and inference the most possible next waypoints based on the given information. You can output the possible coordinates, or the possible region on the map. If you think the robot should turn around to get more information, you can also output the order to let robot explore more.
 The given instruction is: Exit the bedroom, cross the room to the left and stop near the room divider on the left.
 The given visual semantic image is given.'''
-image_path = "/home/wangliuyi/code/w61-grutopia/vln/src/llm/test_imgs/5593/BuildMap_20240808v1.png"
+image_path = "vln/src/llm/test_imgs/5593/BuildMap_20240808v1.png"
 
 # Getting the base64 string
 base64_image = encode_image(image_path)
@@ -33,8 +33,8 @@ payload = {
       "content": [
         {
           "type": "text",
-          # "text": "What’s in this image?"
-          "text": test_prompt
+          "text": "What’s in this image?"
+          # "text": test_prompt
         },
         {
           "type": "image_url",
