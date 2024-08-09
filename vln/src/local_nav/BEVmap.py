@@ -141,11 +141,11 @@ class BEVMap:
                         img_save_path = os.path.join(self.args.log_image_dir, "occupancy_"+str(self.step_time)+".jpg")
 
                     # draw the robot's position using the red 'x' mark
-                    self.plot_occupancy_map(self.occupancy_map, robot_coords, img_save_path)
+                    self.plot_occupancy_map(self.occupancy_map, robot_coords, img_save_path, for_llm=self.args.settings.use_llm)
                     log.info(f"Occupancy map saved at {img_save_path}")
                 return True
     
-    def plot_occupancy_map(self, occupancy_map, robot_coords, img_save_path):
+    def plot_occupancy_map(self, occupancy_map, robot_coords, img_save_path, for_llm=False):
         # Define the color map
         cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
         bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
@@ -157,8 +157,15 @@ class BEVMap:
         plt.xlim(0, occupancy_map.shape[1])  # Fix: should be 0 to width
         plt.ylim(0, occupancy_map.shape[0])  # Fix: should be 0 to height
         plt.imshow(occupancy_map, cmap=cmap, norm=norm)
-        plt.scatter(convert_robot_coords[0], convert_robot_coords[1], color='red', marker='x')
-        plt.savefig(img_save_path)
+        plt.scatter(convert_robot_coords[0], convert_robot_coords[1], color='red', marker='o', label="current position: (%.2f, %.2f)"%(convert_robot_coords[0], convert_robot_coords[1]))
+        if for_llm:
+            # Add text annotation for the x-coordinate
+            # x_coord = convert_robot_coords[0]
+            # y_coord = convert_robot_coords[1]
+            # plt.text(x_coord, y_coord, f'({x_coord}, {y_coord})', fontsize=12, color='black', ha='right')
+            plt.grid()
+            plt.legend()
+        plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
         plt.close()
     
     @property

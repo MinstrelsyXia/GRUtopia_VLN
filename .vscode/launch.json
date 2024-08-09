@@ -92,15 +92,15 @@
             "name": "test.py",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/vln/src/dataset/mp3d_semantic.py",
+            "program": "${workspaceFolder}/vln/src/llm/llm.py",
             // "program": "${workspaceFolder}/GRUtopia/vln/main_very_simple.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python": "/home/wangliuyi/miniforge3/envs/isaaclab/bin/python",
+            "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
             "args":[
                 // "--test_verbose",
                 // "--wait"
-                "--headless",
+                // "--headless",
                 // "--path_id", "5593",
                 // "--path_id", "2234"
                 // "--save_obs"
