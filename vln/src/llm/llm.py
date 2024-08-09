@@ -111,10 +111,9 @@ class OpenAI_GPT:
     def generate_prompt(self, sys_prompt=None, usr_prompt=None, img_list=[], **kwargs):
         content = []
         if sys_prompt is not None:
-            sys_content = {
-                "role": "system",
-                ""
-            }
+            if isinstance(sys_prompt, dict):
+                
+
         
 
 
