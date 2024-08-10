@@ -482,26 +482,33 @@ class RRTstarPathPlanning:
         # plt.show()
 
 class AStarPlanner:
-    def __init__(self, obs_map, agent_radius=1, resolution=1, max_step=10000, show_animation=False, windows_head=False, verbose=False):
+    def __init__(self, map_width, map_height, resolution=1, max_step=10000, show_animation=False, windows_head=False, for_llm=False, verbose=False):
         """
         Initialize grid map for a star planning.
         Note that this class does not consider the robot's radius. So the given obs_map should be expanded
         """
         self.resolution = resolution
-        self.agent_radius = agent_radius
-        self.min_x, self.min_y = 0, 0
-        self.max_x, self.max_y = obs_map.shape[0], obs_map.shape[1]
-        self.x_width = round((self.max_x - self.min_x) / self.resolution)
-        self.y_width = round((self.max_y - self.min_y) / self.resolution)
         self.motion = self.get_motion_model()
-        self.obstacle_map = obs_map # 255: obstacle, 0: free, 2: unknown, 255-2: dilation
         self.show_animation = show_animation # draw animation
         self.verbose = verbose # show the path planning result
         self.max_step = max_step
         self.windows_head = windows_head
+        self.for_llm = for_llm
+
+
+        self.min_x, self.min_y = 0, 0
+        self.max_x, self.max_y = map_width, map_height
+        self.x_width = round((self.max_x - self.min_x) / self.resolution)
+        self.y_width = round((self.max_y - self.min_y) / self.resolution)
         
         if verbose:
             self.visualize_init()
+
+        self.start_position = None
+        self.history_path = [] # [[p0,...,p1],[p1,...,p2],...,[pn-1,...,pn]]
+    
+    def update_obs_map(self, obs_map):
+        self.obstacle_map = obs_map # 255: obstacle, 0: free, 2: unknown, 255-2: dilation
 
     class Node:
         def __init__(self, x, y, cost, parent_index):
@@ -518,34 +525,98 @@ class AStarPlanner:
         """
         Visualizes the current state of the A* exploration.
         """
-        self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
+        # self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
+        self.cmap = mcolors.ListedColormap(['white', '#C1FFC1', 'gray', 'black']) # #C1FFC1 denotes the light green
         bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
         self.norm = mcolors.BoundaryNorm(bounds, self.cmap.N)
         
-        self.fig = plt.figure(2)  # Create and store a specific figure
+        self.fig = plt.figure(2, figsize=(10,10))  # Create and store a specific figurel
         self.ax = self.fig.add_subplot(111)  # Add a subplot to the figure
-        self.ax.set_title("A* Path Planning")
+        # self.ax.set_title("A* Path Planning")
         # self.ax.grid(True)
-        # self.ax.axis("equal")
-        self.ax.set_xlim(0, self.obstacle_map.shape[0]) 
-        self.ax.set_ylim(0, self.obstacle_map.shape[1]) 
-        # self.image_display = self.ax.imshow(np.zeros((10, 10, 3)), aspect='auto', cmap=self.cmap, norm=self.norm)
+        self.ax.axis("equal")
+        self.ax.set_xlim(0, self.max_x) 
+        self.ax.set_ylim(0, self.max_y) 
+
+        self.major_ticks_x = np.linspace(0, self.max_x, 50)
+        # self.minor_ticks_x = np.linspace(0, self.max_x, 40)
+        self.major_ticks_y = np.linspace(0, self.max_y, 50)
+        # self.minor_ticks_y = np.linspace(0, self.max_y, 40)
     
-    def vis_path(self, obs_map, sx, sy, gx, gy, points, img_save_path, legend=False,):
+    def vis_path(self, obs_map, sx, sy, gx, gy, points, img_save_path, legend=False):
         obs_map_draw = obs_map.transpose(1,0) # transpose the map to match the plot
         # self.image_display.set_data(obs_map_draw)
         self.ax.imshow(obs_map_draw, cmap=self.cmap, norm=self.norm, aspect='auto')
-        self.ax.plot(sx, sy, "ob", label="start")
-        self.ax.plot(gx, gy, "xb", label="end")
+        self.ax.plot(sx, sy, "or", label="start")
+        self.ax.plot(gx, gy, "xr", label="end")
         self.ax.plot([x for x, y in points], [y for x, y in points], "-r")
         
         if legend:
             self.ax.legend()
-        # self.ax.draw_artist(self.ax.patch)  # Efficiently redraw the background
-        # self.ax.draw_artist(self.image_display)  # Efficiently redraw the image
         
         self.ax.figure.savefig(img_save_path)
         log.info("Path has been saved to {}".format(img_save_path))
+        if self.windows_head:
+            plt.show(block=False)
+            plt.pause(0.001)
+    
+    def figure_clear(self, for_llm=False):
+        self.ax.clear()
+        self.ax.set_xlim(0, self.max_x) 
+        self.ax.set_ylim(0, self.max_y)
+
+    def vis_whole_path(self, obs_map, img_save_path, whole_path, for_llm=False, vis_latest_path=True):
+        # obs_map_draw = obs_map.transpose(1,0) # transpose the map to match the plot
+        self.figure_clear()
+        obs_map_draw = obs_map
+        self.ax.imshow(obs_map_draw, cmap=self.cmap, norm=self.norm, aspect='auto')
+        self.ax.plot(self.start_position[1], self.start_position[0], "ob", label="start position (0):(%.2f,%.2f)"%(self.start_position[1], self.start_position[0]))
+        if for_llm:
+            self.ax.text(self.start_position[1]-0.5, self.start_position[0]+0.5, '0', fontsize=12, color='blue', ha='right')
+        
+        if not vis_latest_path:
+            whole_points = whole_path[:-1]
+        else:
+            whole_points = whole_path
+
+        for i, points in enumerate(whole_points):
+            for j, point in enumerate(points):
+                if i == 0 and j == 0:
+                    continue
+                if j == 0:
+                    self.ax.plot(point[1], point[0], "ob", label="visited waypoint (%d):(%.2f,%.2f)"%(i, point[1], point[0]))
+                    if for_llm:
+                        self.ax.text(point[1], point[0], str(i), fontsize=12, color='blue', ha='right')
+        
+        # Ensure the entire path is drawn by connecting all points
+        for points in whole_points:
+            x_coords = [point[1] for point in points]
+            y_coords = [point[0] for point in points]
+            self.ax.plot(x_coords, y_coords, "-r")
+        
+        if len(whole_points) >= 1:
+            end_point = whole_points[-1][-1]
+            self.ax.plot(end_point[1], end_point[0], "ob", label="current position (%d):(%.2f,%.2f)"%(len(whole_points), end_point[0], end_point[1]))
+            if for_llm:
+                self.ax.text(end_point[1], end_point[0], str(len(whole_points)), fontsize=12, color='blue', ha='right')
+
+        if for_llm:
+            # Set major and minor ticks
+            self.ax.set_xticks(self.major_ticks_x, rotation=45)
+            self.ax.set_yticks(self.major_ticks_y)
+            # self.ax.set_xticks(self.minor_ticks_x, minor=True)
+            # self.ax.set_yticks(self.minor_ticks_y, minor=True)
+
+            # self.ax.grid(which='minor', linewidth='0.75', color='gray', alpha=0.6)
+            self.ax.grid(which='major', linewidth='0.75', color='gray', alpha=0.75)
+
+            self.ax.set_xlabel('x')
+            self.ax.set_ylabel('y')
+
+        self.ax.legend()
+
+        self.ax.figure.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
+        log.info("Whole path has been saved to {}".format(img_save_path))
         if self.windows_head:
             plt.show(block=False)
             plt.pause(0.001)
@@ -564,8 +635,11 @@ class AStarPlanner:
             rx: x position list of the final path
             ry: y position list of the final path
         """
+        if self.start_position is None:
+            self.start_position = [sx, sy]
+            log.info("Initialize the start position in path planner.")
         if obs_map is not None:
-            self.obstacle_map = obs_map
+            self.update_obs_map(obs_map)
 
         start_node = self.Node(self.calc_xy_index(sx, self.min_x),
                                self.calc_xy_index(sy, self.min_y), 0.0, -1)
@@ -661,7 +735,13 @@ class AStarPlanner:
 
         if self.verbose:
             # show the path planning result
-            self.vis_path(self.obstacle_map, sx, sy, gx, gy, points, img_save_path, legend=path_legend)
+            if self.for_llm:
+                self.history_path.append(points)
+                self.vis_whole_path(self.obstacle_map, img_save_path, self.history_path, for_llm=True, vis_latest_path=True)
+                no_latest_img_path = img_save_path.split('.')[0] + '_no_latest_path.jpg'
+                self.vis_whole_path(self.obstacle_map, no_latest_img_path, self.history_path, for_llm=True, vis_latest_path=False)
+            else:
+                self.vis_path(self.obstacle_map, sx, sy, gx, gy, points, img_save_path, legend=path_legend)
             
         return points, find_flag
 

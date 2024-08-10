@@ -41,7 +41,10 @@ class BEVMap:
 
         # Attributes for path_planner
         self.planner_config = args.planners
-        self.path_planner = None
+        self.path_planner = AStarPlanner(map_width=self.quadtree_width,map_height=self.quadtree_height,max_step=self.planner_config.a_star_max_iter,
+                            windows_head=self.args.windows_head,
+                            for_llm=self.args.settings.use_llm,
+                            verbose=True)
         
         log.info("BEVMap initialized")
     
@@ -132,7 +135,7 @@ class BEVMap:
                         self.occupancy_map = np.maximum(occupancy_map, last_obmap_pure)
                 x, y = np.min(adjusted_coords, axis = 0)
                 width, height = 1 + np.max(adjusted_coords, axis = 0) - (x, y)
-                quadtree_map = 1 - (self.occupancy_map == 0) # This makes all 0 to 0, and other values to 1
+                quadtree_map = 1 - (self.occupancy_map == 255) # This makes all 0 to 0, and other values to 1
                 self.quad_tree_root.update(quadtree_map, x, y, width, height) # !!!
                 if verbose:
                     if global_bev:
@@ -157,17 +160,31 @@ class BEVMap:
         plt.xlim(0, occupancy_map.shape[1])  # Fix: should be 0 to width
         plt.ylim(0, occupancy_map.shape[0])  # Fix: should be 0 to height
         plt.imshow(occupancy_map, cmap=cmap, norm=norm)
-        plt.scatter(convert_robot_coords[0], convert_robot_coords[1], color='red', marker='o', label="current position: (%.2f, %.2f)"%(convert_robot_coords[0], convert_robot_coords[1]))
+        plt.scatter(convert_robot_coords[0], convert_robot_coords[1], color='blue', marker='o', label="current position: (%.2f, %.2f)"%(convert_robot_coords[0], convert_robot_coords[1]))
         if for_llm:
             # Add text annotation for the x-coordinate
             # x_coord = convert_robot_coords[0]
             # y_coord = convert_robot_coords[1]
             # plt.text(x_coord, y_coord, f'({x_coord}, {y_coord})', fontsize=12, color='black', ha='right')
-            plt.grid()
             # Customize the appearance of the grid
-            plt.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
-            plt.grid(which='major', linestyle='-', linewidth='0.75', color='black')
+            major_ticks_x = np.linspace(0, occupancy_map.shape[1], 50)
+            # minor_ticks_x = np.linspace(0, occupancy_map.shape[1], 50)
+            major_ticks_y = np.linspace(0, occupancy_map.shape[0], 50)
+            # minor_ticks_y = np.linspace(0, occupancy_map.shape[0], 50)
+
+            # Set major and minor ticks
+            plt.xticks(major_ticks_x, rotation=45)
+            plt.yticks(major_ticks_y)
+            # plt.xticks(minor_ticks_x, minor=True)
+            # plt.yticks(minor_ticks_y, minor=True)
+
+            # plt.grid(which='minor', linewidth='0.75', color='gray', alpha=0.6)
+            plt.grid(which='major', linewidth='0.75', color='gray', alpha=0.75)
+
             plt.legend()
+
+            plt.xlabel('x')
+            plt.ylabel('y')
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
         plt.close()
     
@@ -262,21 +279,12 @@ class BEVMap:
         quadtree_map[area_bottom_left_y: area_bottom_left_y + area_height, area_bottom_left_x: area_bottom_left_x + area_width] = np.zeros((area_height, area_width)) 
 
         quad_tree.update(quadtree_map, area_bottom_left_x, area_bottom_left_y, area_width, area_height)
-        
-        if self.path_planner is None:        
-            self.path_planner = AStarPlanner(obs_map=quadtree_map,
-                                        max_step=self.planner_config.a_star_max_iter,
-                                        windows_head=self.args.windows_head,
-                                        verbose=verbose)
-            path_legend = True
-        else:
-            path_legend = False
+
         
         paths, find_flag = self.path_planner.planning(current.y, current.x, target.y, target.x, # x and y are reversed in AStarPlanner
                                       obs_map=quadtree_map,
                                       min_final_meter=self.planner_config.last_scope,
-                                      img_save_path=os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg"),
-                                      path_legend=path_legend)
+                                      img_save_path=os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg"))
         
         transfer_paths = []
         for node in paths:

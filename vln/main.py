@@ -129,9 +129,9 @@ def vis_one_path(args, vln_envs):
                 reset_flag = reset_robot
                 if reset_flag:
                     # actions = {'h1': {'stand_still': []}}
-                        vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
-                        robot_current_pos = vln_envs.agents.get_world_pose()[0]
-                        exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point], verbose=vln_config.test_verbose)
+                    vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
+                    robot_current_pos = vln_envs.agents.get_world_pose()[0]
+                    exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point], verbose=vln_config.test_verbose)
 
                     
             if vln_config.windows_head:

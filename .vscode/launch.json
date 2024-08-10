@@ -76,16 +76,16 @@
             // "program": "${workspaceFolder}/GRUtopia/vln/main_very_simple.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
+            "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
             "args":[
                 "--test_verbose",
                 // "--wait"
-                // "--headless",
-                // "--path_id", "5593",
+                "--headless",
+                "--path_id", "5593",
                 // "--path_id", "1726",
-                "--path_id", "251",
+                // "--path_id", "251",
                 // "--save_obs"
-                // "--windows_head"
+                "--windows_head"
             ]
         },
         {
@@ -96,7 +96,7 @@
             // "program": "${workspaceFolder}/GRUtopia/vln/main_very_simple.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
+            "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
             "args":[
                 // "--test_verbose",
                 // "--wait"
