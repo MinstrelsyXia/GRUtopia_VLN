@@ -482,11 +482,15 @@ class RRTstarPathPlanning:
         # plt.show()
 
 class AStarPlanner:
-    def __init__(self, map_width, map_height, resolution=1, max_step=10000, show_animation=False, windows_head=False, for_llm=False, verbose=False):
+    def __init__(self, args, map_width, map_height, resolution=1, max_step=10000, 
+                 show_animation=False, windows_head=False, 
+                 for_llm=False, 
+                 verbose=False):
         """
         Initialize grid map for a star planning.
         Note that this class does not consider the robot's radius. So the given obs_map should be expanded
         """
+        self.args = args
         self.resolution = resolution
         self.motion = self.get_motion_model()
         self.show_animation = show_animation # draw animation
@@ -538,9 +542,9 @@ class AStarPlanner:
         self.ax.set_xlim(0, self.max_x) 
         self.ax.set_ylim(0, self.max_y) 
 
-        self.major_ticks_x = np.linspace(0, self.max_x, 50)
+        self.major_ticks_x = np.linspace(0, self.max_x, self.args.llms.map_grid_num)
         # self.minor_ticks_x = np.linspace(0, self.max_x, 40)
-        self.major_ticks_y = np.linspace(0, self.max_y, 50)
+        self.major_ticks_y = np.linspace(0, self.max_y, self.args.llms.map_grid_num)
         # self.minor_ticks_y = np.linspace(0, self.max_y, 40)
     
     def vis_path(self, obs_map, sx, sy, gx, gy, points, img_save_path, legend=False):
@@ -570,7 +574,7 @@ class AStarPlanner:
         self.figure_clear()
         obs_map_draw = obs_map
         self.ax.imshow(obs_map_draw, cmap=self.cmap, norm=self.norm, aspect='auto')
-        self.ax.plot(self.start_position[1], self.start_position[0], "ob", label="start position (0):(%.2f,%.2f)"%(self.start_position[1], self.start_position[0]))
+        self.ax.plot(self.start_position[1], self.start_position[0], "ob", label="start position (0):(%.2f,%.2f)"%(self.start_position[0], self.start_position[1]))
         if for_llm:
             self.ax.text(self.start_position[1]-0.5, self.start_position[0]+0.5, '0', fontsize=12, color='blue', ha='right')
         
@@ -596,13 +600,14 @@ class AStarPlanner:
         
         if len(whole_points) >= 1:
             end_point = whole_points[-1][-1]
-            self.ax.plot(end_point[1], end_point[0], "ob", label="current position (%d):(%.2f,%.2f)"%(len(whole_points), end_point[0], end_point[1]))
+            self.ax.plot(end_point[1], end_point[0], "ob", label="current position (%d):(%.2f,%.2f)"%(len(whole_points), end_point[1], end_point[0]))
             if for_llm:
                 self.ax.text(end_point[1], end_point[0], str(len(whole_points)), fontsize=12, color='blue', ha='right')
 
         if for_llm:
             # Set major and minor ticks
-            self.ax.set_xticks(self.major_ticks_x, rotation=45)
+            self.ax.set_xticks(self.major_ticks_x)
+            self.ax.set_xticklabels(self.ax.get_xticklabels(), rotation=40)
             self.ax.set_yticks(self.major_ticks_y)
             # self.ax.set_xticks(self.minor_ticks_x, minor=True)
             # self.ax.set_yticks(self.minor_ticks_y, minor=True)
@@ -727,16 +732,18 @@ class AStarPlanner:
         rx, ry = self.calc_final_path(goal_node, closed_set)
         points_list = list(zip(rx, ry))
 
-        if len(points_list) > 0:
+        if len(points_list) > 1:
             points = self.simplify_path(points_list)
             points.append((gx, gy))
         else:
             log.warning(f"Path planning results only contain {len(points_list)} points.")
+            points = []
 
         if self.verbose:
             # show the path planning result
             if self.for_llm:
-                self.history_path.append(points)
+                if len(points) > 0:
+                    self.history_path.append(points)
                 self.vis_whole_path(self.obstacle_map, img_save_path, self.history_path, for_llm=True, vis_latest_path=True)
                 no_latest_img_path = img_save_path.split('.')[0] + '_no_latest_path.jpg'
                 self.vis_whole_path(self.obstacle_map, no_latest_img_path, self.history_path, for_llm=True, vis_latest_path=False)
@@ -746,11 +753,16 @@ class AStarPlanner:
         return points, find_flag
 
     def get_cost(self,x,y):
-        if self.obstacle_map[x][y] in [0,2]:
-            cost = 0
+        if x < self.max_x and y < self.max_y:
+            if self.obstacle_map[x][y] == 0:
+                cost = 240
+            elif self.obstacle_map[x][y] == 2:
+                cost = 0
+            else:
+                cost = self.obstacle_map[x][y]
+            return cost
         else:
-            cost = self.obstacle_map[x][y]
-        return cost
+            return 255
 
     def calc_final_path(self, goal_node, closed_set):
         # generate final course

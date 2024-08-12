@@ -78,14 +78,14 @@
             "justMyCode": false,
             "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
             "args":[
-                "--test_verbose",
+                // "--test_verbose",
                 // "--wait"
-                "--headless",
-                "--path_id", "5593",
+                // "--headless",
+                "--path_id", "251",
                 // "--path_id", "1726",
                 // "--path_id", "251",
-                // "--save_obs"
-                "--windows_head"
+                "--save_obs"
+                // "--windows_head"
             ]
         },
         {

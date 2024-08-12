@@ -41,11 +41,12 @@ class BEVMap:
 
         # Attributes for path_planner
         self.planner_config = args.planners
-        self.path_planner = AStarPlanner(map_width=self.quadtree_width,map_height=self.quadtree_height,max_step=self.planner_config.a_star_max_iter,
+        self.path_planner = AStarPlanner(args=self.args, 
+                                         map_width=self.quadtree_width,map_height=self.quadtree_height,max_step=self.planner_config.a_star_max_iter,
                             windows_head=self.args.windows_head,
                             for_llm=self.args.settings.use_llm,
                             verbose=True)
-        
+            
         log.info("BEVMap initialized")
     
     def reset(self):
@@ -167,13 +168,13 @@ class BEVMap:
             # y_coord = convert_robot_coords[1]
             # plt.text(x_coord, y_coord, f'({x_coord}, {y_coord})', fontsize=12, color='black', ha='right')
             # Customize the appearance of the grid
-            major_ticks_x = np.linspace(0, occupancy_map.shape[1], 50)
+            major_ticks_x = np.linspace(0, occupancy_map.shape[1], self.args.llms.map_grid_num)
             # minor_ticks_x = np.linspace(0, occupancy_map.shape[1], 50)
-            major_ticks_y = np.linspace(0, occupancy_map.shape[0], 50)
+            major_ticks_y = np.linspace(0, occupancy_map.shape[0], self.args.llms.map_grid_num)
             # minor_ticks_y = np.linspace(0, occupancy_map.shape[0], 50)
 
             # Set major and minor ticks
-            plt.xticks(major_ticks_x, rotation=45)
+            plt.xticks(major_ticks_x, rotation=40)
             plt.yticks(major_ticks_y)
             # plt.xticks(minor_ticks_x, minor=True)
             # plt.yticks(minor_ticks_y, minor=True)

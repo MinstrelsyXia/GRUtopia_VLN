@@ -70,6 +70,30 @@ class OpenAI_GPT:
             print('prompt:', prompt)
             print('result:', result)
         return result
+    
+    def extract_llm_result(self, result):
+        extracted = {
+            'thought': '',
+            'action': ''
+        }
+        
+        # Split the result into lines
+        lines = result.split('\n')
+        
+        current_key = None
+        for line in lines:
+            line = line.strip()
+            if line.startswith('**Thought:**'):
+                current_key = 'thought'
+                extracted['thought'] = line[11:].strip()  # Remove '**Thought:**' and leading/trailing whitespace
+            elif line.startswith('**Action:**'):
+                current_key = 'action'
+                extracted['action'] = line[10:].strip()  # Remove '**Action:**' and leading/trailing whitespace
+            elif current_key:
+                extracted[current_key] += ' ' + line.strip()
+        
+        return extracted
+
 
     def get_vln_answer(self, instruction, img_list, **kwargs):
         cnt = 0
@@ -87,6 +111,7 @@ class OpenAI_GPT:
                 result, usage_info = self.post_requests(contents)
                 if self.llm_args.add_history:
                     history["llm_result"] = result
+                    # history["llm_result_extract"] = self.extract_llm_result(result)
                     history["usage_info"] = usage_info
                     self.history.append(history)
                 self.token_manager.update_token_nums(usage_info)
@@ -154,15 +179,23 @@ class OpenAI_GPT:
             "content": [],
         }
         if usr_prompt is not None:
+            usr_prompt_concat = usr_prompt.format(**kwargs)
+            if len(self.history) >= 1:
+                usr_prompt_concat += '\n History:'
+                for i in range(len(self.history)):
+                    usr_prompt_concat += f"\nStep: {i+1}: {self.history[i]['llm_result']}"
+                    # his_info = self.history[i]["llm_result_extract"]
+                    # usr_prompt_concat += f'\nStep: {i+1}.\nThought: {his_info["thought"]} \nAction:{his_info["action"]}'
+
             if isinstance(usr_prompt, dict):
                 user_msg_ditc["content"].append(usr_prompt)
                 history["usr_text"] = usr_prompt["text"]
             elif isinstance(usr_prompt, str):
                 user_msg_ditc["content"].append({
                     "type": "text",
-                    "text": usr_prompt.format(**kwargs)
+                    "text": usr_prompt_concat
                 })
-                history["usr_text"] = usr_prompt.format(**kwargs)
+                history["usr_text"] = usr_prompt_concat
 
         # add img prompt
         if len(img_list) > 0:
@@ -339,8 +372,24 @@ if __name__ == '__main__':
     # test_prompt = '''I need you to guide a robot to follow the given instructions to navigate indoor. I would provide you an image with full semantic information, and a top-down map with the robot's current position, and its ego-centric observation. You need to first describe the robot's current state, and inference the most possible next waypoints based on the given information. You can output the possible coordinates, or the possible region on the map. If you think the robot should turn around to get more information, you can also output the order to let robot explore more.
     # The given instruction is: Exit the bedroom, cross the room to the left and stop near the room divider on the left.
     # The given visual semantic image is: '''
-    instruction = "Exit the bedroom, cross the room to the left and stop near the room divider on the left."
-    image_path = "vln/src/llm/test_imgs/5593/BuildMap_20240808v1.jpg"
-    images = [image_path]
-    results = vlm_agent.get_vln_answer(instruction, images)
-    print(results)
+    
+    # instruction = "Exit the bedroom, cross the room to the left and stop near the room divider on the left." # 5593
+    # image_path = "vln/src/llm/test_imgs/5593/BuildMap_20240808v1.jpg"
+
+    instruction = "Turn around and walk towards the table with the plant on it.  Turn to the right and walk into the living room and stand just behind the couch and wait."
+    image_path_500 = "/home/wangliuyi/code/w61-grutopia/vln/src/llm/test_imgs/251/combined_map_500.jpg"
+    image_path_1000 = "/home/wangliuyi/code/w61-grutopia/vln/src/llm/test_imgs/251/combined_map_1000.jpg"
+    image_path_1500 = "/home/wangliuyi/code/w61-grutopia/vln/src/llm/test_imgs/251/combined_map_1500.jpg"
+    image_path_2000 = "/home/wangliuyi/code/w61-grutopia/vln/src/llm/test_imgs/251/combined_map_2000.jpg"
+    history = {
+        '500': {
+            'thought': 'The current position of the robot is near the center of the map. To execute the instruction, I need to first turn around (which will have me facing back towards the entrance area). The target location is the table with the plant at coordinates (144.8, 210.3). After reaching the plant, I need to turn right towards the living room, then position myself just behind the couch. Based on the top-down map, I can see the path to the target with some obstacles nearby.',
+            'action': 'Low-level action: \'turn around\'.'
+        }
+    }
+
+    images = [image_path_500, image_path_1000, image_path_1500]
+    for i in range(len(images)):
+        results = vlm_agent.get_vln_answer(instruction, [images[i]])
+        print(results)
+        print(1)
