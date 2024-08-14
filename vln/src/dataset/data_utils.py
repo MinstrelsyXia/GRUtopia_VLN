@@ -31,30 +31,39 @@ from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_p
 from ..local_nav.BEVmap import BEVMap
 
 
-def load_data(args, splits):
+def load_data(args, split):
     ''' Load data based on VLN-CE
     '''
     dataset_root_dir = args.datasets.base_data_dir
-    load_data = []
     total_scans = []
-    for split in splits:
-        with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
-            data = json.load(f)
-            for item in data["episodes"]:
-                item["original_start_position"] = copy.copy(item["start_position"])
-                item["original_start_rotation"] = copy.copy(item["start_rotation"])
-                item["start_position"] = [item["original_start_position"][0], -item["original_start_position"][2], item["original_start_position"][1]]
-                item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][2], -item["original_start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
-                item["scan"] = item["scene_id"].split("/")[1]
-                item["c_reference_path"] = []
+    load_data = []
+    with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
+        data = json.load(f)
+        for item in data["episodes"]:
+            item["original_start_position"] = copy.copy(item["start_position"])
+            item["original_start_rotation"] = copy.copy(item["start_rotation"])
+            item["start_position"] = [item["original_start_position"][0], -item["original_start_position"][2], item["original_start_position"][1]]
+            item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][2], -item["original_start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
+            item["scan"] = item["scene_id"].split("/")[1]
+            item["c_reference_path"] = []
+            if "reference_path" in item.keys():
                 for path in item["reference_path"]:
                     item["c_reference_path"].append([path[0], -path[2], path[1]])
                 item["reference_path"] = item["c_reference_path"]
                 del item["c_reference_path"]
-                load_data.append(item)
-                total_scans.append(item["scan"])
-    log.info("Loaded data with the length of %d", len(load_data))
-    return load_data, set(total_scans)
+            load_data.append(item)
+            total_scans.append(item["scan"])
+
+    log.info(f"Loaded data with a total of {len(load_data)} items from {split}")
+    return load_data, list(set(total_scans))
+
+def load_gather_data(args, split):
+    dataset_root_dir = args.datasets.base_data_dir
+    with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
+        data = json.load(f)
+    with open(os.path.join(dataset_root_dir, "gather_data", "env_scan.json"), 'r') as f:
+        scan = json.load(f)
+    return data, scan
 
 def load_scene_usd(args, scan):
     ''' Load scene USD based on the scan
@@ -146,11 +155,14 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
                 log.error(f"Error in saving camera image: {e}")
 
 class VLNDataLoader(Dataset):
-    def __init__(self, args, sim_config):
+    def __init__(self, args, sim_config, split):
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size
-        self.data, self._scans = load_data(args, args.datasets.splits)
+        if args.mode == "extract_data":
+            self.data, self._scans = load_gather_data(args, split)
+        else:
+            self.data, self._scans = load_data(args, split)
         self.robot_type = sim_config.config.tasks[0].robots[0].type
         for cand_robot in args.robots:
             if cand_robot["name"] == self.robot_type:
@@ -236,6 +248,24 @@ class VLNDataLoader(Dataset):
                 return item
         log.error("Path id %d not found in the dataset", path_id)
         return None
+
+    def init_one_scan(self, scan, idx=0, init_omni_env=False):
+        # for extract episodes within one scan (for dataset extraction)
+        item = self.data[scan][idx]
+        scene_usd_path = load_scene_usd(self.args, scan)
+        self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
+        self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
+        self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
+        if init_omni_env:
+            self.init_env(self.sim_config, headless=self.args.headless)
+            self.init_omni_env()
+        self.init_agents()
+        self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
+        log.info("Episode id %d", item['episode_id'])
+        log.info("Initialized scan %s", scan)
+        log.info("Instruction: %s", item['instruction']['instruction_text'])
+        log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
+        return item
     
     def get_agent_pose(self):
         return self.agents.get_world_pose()

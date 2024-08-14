@@ -36,47 +36,26 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
 sys.path.append(ISSAC_SIM_DIR)
 
+from parser import process_args
 
-'''Init parser arguments'''
-parser = argparse.ArgumentParser(description="Main function for VLN in GRUtopia")
-parser.add_argument("--env", default="val_seen", type=str, help="The split of the dataset", choices=['train', 'val_seen', 'val_unseen'])
-parser.add_argument("--path_id", default=5593, type=int, help="The number of path id") # 5593
-parser.add_argument("--headless", action="store_true", default=False)
-parser.add_argument("--test_verbose", action="store_true", default=False)
-parser.add_argument("--wait", action="store_true", default=False)
-parser.add_argument("--mode", type=str, default="vis_one_path", help="The mode of the program")
-parser.add_argument("--sim_cfg_file", type=str, default="vln/configs/sim_cfg.yaml")
-parser.add_argument("--vln_cfg_file", type=str, default="vln/configs/vln_cfg.yaml")
-parser.add_argument("--save_obs", action="store_true", default=False)
-parser.add_argument("--windows_head", default=False, action="store_true", help="Open a matplotlib window to show the topdown camera for view the robot's action")
-args = parser.parse_args()
-
-args.root_dir = ROOT_DIR
-args.log_dir = os.path.join(ROOT_DIR, "logs")
-args.log_image_dir = os.path.join(args.log_dir, "images", str(args.env), str(args.path_id))
-if not os.path.exists(args.log_image_dir):
-    os.makedirs(args.log_image_dir)
-
-'''Init simulation config'''
-sim_config = SimulatorConfig(args.sim_cfg_file)
-
-'''Init VLN config'''
-with open(args.vln_cfg_file, 'r') as f:
-    vln_config = dict_to_namespace(yaml.load(f.read(), yaml.FullLoader))
-# update args into vln_config
-for key, value in vars(args).items():
-    setattr(vln_config, key, value)
-
-def build_dataset(vln_config, sim_config):
+def build_dataset():
     ''' Build dataset for VLN
     '''
-    vln_dataset = VLNDataLoader(vln_config, 
-                                sim_config=sim_config)
+    vln_config, sim_config = process_args()
+    vln_datasets = {}
+    for split in vln_config.datasets.splits:
+        vln_datasets[split] = VLNDataLoader(vln_config, 
+                                sim_config=sim_config,
+                                split=split)
     camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params if x.enable]
+    if vln_config.mode == 'sample_episodes':
+        data_camera_list = vln_config.settings.sample_camera_list
+    else:
+        data_camera_list = None
     # camera_list = ["pano_camera_0"] # !!! for debugging
     vln_config.camera_list = camera_list
     
-    return vln_dataset
+    return vln_datasets, vln_config, sim_config, data_camera_list
 
 
 def vis_one_path(args, vln_envs):
@@ -84,6 +63,7 @@ def vis_one_path(args, vln_envs):
         log.error("Please specify the path id")
         return
     # get the specific path
+    vln_envs = vln_envs[args.env]
     data_item = vln_envs.init_one_path(args.path_id)
     env = vln_envs.env
     
@@ -368,14 +348,84 @@ def llm_inference(args, vln_envs):
     if vln_config.windows_head:
         # close the topdown camera
         vln_envs.cam_occupancy_map.close_windows_head()
-    
+
+def sample_episodes(args, vln_envs, data_camera_list):
+    for scan in vln_envs.data:
+        for idx in range(vln_envs[scan]):
+            # 1. init Omni Env or Reset robot episode
+            if idx == 0:
+                data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True)
+            else:
+                data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=False)
+
+            env = vln_envs.env
+            paths = data_item['reference_path']
+            current_point = 0
+            # total_points = [vln_envs.agent_init_pose, vln_envs.agent_init_rotatation] # [[x,y,z],[w,x,y,z]]
+            total_points = []
+        
+            if vln_config.windows_head:
+                vln_envs.cam_occupancy_map.open_windows_head(text_info=data_item['instruction']['instruction_text'])
+        
+            '''start simulation'''
+            i = 0
+            warm_step = 100 if args.headless else 500
+            actions = {}
+
+            while env.simulation_app.is_running():
+                i += 1
+                reset_flag = False
+                env_actions = []
+                
+                if i < warm_step:
+                    continue
+                
+                if i % 10 == 0:
+                    if current_point == 0:
+                        log.info(f"===The robot starts navigating===")
+                        log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
+                        # init BEVMapgru
+                        agent_current_pose = vln_envs.agents.get_world_pose()[0]
+                        vln_envs.init_BEVMap(robot_init_pose=agent_current_pose)
+                        
+                        if args.save_obs:
+                            vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], step_time=i)
+                        vln_envs.bev.step_time = i
+                        vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
+                        exe_path, node_type = vln_envs.bev.navigate_p2p(paths[current_point], paths[current_point+1], verbose=vln_config.test_verbose) # TODO
+                        
+                        total_points.extend(exe_path)
+
+                    else:
+                        vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
+                        robot_current_pos = vln_envs.agents.get_world_pose()[0]
+                        exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point], verbose=vln_config.test_verbose)
+                    
+                            
+                    if vln_config.windows_head:
+                        # show the topdown camera
+                        vln_envs.cam_occupancy_map.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
+
+                                    
+                env_actions.append(actions)
+                obs = env.step(actions=env_actions)
+
+
+            env.simulation_app.close()
+            if vln_config.windows_head:
+                # close the topdown camera
+                vln_envs.cam_occupancy_map.close_windows_head()
+        
 
 if __name__ == "__main__":
-    vln_envs = build_dataset(vln_config, sim_config)
+    vln_envs, vln_config, sim_config, data_camera_list = build_dataset()
     
-    if args.mode == "vis_one_path":
-        vis_one_path(args, vln_envs)
-    elif args.mode == "keyboard_control":
-        keyboard_control(args, vln_envs)
-    elif args.mode == "llm_inference":
-        llm_inference(args, vln_envs)
+    if vln_config.mode == "vis_one_path":
+        vis_one_path(vln_config, vln_envs)
+    elif vln_config.mode == "keyboard_control":
+        keyboard_control(vln_config, vln_envs)
+    elif vln_config.mode == "llm_inference":
+        # TODO
+        llm_inference(vln_config, vln_envs)
+    elif vln_config.mode == "sample_episodes":
+        sample_episodes(vln_config, vln_envs, data_camera_list)

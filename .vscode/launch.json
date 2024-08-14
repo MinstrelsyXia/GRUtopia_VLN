@@ -8,7 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "python": "/home/pjlab/anaconda3/envs/isaaclab/bin/python",
+            "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
             "args":[
                 // "--headless"
                 // "--env", "val_seen",
@@ -72,7 +72,7 @@
             "name": "vln_grutopia.py",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/vln/main.py",
+            "program": "${workspaceFolder}/vln/main_e.py",
             // "program": "${workspaceFolder}/GRUtopia/vln/main_very_simple.py",
             "console": "integratedTerminal",
             "justMyCode": false,
