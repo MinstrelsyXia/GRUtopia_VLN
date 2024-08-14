@@ -159,7 +159,7 @@ class VLNDataLoader(Dataset):
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size
-        if args.mode == "extract_data":
+        if args.settings.mode == "sample_episodes":
             self.data, self._scans = load_gather_data(args, split)
         else:
             self.data, self._scans = load_data(args, split)
@@ -173,10 +173,17 @@ class VLNDataLoader(Dataset):
             raise ValueError("Robot offset not found for robot type")
         
         # process paths offset
-        for item in self.data:
-            item["start_position"] += self.robot_offset
-            for i, path in enumerate(item["reference_path"]):
-                item["reference_path"][i] += self.robot_offset
+        if args.settings.mode == "sample_episodes":
+            for scan, data in self.data.items():
+                for item in data:
+                    item["start_position"] += self.robot_offset
+                    for i, path in enumerate(item["reference_path"]):
+                        item["reference_path"][i] += self.robot_offset
+        else:
+            for item in self.data:
+                item["start_position"] += self.robot_offset
+                for i, path in enumerate(item["reference_path"]):
+                    item["reference_path"][i] += self.robot_offset
 
         
         self.task_name = sim_config.config.tasks[0].name # only one task
@@ -213,7 +220,10 @@ class VLNDataLoader(Dataset):
     
     def init_cam_occunpancy_map(self, robot_prim="/World/env_0/robots/World/h1",start_point=[0,0,0]):
         from ..local_nav.camera_occupancy_map import CamOccupancyMap
-        self.cam_occupancy_map = CamOccupancyMap(self.args, robot_prim, start_point)
+        from ..local_nav.global_topdown_map import GlobalTopdownMap
+        self.GlobalTopdownMap = GlobalTopdownMap
+        self.cam_occupancy_map_local = CamOccupancyMap(self.args, robot_prim, start_point, local=True)
+        self.cam_occupancy_map_global = CamOccupancyMap(self.args, robot_prim, start_point, local=False)
     
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
@@ -261,7 +271,7 @@ class VLNDataLoader(Dataset):
             self.init_omni_env()
         self.init_agents()
         self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
-        log.info("Episode id %d", item['episode_id'])
+        log.info("trajectory id %d", item['trajectory_id'])
         log.info("Initialized scan %s", scan)
         log.info("Instruction: %s", item['instruction']['instruction_text'])
         log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
@@ -351,8 +361,16 @@ class VLNDataLoader(Dataset):
         '''
         # agent_current_pose = self.get_agent_pose()[0]
         # agent_bottom_z = self.get_robot_bottom_z()
-        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.7, verbose=verbose)
-        self.surrounding_freemap_camera_pose = self.cam_occupancy_map.topdown_camera.get_world_pose()[0]
+        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map_local.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.65, verbose=verbose)
+        self.surrounding_freemap_camera_pose = self.cam_occupancy_map_local.topdown_camera.get_world_pose()[0]
+
+    def get_global_free_map(self, verbose=False):
+        ''' Use top-down orthogonal camera to get the ground-truth surrounding free map
+            This is useful to reset the robot's location when it get stuck or falling down.
+        '''
+        self.global_freemap_camera_pose = self.cam_occupancy_map_global.topdown_camera.get_world_pose()[0]
+        self.global_freemap, _ = self.cam_occupancy_map_global.get_global_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.65, verbose=verbose)
+        return self.global_freemap, self.global_freemap_camera_pose
     
     def update_occupancy_map(self, verbose=False):
         '''Use BEVMap to update the occupancy map based on pointcloud
@@ -456,7 +474,7 @@ class VLNDataLoader(Dataset):
         random_index = np.random.choice(free_indices.shape[0], p=combined_weights)
         random_position = free_indices[random_index]
 
-        random_position = self.cam_occupancy_map.pixel_to_world(random_position, camera_pose)
+        random_position = self.cam_occupancy_map_local.pixel_to_world(random_position, camera_pose)
         # random_position = [random_position[0], random_position[1], self.agent_last_valid_pose[2]]
         random_position = [random_position[0], random_position[1], self.agent_init_pose[2]]
 

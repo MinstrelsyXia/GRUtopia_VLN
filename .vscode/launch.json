@@ -72,19 +72,40 @@
             "name": "vln_grutopia.py",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/vln/main_e.py",
+            "program": "${workspaceFolder}/vln/main.py",
             // "program": "${workspaceFolder}/GRUtopia/vln/main_very_simple.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
             "args":[
-                // "--test_verbose",
+                "--test_verbose",
                 // "--wait"
-                // "--headless",
+                "--headless",
                 "--path_id", "251",
                 // "--path_id", "1726",
                 // "--path_id", "251",
-                "--save_obs"
+                // "--save_obs"
+                // "--windows_head"
+            ]
+        },
+        {
+            "name": "vln_sample_episodes.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/vln/main.py",
+            // "program": "${workspaceFolder}/GRUtopia/vln/main_very_simple.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/bin/python",
+            "args":[
+                "--test_verbose",
+                // "--wait"
+                "--headless",
+                "--path_id", "251",
+                // "--path_id", "1726",
+                // "--path_id", "251",
+                "--save_obs",
+                "--vln_cfg_file", "vln/configs/vln_extract_data.yaml",
                 // "--windows_head"
             ]
         },
