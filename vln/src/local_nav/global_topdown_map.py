@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from collections import defaultdict
+import math
 
 from PIL import Image
 from copy import copy
@@ -20,13 +21,15 @@ class GlobalTopdownMap:
         self.scan_name = scan_name
 
         self.camera_aperture = self.args.maps.global_topdown_config.aperture
+        self.camera_height = self.args.maps.global_topdown_config.camera_transform_height
         self.width = self.args.maps.global_topdown_config.width
         self.height = self.args.maps.global_topdown_config.height
         
         self.floor_maps = defaultdict(lambda: {})
-        self.floor_heights = []
+        self.floor_heights = [] # this height is built based on robot's base (not camera base)
 
         self.agent_radius = args.maps.agent_radius  # The radius(m) of robot
+        self.voxel_size = 1 # TODO
         if self.args.maps.add_dilation: # TODO
             self.dilation_structure = self.create_dilation_structure(self.agent_radius)
 
@@ -38,14 +41,14 @@ class GlobalTopdownMap:
                             for_llm=self.args.settings.use_llm,
                             verbose=True)
     
-    def save_map(self, robot_pos=None):
-        height = int(robot_pos[2])
-        occupancy_map = self.get_map(robot_pos)
+    def save_map(self, robot_pos=None, is_camera_base=False):
+        height = self.get_height(robot_pos, is_camera_base=is_camera_base)
+        occupancy_map = self.get_map(robot_pos, is_camera_base=is_camera_base)
         if occupancy_map is None:
             return None
 
         # Define the color map
-        cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
+        cmap = mcolors.ListedColormap(['white', '#C1FFC1', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
         bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
         norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
@@ -54,8 +57,8 @@ class GlobalTopdownMap:
         plt.ylim(0, occupancy_map.shape[0])
         plt.imshow(occupancy_map, cmap=cmap, norm=norm)
         if robot_pos is not None:
-            robot_pixel = self.world_to_pixel(robot_pos)
-            plt.plot(robot_pixel[0], robot_pixel[1], 'blue', markersize=10, label="current position (%.2f, %.2f)" % (robot_pos[0], robot_pos[1]))
+            robot_pixel = self.world_to_pixel(robot_pos, is_camera_base=is_camera_base)
+            plt.scatter(robot_pixel[0], robot_pixel[1], color='blue', marker='o', label="current position (%.2f, %.2f)" % (robot_pos[0], robot_pos[1]))
         plt.legend()
         
         img_save_path = os.path.join(self.args.log_image_dir, f"global_topdown_map_{self.scan_name}_{height}.jpg")
@@ -63,9 +66,14 @@ class GlobalTopdownMap:
 
         log.info(f"Saved global topdown map at height {height} to {img_save_path}")
     
+    def get_height(self, pos, is_camera_base=False):
+        if is_camera_base:
+            return math.floor(pos[2] - self.camera_height)
+        return math.floor(pos[2])
+    
     def update_map(self, freemap, camera_pose, update_map=False, verbose=False):
-        height = int(camera_pose[2])
-        if height not in self.floor_map:
+        height = self.get_height(camera_pose, is_camera_base=True)
+        if height not in self.floor_maps:
             self.floor_heights.append(height)
             self.floor_maps[height] = {
                 'camera_pose': camera_pose,
@@ -74,7 +82,7 @@ class GlobalTopdownMap:
             } 
             log.info("update global topdown map at height: {}".format(height))
             if verbose:
-                self.save_map(robot_pos=camera_pose)
+                self.save_map(robot_pos=camera_pose, is_camera_base=True)
         else:
             if update_map:
                 self.floor_maps[height] = {
@@ -83,8 +91,8 @@ class GlobalTopdownMap:
                     'occupancy_map': self.freemap_to_accupancy_map(freemap, add_dilation=self.args.maps.add_dilation)
                 }
 
-    def get_map(self, world_pose):
-        height = int(world_pose[2])
+    def get_map(self, world_pose, is_camera_base=False):
+        height = self.get_height(world_pose, is_camera_base=is_camera_base)
         if height in self.floor_maps.keys():
             return self.floor_maps[height]['occupancy_map']
         else:
@@ -110,37 +118,39 @@ class GlobalTopdownMap:
         
         return world_x, world_y
 
-    def world_to_pixel(self, world_coords):
-        height = int(world_coords[2])
+    def world_to_pixel(self, world_coords, specific_height=None, is_camera_base=False):
+        height = self.get_height(world_coords, is_camera_base=is_camera_base)
 
-        if height not in self.floor_maps.keys():
+        if height not in self.floor_maps.keys() and specific_height is None:
             log.error("Floor height not found in global topdown map")
             return None
-        else:
-            camera_pose = self.floor_maps[height]['camera_pose']
+        elif specific_height is not None:
+            height = specific_height
+        
+        camera_pose = self.floor_maps[height]['camera_pose']
 
-            world_x, world_y = world_coords[0], world_coords[1]
-            
-            # Convert aperture to radians
-            fov_rad = np.deg2rad(self.camera_aperture)
-            
-            # Calculate the scale factor
-            scale_x = 2 * np.tan(fov_rad / 2) / self.width
-            scale_y = 2 * np.tan(fov_rad / 2) / self.height
-            
-            # Calculate offsets from camera pose
-            offset_x = world_x - camera_pose[0]
-            offset_y = world_y - camera_pose[1]
-            
-            # Convert world offsets to pixel offsets
-            pixel_offset_x = offset_x / scale_x
-            pixel_offset_y = offset_y / scale_y
-            
-            # Calculate pixel coordinates
-            pixel_x = int(pixel_offset_x + self.width / 2)
-            pixel_y = int(pixel_offset_y + self.height / 2)
-            
-            return pixel_x, pixel_y, world_coords[2]
+        world_x, world_y = world_coords[0], world_coords[1]
+        
+        # Convert aperture to radians
+        fov_rad = np.deg2rad(self.camera_aperture)
+        
+        # Calculate the scale factor
+        scale_x = 2 * np.tan(fov_rad / 2) / self.width
+        scale_y = 2 * np.tan(fov_rad / 2) / self.height
+        
+        # Calculate offsets from camera pose
+        offset_x = world_x - camera_pose[0]
+        offset_y = world_y - camera_pose[1]
+        
+        # Convert world offsets to pixel offsets
+        pixel_offset_x = offset_x / scale_x
+        pixel_offset_y = offset_y / scale_y
+        
+        # Calculate pixel coordinates
+        pixel_x = int(pixel_offset_x + self.width / 2)
+        pixel_y = int(pixel_offset_y + self.height / 2)
+        
+        return pixel_x, pixel_y, world_coords[2]
     
     def clear_map(self):
         self.floor_maps = defaultdict(lambda: {})
@@ -148,12 +158,8 @@ class GlobalTopdownMap:
     
     def freemap_to_accupancy_map(self, freemap, add_dilation=False):
         occupancy_map = np.zeros((self.width, self.height))
-        for i in range(self.width):
-            for j in range(self.height):
-                if freemap[i, j] == 1:
-                    occupancy_map[i, j] = 2
-                elif freemap[i, j] == 0:
-                    occupancy_map[i, j] = 255
+        occupancy_map[freemap == 1] = 2
+        occupancy_map[freemap == 0] = 255
         if add_dilation:
             for i in range(1, self.args.maps.dilation_iterations):
                 ob_mask = np.logical_and(occupancy_map!=0, occupancy_map!=2)
@@ -175,23 +181,47 @@ class GlobalTopdownMap:
                     dilation_structure[y, x] = True
         return dilation_structure
 
-    def navigate_p2p(self, start, goal, step_time=0):
-        start_height = int(start[2])
-        goal_height = int(goal[2])
+    def sample_points_between_two_points(self, start, end, step=1):
+        start = np.array(start)
+        end = np.array(end)
 
-        if start_height != goal_height:
-            # different floor
-            return None
+        delta = (end-start)/step
+        sampled_points = [start + i*delta for i in range(step+1)]
 
-        occupancy_map = self.get_map(start)
+        return sampled_points
+
+    def navigate_p2p(self, start, goal, step_time=0, verbose=False):
+        # start_height = int(start[2])
+        # goal_height = int(goal[2])
+
+        if abs(start[2] - goal[2]) >= 0.3:
+            # different floor! we directly sample the nodes
+            # return None
+            transfer_paths = self.sample_points_between_two_points(start, goal, step=self.args.planners.stair_sample_step) # !!!
+            if verbose:
+                occupancy_map = self.get_map(start)
+                map_nodes = [self.world_to_pixel(x, specific_height=self.get_height(start)) for x in transfer_paths]
+                self.path_planner.vis_path(occupancy_map, map_nodes[0][1], map_nodes[0][0], map_nodes[-1][1], map_nodes[-1][0], map_nodes, os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"), legend=True)
         
-        start_pixel = self.world_to_pixel(start)
-        goal_pixel = self.world_to_pixel(goal)
+        else:
+            occupancy_map = self.get_map(start)
+            
+            start_pixel = self.world_to_pixel(start)
+            goal_pixel = self.world_to_pixel(goal)
 
-        path = self.path_planner.planning(start_pixel[1], start_pixel[0],
-                                          goal_pixel[1], goal_pixel[0],
-                                          occupancy_map,
-                                          min_final_meter=self.planner_config.last_scope,
-                                          img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
+            self.path_planner.update_obs_map(occupancy_map)
+            paths, find_flag = self.path_planner.planning(start_pixel[1], start_pixel[0],
+                                            goal_pixel[1], goal_pixel[0],
+                                            occupancy_map,
+                                            min_final_meter=self.planner_config.last_scope,
+                                            img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
 
-        return path
+            if find_flag:
+                transfer_paths = []
+                for node in paths:
+                    world_coords = self.pixel_to_world([node[1], node[0]], start[2])
+                    transfer_paths.append([world_coords[0], world_coords[1], start[2]])
+            else:
+                transfer_paths = None
+
+        return transfer_paths

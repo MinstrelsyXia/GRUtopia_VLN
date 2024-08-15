@@ -124,6 +124,8 @@ class Humanoid(IsaacRobot):
         name = 'base_legs'
         actuator = self.actuators[name]
 
+        if 'oracle' in controller_name:
+            return
         control_joint_pos = torch.tensor(control_action.joint_positions, dtype=torch.float32)
         control_actions = ArticulationActions(
             joint_positions=control_joint_pos,

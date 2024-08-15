@@ -106,7 +106,10 @@ def vis_one_path(args, vln_envs):
         if i % 10 == 0:
             # print(i)
             if vln_config.settings.check_and_reset_robot:
-                vln_envs.get_global_free_map(verbose=vln_config.test_verbose)
+                topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) # !!!
+                freemap, camera_pose = vln_envs.get_global_free_map(verbose=vln_config.test_verbose) # !!!
+                topdown_map.update_map(freemap, camera_pose, verbose=vln_config.test_verbose) # !!!
+
                 reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=vln_config.test_verbose)
                 reset_flag = reset_robot
                 if reset_flag:
@@ -352,11 +355,19 @@ def llm_inference(args, vln_envs):
         vln_envs.cam_occupancy_map.close_windows_head()
 
 def sample_episodes(args, vln_envs_all, data_camera_list):
+    # init the action
+    action_name = vln_config.settings.action
+
     topdown_maps = {}
     for split, vln_envs in vln_envs_all.items():
         for scan in vln_envs.data:
             for idx in range(len(vln_envs.data[scan])):
                 # 1. init Omni Env or Reset robot episode
+                if args.test_verbose:
+                    args.log_image_dir = os.path.join(args.log_dir, "images", split, scan, str(vln_envs.data[scan][idx]['trajectory_id'])) # Note that this will inflence the global arg value
+                    if not os.path.exists(args.log_image_dir):
+                        os.makedirs(args.log_image_dir)
+
                 if idx == 0:
                     data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True)
                 else:
@@ -369,12 +380,12 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                 total_points = []
             
                 if vln_config.windows_head:
-                    vln_envs.cam_occupancy_map.open_windows_head(text_info=data_item['instruction']['instruction_text'])
+                    vln_envs.cam_occupancy_map_local.open_windows_head(text_info=data_item['instruction']['instruction_text'])
             
                 '''start simulation'''
                 i = 0
-                warm_step = 100 if args.headless else 500
-                actions = {'h1': {'stand_still': []}}
+                warm_step = 300 if args.headless else 500
+                init_actions = {'h1': {action_name: [[paths[0]]]}}
 
                 while env.simulation_app.is_running():
                     i += 1
@@ -382,7 +393,16 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     env_actions = []
                     
                     if i < warm_step:
+                        env_actions.append(init_actions)
+                        obs = env.step(actions=env_actions)
+                        
+                        if i % 50 == 0:
+                            if vln_config.windows_head:
+                                # show the topdown camera
+                                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
+                        
                         continue
+
                     elif i == warm_step:
                         # first warm up finished
                         if scan not in topdown_maps:
@@ -393,32 +413,52 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                             log.info(f"====The global freemap has been initialized for {scan}====")
                         else:
                             topdown_map = topdown_maps[scan]
+                        
+                        agent_action_state = {}
+                        agent_action_state["finished"] = True
                     
-                    if i % 10 == 0:
+                    if args.test_verbose and args.windows_head:
+                        vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
+                    
+                    if i % 10 == 0 and agent_action_state['finished'] and current_point < len(paths)-1:
                         if current_point == 0:
                             log.info(f"===The robot starts navigating===")
                         log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
-
+                        
                         freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                         topdown_map.update_map(freemap, camera_pose, verbose=args.test_verbose)
-                        exe_path = topdown_map.navigate_p2p(paths[current_point], paths[current_point+1], verbose=args.test_verbose)
+                        robot_current_position = vln_envs.get_agent_pose()[0]
+                        exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose) # TODO: check world to map coordinate
+
+                        actions = {'h1': {action_name: [exe_path]}}
                         
                         total_points.extend(exe_path)
                         current_point += 1
 
                         if vln_config.windows_head:
                             # show the topdown camera
-                            vln_envs.cam_occupancy_map.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
+                            vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
 
+                    # if i % 10 == 0 and args.test_verbose:
+                    #         vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], step_time=i)
+                    if current_point == len(paths):
+                        log.info("===The robot has achieved the target place.===")
+                        break
                                         
                     env_actions.append(actions)
                     obs = env.step(actions=env_actions)
+
+                    # get the action state
+                    if len(obs[vln_envs.task_name]) > 0:
+                        agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
+                    else:
+                        agent_action_state['finished'] = False
 
 
                 env.simulation_app.close()
                 if vln_config.windows_head:
                     # close the topdown camera
-                    vln_envs.cam_occupancy_map.close_windows_head()
+                    vln_envs.cam_occupancy_map_local.close_windows_head()
         
 
 if __name__ == "__main__":

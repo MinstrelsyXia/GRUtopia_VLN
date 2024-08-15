@@ -27,6 +27,8 @@ tasks:
     - name: "move_with_keyboard"
     # - name: "web_chat"
     - name: "stand_still"
+    - name: "oracle_move_to_point"
+    - name: "oracle_move_along_path"
     sensor_params:
     - name: "pano_camera_0"
       enable: true

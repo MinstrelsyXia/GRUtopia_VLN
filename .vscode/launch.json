@@ -106,7 +106,8 @@
                 // "--path_id", "251",
                 "--save_obs",
                 "--vln_cfg_file", "vln/configs/vln_extract_data.yaml",
-                // "--windows_head"
+                "--windows_head",
+                "--windows_head_type", "save"
             ]
         },
         {

@@ -553,12 +553,12 @@ class AStarPlanner:
         self.ax.imshow(obs_map_draw, cmap=self.cmap, norm=self.norm, aspect='auto')
         self.ax.plot(sx, sy, "or", label="start")
         self.ax.plot(gx, gy, "xr", label="end")
-        self.ax.plot([x for x, y in points], [y for x, y in points], "-r")
+        self.ax.plot([x[0] for x in points], [x[1] for x in points], "-r")
         
         if legend:
             self.ax.legend()
         
-        self.ax.figure.savefig(img_save_path)
+        self.ax.figure.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
         log.info("Path has been saved to {}".format(img_save_path))
         if self.windows_head:
             plt.show(block=False)

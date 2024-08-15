@@ -23,6 +23,7 @@ def process_args():
     parser.add_argument("--vln_cfg_file", type=str, default="vln/configs/vln_cfg.yaml")
     parser.add_argument("--save_obs", action="store_true", default=False)
     parser.add_argument("--windows_head", default=False, action="store_true", help="Open a matplotlib window to show the topdown camera for view the robot's action")
+    parser.add_argument("--windows_head_type", default="show", choices=['show', 'save'], help="The type of the window head")
     args = parser.parse_args()
 
     args.root_dir = ROOT_DIR

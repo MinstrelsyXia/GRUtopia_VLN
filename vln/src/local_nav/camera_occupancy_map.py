@@ -240,7 +240,7 @@ class CamOccupancyMap:
             self.ax.text(4, 11, text_info, fontsize=10, ha='center', va='bottom', wrap=True)
         self.ax.set_title('Top-down RGB Image')
 
-    def update_windows_head(self, robot_pos, text_info=None):
+    def update_windows_head(self, robot_pos, text_info=None, mode="show"):
         rgb_data = self.get_camera_data(["rgba"])["rgba"]
         self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
         self.image_display.set_data(rgb_data)  # Update the image data
@@ -248,8 +248,12 @@ class CamOccupancyMap:
             self.ax.text(0.5, 0.01, text_info, fontsize=10, ha='left', va='bottom', wrap=True)
         # self.ax.draw_artist(self.ax.patch)  # Efficiently redraw the background
         self.ax.draw_artist(self.image_display)  # Efficiently redraw the image
-        plt.show(block=False)
-        plt.pause(0.001)  # This is necessary to update the window
+        if mode == 'show':
+            plt.show(block=False)
+            plt.pause(0.001)  # This is necessary to update the window
+        elif mode == 'save':
+            img_save_path = self.args.log_image_dir + "/window_topdown_image.png"
+            self.window_fig.savefig(img_save_path, bbox_inches='tight')
 
     def close_windows_head(self):
         plt.close('all')  # Close all figures
@@ -402,7 +406,7 @@ class CamOccupancyMap:
             # Save the image
             free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "topdown_global_freemap.png")
             free_map_image.save(free_map_path)
-            log.info("Global free map saved at", free_map_path)
+            log.info(f"Global free map saved at {free_map_path}.")
         
         # extract connectd free area
         if connect_filter:

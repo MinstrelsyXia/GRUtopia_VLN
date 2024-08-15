@@ -208,6 +208,15 @@ class VLNDataLoader(Dataset):
         self.agent_last_pose = None
         self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
         self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
+        if 'oracle' in self.args.settings.action:
+            from pxr import Usd, UsdPhysics
+            robot_prim = self.agents.prim
+            physics_schema = UsdPhysics.RigidBodyAPI(robot_prim)
+            if physics_schema:
+                physics_schema.CreateCollisionEnabledAttr(False)
+                log.info("In oracle mode, set robot collision to False")
+            else:
+                log.warning("In oracle mode, set robot collision to False failed")
     
     def init_BEVMap(self, robot_init_pose=(0,0,0)):
         '''init BEV map'''
@@ -219,6 +228,7 @@ class VLNDataLoader(Dataset):
         self.isaac_occupancy_map = IsaacOccupancyMap(self.args)
     
     def init_cam_occunpancy_map(self, robot_prim="/World/env_0/robots/World/h1",start_point=[0,0,0]):
+        # some pacakages can only be imported after app.run()
         from ..local_nav.camera_occupancy_map import CamOccupancyMap
         from ..local_nav.global_topdown_map import GlobalTopdownMap
         self.GlobalTopdownMap = GlobalTopdownMap
