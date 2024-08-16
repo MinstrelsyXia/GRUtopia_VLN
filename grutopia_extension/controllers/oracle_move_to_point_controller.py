@@ -2,9 +2,10 @@ from typing import Any, Dict, List
 
 import numpy as np
 from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation as R
 
 from omni.isaac.core.scenes import Scene
-from omni.isaac.core.utils.rotations import quat_to_euler_angles
+from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
 from omni.isaac.core.utils.types import ArticulationAction
 
 from grutopia.core.robot.controller import BaseController
@@ -26,40 +27,9 @@ class OracleMoveToPoint(BaseController):
         self.rotation_speed = config.rotation_speed if config.rotation_speed is not None else 8.0
         self.threshold = config.threshold if config.threshold is not None else 0.02
 
+        self.finished = False
+
         super().__init__(config=config, robot=robot, scene=scene)
-
-    @staticmethod
-    def vector_to_quaternion(vec):
-        z_axis = np.array([0, 0, 1])
-        axis = np.cross(z_axis, vec)
-        angle = np.arccos(np.dot(z_axis, vec))
-        
-        if np.linalg.norm(axis) < 1e-6:  
-            return np.array([0, 0, 0, 1])  
-
-        axis /= np.linalg.norm(axis)  
-        s = np.sin(angle / 2)
-        q = np.array([axis[0] * s, axis[1] * s, axis[2] * s, np.cos(angle / 2)])
-        return q
-
-    @staticmethod
-    def quaternion_from_axis_angle(axis, angle):
-        """Create a quaternion from an axis-angle representation."""
-        axis = axis / np.linalg.norm(axis)  # Normalize the axis
-        s = np.sin(angle / 2)
-        return np.array([axis[0] * s, axis[1] * s, axis[2] * s, np.cos(angle / 2)])
-
-    @staticmethod
-    def quaternion_multiply(q1, q2):
-        """Multiply two quaternions."""
-        w1, x1, y1, z1 = q1
-        w2, x2, y2, z2 = q2
-        return np.array([
-            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2
-        ])
 
     @staticmethod
     def get_angle_and_orientation(start_position, start_orientation, goal_position):
@@ -85,9 +55,9 @@ class OracleMoveToPoint(BaseController):
 
         signed_angle = angle * angle_sign
 
-        goal_orientation = OracleMoveToPoint.vector_to_quaternion(target_vec)
+        goal_orientation = OracleMoveToPoint.compute_goal_orientation(start_position, goal_position)
 
-        return signed_angle, goal_orientation
+        return signed_angle, goal_orientation, robot_z_rot
 
     @staticmethod
     def get_angle(
@@ -118,6 +88,21 @@ class OracleMoveToPoint(BaseController):
         signed_angle = angle * angle_sign
         return signed_angle
 
+    @staticmethod
+    def compute_goal_orientation(start_position, goal_position):
+        """
+        Compute the goal orientation quaternion given the start orientation and goal position.
+        
+        Args:
+        goal_position (tuple): Goal position as (x, y, z).
+        start_position (tuple): Start position as (x, y, z).
+        
+        Returns:
+        tuple: Goal orientation as a quaternion (w, x, y, z).
+        """
+        goal_orientation = euler_angles_to_quat(np.array([0, 0, np.arctan2(goal_position[1]-start_position[1], goal_position[0]-start_position[0])]))
+        return goal_orientation
+
     def forward(self,
                 start_position: np.ndarray,
                 start_orientation: np.ndarray,
@@ -136,33 +121,25 @@ class OracleMoveToPoint(BaseController):
         dist_from_goal = np.linalg.norm(start_position - goal_position)
         if dist_from_goal < threshold:
             # the same point
+            start_position = [start_position[0], start_position[1], start_z]
             self.robot.isaac_robot.set_world_pose(start_position, start_orientation)
+            self.finished = True
             return ArticulationAction()
         
-        angle_to_goal, goal_orientation = OracleMoveToPoint.get_angle_and_orientation(start_position, start_orientation, goal_position)
+        angle_to_goal, goal_orientation, robot_z_rot = OracleMoveToPoint.get_angle_and_orientation(start_position, start_orientation, goal_position)
 
         # Limit the robot to only rotate a maximum of pi/4
-        # if abs(angle_to_goal) > angle_threshold:
-        #     # Calculate the limited angle
-        #     limited_angle = angle_threshold * np.sign(angle_to_goal)
-            
-        #     # Create a rotation quaternion for the limited angle
-        #     rotation_axis = np.array([0, 0, 1])  # Assuming rotation around the Z-axis
-        #     rotation_quaternion = OracleMoveToPoint.quaternion_from_axis_angle(rotation_axis, limited_angle)  
-            
-        #     # Combine the current orientation with the limited rotation
-        #     new_orientation = OracleMoveToPoint.quaternion_multiply(start_orientation, rotation_quaternion) 
-            
-        #     # Set the robot's pose with the current position and new limited orientation
-        #     self.robot.isaac_robot.set_world_pose(start_position, new_orientation)
-        # else:
-        #     # If the angle is within pi/4, directly set the robot to goal position and orientation
-        #     self.robot.isaac_robot.set_world_pose(goal_position, goal_orientation)
-
-        goal_position = [goal_position[0], goal_position[1], goal_z]
+        if abs(angle_to_goal) > angle_threshold:
+            # Calculate the limited angle
+            limited_angle = angle_threshold * np.sign(angle_to_goal)
+            next_angle = (robot_z_rot + limited_angle)%(2*np.pi)
+            goal_orientation = euler_angles_to_quat(np.array([0, 0, next_angle]))
+            goal_position = [start_position[0], start_position[1], start_z]
+        else:
+            goal_position = [goal_position[0], goal_position[1], goal_z]
         self.robot.isaac_robot.set_world_pose(goal_position, goal_orientation) # TODO
 
-        # We have reached the goal position.
+        self.finished = True
         return ArticulationAction()
 
     def action_to_control(self, action: List | np.ndarray) -> ArticulationAction:
@@ -184,5 +161,5 @@ class OracleMoveToPoint(BaseController):
 
     def get_obs(self) -> Dict[str, Any]:
         return {
-            'finished': True,
+            'finished': self.finished,
         }

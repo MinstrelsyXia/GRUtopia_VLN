@@ -31,7 +31,9 @@ class OracleMoveAlongPathPointsController(BaseController):
                 start_position: np.ndarray,
                 start_orientation: np.ndarray,
                 path_points: np.ndarray,
-                threshold: float = 0.02) -> ArticulationAction:
+                threshold: float = 0.02,
+                current_step: int = 10,
+                step_interval: int = 30) -> ArticulationAction:
 
         if self.path_points is not path_points:
             self.path_points = path_points
@@ -40,22 +42,33 @@ class OracleMoveAlongPathPointsController(BaseController):
             self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
             # self.current_path_point[-1] = 0
 
-        # Just make sure we ignore z components
-        # start_position[-1] = 0 # The robot's actual current position
-        dist_from_goal = np.linalg.norm(start_position - self.current_path_point)
-        if dist_from_goal < threshold:
-            if self.path_point_idx < len(self.path_points) - 1:
-                self.path_point_idx += 1
-                self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
-                self.current_path_point[-1] = 0
-                log.info(f'switch to next path point: {self.current_path_point}')
+        if current_step % step_interval == 0:
+            # Just make sure we ignore z components
+            # start_position[-1] = 0 # The robot's actual current position
 
-        return self.sub_controllers[0].forward(
-            start_position=start_position,
-            start_orientation=start_orientation,
-            goal_position=self.current_path_point,
-            threshold=threshold
-        )
+            dist_from_goal = np.linalg.norm(start_position[:2] - self.current_path_point[:2])
+            if dist_from_goal < threshold:
+                if self.path_point_idx < len(self.path_points) - 1:
+                    self.path_point_idx += 1
+                    self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
+                    # self.current_path_point[-1] = 0
+                    log.info(f'switch to next path point: {self.current_path_point}')
+
+            return self.sub_controllers[0].forward(
+                start_position=start_position,
+                start_orientation=start_orientation,
+                goal_position=self.current_path_point,
+                threshold=threshold
+            )
+        else:
+            self.sub_controllers[0].forward(
+                start_position=start_position,
+                start_orientation=start_orientation,
+                goal_position=start_position,
+                threshold=threshold
+            )
+            self.sub_controllers[0].finished = False
+            return ArticulationAction()
 
     def action_to_control(self, action: List | np.ndarray) -> ArticulationAction:
         """Convert input action (in 1d array format) to joint signals to apply.
@@ -67,13 +80,21 @@ class OracleMoveAlongPathPointsController(BaseController):
         Returns:
             ArticulationAction: joint signals to apply.
         """
-        assert len(action) == 1, 'action must contain 1 elements'
+        # assert len(action) == 1, 'action must contain 1 elements'
         assert len(action[0]) > 0, 'path points cannot be empty'
         start_position, start_orientation = self.robot.get_world_pose()
+
+        if len(action)>1 and 'current_step' in action[1]:
+            current_step = action[1]['current_step']
+        else:
+            current_step = 10
+
         return self.forward(start_position=start_position,
                             start_orientation=start_orientation,
                             path_points=action[0],
-                            threshold=self.threshold*self.robot.get_robot_scale()[0])
+                            threshold=self.threshold*self.robot.get_robot_scale()[0],
+                            current_step=current_step,
+                            )
 
     def get_obs(self) -> Dict[str, Any]:
         finished = False

@@ -53,12 +53,12 @@ class GlobalTopdownMap:
         norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
         plt.figure(figsize=(10, 10))
-        plt.xlim(0, occupancy_map.shape[1])
-        plt.ylim(0, occupancy_map.shape[0])
+        # plt.xlim(0, occupancy_map.shape[1])
+        # plt.ylim(0, occupancy_map.shape[0])
         plt.imshow(occupancy_map, cmap=cmap, norm=norm)
         if robot_pos is not None:
             robot_pixel = self.world_to_pixel(robot_pos, is_camera_base=is_camera_base)
-            plt.scatter(robot_pixel[0], robot_pixel[1], color='blue', marker='o', label="current position (%.2f, %.2f)" % (robot_pos[0], robot_pos[1]))
+            plt.scatter(robot_pixel[0], robot_pixel[1], color='blue', marker='o', label="current position (%.2f, %.2f, %.2f)" % (robot_pos[0], robot_pos[1], robot_pos[2]))
         plt.legend()
         
         img_save_path = os.path.join(self.args.log_image_dir, f"global_topdown_map_{self.scan_name}_{height}.jpg")
@@ -99,27 +99,83 @@ class GlobalTopdownMap:
             log.error("Floor height not found in global topdown map")
             return None
 
-    def pixel_to_world(self, pixel, camera_pose):
-        # Convert aperture to radians
-        pixel_x, pixel_y = pixel
-        fov_rad = np.deg2rad(self.camera_aperture)
-        
-        # Calculate the scale factor
-        scale_x = 2 * np.tan(fov_rad / 2) / self.width
-        scale_y = 2 * np.tan(fov_rad / 2) / self.height
-        
-        # Calculate the offsets from the center of the image
-        offset_x = (pixel_x - self.width / 2) * scale_x
-        offset_y = (pixel_y - self.height / 2) * scale_y
-        
-        # Compute the world coordinates
-        world_x = camera_pose[0] + offset_x
-        world_y = camera_pose[1] + offset_y
-        
-        return world_x, world_y
+    # def pixel_to_world(self, pixel, world_pose, is_camera_base=False):
+    #     height = self.get_height(world_pose, is_camera_base=is_camera_base)
 
-    def world_to_pixel(self, world_coords, specific_height=None, is_camera_base=False):
-        height = self.get_height(world_coords, is_camera_base=is_camera_base)
+    #     if height not in self.floor_maps.keys():
+    #         log.error("Floor height not found in global topdown map")
+    #         return None
+        
+    #     camera_pose = self.floor_maps[height]['camera_pose']
+        
+    #     # Convert aperture to radians
+    #     pixel_x, pixel_y = pixel
+    #     fov_rad = np.deg2rad(self.camera_aperture)
+        
+    #     # Calculate the scale factor
+    #     scale_x = 2 * np.tan(fov_rad / 2) / self.width
+    #     scale_y = 2 * np.tan(fov_rad / 2) / self.height
+        
+    #     # Calculate the offsets from the center of the image
+    #     offset_x = (pixel_x - self.width / 2) * scale_x
+    #     offset_y = (pixel_y - self.height / 2) * scale_y
+        
+    #     # Compute the world coordinates
+    #     world_x = camera_pose[0] + offset_x
+    #     world_y = camera_pose[1] + offset_y
+        
+    #     return world_x, world_y
+
+    # def world_to_pixel(self, world_coords, specific_height=None, is_camera_base=False):
+    #     height = self.get_height(world_coords, is_camera_base=is_camera_base)
+
+    #     if height not in self.floor_maps.keys() and specific_height is None:
+    #         log.error("Floor height not found in global topdown map")
+    #         return None
+    #     elif specific_height is not None:
+    #         height = specific_height
+        
+    #     camera_pose = self.floor_maps[height]['camera_pose']
+
+    #     world_x, world_y = world_coords[0], world_coords[1]
+        
+    #     # Convert aperture to radians
+    #     fov_rad = np.deg2rad(self.camera_aperture)
+        
+    #     # Calculate the scale factor
+    #     scale_x = 2 * np.tan(fov_rad / 2) / self.width
+    #     scale_y = 2 * np.tan(fov_rad / 2) / self.height
+        
+    #     # Calculate offsets from camera pose
+    #     offset_x = world_x - camera_pose[0]
+    #     offset_y = world_y - camera_pose[1]
+        
+    #     # Convert world offsets to pixel offsets
+    #     pixel_offset_x = offset_x / scale_x
+    #     pixel_offset_y = offset_y / scale_y
+        
+    #     # Calculate pixel coordinates
+    #     pixel_x = int(pixel_offset_x + self.width / 2)
+    #     pixel_y = int(pixel_offset_y + self.height / 2)
+        
+    #     return pixel_x, pixel_y, world_coords[2]
+
+    def pixel_to_world(self, pixel, camera_pose):
+        cx, cy = camera_pose[0], [1]
+        x,y = pixel[0], pixel[1]
+        
+        # Convert pixel to NDC (Normalized Device Coordinates)
+        ndc_x = (x / self.width) * 2 - 1
+        ndc_y = (y / self.height) * 2 - 1
+        
+        # Convert NDC to world coordinates
+        world_x = cx + (ndc_x * self.camera_aperture / 2)
+        world_y = cy + (ndc_y * self.camera_aperture / 2)
+        
+        return [world_x, world_y, pixel[2]]
+
+    def world_to_pixel(self, world_pose, specific_height=None, is_camera_base=False):
+        height = self.get_height(world_pose, is_camera_base=is_camera_base)
 
         if height not in self.floor_maps.keys() and specific_height is None:
             log.error("Floor height not found in global topdown map")
@@ -129,28 +185,22 @@ class GlobalTopdownMap:
         
         camera_pose = self.floor_maps[height]['camera_pose']
 
-        world_x, world_y = world_coords[0], world_coords[1]
+        cx, cy = camera_pose[0], camera_pose[1]
+        X, Y = world_pose[0], world_pose[1]
+        # Translate world coordinates to camera-centered coordinates
+        trans_x = X - cx
+        trans_y = Y - cy
         
-        # Convert aperture to radians
-        fov_rad = np.deg2rad(self.camera_aperture)
+        # Convert world coordinates to NDC
+        ndc_x = (trans_x / (self.camera_aperture / 2))
+        ndc_y = (trans_y / (self.camera_aperture / 2))
         
-        # Calculate the scale factor
-        scale_x = 2 * np.tan(fov_rad / 2) / self.width
-        scale_y = 2 * np.tan(fov_rad / 2) / self.height
-        
-        # Calculate offsets from camera pose
-        offset_x = world_x - camera_pose[0]
-        offset_y = world_y - camera_pose[1]
-        
-        # Convert world offsets to pixel offsets
-        pixel_offset_x = offset_x / scale_x
-        pixel_offset_y = offset_y / scale_y
-        
-        # Calculate pixel coordinates
-        pixel_x = int(pixel_offset_x + self.width / 2)
-        pixel_y = int(pixel_offset_y + self.height / 2)
-        
-        return pixel_x, pixel_y, world_coords[2]
+        # Convert NDC to pixel coordinates
+        pixel_x = (ndc_x + 1) * self.width / 2
+        pixel_y = (ndc_y + 1) * self.height / 2
+
+        return [pixel_x, pixel_y]
+    
     
     def clear_map(self):
         self.floor_maps = defaultdict(lambda: {})
@@ -201,7 +251,7 @@ class GlobalTopdownMap:
             if verbose:
                 occupancy_map = self.get_map(start)
                 map_nodes = [self.world_to_pixel(x, specific_height=self.get_height(start)) for x in transfer_paths]
-                self.path_planner.vis_path(occupancy_map, map_nodes[0][1], map_nodes[0][0], map_nodes[-1][1], map_nodes[-1][0], map_nodes, os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"), legend=True)
+                self.path_planner.vis_path(occupancy_map, map_nodes[0][0], map_nodes[0][1], map_nodes[-1][0], map_nodes[-1][1], map_nodes, os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"), legend=True)
         
         else:
             occupancy_map = self.get_map(start)

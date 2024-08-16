@@ -385,7 +385,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                 '''start simulation'''
                 i = 0
                 warm_step = 300 if args.headless else 500
-                init_actions = {'h1': {action_name: [[paths[0]]]}}
+                init_actions = {'h1': {action_name: [[paths[0]], {'current_step': 0}]}}
 
                 while env.simulation_app.is_running():
                     i += 1
@@ -393,6 +393,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     env_actions = []
                     
                     if i < warm_step:
+                        init_actions['h1'][action_name][1]['current_step'] = i
                         env_actions.append(init_actions)
                         obs = env.step(actions=env_actions)
                         
@@ -420,33 +421,39 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     if args.test_verbose and args.windows_head:
                         vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
                     
-                    if i % 10 == 0 and agent_action_state['finished'] and current_point < len(paths)-1:
+                    if agent_action_state['finished']:
                         if current_point == 0:
                             log.info(f"===The robot starts navigating===")
-                        log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
-                        
-                        freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
-                        topdown_map.update_map(freemap, camera_pose, verbose=args.test_verbose)
-                        robot_current_position = vln_envs.get_agent_pose()[0]
-                        exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose) # TODO: check world to map coordinate
+                        if current_point < len(paths)-1:
+                            log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
+                            
+                            freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
+                            topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
+                            robot_current_position = vln_envs.get_agent_pose()[0]
+                            exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose) # TODO: check world to map coordinate
 
-                        actions = {'h1': {action_name: [exe_path]}}
-                        
-                        total_points.extend(exe_path)
-                        current_point += 1
+                            actions = {'h1': {action_name: [exe_path, {'current_step': i}]}}
+                            
+                            total_points.extend(exe_path)
+                            current_point += 1
 
-                        if vln_config.windows_head:
-                            # show the topdown camera
-                            vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
+                            if vln_config.windows_head:
+                                # show the topdown camera
+                                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
 
-                    # if i % 10 == 0 and args.test_verbose:
-                    #         vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], step_time=i)
-                    if current_point == len(paths):
-                        log.info("===The robot has achieved the target place.===")
-                        break
-                                        
+                        elif current_point == len(paths)-1:
+                            log.info("===The robot has achieved the target place.===")
+                            break
+                    
+                    actions['h1'][action_name][1]['current_step'] = i
+
                     env_actions.append(actions)
                     obs = env.step(actions=env_actions)
+
+                    if args.test_verbose and args.save_obs and i%30==0:
+                        vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], step_time=i)
+                        freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
+                        topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
 
                     # get the action state
                     if len(obs[vln_envs.task_name]) > 0:

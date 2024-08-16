@@ -348,7 +348,8 @@ class CamOccupancyMap:
         # free_map: 1 for free space, 0 for occupied space
 
         min_height = robot_height
-        max_height = robot_height + 0.8
+        # max_height = robot_height + 0.8
+        max_height = 4
         normal_threshold = 0.005
 
         # rgb_init, depth_init, mask, (row_min, row_max), (col_min, col_max), pointcloud = self._get_topdown_map(self.topdown_camera)
