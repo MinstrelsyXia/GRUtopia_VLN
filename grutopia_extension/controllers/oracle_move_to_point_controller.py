@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+from copy import deepcopy
 
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -28,6 +29,7 @@ class OracleMoveToPoint(BaseController):
         self.threshold = config.threshold if config.threshold is not None else 0.02
 
         self.finished = False
+        self.point = None
 
         super().__init__(config=config, robot=robot, scene=scene)
 
@@ -107,10 +109,12 @@ class OracleMoveToPoint(BaseController):
                 start_position: np.ndarray,
                 start_orientation: np.ndarray,
                 goal_position: np.ndarray,
-                threshold: float) -> ArticulationAction:
+                threshold: float,
+                topdown_camera_global=None,
+                topdown_camera_local=None) -> ArticulationAction:
         # Just make sure we ignore z components
-        start_z = start_position[-1]
-        goal_z = goal_position[-1]
+        start_z = deepcopy(start_position[-1])
+        goal_z = deepcopy(goal_position[-1])
         start_position[-1] = 0
         goal_position[-1] = 0
 
@@ -118,11 +122,16 @@ class OracleMoveToPoint(BaseController):
         self.last_threshold = threshold
         angle_threshold = np.pi/4
 
-        dist_from_goal = np.linalg.norm(start_position - goal_position)
+        dist_from_goal = np.linalg.norm(start_position[:2] - goal_position[:2])
         if dist_from_goal < threshold:
             # the same point
-            start_position = [start_position[0], start_position[1], start_z]
-            self.robot.isaac_robot.set_world_pose(start_position, start_orientation)
+            # start_position = [start_position[0], start_position[1], start_z]
+            self.robot.oracle_set_world_pose(start_position, start_orientation)
+            if topdown_camera_local is not None:
+                topdown_camera_local.set_world_pose(start_position)
+            if topdown_camera_global is not None:
+                topdown_camera_global.set_world_pose(start_position)
+            self.point = None
             self.finished = True
             return ArticulationAction()
         
@@ -137,7 +146,14 @@ class OracleMoveToPoint(BaseController):
             goal_position = [start_position[0], start_position[1], start_z]
         else:
             goal_position = [goal_position[0], goal_position[1], goal_z]
-        self.robot.isaac_robot.set_world_pose(goal_position, goal_orientation) # TODO
+        
+        self.point = [goal_position, goal_orientation]
+        self.robot.oracle_set_world_pose(goal_position, goal_orientation)
+
+        if topdown_camera_local is not None:
+            topdown_camera_local.set_world_pose(goal_position)
+        if topdown_camera_global is not None:
+            topdown_camera_global.set_world_pose(goal_position)
 
         self.finished = True
         return ArticulationAction()
@@ -160,6 +176,8 @@ class OracleMoveToPoint(BaseController):
                             threshold=np.pi/4)
 
     def get_obs(self) -> Dict[str, Any]:
-        return {
+        res = {
+            'point': self.point,
             'finished': self.finished,
         }
+        return res

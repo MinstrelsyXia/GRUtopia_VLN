@@ -10,6 +10,8 @@ import numpy as np
 import argparse
 import yaml
 import time
+from collections import defaultdict
+from PIL import Image
 
 # enable multiple gpus
 # import isaacsim
@@ -378,6 +380,8 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                 current_point = 0
                 # total_points = [vln_envs.agent_init_pose, vln_envs.agent_init_rotatation] # [[x,y,z],[w,x,y,z]]
                 total_points = []
+                total_points.append([np.array(vln_envs.agent_init_pose),np.array(vln_envs.agent_init_rotation)])
+                total_images = defaultdict(lambda: [])
             
                 if vln_config.windows_head:
                     vln_envs.cam_occupancy_map_local.open_windows_head(text_info=data_item['instruction']['instruction_text'])
@@ -385,12 +389,26 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                 '''start simulation'''
                 i = 0
                 warm_step = 300 if args.headless else 500
-                init_actions = {'h1': {action_name: [[paths[0]], {'current_step': 0}]}}
+
+                action_info = {
+                    'current_step': 0,
+                    'topdown_camera_local': vln_envs.cam_occupancy_map_local,
+                    'topdown_camera_global': vln_envs.cam_occupancy_map_global
+                }
+
+                init_actions = {'h1': {action_name: [[paths[0]], action_info]}}
 
                 while env.simulation_app.is_running():
                     i += 1
                     reset_flag = False
                     env_actions = []
+
+                    # if i == 1:
+                    #     # reset robot (avoid the warm up process changes the robot's state)
+                    #     vln_envs.set_agent_pose(vln_envs.agent_init_pose, vln_envs.agent_init_rotation)
+                    #     env_actions.append({'h1':{}})
+                    #     env.step(env_actions)
+                    #     continue
                     
                     if i < warm_step:
                         init_actions['h1'][action_name][1]['current_step'] = i
@@ -432,9 +450,10 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                             robot_current_position = vln_envs.get_agent_pose()[0]
                             exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose) # TODO: check world to map coordinate
 
-                            actions = {'h1': {action_name: [exe_path, {'current_step': i}]}}
+                            action_info.update({'current_step': i})
+                            actions = {'h1': {action_name: [exe_path, action_info]}}
                             
-                            total_points.extend(exe_path)
+                            # total_points.extend(exe_path)
                             current_point += 1
 
                             if vln_config.windows_head:
@@ -450,7 +469,20 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     env_actions.append(actions)
                     obs = env.step(actions=env_actions)
 
-                    if args.test_verbose and args.save_obs and i%30==0:
+                    exe_point = obs[vln_envs.task_name][vln_envs.robot_name][action_name].get('exe_point', None)
+                    if exe_point is not None:
+                        total_points.append(exe_point)
+
+                    # stack images
+                    if i % args.sample_episodes.step_interval == 0:
+                        # Since oracle_move_path_controller moves to the next point every 30 steps, the image is fetched every 20 steps
+                        for camera in data_camera_list:
+                            total_images[camera].append(
+                                [obs[vln_envs.task_name][vln_envs.robot_name][camera]['rgba'][:,:,:3],
+                                obs[vln_envs.task_name][vln_envs.robot_name][camera]['depth']
+                                ])
+
+                    if args.test_verbose and args.save_obs and i % 40 == 0:
                         vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], step_time=i)
                         freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                         topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
@@ -461,6 +493,23 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     else:
                         agent_action_state['finished'] = False
 
+                # save data
+                # Iterate through the dictionary and save images
+                for camera, images in total_images.items():
+                    for idx, (rgba_image, depth_image) in enumerate(images):
+                        # Convert RGBA to RGB if needed (PIL expects 3 channels)
+                        rgb_image = Image.fromarray(np.uint8(rgba_image[:, :, :3]))  # Assuming rgba_image is a numpy array
+                        depth_image_pil = Image.fromarray(depth_image) 
+
+                        # Define filenames
+                        rgb_filename = os.path.join(args.log_image_dir, "obs", f"{camera}_image_{idx:04d}.png")
+                        depth_filename = os.path.join(args.log_image_dir, "obs", f"{camera}_depth_{idx:04d}.png")
+
+                        # Save images
+                        rgb_image.save(rgb_filename)
+                        depth_image_pil.save(depth_filename)
+
+                        print(f"Saved {rgb_filename} and {depth_filename}")
 
                 env.simulation_app.close()
                 if vln_config.windows_head:

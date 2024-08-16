@@ -19,6 +19,9 @@ settings:
   sample_camera_list:
     - pano_camera_0
 
+sample_episodes:
+  step_interval: 20
+
 robots:
   - name: "CylinderRobot"
     z_offset: 0.7 # !!!

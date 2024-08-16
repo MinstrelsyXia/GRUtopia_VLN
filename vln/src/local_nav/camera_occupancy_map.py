@@ -342,6 +342,10 @@ class CamOccupancyMap:
         print(f"depth range: {min_depth} - {max_depth}")
         print(f"depth mean: {mean_depth}")
         print(f"depth std: {std_depth}")
+    
+    def set_world_pose(self, robot_pos):
+        # update the pose of the camera based on robot's pose
+        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
 
     def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, verbose=False):
         # Define height range for free map

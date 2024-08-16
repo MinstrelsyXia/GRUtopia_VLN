@@ -91,9 +91,11 @@ class GlobalTopdownMap:
                     'occupancy_map': self.freemap_to_accupancy_map(freemap, add_dilation=self.args.maps.add_dilation)
                 }
 
-    def get_map(self, world_pose, is_camera_base=False):
+    def get_map(self, world_pose, is_camera_base=False, return_camera_pose=False):
         height = self.get_height(world_pose, is_camera_base=is_camera_base)
         if height in self.floor_maps.keys():
+            if return_camera_pose:
+                return self.floor_maps[height]['occupancy_map'], self.floor_maps[height]['camera_pose']
             return self.floor_maps[height]['occupancy_map']
         else:
             log.error("Floor height not found in global topdown map")
@@ -161,7 +163,7 @@ class GlobalTopdownMap:
     #     return pixel_x, pixel_y, world_coords[2]
 
     def pixel_to_world(self, pixel, camera_pose):
-        cx, cy = camera_pose[0], [1]
+        cx, cy = camera_pose[0], camera_pose[1]
         x,y = pixel[0], pixel[1]
         
         # Convert pixel to NDC (Normalized Device Coordinates)
@@ -172,7 +174,7 @@ class GlobalTopdownMap:
         world_x = cx + (ndc_x * self.camera_aperture / 2)
         world_y = cy + (ndc_y * self.camera_aperture / 2)
         
-        return [world_x, world_y, pixel[2]]
+        return [world_x, world_y]
 
     def world_to_pixel(self, world_pose, specific_height=None, is_camera_base=False):
         height = self.get_height(world_pose, is_camera_base=is_camera_base)
@@ -254,22 +256,23 @@ class GlobalTopdownMap:
                 self.path_planner.vis_path(occupancy_map, map_nodes[0][0], map_nodes[0][1], map_nodes[-1][0], map_nodes[-1][1], map_nodes, os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"), legend=True)
         
         else:
-            occupancy_map = self.get_map(start)
+            occupancy_map, camera_pose = self.get_map(start, return_camera_pose=True)
             
             start_pixel = self.world_to_pixel(start)
             goal_pixel = self.world_to_pixel(goal)
 
-            self.path_planner.update_obs_map(occupancy_map)
-            paths, find_flag = self.path_planner.planning(start_pixel[1], start_pixel[0],
-                                            goal_pixel[1], goal_pixel[0],
-                                            occupancy_map,
+            # self.path_planner.update_obs_map(occupancy_map)
+            paths, find_flag = self.path_planner.planning(start_pixel[0], start_pixel[1],
+                                            goal_pixel[0], goal_pixel[1],
+                                            obs_map=occupancy_map,
                                             min_final_meter=self.planner_config.last_scope,
                                             img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
 
             if find_flag:
                 transfer_paths = []
                 for node in paths:
-                    world_coords = self.pixel_to_world([node[1], node[0]], start[2])
+                    # world_coords = self.pixel_to_world([node[1], node[0]], start[2])
+                    world_coords = self.pixel_to_world([node[0],node[1]], camera_pose)
                     transfer_paths.append([world_coords[0], world_coords[1], start[2]])
             else:
                 transfer_paths = None

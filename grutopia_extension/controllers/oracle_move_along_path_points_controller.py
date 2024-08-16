@@ -25,6 +25,8 @@ class OracleMoveAlongPathPointsController(BaseController):
         self.rotation_speed = config.rotation_speed if config.rotation_speed is not None else 8.0
         self.threshold = config.threshold if config.threshold is not None else 0.02
 
+        self.step_interval = 20
+
         super().__init__(config=config, robot=robot, scene=scene)
 
     def forward(self,
@@ -33,18 +35,17 @@ class OracleMoveAlongPathPointsController(BaseController):
                 path_points: np.ndarray,
                 threshold: float = 0.02,
                 current_step: int = 10,
-                step_interval: int = 30) -> ArticulationAction:
-
-        if self.path_points is not path_points:
-            self.path_points = path_points
-            self.path_point_idx = 0
-            log.info('reset path points')
-            self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
-            # self.current_path_point[-1] = 0
+                step_interval: int = 30,
+                topdown_camera_local=None,
+                topdown_camera_global=None) -> ArticulationAction:
 
         if current_step % step_interval == 0:
-            # Just make sure we ignore z components
-            # start_position[-1] = 0 # The robot's actual current position
+            if self.path_points is not path_points:
+                self.path_points = path_points
+                self.path_point_idx = 0
+                log.info('reset path points')
+                self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
+                # self.current_path_point[-1] = 0
 
             dist_from_goal = np.linalg.norm(start_position[:2] - self.current_path_point[:2])
             if dist_from_goal < threshold:
@@ -54,21 +55,28 @@ class OracleMoveAlongPathPointsController(BaseController):
                     # self.current_path_point[-1] = 0
                     log.info(f'switch to next path point: {self.current_path_point}')
 
+            current_path_point = deepcopy(self.current_path_point)
+
             return self.sub_controllers[0].forward(
                 start_position=start_position,
                 start_orientation=start_orientation,
-                goal_position=self.current_path_point,
-                threshold=threshold
+                goal_position=current_path_point,
+                threshold=threshold,
+                topdown_camera_global=topdown_camera_global,
+                topdown_camera_local=topdown_camera_local
             )
+        
         else:
-            self.sub_controllers[0].forward(
+            sub_control = self.sub_controllers[0].forward(
                 start_position=start_position,
                 start_orientation=start_orientation,
                 goal_position=start_position,
-                threshold=threshold
+                threshold=threshold,
+                topdown_camera_global=topdown_camera_global,
+                topdown_camera_local=topdown_camera_local
             )
             self.sub_controllers[0].finished = False
-            return ArticulationAction()
+            return sub_control
 
     def action_to_control(self, action: List | np.ndarray) -> ArticulationAction:
         """Convert input action (in 1d array format) to joint signals to apply.
@@ -84,16 +92,27 @@ class OracleMoveAlongPathPointsController(BaseController):
         assert len(action[0]) > 0, 'path points cannot be empty'
         start_position, start_orientation = self.robot.get_world_pose()
 
-        if len(action)>1 and 'current_step' in action[1]:
-            current_step = action[1]['current_step']
-        else:
-            current_step = 10
+        current_step = 10
+        topdown_camera_local = None
+        topdown_camera_global = None
+
+        if len(action)>1:
+            action_info = action[1]
+            if 'current_step' in action_info:
+                current_step = action[1]['current_step']
+            if 'topdown_camera_local' in action_info:
+                topdown_camera_local = action[1]['topdown_camera_local']
+            if 'topdown_camera_global' in action_info:
+                topdown_camera_global = action[1]['topdown_camera_global']
 
         return self.forward(start_position=start_position,
                             start_orientation=start_orientation,
                             path_points=action[0],
                             threshold=self.threshold*self.robot.get_robot_scale()[0],
                             current_step=current_step,
+                            step_interval=self.step_interval,
+                            topdown_camera_local=topdown_camera_local,
+                            topdown_camera_global=topdown_camera_global
                             )
 
     def get_obs(self) -> Dict[str, Any]:
@@ -102,9 +121,13 @@ class OracleMoveAlongPathPointsController(BaseController):
         if total_points > 0 and self.path_point_idx == total_points - 1:
             finished = self.sub_controllers[0].get_obs().get('finished', False)
 
+        # exe_point = self.sub_controllers[0].get_obs().get('point', None)
+        exe_point = self.sub_controllers[0].point
+
         return {
             'current_index': self.path_point_idx,
             'current_point': self.current_path_point,
             'total_points': total_points,
             'finished': finished,
+            'exe_point': exe_point
         }
