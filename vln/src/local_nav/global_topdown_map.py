@@ -266,7 +266,10 @@ class GlobalTopdownMap:
                                             goal_pixel[0], goal_pixel[1],
                                             obs_map=occupancy_map,
                                             min_final_meter=self.planner_config.last_scope,
-                                            img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
+                                            img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"),
+                                            vis_path=False)
+            if verbose:
+                self.vis_nav_path(start_pixel, goal_pixel, paths, occupancy_map, img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
 
             if find_flag:
                 transfer_paths = []
@@ -278,3 +281,26 @@ class GlobalTopdownMap:
                 transfer_paths = None
 
         return transfer_paths
+
+    def vis_nav_path(self, start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
+        plt.figure(figsize=(10, 10))
+        plt.imshow(occupancy_map, cmap='binary', origin='lower')
+
+        # Plot start and goal points
+        plt.plot(start_pixel[0], start_pixel[1], 'ro', markersize=6, label='Start')
+        plt.plot(goal_pixel[0], goal_pixel[1], 'go', markersize=6, label='Goal')
+
+        # Plot the path
+        path = np.array(points)
+        plt.plot(path[:, 0], path[:, 1], 'b-', linewidth=2, label='Path')
+
+        # Customize the plot
+        plt.title('Path planning')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.legend()
+        plt.colorbar(label='Occupancy (0: Free, 1: Occupied)')
+
+        # Save the plot
+        plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
+        log.info(f"Saved path planning visualization to {img_save_path}")

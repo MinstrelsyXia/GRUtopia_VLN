@@ -371,6 +371,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                         os.makedirs(args.log_image_dir)
 
                 if idx == 0:
+                    idx = 2 # !!!
                     data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True)
                 else:
                     data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=False)
@@ -382,13 +383,15 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                 total_points = []
                 total_points.append([np.array(vln_envs.agent_init_pose),np.array(vln_envs.agent_init_rotation)])
                 total_images = defaultdict(lambda: [])
+                is_image_stacked = False
             
                 if vln_config.windows_head:
                     vln_envs.cam_occupancy_map_local.open_windows_head(text_info=data_item['instruction']['instruction_text'])
             
                 '''start simulation'''
                 i = 0
-                warm_step = 300 if args.headless else 500
+                warm_step = 240 if args.headless else 500
+                # Note that warm_step should be the times of the oracle sample interval (now is set to 20)
 
                 action_info = {
                     'current_step': 0,
@@ -459,10 +462,6 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                             if vln_config.windows_head:
                                 # show the topdown camera
                                 vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
-
-                        elif current_point == len(paths)-1:
-                            log.info("===The robot has achieved the target place.===")
-                            break
                     
                     actions['h1'][action_name][1]['current_step'] = i
 
@@ -472,17 +471,19 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     exe_point = obs[vln_envs.task_name][vln_envs.robot_name][action_name].get('exe_point', None)
                     if exe_point is not None:
                         total_points.append(exe_point)
+                        is_image_stacked = False
 
                     # stack images
-                    if i % args.sample_episodes.step_interval == 0:
-                        # Since oracle_move_path_controller moves to the next point every 30 steps, the image is fetched every 20 steps
+                    if i % (args.sample_episodes.step_interval+7) == 0:
+                        # Since oracle_move_path_controller moves to the next point every 20 steps, the image is fetched every 20+5 steps
                         for camera in data_camera_list:
                             total_images[camera].append(
                                 [obs[vln_envs.task_name][vln_envs.robot_name][camera]['rgba'][:,:,:3],
                                 obs[vln_envs.task_name][vln_envs.robot_name][camera]['depth']
                                 ])
+                        is_image_stacked = True
 
-                    if args.test_verbose and args.save_obs and i % 40 == 0:
+                    if args.test_verbose and args.save_obs and i % (args.sample_episodes.step_interval+7) == 0:
                         vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], step_time=i)
                         freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                         topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
@@ -490,28 +491,37 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     # get the action state
                     if len(obs[vln_envs.task_name]) > 0:
                         agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
+                        print(i)
                     else:
                         agent_action_state['finished'] = False
+                    
+                    if agent_action_state['finished']:
+                        if current_point == len(paths)-1 and is_image_stacked:
+                            log.info("===The robot has achieved the final target.===")
+                            log.info("===Break this episode.===")
+                            break
 
                 # save data
                 # Iterate through the dictionary and save images
                 for camera, images in total_images.items():
                     for idx, (rgba_image, depth_image) in enumerate(images):
                         # Convert RGBA to RGB if needed (PIL expects 3 channels)
-                        rgb_image = Image.fromarray(np.uint8(rgba_image[:, :, :3]))  # Assuming rgba_image is a numpy array
-                        depth_image_pil = Image.fromarray(depth_image) 
+                        rgb_image = rgba_image[:, :, :3]
+                        max_depth = 10
+                        depth_image[depth_image > max_depth] = 0 
 
                         # Define filenames
                         rgb_filename = os.path.join(args.log_image_dir, "obs", f"{camera}_image_{idx:04d}.png")
                         depth_filename = os.path.join(args.log_image_dir, "obs", f"{camera}_depth_{idx:04d}.png")
 
                         # Save images
-                        rgb_image.save(rgb_filename)
-                        depth_image_pil.save(depth_filename)
+                        plt.imsave(rgb_filename, rgb_image)
+                        plt.imsave(depth_filename, depth_image)
 
                         print(f"Saved {rgb_filename} and {depth_filename}")
 
                 env.simulation_app.close()
+                print('finish')
                 if vln_config.windows_head:
                     # close the topdown camera
                     vln_envs.cam_occupancy_map_local.close_windows_head()

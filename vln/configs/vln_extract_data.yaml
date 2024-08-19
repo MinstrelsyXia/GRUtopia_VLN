@@ -15,12 +15,12 @@ settings:
   # action: "move_along_path"
   action: "oracle_move_along_path"
   check_and_reset_robot: true
-  use_llm: false
+  use_llm: true
   sample_camera_list:
     - pano_camera_0
 
 sample_episodes:
-  step_interval: 20
+  step_interval: 10
 
 robots:
   - name: "CylinderRobot"

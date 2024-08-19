@@ -111,7 +111,8 @@ class OracleMoveToPoint(BaseController):
                 goal_position: np.ndarray,
                 threshold: float,
                 topdown_camera_global=None,
-                topdown_camera_local=None) -> ArticulationAction:
+                topdown_camera_local=None,
+                is_hold=False) -> ArticulationAction:
         # Just make sure we ignore z components
         start_z = deepcopy(start_position[-1])
         goal_z = deepcopy(goal_position[-1])
@@ -125,14 +126,19 @@ class OracleMoveToPoint(BaseController):
         dist_from_goal = np.linalg.norm(start_position[:2] - goal_position[:2])
         if dist_from_goal < threshold:
             # the same point
-            # start_position = [start_position[0], start_position[1], start_z]
+            start_position = [start_position[0], start_position[1], start_z]
             self.robot.oracle_set_world_pose(start_position, start_orientation)
             if topdown_camera_local is not None:
                 topdown_camera_local.set_world_pose(start_position)
             if topdown_camera_global is not None:
                 topdown_camera_global.set_world_pose(start_position)
             self.point = None
-            self.finished = True
+            
+            if is_hold:
+                self.finished = False # 只是为了oracle过度interval
+            else:
+                self.finished = True
+
             return ArticulationAction()
         
         angle_to_goal, goal_orientation, robot_z_rot = OracleMoveToPoint.get_angle_and_orientation(start_position, start_orientation, goal_position)
@@ -144,6 +150,7 @@ class OracleMoveToPoint(BaseController):
             next_angle = (robot_z_rot + limited_angle)%(2*np.pi)
             goal_orientation = euler_angles_to_quat(np.array([0, 0, next_angle]))
             goal_position = [start_position[0], start_position[1], start_z]
+            self.finished = False
         else:
             goal_position = [goal_position[0], goal_position[1], goal_z]
         
@@ -155,7 +162,6 @@ class OracleMoveToPoint(BaseController):
         if topdown_camera_global is not None:
             topdown_camera_global.set_world_pose(goal_position)
 
-        self.finished = True
         return ArticulationAction()
 
     def action_to_control(self, action: List | np.ndarray) -> ArticulationAction:
@@ -176,8 +182,14 @@ class OracleMoveToPoint(BaseController):
                             threshold=np.pi/4)
 
     def get_obs(self) -> Dict[str, Any]:
+        if self.goal_position is None or self.last_threshold is None:
+            return {}
+        start_position = self.robot.isaac_robot.get_world_pose()[0]
+        dist_from_goal = np.linalg.norm(start_position[:2] - self.goal_position[:2])
+        finished = True if dist_from_goal < self.last_threshold else False
+    
         res = {
             'point': self.point,
-            'finished': self.finished,
+            'finished': finished,
         }
         return res
