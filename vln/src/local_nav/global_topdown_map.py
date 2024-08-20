@@ -171,8 +171,8 @@ class GlobalTopdownMap:
         ndc_y = (y / self.height) * 2 - 1
         
         # Convert NDC to world coordinates
-        world_x = cx + (ndc_x * self.camera_aperture / 2)
-        world_y = cy + (ndc_y * self.camera_aperture / 2)
+        world_x = cx + (ndc_x * self.camera_aperture / 2)/10
+        world_y = cy + (ndc_y * self.camera_aperture / 2)/10
         
         return [world_x, world_y]
 
@@ -188,10 +188,10 @@ class GlobalTopdownMap:
         camera_pose = self.floor_maps[height]['camera_pose']
 
         cx, cy = camera_pose[0], camera_pose[1]
-        X, Y = world_pose[0], world_pose[1]
+        X, Y = self.width-world_pose[0], self.height-world_pose[1] # !!!
         # Translate world coordinates to camera-centered coordinates
-        trans_x = X - cx
-        trans_y = Y - cy
+        trans_x = (X - cx)*10
+        trans_y = (Y - cy)*10
         
         # Convert world coordinates to NDC
         ndc_x = (trans_x / (self.camera_aperture / 2))
@@ -241,6 +241,15 @@ class GlobalTopdownMap:
         sampled_points = [start + i*delta for i in range(step+1)]
 
         return sampled_points
+    
+    def rotate_180(self, matrix):
+        # Step 1: Reverse the order of rows
+        # matrix.reverse()
+        # # Step 2: Reverse each row
+        # for row in matrix:
+        #     row.reverse()
+        matrix = np.flipud(np.fliplr(matrix))
+        return matrix
 
     def navigate_p2p(self, start, goal, step_time=0, verbose=False):
         # start_height = int(start[2])
@@ -257,19 +266,25 @@ class GlobalTopdownMap:
         
         else:
             occupancy_map, camera_pose = self.get_map(start, return_camera_pose=True)
+            occupancy_map_180 = self.rotate_180(occupancy_map)
             
             start_pixel = self.world_to_pixel(start)
             goal_pixel = self.world_to_pixel(goal)
 
             # self.path_planner.update_obs_map(occupancy_map)
+
             paths, find_flag = self.path_planner.planning(start_pixel[0], start_pixel[1],
                                             goal_pixel[0], goal_pixel[1],
-                                            obs_map=occupancy_map,
+                                            obs_map=occupancy_map_180,
                                             min_final_meter=self.planner_config.last_scope,
                                             img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"),
                                             vis_path=False)
             if verbose:
-                self.vis_nav_path(start_pixel, goal_pixel, paths, occupancy_map, img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
+                path_convert_y = []
+                for path in paths:
+                    path_convert_y.append([path[0], self.height - path[1]])
+                    goal_pixel_convert_y = [goal_pixel[0], self.height - goal_pixel[1]]
+                self.vis_nav_path(start_pixel, goal_pixel_convert_y, path_convert_y, occupancy_map_180, img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
 
             if find_flag:
                 transfer_paths = []
@@ -284,7 +299,8 @@ class GlobalTopdownMap:
 
     def vis_nav_path(self, start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
         plt.figure(figsize=(10, 10))
-        plt.imshow(occupancy_map, cmap='binary', origin='lower')
+        # plt.imshow(occupancy_map, cmap='binary', origin='lower')
+        plt.imshow(occupancy_map, cmap='binary')
 
         # Plot start and goal points
         plt.plot(start_pixel[0], start_pixel[1], 'ro', markersize=6, label='Start')
@@ -299,6 +315,7 @@ class GlobalTopdownMap:
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.legend()
+        plt.grid()
         plt.colorbar(label='Occupancy (0: Free, 1: Occupied)')
 
         # Save the plot

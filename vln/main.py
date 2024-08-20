@@ -371,7 +371,8 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                         os.makedirs(args.log_image_dir)
 
                 if idx == 0:
-                    idx = 2 # !!!
+                    scan = "vyrNrziPKCB"
+                    idx = 9
                     data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True)
                 else:
                     data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=False)

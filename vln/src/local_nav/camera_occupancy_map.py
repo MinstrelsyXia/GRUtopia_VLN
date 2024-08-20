@@ -347,7 +347,7 @@ class CamOccupancyMap:
         # update the pose of the camera based on robot's pose
         self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
 
-    def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, verbose=False):
+    def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, update_camera_pose=True, verbose=False):
         # Define height range for free map
         # free_map: 1 for free space, 0 for occupied space
 
@@ -420,7 +420,8 @@ class CamOccupancyMap:
             connected_free_area = None
 
         # update the pose of the camera based on robot's pose
-        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+        if update_camera_pose:
+            self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
 
         return free_map, connected_free_area
     

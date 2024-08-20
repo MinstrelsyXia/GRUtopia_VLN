@@ -379,7 +379,7 @@ class VLNDataLoader(Dataset):
             This is useful to reset the robot's location when it get stuck or falling down.
         '''
         self.global_freemap_camera_pose = self.cam_occupancy_map_global.topdown_camera.get_world_pose()[0]
-        self.global_freemap, _ = self.cam_occupancy_map_global.get_global_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.65, verbose=verbose)
+        self.global_freemap, _ = self.cam_occupancy_map_global.get_global_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
         return self.global_freemap, self.global_freemap_camera_pose
     
     def update_occupancy_map(self, verbose=False):

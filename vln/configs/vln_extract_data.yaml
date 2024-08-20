@@ -43,8 +43,8 @@ maps:
     max_depth: 8  # Maximum depth of the quadtree
     threshold: 1  # Threshold for node splitting  
   global_topdown_config:
-    width: 1024
-    height: 1024
+    width: 500
+    height: 500
     aperture: 500
     camera_transform_height: 0.8
     
