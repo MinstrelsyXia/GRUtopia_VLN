@@ -18,6 +18,9 @@ settings:
   use_llm: true
   sample_camera_list:
     - pano_camera_0
+  camera_data_type:
+    - rgba
+    - depth
 
 sample_episodes:
   step_interval: 10

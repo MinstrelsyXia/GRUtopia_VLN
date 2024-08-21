@@ -12,6 +12,7 @@ import yaml
 import time
 from collections import defaultdict
 from PIL import Image
+from copy import deepcopy
 
 # enable multiple gpus
 # import isaacsim
@@ -392,6 +393,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                 '''start simulation'''
                 i = 0
                 warm_step = 240 if args.headless else 500
+                move_step = warm_step
                 # Note that warm_step should be the times of the oracle sample interval (now is set to 20)
 
                 action_info = {
@@ -452,7 +454,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                             freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                             topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
                             robot_current_position = vln_envs.get_agent_pose()[0]
-                            exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose) # TODO: check world to map coordinate
+                            exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose, all_paths=paths) # TODO: check world to map coordinate
 
                             action_info.update({'current_step': i})
                             actions = {'h1': {action_name: [exe_path, action_info]}}
@@ -467,15 +469,16 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     actions['h1'][action_name][1]['current_step'] = i
 
                     env_actions.append(actions)
-                    obs = env.step(actions=env_actions)
+                    obs = env.step(actions=env_actions, data_type=args.settings.camera_data_type)
 
                     exe_point = obs[vln_envs.task_name][vln_envs.robot_name][action_name].get('exe_point', None)
                     if exe_point is not None:
                         total_points.append(exe_point)
                         is_image_stacked = False
+                        move_step = deepcopy(i)
 
                     # stack images
-                    if i % (args.sample_episodes.step_interval+7) == 0:
+                    if (i-move_step) != 0 and (i-move_step) % 7 == 0:
                         # Since oracle_move_path_controller moves to the next point every 20 steps, the image is fetched every 20+5 steps
                         for camera in data_camera_list:
                             total_images[camera].append(
@@ -484,7 +487,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                                 ])
                         is_image_stacked = True
 
-                    if args.test_verbose and args.save_obs and i % (args.sample_episodes.step_interval+7) == 0:
+                    if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%7 == 0:
                         vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], step_time=i)
                         freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                         topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)

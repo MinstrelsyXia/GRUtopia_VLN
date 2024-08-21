@@ -66,7 +66,7 @@ class SimulatorRunner:
         # task.load()
         self._warm_up()
 
-    def step(self, actions: dict, render: bool = True):
+    def step(self, actions: dict, render: bool = True, data_type=None):
         for task_name, action_dict in actions.items():
             task = self.current_tasks.get(task_name)
             for name, action in action_dict.items():
@@ -78,7 +78,7 @@ class SimulatorRunner:
             self.render_trigger = 0
         self._world.step(render=render)
 
-        obs = self.get_obs()
+        obs = self.get_obs(data_type=data_type)
         for npc in self.npc:
             try:
                 npc.feed(obs)

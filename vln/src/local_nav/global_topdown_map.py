@@ -162,46 +162,104 @@ class GlobalTopdownMap:
         
     #     return pixel_x, pixel_y, world_coords[2]
 
-    def pixel_to_world(self, pixel, camera_pose):
-        cx, cy = camera_pose[0], camera_pose[1]
-        x,y = pixel[0], pixel[1]
+    # def pixel_to_world(self, pixel, camera_pose):
+    #     cx, cy = camera_pose[0], camera_pose[1]
+    #     # x,y = pixel[0], pixel[1]
+    #     x, y = self.width-pixel[0], self.height-pixel[1]
         
-        # Convert pixel to NDC (Normalized Device Coordinates)
-        ndc_x = (x / self.width) * 2 - 1
-        ndc_y = (y / self.height) * 2 - 1
+    #     # Convert pixel to NDC (Normalized Device Coordinates)
+    #     ndc_x = (x / self.width) * 2 - 1
+    #     ndc_y = (y / self.height) * 2 - 1
         
-        # Convert NDC to world coordinates
-        world_x = cx + (ndc_x * self.camera_aperture / 2)/10
-        world_y = cy + (ndc_y * self.camera_aperture / 2)/10
+    #     # Convert NDC to world coordinates
+    #     world_x = cx + (ndc_x * self.camera_aperture / 2)/10
+    #     world_y = cy + (ndc_y * self.camera_aperture / 2)/10
+
+    #     # convert_world_x = self.width - world_x
+    #     # convert_world_y = self.height - world_y
         
-        return [world_x, world_y]
+    #     return [world_x, world_y]
+
+    # def world_to_pixel_2(self, world_pose, specific_height=None, is_camera_base=False):
+    #     height = self.get_height(world_pose, is_camera_base=is_camera_base)
+
+    #     if height not in self.floor_maps.keys() and specific_height is None:
+    #         log.error("Floor height not found in global topdown map")
+    #         return None
+    #     elif specific_height is not None:
+    #         height = specific_height
+        
+    #     camera_pose = self.floor_maps[height]['camera_pose']
+
+    #     cx, cy = camera_pose[0], camera_pose[1]
+    #     X, Y = world_pose[0], world_pose[1] # !!!
+    #     # Translate world coordinates to camera-centered coordinates
+    #     trans_x = (X - cx)*10
+    #     trans_y = (Y - cy)*10
+        
+    #     # Convert world coordinates to NDC
+    #     ndc_x = (trans_x / (self.camera_aperture / 2))
+    #     ndc_y = (trans_y / (self.camera_aperture / 2))
+        
+    #     # Convert NDC to pixel coordinates
+    #     pixel_x = (ndc_x + 1) * self.width / 2
+    #     pixel_y = (ndc_y + 1) * self.height / 2
+
+    #     convert_pixel_x = self.width - pixel_x
+    #     convert_pixel_y = self.height - pixel_y
+
+    #     return [convert_pixel_x, convert_pixel_y]
+    
+    # def world_to_pixel_yesterday(self, world_pose, specific_height=None, is_camera_base=False):
+    #     height = self.get_height(world_pose, is_camera_base=is_camera_base)
+
+    #     if height not in self.floor_maps.keys() and specific_height is None:
+    #         log.error("Floor height not found in global topdown map")
+    #         return None
+    #     elif specific_height is not None:
+    #         height = specific_height
+        
+    #     camera_pose = self.floor_maps[height]['camera_pose']
+
+    #     cx, cy = camera_pose[0]*10, camera_pose[1]*10
+    #     X, Y = world_pose[0]*10, world_pose[1]*10 # !!!
+
+    #     negative_X, negative_Y = -X, -Y
+    #     pixel_x = negative_X + cx + self.width/2
+    #     pixel_y = self.height - (negative_Y + cy + self.height/2)
+
+    #     return [pixel_x, pixel_y]
 
     def world_to_pixel(self, world_pose, specific_height=None, is_camera_base=False):
-        height = self.get_height(world_pose, is_camera_base=is_camera_base)
+        if specific_height is None:
+            height = self.get_height(world_pose, is_camera_base=is_camera_base)
 
-        if height not in self.floor_maps.keys() and specific_height is None:
-            log.error("Floor height not found in global topdown map")
-            return None
-        elif specific_height is not None:
+            if height not in self.floor_maps.keys() and specific_height is None:
+                log.error("Floor height not found in global topdown map")
+                return None
+        else:
             height = specific_height
         
         camera_pose = self.floor_maps[height]['camera_pose']
 
-        cx, cy = camera_pose[0], camera_pose[1]
-        X, Y = self.width-world_pose[0], self.height-world_pose[1] # !!!
-        # Translate world coordinates to camera-centered coordinates
-        trans_x = (X - cx)*10
-        trans_y = (Y - cy)*10
-        
-        # Convert world coordinates to NDC
-        ndc_x = (trans_x / (self.camera_aperture / 2))
-        ndc_y = (trans_y / (self.camera_aperture / 2))
-        
-        # Convert NDC to pixel coordinates
-        pixel_x = (ndc_x + 1) * self.width / 2
-        pixel_y = (ndc_y + 1) * self.height / 2
+        cx, cy = camera_pose[1]*10/self.camera_aperture*self.width, -camera_pose[0]*10/self.camera_aperture*self.height
+        X, Y = world_pose[1]*10/self.camera_aperture*self.width, -world_pose[0]*10/self.camera_aperture*self.height
+
+        pixel_x = X - cx + self.width/2
+        pixel_y = Y - cy + self.height/2
 
         return [pixel_x, pixel_y]
+
+    def pixel_to_world(self, pixel, camera_pose):
+        cx, cy = camera_pose[1]*10/self.camera_aperture*self.width, -camera_pose[0]*10/self.camera_aperture*self.height
+
+        px = pixel[0] + cx - self.height/2
+        py = pixel[1] + cy - self.width/2
+
+        world_x = -py/10/self.height*self.camera_aperture
+        world_y = px/10/self.width*self.camera_aperture
+        
+        return [world_x, world_y]
     
     
     def clear_map(self):
@@ -241,17 +299,8 @@ class GlobalTopdownMap:
         sampled_points = [start + i*delta for i in range(step+1)]
 
         return sampled_points
-    
-    def rotate_180(self, matrix):
-        # Step 1: Reverse the order of rows
-        # matrix.reverse()
-        # # Step 2: Reverse each row
-        # for row in matrix:
-        #     row.reverse()
-        matrix = np.flipud(np.fliplr(matrix))
-        return matrix
 
-    def navigate_p2p(self, start, goal, step_time=0, verbose=False):
+    def navigate_p2p(self, start, goal, step_time=0, verbose=False, all_paths=[]):
         # start_height = int(start[2])
         # goal_height = int(goal[2])
 
@@ -266,30 +315,35 @@ class GlobalTopdownMap:
         
         else:
             occupancy_map, camera_pose = self.get_map(start, return_camera_pose=True)
-            occupancy_map_180 = self.rotate_180(occupancy_map)
             
             start_pixel = self.world_to_pixel(start)
             goal_pixel = self.world_to_pixel(goal)
+
+            # test
+            if len(all_paths) > 0:
+                plt.clf()
+                plt.imshow(occupancy_map, cmap='binary', origin='upper')
+                for path in all_paths:
+                    path_pixel = self.world_to_pixel(path)
+                    plt.scatter(path_pixel[1], path_pixel[0])
+                plt.savefig('test.jpg')
+                plt.clf()
 
             # self.path_planner.update_obs_map(occupancy_map)
 
             paths, find_flag = self.path_planner.planning(start_pixel[0], start_pixel[1],
                                             goal_pixel[0], goal_pixel[1],
-                                            obs_map=occupancy_map_180,
+                                            obs_map=occupancy_map,
                                             min_final_meter=self.planner_config.last_scope,
                                             img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"),
                                             vis_path=False)
             if verbose:
-                path_convert_y = []
-                for path in paths:
-                    path_convert_y.append([path[0], self.height - path[1]])
-                    goal_pixel_convert_y = [goal_pixel[0], self.height - goal_pixel[1]]
-                self.vis_nav_path(start_pixel, goal_pixel_convert_y, path_convert_y, occupancy_map_180, img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
+                if len(paths) > 0:
+                    self.vis_nav_path(start_pixel, goal_pixel, paths, occupancy_map, img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
 
             if find_flag:
                 transfer_paths = []
                 for node in paths:
-                    # world_coords = self.pixel_to_world([node[1], node[0]], start[2])
                     world_coords = self.pixel_to_world([node[0],node[1]], camera_pose)
                     transfer_paths.append([world_coords[0], world_coords[1], start[2]])
             else:
@@ -300,15 +354,15 @@ class GlobalTopdownMap:
     def vis_nav_path(self, start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
         plt.figure(figsize=(10, 10))
         # plt.imshow(occupancy_map, cmap='binary', origin='lower')
-        plt.imshow(occupancy_map, cmap='binary')
+        plt.imshow(occupancy_map, cmap='binary', origin='upper')
 
         # Plot start and goal points
-        plt.plot(start_pixel[0], start_pixel[1], 'ro', markersize=6, label='Start')
-        plt.plot(goal_pixel[0], goal_pixel[1], 'go', markersize=6, label='Goal')
+        plt.plot(start_pixel[1], start_pixel[0], 'ro', markersize=6, label='Start')
+        plt.plot(goal_pixel[1], goal_pixel[0], 'go', markersize=6, label='Goal')
 
         # Plot the path
         path = np.array(points)
-        plt.plot(path[:, 0], path[:, 1], 'b-', linewidth=2, label='Path')
+        plt.plot(path[:, 1], path[:, 0], 'b-', linewidth=2, label='Path')
 
         # Customize the plot
         plt.title('Path planning')

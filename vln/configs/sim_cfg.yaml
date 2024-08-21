@@ -1,6 +1,7 @@
 simulator:
   physics_dt: 1/240
   rendering_dt: 1/240
+  rendering_interval: 2
 
 tasks:
 - type: "SingleInferenceTask"

@@ -736,7 +736,7 @@ class AStarPlanner:
 
         if len(points_list) > 1:
             points = self.simplify_path(points_list)
-            # points.append((gx, gy))
+            points.append((gx, gy))
         else:
             log.warning(f"Path planning results only contain {len(points_list)} points.")
             points = []

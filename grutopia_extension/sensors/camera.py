@@ -94,6 +94,7 @@ class Camera(BaseSensor):
     
     def get_camera_data(self, data_type: list) -> Dict:
         output_data = {}
+        rep.orchestrator.step(rt_subframes=2) # !!!
         if "bbox" in data_type:
             output_data["bbox"] = self.bbox_receiver.get_data()
         if "rgba" in data_type:
