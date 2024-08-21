@@ -383,6 +383,10 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                 current_point = 0
                 # total_points = [vln_envs.agent_init_pose, vln_envs.agent_init_rotatation] # [[x,y,z],[w,x,y,z]]
                 total_points = []
+                total_info = {
+                    'robot_pose': [],
+                    'camera_params': []
+                }
                 total_points.append([np.array(vln_envs.agent_init_pose),np.array(vln_envs.agent_init_rotation)])
                 total_images = defaultdict(lambda: [])
                 is_image_stacked = False
@@ -409,12 +413,6 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     reset_flag = False
                     env_actions = []
 
-                    # if i == 1:
-                    #     # reset robot (avoid the warm up process changes the robot's state)
-                    #     vln_envs.set_agent_pose(vln_envs.agent_init_pose, vln_envs.agent_init_rotation)
-                    #     env_actions.append({'h1':{}})
-                    #     env.step(env_actions)
-                    #     continue
                     
                     if i < warm_step:
                         init_actions['h1'][action_name][1]['current_step'] = i
@@ -469,7 +467,12 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     actions['h1'][action_name][1]['current_step'] = i
 
                     env_actions.append(actions)
-                    obs = env.step(actions=env_actions, data_type=args.settings.camera_data_type)
+                    if i % args.sample_episodes.step_interval == 0:
+                        data_type = args.settings.camera_data_type
+                    else:
+                        data_type = None
+
+                    obs = env.step(actions=env_actions, data_type=data_type)
 
                     exe_point = obs[vln_envs.task_name][vln_envs.robot_name][action_name].get('exe_point', None)
                     if exe_point is not None:
@@ -477,8 +480,12 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                         is_image_stacked = False
                         move_step = deepcopy(i)
 
-                    # stack images
-                    if (i-move_step) != 0 and (i-move_step) % 7 == 0:
+                        camera_params = vln_envs.get_observations(data_types='camera_params')
+                        total_info['camera_params'].append(camera_params[vln_envs.task_name][vln_envs.robot_name][data_camera_list[0]]['camera_params']) # !!!
+                        total_info['robot_pose'].append(exe_point)
+
+                    # stack images and information
+                    if (i-move_step) != 0 and (i-move_step) % (args.sample_episodes.step_interval-2) == 0:
                         # Since oracle_move_path_controller moves to the next point every 20 steps, the image is fetched every 20+5 steps
                         for camera in data_camera_list:
                             total_images[camera].append(
@@ -487,7 +494,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                                 ])
                         is_image_stacked = True
 
-                    if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%7 == 0:
+                    if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%(args.sample_episodes.step_interval-2) == 0:
                         vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], step_time=i)
                         freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                         topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
@@ -523,6 +530,12 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                         plt.imsave(depth_filename, depth_image)
 
                         print(f"Saved {rgb_filename} and {depth_filename}")
+                
+                # save the information
+                info_save_file = os.path.join(args.log_image_dir, 'sample_episodes.json')
+                with open(info_save_file, 'w') as json_file:
+                    json.dump(total_info, json_file, indent=4)
+                log.info(f"Saved the information to {info_save_file}")
 
                 env.simulation_app.close()
                 print('finish')

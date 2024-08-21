@@ -25,7 +25,7 @@ class OracleMoveAlongPathPointsController(BaseController):
         self.rotation_speed = config.rotation_speed if config.rotation_speed is not None else 8.0
         self.threshold = config.threshold if config.threshold is not None else 0.02
 
-        self.step_interval = 10
+        self.step_interval = 5
 
         super().__init__(config=config, robot=robot, scene=scene)
 
