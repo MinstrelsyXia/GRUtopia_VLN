@@ -35,6 +35,9 @@ maps:
     global_height: 30
     max_depth: 8  # Maximum depth of the quadtree
     threshold: 1  # Threshold for node splitting  
+
+segmentation:
+    num_categories: 160 # Number of semantic categories, no open volcabulary 
     
 planners:
   method: "a_star" # The method used for planning (a_star or rrt_star)

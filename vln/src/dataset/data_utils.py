@@ -8,7 +8,7 @@ import gzip
 import json
 import copy
 import numpy as np
-
+import cv2
 import torch
 from torch.utils.data import Dataset
 # from torchvision import transforms
@@ -29,7 +29,7 @@ from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_re
 
 from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
 from ..local_nav.BEVmap import BEVMap
-
+from ..local_nav.sementic_map import BEVSemMap
 
 def load_data(args, splits):
     ''' Load data based on VLN-CE
@@ -193,6 +193,9 @@ class VLNDataLoader(Dataset):
     def init_BEVMap(self, robot_init_pose=(0,0,0)):
         '''init BEV map'''
         self.bev = BEVMap(self.args, robot_init_pose=robot_init_pose)
+        # TODO：可能在其他位置调用
+        self.robot_init_pose = robot_init_pose
+        self.init_BEVSemMap(robot_init_pose=robot_init_pose)
     
     def init_isaac_occupancy_map(self):
         '''init Isaac Occupancy map'''
@@ -274,7 +277,7 @@ class VLNDataLoader(Dataset):
                 elif data == "depth":
                     data_info = cur_obs[data]
                     max_depth = 10
-                    data_info[data_info > max_depth] = 0
+                    data_info[data_info > max_depth] = 0 # automatically discard unsatisfied values
                     save_img_flag = True
                 elif data == 'pointcloud':
                     save_img_flag = False
@@ -289,7 +292,93 @@ class VLNDataLoader(Dataset):
                     except Exception as e:
                         log.error(f"Error in saving camera image: {e}")
         return obs
+    
+    def save_observations_special(self, camera_list:list, data_types:list, save_image_list=None, save_imgs=True, step_time=0):
+            ''' Save observations from the agent
+            '''
+            obs = self.env.get_observations(data_type=data_types)
+            DIR= os.path.expanduser("~/code/xxy/Matterport3D/data/grutopia_test")
+            path_id = str(self.args.path_id)
+            main_dir = os.path.join(DIR,self.args.env,path_id)
+            if not os.path.exists(main_dir):
+                os.makedirs(main_dir)
+            camera_pose_dict = self.get_camera_pose()
+            for camera in camera_list:
+                cur_obs = obs[self.task_name][self.robot_name][camera]
+                # save pose
+                camera_pose=camera_pose_dict[camera]
+                pos, quat = camera_pose[0], camera_pose[1]
+                pose_save_path = os.path.join(main_dir,'poses.txt')
+                with open(pose_save_path,'a') as f:
+                    sep =""
+                    f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}")
+                    sep = "\n"
+                
+                # save rgb
+                data_info = cur_obs['rgba'][...,:3]
+                save_dir = os.path.join(main_dir,'rgb')
+                if not os.path.exists(save_dir):
+                    os.mkdir(save_dir)
+                save_path = os.path.join(save_dir, f"{camera}_{step_time}.png")
+                try:
+                    # plt.imsave(save_path, data_info)
+                    cv2.imwrite(save_path, cv2.cvtColor(data_info, cv2.COLOR_RGB2BGR))
+                    log.info(f"Images have been saved in {save_path}.")
+                except Exception as e:
+                    log.error(f"Error in saving camera rgb image: {e}")
+                
+                # save depth
+                data_info = cur_obs['depth']
+                save_dir = os.path.join(main_dir,'depth')
+                if not os.path.exists(save_dir):
+                    os.mkdir(save_dir)
+                save_path = os.path.join(save_dir, f"{camera}_{step_time}.npy")
+                try:
+                    np.save(save_path, data_info)
+                    log.info(f"Depth have been saved in {save_path}.")
+                except Exception as e:
+                    log.error(f"Error in saving camera depth image: {e}")
+                
+                # save camera_intrinsic
+                camera_params = cur_obs['camera_params']
+                # 构造要保存的字典
+                camera_info = {
+                    "camera": camera,
+                    "step_time": step_time,
+                    "intrinsic_matrix": camera_params['cameraProjection'].tolist(),
+                    "extrinsic_matrix": camera_params['cameraViewTransform'].tolist(),
+                    "cameraAperture": camera_params['cameraAperture'].tolist(),
+                    "cameraApertureOffset": camera_params['cameraApertureOffset'].tolist(),
+                    "cameraFocalLength": camera_params['cameraFocalLength'],
+                    "robot_init_pose": self.robot_init_pose
+                }
+                print(self.robot_init_pose)
+                save_path = os.path.join(save_dir, 'camera_param.jsonl')
 
+                # 将信息追加保存到 jsonl 文件
+                with open(save_path, 'a') as f:
+                    json.dump(camera_info, f)
+                    f.write('\n')
+
+                        
+            return obs
+
+    def habit2issac(self,habit_pos,habit_rot):
+        '''
+        habit pose to issac pose
+        # [x,y,z,-w] => [w,x,y,z]
+        '''
+        
+    def get_camera_pose(self):
+        '''
+        Obtain position, orientation of the camera
+        Output: position, orientation
+        '''
+        camera_dict = self.args.camera_list
+        camera_pose = {}
+        for camera in camera_dict:
+            camera_pose[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
+        return camera_pose
     def process_pointcloud(self, camera_list: list, draw=False, convert_to_local=False):
         ''' Process pointcloud for combining multiple cameras
         '''
@@ -312,7 +401,7 @@ class VLNDataLoader(Dataset):
                 camera_pc_data.append(cur_obs['pointcloud']['data'])
         
         if draw:
-            combined_pcd = generate_pano_pointcloud_local(camera_positions, camera_orientations, camera_pc_data, draw=draw, log_dir=self.args.log_image_dir)
+            combined_pcd = generate_pano_pointcloud_local(camera_positions, camera_orientations, camera_pc_data, draw=draw, log_dir=self.args.log_image_dir) # TODO：wrong code
         return camera_pc_data, camera_positions, camera_orientations
     
     def get_surrounding_free_map(self, verbose=False):
@@ -327,9 +416,33 @@ class VLNDataLoader(Dataset):
     def update_occupancy_map(self, verbose=False):
         '''Use BEVMap to update the occupancy map based on pointcloud
         '''
-        pointclouds, _, _ = self.process_pointcloud(self.args.camera_list)
+        return
+        pointclouds, _, _ = self.process_pointcloud(self.args.camera_list) # ! 直接拿到的pointcloud個數比depth小
         robot_ankle_z = self.get_robot_bottom_z()
         self.bev.update_occupancy_map(pointclouds, robot_ankle_z, add_dilation=self.args.maps.add_dilation, verbose=verbose, robot_coords=self.get_agent_pose()[0])
+        # TODO: 可能在main里调用
+        # self.update_semantic_map(verbose=verbose)
+
+    
+    def update_semantic_map(self,verbose=False):
+        # single robot
+        obs = self.get_observations(data_types=['rgba', 'depth', 'camera_params'])
+        cur_obs = obs[self.task_name][self.robot_name]
+        camera_pose = self.get_camera_pose()
+        self.bev_sem.update_semantic_map(obs_tr=cur_obs,camera_dict=self.args.camera_list,camera_poses=camera_pose,verbose=verbose,robot_coords=self.get_agent_pose()[0])
+        
+    
+    def get_camera_pose(self):
+        camera_dict = self.args.camera_list
+        camera_pose = {}
+        for camera in camera_dict:
+            camera_pose[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
+        return camera_pose
+
+    def init_BEVSemMap(self, robot_init_pose=(0,0,0)):
+        '''init BEVSem map'''
+        self.bev_sem = BEVSemMap(self.args, robot_init_pose=robot_init_pose)
+        self.robot_init_pose=robot_init_pose
 
     def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, height_threshold=0.5, adjust=False, initial_pose=None, initial_rotation=None):
         '''

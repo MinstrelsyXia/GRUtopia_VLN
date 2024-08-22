@@ -12,14 +12,15 @@ import json
 from grutopia.core.util.log import log
 
 from .path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
-
+import copy
 class BEVMap:
     def __init__(self, args, robot_init_pose=(0, 0, 0)):
         self.args = args
         
         self.step_time = 0
         # Attributes for occupancy_map
-        quadtree_config = args.maps.quadtree_config
+        # quadtree_config = args.maps.quadtree_config
+        quadtree_config = copy.deepcopy(args.maps.quadtree_config) # ! 淺拷貝改成深拷貝，防止改變config内容
         self.voxel_size = args.maps.voxel_size  # Resolution to present the map
         quadtree_config.width, quadtree_config.height = int(quadtree_config.width/self.voxel_size), int(quadtree_config.height/self.voxel_size)
         self.quadtree_config = quadtree_config
@@ -80,6 +81,27 @@ class BEVMap:
         return dilation_structure
         
     ######################## update_occupancy_map ########################
+
+    # def save_point_cloud_image(self, pc, temp_path="temp_pc_image.png"):
+    #         """
+    #         生成并保存点云图像。
+    #         """
+    #         os.environ['DISPLAY'] = ':0.0'
+    #         # 创建点云对象
+    #         pcd = o3d.geometry.PointCloud()
+    #         pcd.points = o3d.utility.Vector3dVector(pc)
+    #         # 设置无头渲染
+    #         vis = o3d.visualization.Visualizer()
+    #         vis.create_window() 
+            
+    #         vis.add_geometry(pcd)
+    #         vis.poll_events()
+    #         vis.update_renderer()
+            
+    #         # 捕获当前视图并保存为图像
+    #         vis.capture_screen_image(temp_path)
+    #         vis.destroy_window()
+
     def update_occupancy_map(self, point_cloud, robot_bottom_z, add_dilation=False, verbose = False, global_bev=False, robot_coords=None):
         """
         Updates the occupancy map based on the new point cloud data.
@@ -109,6 +131,9 @@ class BEVMap:
 
                 point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z+self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))].astype(int) # points that are within the robot's height range (occupancy)
 
+                # ploted_downsampled_cloud = np.asarray(pcd.voxel_down_sample(voxel_size=self.voxel_size*20).points)
+
+                # self.save_point_cloud_image(ploted_downsampled_cloud, temp_path="temp_pc_image.png")
                 unique_data_0 = np.unique(point_within_robot_z[:, :2], axis=0)
                 unique_data_all = np.unique(point_to_consider[:, :2], axis=0).astype(int)
                 unique_data_1 = np.array(list(set(map(tuple, unique_data_all)) - set(map(tuple, unique_data_0)))).astype(int) # points that are not within the robot's height range (free)
