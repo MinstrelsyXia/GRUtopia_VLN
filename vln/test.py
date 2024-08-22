@@ -1,66 +1,80 @@
-import math
+def save_observations_special(self, camera_list:list, data_types:list, save_image_list=None, save_imgs=True, step_time=0):
+            ''' Save observations from the agent
+            '''
+            obs = self.env.get_observations(data_type=data_types)
+            DIR= os.path.expanduser("~/code/xxy/Matterport3D/data/grutopia_test")
+            path_id = str(self.args.path_id)
+            main_dir = os.path.join(DIR,self.args.env,path_id)
+            if not os.path.exists(main_dir):
+                os.makedirs(main_dir)
+            camera_pose_dict = self.get_camera_pose()
+            for camera in camera_list:
+                cur_obs = obs[self.task_name][self.robot_name][camera]
+                # save pose
+                camera_pose=camera_pose_dict[camera]
+                pos, quat = camera_pose[0], camera_pose[1]
+                pose_save_path = os.path.join(main_dir,'poses.txt')
+                with open(pose_save_path,'a') as f:
+                    sep =""
+                    f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}")
+                    sep = "\n"
+                
+                # save rgb
+                data_info = cur_obs['rgba'][...,:3]
+                save_dir = os.path.join(main_dir,'rgb')
+                if not os.path.exists(save_dir):
+                    os.mkdir(save_dir)
+                save_path = os.path.join(save_dir, f"{camera}_{step_time}.png")
+                try:
+                    # plt.imsave(save_path, data_info)
+                    cv2.imwrite(save_path, cv2.cvtColor(data_info, cv2.COLOR_RGB2BGR))
+                    log.info(f"Images have been saved in {save_path}.")
+                except Exception as e:
+                    log.error(f"Error in saving camera rgb image: {e}")
+                
+                # save depth
+                data_info = cur_obs['depth']
+                save_dir = os.path.join(main_dir,'depth')
+                if not os.path.exists(save_dir):
+                    os.mkdir(save_dir)
+                save_path = os.path.join(save_dir, f"{camera}_{step_time}.npy")
+                try:
+                    np.save(save_path, data_info)
+                    log.info(f"Depth have been saved in {save_path}.")
+                except Exception as e:
+                    log.error(f"Error in saving camera depth image: {e}")
+                
+                # save camera_intrinsic
+                camera_params = cur_obs['camera_params']
+                # 构造要保存的字典
+                camera_info = {
+                    "camera": camera,
+                    "step_time": step_time,
+                    "intrinsic_matrix": camera_params['cameraProjection'].tolist(),
+                    "extrinsic_matrix": camera_params['cameraViewTransform'].tolist(),
+                    "cameraAperture": camera_params['cameraAperture'].tolist(),
+                    "cameraApertureOffset": camera_params['cameraApertureOffset'].tolist(),
+                    "cameraFocalLength": camera_params['cameraFocalLength'],
+                    "robot_init_pose": self.robot_init_pose
+                }
+                print(self.robot_init_pose)
+                save_path = os.path.join(save_dir, 'camera_param.jsonl')
 
-def euler_angles_to_quat(roll, pitch, yaw):
-    """
-    Convert Euler angles (roll, pitch, yaw) to a quaternion (w, x, y, z).
-    
-    :param roll: Rotation around the X-axis in radians.
-    :param pitch: Rotation around the Y-axis in radians.
-    :param yaw: Rotation around the Z-axis in radians.
-    :return: Quaternion as a tuple (w, x, y, z).
-    """
-    cy = math.cos(yaw * 0.5)
-    sy = math.sin(yaw * 0.5)
-    cp = math.cos(pitch * 0.5)
-    sp = math.sin(pitch * 0.5)
-    cr = math.cos(roll * 0.5)
-    sr = math.sin(roll * 0.5)
+                # 将信息追加保存到 jsonl 文件
+                with open(save_path, 'a') as f:
+                    json.dump(camera_info, f)
+                    f.write('\n')
 
-    w = cr * cp * cy + sr * sp * sy
-    x = sr * cp * cy - cr * sp * sy
-    y = cr * sp * cy + sr * cp * sy
-    z = cr * cp * sy - sr * sp * cy
+                        
+            return obs
 
-    return (w, x, y, z)
-
-def quat_to_euler_angles(quaternion):
-    """
-    Convert a quaternion (w, x, y, z) to Euler angles (roll, pitch, yaw).
-    
-    :param quaternion: Quaternion as a tuple (w, x, y, z).
-    :return: Euler angles as a tuple (roll, pitch, yaw) in radians.
-    """
-    w, x, y, z = quaternion
-
-    # Roll (x-axis rotation)
-    sinr_cosp = 2 * (w * x + y * z)
-    cosr_cosp = 1 - 2 * (x * x + y * y)
-    roll = math.atan2(sinr_cosp, cosr_cosp)
-
-    # Pitch (y-axis rotation)
-    sinp = 2 * (w * y - z * x)
-    if abs(sinp) >= 1:
-        pitch = math.copysign(math.pi / 2, sinp)  # use 90 degrees if out of range
-    else:
-        pitch = math.asin(sinp)
-
-    # Yaw (z-axis rotation)
-    siny_cosp = 2 * (w * z + x * y)
-    cosy_cosp = 1 - 2 * (y * y + z * z)
-    yaw = math.atan2(siny_cosp, cosy_cosp)
-
-    return (roll, pitch, yaw)
-
-# Initial Euler angles
-original_euler_angles = (2.312, -1.587, -124.447)  # (roll, pitch, yaw) in radians
-
-# Convert to quaternion
-quaternion = euler_angles_to_quat(*original_euler_angles)
-print("Quaternion:", quaternion)
-
-# Convert back to Euler angles
-recovered_euler_angles = quat_to_euler_angles(quaternion)
-print("Recovered Euler angles:", recovered_euler_angles)
-
-# Compare the original and recovered Euler angles
-print("Difference:", [original_euler_angles[i] - recovered_euler_angles[i] for i in range(3)])
+    def get_camera_pose(self):
+        '''
+        Obtain position, orientation of the camera
+        Output: position, orientation
+        '''
+        camera_dict = self.args.camera_list
+        camera_pose = {}
+        for camera in camera_dict:
+            camera_pose[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
+        return camera_pose

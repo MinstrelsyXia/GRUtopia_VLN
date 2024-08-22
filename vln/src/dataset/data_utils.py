@@ -309,6 +309,17 @@ class VLNDataLoader(Dataset):
         ''' GEt observations from the sensors
         '''
         return self.env.get_observations(data_type=data_types)
+
+    def get_camera_pose(self):
+        '''
+        Obtain position, orientation of the camera
+        Output: position, orientation
+        '''
+        camera_dict = self.args.camera_list
+        camera_pose = {}
+        for camera in camera_dict:
+            camera_pose[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
+        return camera_pose
     
     def save_observations(self, camera_list:list, data_types:list, save_image_list=None, save_imgs=True, step_time=0):
         ''' Save observations from the agent
@@ -339,6 +350,76 @@ class VLNDataLoader(Dataset):
                     except Exception as e:
                         log.error(f"Error in saving camera image: {e}")
         return obs
+
+    def save_episode_data(self, scan, path_id, total_images, camera_list:list, data_types:list, step_time=0):
+        ''' Save episode data
+        '''
+        # make dir
+        save_dir = os.path.join(self.args.sample_episode_dir, scan, f"id_{str(path_id)}")
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        obs = self.env.get_observations(data_type=data_types)
+        camera_pose_dict = self.get_camera_pose()
+
+        # save camera information
+        for camera in camera_list:
+            cur_obs = obs[self.task_name][self.robot_name][camera]
+            # save pose
+            camera_pose = camera_pose_dict[camera]
+            pos, quat = camera_pose[0], camera_pose[1]
+            pose_save_path = os.path.join(save_dir, 'poses.txt')
+            with open(pose_save_path,'a') as f:
+                sep =""
+                f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}")
+                sep = "\n"
+        
+            # stack RGB into memory
+            rgb_info = cur_obs['rgba'][...,:3]
+            depth_info = cur_obs['depth']
+            max_depth = 10
+            depth_info[depth_info > max_depth] = 0 
+
+            total_images[camera].append({
+                'step_time': step_time,
+                'rgb': rgb_info,
+                'depth': depth_info})
+
+            # save camera_intrinsic
+            camera_params = cur_obs['camera_params']
+            # 构造要保存的字典
+            camera_info = {
+                "camera": camera,
+                "step_time": step_time,
+                "intrinsic_matrix": camera_params['cameraProjection'].tolist(),
+                "extrinsic_matrix": camera_params['cameraViewTransform'].tolist(),
+                "cameraAperture": camera_params['cameraAperture'].tolist(),
+                "cameraApertureOffset": camera_params['cameraApertureOffset'].tolist(),
+                "cameraFocalLength": camera_params['cameraFocalLength'],
+                "robot_init_pose": self.agent_init_pose.tolist()
+            }
+            # print(self.agent_init_pose)
+            cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
+
+            # 将信息追加保存到 jsonl 文件
+            with open(cam_save_path, 'a') as f:
+                json.dump(camera_info, f)
+                f.write('\n')
+        
+        # save robot information
+        robot_info = {
+            "step_time": step_time,
+            "position": obs[self.task_name][self.robot_name]['position'].tolist(),
+            "orientation": obs[self.task_name][self.robot_name]['orientation'].tolist()
+        }
+        robot_save_path = os.path.join(save_dir, 'robot_param.jsonl')
+
+        # 将信息追加保存到 jsonl 文件
+        with open(robot_save_path, 'a') as f:
+            json.dump(robot_info, f)
+            f.write('\n')
+
+        return total_images
 
     def process_pointcloud(self, camera_list: list, draw=False, convert_to_local=False):
         ''' Process pointcloud for combining multiple cameras

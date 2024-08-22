@@ -380,13 +380,10 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
 
                 env = vln_envs.env
                 paths = data_item['reference_path']
+                path_id = data_item['trajectory_id']
                 current_point = 0
                 # total_points = [vln_envs.agent_init_pose, vln_envs.agent_init_rotatation] # [[x,y,z],[w,x,y,z]]
                 total_points = []
-                total_info = {
-                    'robot_pose': [],
-                    'camera_params': []
-                }
                 total_points.append([np.array(vln_envs.agent_init_pose),np.array(vln_envs.agent_init_rotation)])
                 total_images = defaultdict(lambda: [])
                 is_image_stacked = False
@@ -408,6 +405,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
 
                 init_actions = {'h1': {action_name: [[paths[0]], action_info]}}
 
+                start_time = time.time()
                 while env.simulation_app.is_running():
                     i += 1
                     reset_flag = False
@@ -469,6 +467,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     env_actions.append(actions)
                     if i % args.sample_episodes.step_interval == 0:
                         data_type = args.settings.camera_data_type
+                        # input data_type to retrival the high quality image 
                     else:
                         data_type = None
 
@@ -480,18 +479,11 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                         is_image_stacked = False
                         move_step = deepcopy(i)
 
-                        camera_params = vln_envs.get_observations(data_types='camera_params')
-                        total_info['camera_params'].append(camera_params[vln_envs.task_name][vln_envs.robot_name][data_camera_list[0]]['camera_params']) # !!!
-                        total_info['robot_pose'].append(exe_point)
-
                     # stack images and information
                     if (i-move_step) != 0 and (i-move_step) % (args.sample_episodes.step_interval-2) == 0:
-                        # Since oracle_move_path_controller moves to the next point every 20 steps, the image is fetched every 20+5 steps
-                        for camera in data_camera_list:
-                            total_images[camera].append(
-                                [obs[vln_envs.task_name][vln_envs.robot_name][camera]['rgba'][:,:,:3],
-                                obs[vln_envs.task_name][vln_envs.robot_name][camera]['depth']
-                                ])
+                        # Since oracle_move_path_controller moves to the next point every 5 steps, the image is fetched every 5+3 steps
+                        total_images = vln_envs.save_episode_data(scan=scan, path_id=path_id, camera_list=data_camera_list, data_types=args.settings.camera_data_type, step_time=i, total_images=total_images)
+
                         is_image_stacked = True
 
                     if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%(args.sample_episodes.step_interval-2) == 0:
@@ -514,28 +506,34 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
 
                 # save data
                 # Iterate through the dictionary and save images
-                for camera, images in total_images.items():
-                    for idx, (rgba_image, depth_image) in enumerate(images):
-                        # Convert RGBA to RGB if needed (PIL expects 3 channels)
-                        rgb_image = rgba_image[:, :, :3]
-                        max_depth = 10
-                        depth_image[depth_image > max_depth] = 0 
+                for camera, info in total_images.items():
+                    for idx, image_info in enumerate(info):
+                        step_time = image_info['step_time']
+                        rgb_image = image_info['rgb']
+                        depth_image = image_info['depth']
 
                         # Define filenames
-                        rgb_filename = os.path.join(args.log_image_dir, "obs", f"{camera}_image_{idx:04d}.png")
-                        depth_filename = os.path.join(args.log_image_dir, "obs", f"{camera}_depth_{idx:04d}.png")
+                        save_dir = os.path.join(args.sample_episode_dir, scan, f"id_{str(path_id)}")
+                        if not os.path.exists(save_dir):
+                            os.makedirs(save_dir)
 
-                        # Save images
+                        rgb_filename = os.path.join(save_dir, f"{camera}_image_step_{step_time}.png")
                         plt.imsave(rgb_filename, rgb_image)
-                        plt.imsave(depth_filename, depth_image)
+
+                        depth_filename = os.path.join(args.log_image_dir, "obs", f"{camera}_depth_step_{step_time}.npy")
+                        np.save(depth_filename, depth_image)
 
                         print(f"Saved {rgb_filename} and {depth_filename}")
                 
                 # save the information
-                info_save_file = os.path.join(args.log_image_dir, 'sample_episodes.json')
-                with open(info_save_file, 'w') as json_file:
-                    json.dump(total_info, json_file, indent=4)
-                log.info(f"Saved the information to {info_save_file}")
+                # info_save_file = os.path.join(args.log_image_dir, 'sample_episodes.json')
+                # with open(info_save_file, 'w') as json_file:
+                #     json.dump(total_info, json_file, indent=4)
+                # log.info(f"Saved the information to {info_save_file}")
+
+                end_time = time.time()
+                total_time = (end_time - start_time)/60
+                log.info(f"Total time for the [scan: {scan}] and [path_id: {path_id}] episode: {total_time:.2f} minutes")
 
                 env.simulation_app.close()
                 print('finish')

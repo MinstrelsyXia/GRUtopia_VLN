@@ -21,6 +21,7 @@ settings:
   camera_data_type:
     - rgba
     - depth
+    - camera_params
 
 sample_episodes:
   step_interval: 5

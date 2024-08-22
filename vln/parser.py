@@ -26,12 +26,6 @@ def process_args():
     parser.add_argument("--windows_head_type", default="show", choices=['show', 'save'], help="The type of the window head")
     args = parser.parse_args()
 
-    args.root_dir = ROOT_DIR
-    args.log_dir = os.path.join(ROOT_DIR, "logs")
-    args.log_image_dir = os.path.join(args.log_dir, "images", str(args.env), str(args.path_id))
-    if not os.path.exists(args.log_image_dir):
-        os.makedirs(args.log_image_dir)
-
     '''Init simulation config'''
     sim_config = SimulatorConfig(args.sim_cfg_file)
 
@@ -41,5 +35,18 @@ def process_args():
     # update args into vln_config
     for key, value in vars(args).items():
         setattr(vln_config, key, value)
+
+    '''Init save directory'''
+    vln_config.root_dir = ROOT_DIR
+    vln_config.log_dir = os.path.join(ROOT_DIR, "logs")
+    vln_config.log_image_dir = os.path.join(vln_config.log_dir, "images", str(vln_config.env), str(vln_config.path_id))
+    if not os.path.exists(vln_config.log_image_dir):
+        os.makedirs(vln_config.log_image_dir)
+    
+    if vln_config.settings.mode == "sample_episodes":
+        vln_config.sample_episode_dir = os.path.join(ROOT_DIR, "logs", "sample_episodes")
+        if not os.path.exists(vln_config.sample_episode_dir):
+            os.makedirs(vln_config.sample_episode_dir)
+
     return vln_config, sim_config
 

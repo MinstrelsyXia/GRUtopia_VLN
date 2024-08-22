@@ -46,13 +46,7 @@ class OracleMoveAlongPathPointsController(BaseController):
             self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
     
         if current_step % step_interval == 0:
-            # if self.path_points is not path_points:
-            #     self.path_points = path_points
-            #     self.path_point_idx = 0
-            #     log.info('reset path points')
-            #     self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
-                # self.current_path_point[-1] = 0
-
+            # move to next path point
             dist_from_goal = np.linalg.norm(start_position[:2] - self.current_path_point[:2])
             if dist_from_goal < threshold:
                 if self.path_point_idx < len(self.path_points) - 1:
@@ -74,6 +68,7 @@ class OracleMoveAlongPathPointsController(BaseController):
             )
         
         else:
+            # waitting time
             sub_control = self.sub_controllers[0].forward(
                 start_position=start_position,
                 start_orientation=start_orientation,
@@ -84,6 +79,7 @@ class OracleMoveAlongPathPointsController(BaseController):
                 is_hold=True
             )
             self.sub_controllers[0].finished = False
+            self.sub_controllers[0].point = None
             return sub_control
 
     def action_to_control(self, action: List | np.ndarray) -> ArticulationAction:

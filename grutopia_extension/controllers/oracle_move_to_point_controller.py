@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 from copy import deepcopy
 
 import numpy as np
+import math
 from scipy.spatial.transform import Rotation
 from scipy.spatial.transform import Rotation as R
 
@@ -124,24 +125,26 @@ class OracleMoveToPoint(BaseController):
         angle_threshold = np.pi/4
 
         dist_from_goal = np.linalg.norm(start_position[:2] - goal_position[:2])
-        if dist_from_goal < threshold:
+    
+        angle_to_goal, goal_orientation, robot_z_rot = OracleMoveToPoint.get_angle_and_orientation(start_position, start_orientation, goal_position)
+
+        if dist_from_goal < threshold and abs(math.degrees(angle_to_goal)) < 15:
             # the same point
-            # start_position = [start_position[0], start_position[1], start_z]
-            # self.robot.oracle_set_world_pose(start_position, start_orientation)
-            # if topdown_camera_local is not None:
-            #     topdown_camera_local.set_world_pose(start_position)
-            # if topdown_camera_global is not None:
-            #     topdown_camera_global.set_world_pose(start_position)
-            # self.point = None
+            start_position = [start_position[0], start_position[1], start_z]
+            self.robot.oracle_set_world_pose(start_position, start_orientation)
+            if topdown_camera_local is not None:
+                topdown_camera_local.set_world_pose(start_position)
+            if topdown_camera_global is not None:
+                topdown_camera_global.set_world_pose(start_position)
+            self.point = None
             
             if is_hold:
                 self.finished = False # 只是为了oracle过度interval
             else:
                 self.finished = True
 
-            # return ArticulationAction()
-        
-        angle_to_goal, goal_orientation, robot_z_rot = OracleMoveToPoint.get_angle_and_orientation(start_position, start_orientation, goal_position)
+            return ArticulationAction()
+
 
         # Limit the robot to only rotate a maximum of pi/4
         if abs(angle_to_goal) > angle_threshold:
@@ -153,6 +156,12 @@ class OracleMoveToPoint(BaseController):
             self.finished = False
         else:
             goal_position = [goal_position[0], goal_position[1], goal_z]
+        
+        # if dist_from_goal < threshold:
+        #     if is_hold:
+        #         self.finished = False # 只是为了oracle过度interval
+        #     else:
+        #         self.finished = True
         
         self.point = [goal_position, goal_orientation]
         self.robot.oracle_set_world_pose(goal_position, goal_orientation)
