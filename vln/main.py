@@ -19,7 +19,9 @@ from copy import deepcopy
 # import carb.settings
 # settings = carb.settings.get_settings()
 # settings.set("/renderer/multiGPU/enabled", True)
-
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
+sys.path.append(ISSAC_SIM_DIR)
 
 from grutopia.core.config import SimulatorConfig
 from grutopia.core.env import BaseEnv
@@ -31,14 +33,16 @@ from grutopia.core.util.log import log
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
+for idx, path in enumerate(sys.path):
+    if 'code/w61-grutopi' in path:
+        sys.path.pop(idx)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+print(sys.path)
+
 from vln.src.dataset.data_utils import VLNDataLoader
 from vln.src.utils.utils import dict_to_namespace
 # from vln.src.local_nav.global_topdown_map import GlobalTopdownMap
 
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
-sys.path.append(ISSAC_SIM_DIR)
 
 from parser import process_args
 
