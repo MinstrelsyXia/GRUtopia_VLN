@@ -103,6 +103,13 @@ robots:
     type: StandStillController
     sub_controllers:
     - name: move_by_speed
+  - name: oracle_move_to_point
+    type: OracleMoveToPointController
+  - name: oracle_move_along_path
+    type: OracleMoveAlongPathPointsController
+    threshold: 0.1
+    sub_controllers:
+    - name: oracle_move_to_point
   sensors:
   - name: "pano_camera_0"
     type: "Camera"

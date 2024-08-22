@@ -13,9 +13,10 @@ from omni.isaac.core.utils.rotations import euler_angles_to_quat
 import omni.replicator.core as rep
 
 from .BEVmap import BEVMap
+from grutopia.core.util.log import log
 
 class CamOccupancyMap:
-    def __init__(self, args, robot_prim, start_point):
+    def __init__(self, args, robot_prim, start_point, local=True):
         self.args = args
         self.width = 512
         self.height = 512
@@ -27,13 +28,20 @@ class CamOccupancyMap:
         # self.create_new_orthogonal_camera()
         
         # load from a pre-defined top-down camera
-        self.topdown_camera_prim_path = robot_prim + "/topdown_camera"
+        if local:
+            self.topdown_camera_prim_path = robot_prim + "/topdown_camera_50"
+            self.aperture = 50
+        else:
+            self.topdown_camera_prim_path = robot_prim + "/topdown_camera_500"
+            self.aperture = self.args.maps.global_topdown_config.aperture
+            self.width = self.args.maps.global_topdown_config.width
+            self.height = self.args.maps.global_topdown_config.height
+            self.center_x, self.center_y = self.width // 2, self.height// 2
         self.topdown_camera = Camera(prim_path=self.topdown_camera_prim_path,resolution=(self.width, self.height))
         self.topdown_camera.initialize()
         self.topdown_camera.add_distance_to_image_plane_to_frame()
         self.topdown_camera.add_normals_to_frame()
-        self.aperture = 50
-
+        
         self.rp = rep.create.render_product(self.topdown_camera_prim_path, (self.width, self.height))
         # rgba
         self.rgba_receiver = rep.AnnotatorRegistry.get_annotator("LdrColor")
@@ -184,6 +192,30 @@ class CamOccupancyMap:
         world_y = camera_pose[1] + offset_y
         
         return world_x, world_y
+
+    def world_to_pixel(self, world_coords, camera_pose):
+        world_x, world_y = world_coords[0], world_coords[1]
+        
+        # Convert aperture to radians
+        fov_rad = np.deg2rad(self.aperture)
+        
+        # Calculate the scale factor
+        scale_x = 2 * np.tan(fov_rad / 2) / self.width
+        scale_y = 2 * np.tan(fov_rad / 2) / self.height
+        
+        # Calculate offsets from camera pose
+        offset_x = world_x - camera_pose[0]
+        offset_y = world_y - camera_pose[1]
+        
+        # Convert world offsets to pixel offsets
+        pixel_offset_x = offset_x / scale_x
+        pixel_offset_y = offset_y / scale_y
+        
+        # Calculate pixel coordinates
+        pixel_x = int(pixel_offset_x + self.width / 2)
+        pixel_y = int(pixel_offset_y + self.height / 2)
+        
+        return pixel_x, pixel_y
     
     def create_robot_mask(self, mask_size=20):
         # Calculate the top-left and bottom-right coordinates
@@ -208,7 +240,7 @@ class CamOccupancyMap:
             self.ax.text(4, 11, text_info, fontsize=10, ha='center', va='bottom', wrap=True)
         self.ax.set_title('Top-down RGB Image')
 
-    def update_windows_head(self, robot_pos, text_info=None):
+    def update_windows_head(self, robot_pos, text_info=None, mode="show"):
         rgb_data = self.get_camera_data(["rgba"])["rgba"]
         self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
         self.image_display.set_data(rgb_data)  # Update the image data
@@ -216,8 +248,12 @@ class CamOccupancyMap:
             self.ax.text(0.5, 0.01, text_info, fontsize=10, ha='left', va='bottom', wrap=True)
         # self.ax.draw_artist(self.ax.patch)  # Efficiently redraw the background
         self.ax.draw_artist(self.image_display)  # Efficiently redraw the image
-        plt.show(block=False)
-        plt.pause(0.001)  # This is necessary to update the window
+        if mode == 'show':
+            plt.show(block=False)
+            plt.pause(0.001)  # This is necessary to update the window
+        elif mode == 'save':
+            img_save_path = self.args.log_image_dir + "/window_topdown_image.png"
+            self.window_fig.savefig(img_save_path, bbox_inches='tight')
 
     def close_windows_head(self):
         plt.close('all')  # Close all figures
@@ -266,12 +302,12 @@ class CamOccupancyMap:
             img = Image.fromarray(rgb)
             if os.path.exists(self.args.log_image_dir+"/cam_free") == False:
                 os.makedirs(self.args.log_image_dir+"/cam_free")
-            img_path = os.path.join(self.args.log_image_dir, "cam_free","rgb_scene_center.png")
+            img_path = os.path.join(self.args.log_image_dir, "cam_free","rgb_scene_local.png")
             img.save(img_path)
             # print("Image saved at", img_path)
 
             depth_img = self.vis_depth(depth, robot_height)
-            depth_img_path = os.path.join(self.args.log_image_dir, "cam_free", "depth_scene_center.png")
+            depth_img_path = os.path.join(self.args.log_image_dir, "cam_free", "depth_scene_local.png")
             depth_img.save(depth_img_path)
             # print("Depth saved at", depth_img_path)
         
@@ -280,7 +316,7 @@ class CamOccupancyMap:
             # free_map_normalized = ((free_map - free_map.min()) * (1/(free_map.max() - free_map.min()) * 255)).astype('uint8')
             free_map_image = Image.fromarray(free_map_normalized)
             # Save the image
-            free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "cam_global_free_map.png")
+            free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "topdown_local_freemap.png")
             free_map_image.save(free_map_path)
             # print("Free map saved at", free_map_path)
         
@@ -291,6 +327,104 @@ class CamOccupancyMap:
         self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
 
         return free_map, connected_free_area
+    
+    def analysize_depth(self, depth_array):
+        mask = ~np.isinf(depth_array)
+
+        valid_depths = depth_array[mask]
+
+        min_depth = np.min(valid_depths)
+        max_depth = np.max(valid_depths)
+
+        mean_depth = np.mean(valid_depths)
+        std_depth = np.std(valid_depths)
+
+        print(f"depth range: {min_depth} - {max_depth}")
+        print(f"depth mean: {mean_depth}")
+        print(f"depth std: {std_depth}")
+    
+    def set_world_pose(self, robot_pos):
+        # update the pose of the camera based on robot's pose
+        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+
+    def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, update_camera_pose=True, verbose=False):
+        # Define height range for free map
+        # free_map: 1 for free space, 0 for occupied space
+
+        min_height = robot_height
+        max_height = robot_height + 0.8
+        # max_height = 4
+        normal_threshold = 0.005
+
+        # rgb_init, depth_init, mask, (row_min, row_max), (col_min, col_max), pointcloud = self._get_topdown_map(self.topdown_camera)
+
+        # get info
+        data_info = self.get_camera_data(["rgba", "depth", "normals"])
+        rgb = np.array(data_info["rgba"])
+        depth = np.array(data_info["depth"])
+        normals = np.array(data_info["normals"])
+
+        # Generate free map using normal vectors and depth information
+
+        # Normalize the normal vectors (ignoring the last component if it exists)
+        if norm_filter:
+            norm_magnitudes = np.linalg.norm(normals[..., :3], axis=2)
+            try:
+                normalized_normals = normals[..., :3] / (norm_magnitudes[..., np.newaxis]+1e-8)
+                # Generate mask for flat surfaces based on normal vectors
+                flat_surface_mask = np.abs(normalized_normals[..., 2] - 1) < normal_threshold
+            except Exception:
+                # NOTE: Sometimes the normal vectors are not available? 
+                # the issue is: RuntimeWarning: invalid value encountered in divide
+                flat_surface_mask = np.ones_like(depth, dtype=bool)
+        else:
+            flat_surface_mask = np.ones_like(depth, dtype=bool)
+
+        # Generate mask for depth within the acceptable range
+        depth_mask = (depth >= min_height) & (depth < max_height)
+
+        # robot_mask
+        robot_mask = self.create_robot_mask()
+
+        # Combine masks to determine free space
+        free_map = np.zeros_like(depth, dtype=int)
+        free_map[flat_surface_mask & depth_mask] = 1  # Free space is where conditions are met
+        free_map[robot_mask == 1] = 1  # Robot's location is free space
+
+        if verbose:
+            img = Image.fromarray(rgb)
+            if os.path.exists(self.args.log_image_dir+"/cam_free") == False:
+                os.makedirs(self.args.log_image_dir+"/cam_free")
+            img_path = os.path.join(self.args.log_image_dir, "cam_free","rgb_scene_global.png")
+            img.save(img_path)
+            # print("Image saved at", img_path)
+
+            depth_img = self.vis_depth(depth, robot_height)
+            depth_img_path = os.path.join(self.args.log_image_dir, "cam_free", "depth_scene_global.png")
+            depth_img.save(depth_img_path)
+            # print("Depth saved at", depth_img_path)
+        
+            # Visualize the free map
+            free_map_normalized = free_map.astype(bool)
+            # free_map_normalized = ((free_map - free_map.min()) * (1/(free_map.max() - free_map.min()) * 255)).astype('uint8')
+            free_map_image = Image.fromarray(free_map_normalized)
+            # Save the image
+            free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "topdown_global_freemap.png")
+            free_map_image.save(free_map_path)
+            log.info(f"Global free map saved at {free_map_path}.")
+        
+        # extract connectd free area
+        if connect_filter:
+            connected_free_area = self.extract_connected_free_area(free_map, verbose=verbose)
+        else:
+            connected_free_area = None
+
+        # update the pose of the camera based on robot's pose
+        if update_camera_pose:
+            self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+
+        return free_map, connected_free_area
+    
         
     def extract_connected_free_area(self, free_map, verbose=False):
         """

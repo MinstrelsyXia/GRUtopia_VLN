@@ -550,15 +550,17 @@ class AStarPlanner:
     def vis_path(self, obs_map, sx, sy, gx, gy, points, img_save_path, legend=False):
         obs_map_draw = obs_map.transpose(1,0) # transpose the map to match the plot
         # self.image_display.set_data(obs_map_draw)
+        self.ax.clear()
         self.ax.imshow(obs_map_draw, cmap=self.cmap, norm=self.norm, aspect='auto')
         self.ax.plot(sx, sy, "or", label="start")
         self.ax.plot(gx, gy, "xr", label="end")
-        self.ax.plot([x for x, y in points], [y for x, y in points], "-r")
+        self.ax.plot([x[0] for x in points], [x[1] for x in points], "-r")
         
         if legend:
             self.ax.legend()
+            self.ax.grid()
         
-        self.ax.figure.savefig(img_save_path)
+        self.ax.figure.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
         log.info("Path has been saved to {}".format(img_save_path))
         if self.windows_head:
             plt.show(block=False)
@@ -626,7 +628,7 @@ class AStarPlanner:
             plt.show(block=False)
             plt.pause(0.001)
 
-    def planning(self, sx, sy, gx, gy, min_final_meter=1, img_save_path='a_star.png', obs_map=None, path_legend=False):
+    def planning(self, sx, sy, gx, gy, min_final_meter=1, img_save_path='a_star.png', obs_map=None, path_legend=False, vis_path=True) -> tuple[list[tuple[float, float]], bool]:
         """
         A star path search
 
@@ -739,7 +741,7 @@ class AStarPlanner:
             log.warning(f"Path planning results only contain {len(points_list)} points.")
             points = []
 
-        if self.verbose:
+        if self.verbose and vis_path:
             # show the path planning result
             if self.for_llm:
                 if len(points) > 0:

@@ -88,8 +88,9 @@ class Camera(BaseSensor):
             if self.config.enable:
                 rgba = self._camera.get_rgba()
                 depth = self._camera.get_depth()
-                frame = self._camera.get_current_frame()
-                return {'rgba': rgba, 'depth': depth, 'frame': frame}
+                # frame = self._camera.get_current_frame()
+                # camera_params = self._camera.get_camera_params()
+                return {'rgba': rgba, 'depth': depth}
             return {}
     
     def get_camera_data(self, data_type: list) -> Dict:
@@ -97,6 +98,7 @@ class Camera(BaseSensor):
         if "bbox" in data_type:
             output_data["bbox"] = self.bbox_receiver.get_data()
         if "rgba" in data_type:
+            rep.orchestrator.step(rt_subframes=2) # !!!
             output_data["rgba"] = self.rgba_receiver.get_data()
         if "depth" in data_type:
             output_data["depth"] = self.depth_reveiver.get_data()

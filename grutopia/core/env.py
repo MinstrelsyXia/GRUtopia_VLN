@@ -61,7 +61,7 @@ class BaseEnv:
     def get_dt(self):
         return self._runner.dt
 
-    def step(self, actions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def step(self, actions: List[Dict[str, Any]], data_type=None) -> List[Dict[str, Any]]:
         """
         run step with given action(with isaac step)
 
@@ -85,7 +85,7 @@ class BaseEnv:
         }
 
         # log.debug(action_after_reshape)
-        self._runner.step(action_after_reshape)
+        self._runner.step(action_after_reshape, data_type=data_type)
         observations = self.get_observations()
         return observations
     

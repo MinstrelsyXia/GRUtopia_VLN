@@ -124,6 +124,8 @@ class Humanoid(IsaacRobot):
         name = 'base_legs'
         actuator = self.actuators[name]
 
+        if 'oracle' in controller_name:
+            return
         control_joint_pos = torch.tensor(control_action.joint_positions, dtype=torch.float32)
         control_actions = ArticulationActions(
             joint_positions=control_joint_pos,
@@ -243,6 +245,13 @@ class HumanoidRobot(BaseRobot):
             controller = self.controllers[controller_name]
             control = controller.action_to_control(controller_action)
             self.isaac_robot.apply_actuator_model(control, controller_name, self.joint_subset)
+    
+    def oracle_set_world_pose(self, position, orientation):
+        self.isaac_robot.set_world_pose(position, orientation)
+        self.isaac_robot.set_joint_velocities(np.zeros(len(self.isaac_robot.dof_names)))
+        self.isaac_robot.set_joint_positions(np.zeros(len(self.isaac_robot.dof_names)))
+        self.isaac_robot.set_linear_velocity(np.zeros(3))
+        self.isaac_robot.set_angular_velocity(np.zeros(3))
 
     def get_obs(self, data_type=None):
         position, orientation = self._robot_base.get_world_pose()
