@@ -48,7 +48,7 @@ def build_dataset():
     vln_config, sim_config = process_args()
     vln_datasets = {}
     for split in vln_config.datasets.splits:
-        vln_datasets[split] = VLNDataLoader(vln_config, 
+        vln_datasets[split] = VLNDataLoader(args=vln_config, 
                                 sim_config=sim_config,
                                 split=split)
     camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params if x.enable]

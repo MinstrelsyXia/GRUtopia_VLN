@@ -156,6 +156,7 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
 
 class VLNDataLoader(Dataset):
     def __init__(self, args, sim_config, split):
+        print(split)
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size
@@ -312,6 +313,8 @@ class VLNDataLoader(Dataset):
         ''' GEt observations from the sensors
         '''
         return self.env.get_observations(data_type=data_types)
+
+
 
     def get_camera_pose(self):
         '''
@@ -485,12 +488,6 @@ class VLNDataLoader(Dataset):
         self.bev_sem.update_semantic_map(obs_tr=cur_obs,camera_dict=self.args.camera_list,camera_poses=camera_pose,verbose=verbose,robot_coords=self.get_agent_pose()[0])
         
     
-    def get_camera_pose(self):
-        camera_dict = self.args.camera_list
-        camera_pose = {}
-        for camera in camera_dict:
-            camera_pose[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
-        return camera_pose
 
     def init_BEVSemMap(self, robot_init_pose=(0,0,0)):
         '''init BEVSem map'''
