@@ -29,7 +29,9 @@ from vlmaps.utils.matterport3d_categories import mp3dcat
 from typing import List, Tuple, Dict, Any, Union
 
 class IsaacSimLanguageRobot(LangRobot):
-
+    '''
+    robot running based on grutopia
+    '''
     # if vln_config.windows_head:
     #     vln_envs.cam_occupancy_map.open_windows_head(text_info=data_item['instruction']['instruction_text'])
     
@@ -109,7 +111,7 @@ class IsaacSimLanguageRobot(LangRobot):
 
     def _setup_sim(self, scene_name: str):
         """
-        Setup Habitat simulator, load habitat scene and relevant mesh data
+        Setup  Isaacsim, load habitat scene and relevant mesh data
         """
         if self.sim is not None:
             self.sim.close()
@@ -136,6 +138,21 @@ class IsaacSimLanguageRobot(LangRobot):
         #     obj_attr_mgr = self.sim.get_object_template_manager()
         #     locobot_template_id = obj_attr_mgr.load_configs(self.agent_model_dir)[0]
         #     locobot = rigid_obj_mgr.add_object_by_template_id(locobot_template_id, self.sim.agents[0].scene_node)
+
+        find_flag = False
+        for root, dirs, files in os.walk(os.path.join(args.datasets.mp3d_data_dir, scan)):
+            for file in files:
+                if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
+                    scene_usd_path = os.path.join(root, file)
+                    find_flag = True
+                    break
+            if find_flag:
+                break
+        if not find_flag:
+            log.error("Scene USD not found for scan %s", scan)
+            return None
+        return scene_usd_path
+
 
     def set_agent_state(self, tf: np.ndarray):
         agent_state = tf2agent_state(tf)

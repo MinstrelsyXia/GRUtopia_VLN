@@ -33,9 +33,7 @@ from grutopia.core.util.log import log
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
-for idx, path in enumerate(sys.path):
-    if 'code/w61-grutopi' in path:
-        sys.path.pop(idx)
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 print(sys.path)
 
