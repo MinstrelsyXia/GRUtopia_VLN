@@ -10,7 +10,10 @@ import omni
 from pxr import UsdGeom, Usd, Sdf, Gf, UsdPhysics, UsdUtils
 from omni.isaac.sensor import Camera
 from omni.isaac.core.utils.rotations import euler_angles_to_quat
+import omni.isaac.core.utils.numpy.rotations as rot_utils
 import omni.replicator.core as rep
+
+from pxr import Usd, UsdGeom, Sdf
 
 from .BEVmap import BEVMap
 from grutopia.core.util.log import log
@@ -38,6 +41,9 @@ class CamOccupancyMap:
             self.height = self.args.maps.global_topdown_config.height
             self.center_x, self.center_y = self.width // 2, self.height// 2
         self.topdown_camera = Camera(prim_path=self.topdown_camera_prim_path,resolution=(self.width, self.height))
+        # if not local:
+        #     self.edit_to_unparant(self.topdown_camera_prim_path)
+
         self.topdown_camera.initialize()
         self.topdown_camera.add_distance_to_image_plane_to_frame()
         self.topdown_camera.add_normals_to_frame()
@@ -69,6 +75,40 @@ class CamOccupancyMap:
         # self.topdown_camera.set_world_pose(start_point+[0,0,0.65])
         # self.topdown_camera_init_robot_pose = False
         print("Topdown camera pose init:", self.topdown_camera.get_world_pose())
+    
+    def edit_to_unparant(self, camera_prim_path):
+        # new_path = "/".join(camera_prim_path.split("/")[:-1])
+        camera_prim = self.topdown_camera.prim
+        # stage = self.topdown_camera.prim.GetStage()
+        stage = omni.usd.get_context().get_stage()
+
+        # parent_path = Sdf.Path(camera_prim_path).GetParentPath()
+        # parent_parent_path = Sdf.Path(parent_path).GetParentPath()
+        # UsdGeom.Xform.Define(stage, parent_parent_path)
+
+        new_prim_path = "/".join(camera_prim_path.split("/")[:-2])+'/'+camera_prim_path.split("/")[-1]
+        if not stage.GetPrimAtPath(new_prim_path).IsValid():
+            UsdGeom.Xform.Define(stage, new_prim_path)
+        # new_prim = stage.DefinePrim(new_prim_path)
+
+        # 获取编辑目标
+        edit_target = stage.GetEditTarget()
+        edit_layer = edit_target.GetLayer()
+
+        with Sdf.ChangeBlock():
+            success = Sdf.JumpToEdit(edit_layer, camera_prim_path, new_prim_path)
+
+        # 设置新prim的属性
+        # new_camera = Camera(prim_path=new_prim_path, resolution=(self.width, self.height))
+        # for prop_name, value in prim_properties.items():
+        #     new_prim.GetAttribute(prop_name).Set(value)
+
+        # Usd.Prim.SetParent(camera_prim, stage.GetPrimAtPath(parent_parent_path))
+
+        self.topdown_camera.prim_path = new_prim_path
+        self.topdown_camera.prim = stage.GetPrimAtPath(new_prim_path)
+
+        log.info("Camera prim path changed to", new_prim_path)
 
     def get_camera_data(self, data_type: list): 
         output_data = {}
@@ -345,7 +385,9 @@ class CamOccupancyMap:
     
     def set_world_pose(self, robot_pos):
         # update the pose of the camera based on robot's pose
-        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+        # orientation_quat = euler_angles_to_quat([0,180,0])
+        orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
 
     def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, update_camera_pose=True, verbose=False):
         # Define height range for free map

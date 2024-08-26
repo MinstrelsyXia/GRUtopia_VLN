@@ -8,6 +8,8 @@ import gzip
 import json
 import copy
 import numpy as np
+import time
+
 import cv2
 import torch
 from torch.utils.data import Dataset
@@ -209,6 +211,8 @@ class VLNDataLoader(Dataset):
         self.agent_last_pose = None
         self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
         self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
+
+        self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
         # if 'oracle' in self.args.settings.action:
         #     from pxr import Usd, UsdPhysics
         #     robot_prim = self.agents.prim
@@ -272,19 +276,37 @@ class VLNDataLoader(Dataset):
                 return item
         log.error("Path id %d not found in the dataset", path_id)
         return None
+    
+    def reload_scene(self, scan):
+        ''' Reload scene USD
+        '''
+        scene_usd_path = load_scene_usd(self.args, scan)
+        self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
+        # self.env._runner._world._current_tasks[0].reload_scene(scene_usd_path)
 
-    def init_one_scan(self, scan, idx=0, init_omni_env=False):
+    def init_one_scan(self, scan, idx=0, init_omni_env=False, reset_scene=False):
         # for extract episodes within one scan (for dataset extraction)
         item = self.data[scan][idx]
         scene_usd_path = load_scene_usd(self.args, scan)
         self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
         self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
-        self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
-        if init_omni_env:
+        self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"]
+        if reset_scene:
+            # reset scene without restart app
+            # TODO: this not works!
+            # TODO: 尝试开多个task。
+            start_time = time.time()
+            self.env._runner._world.clear()
+            self.env._runner.add_tasks(self.sim_config.config.tasks)
+            log.info(f"Reset scene {scan} without restarting app for using {((time.time()-start_time)/60):.2f} minutes.")
+        elif init_omni_env:
+            # start app.
+            # should only be called at the first time.
             self.init_env(self.sim_config, headless=self.args.headless)
             self.init_omni_env()
         self.init_agents()
-        self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
+        if init_omni_env:
+            self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
         log.info("trajectory id %d", item['trajectory_id'])
         log.info("Initialized scan %s", scan)
         log.info("Instruction: %s", item['instruction']['instruction_text'])
@@ -373,11 +395,11 @@ class VLNDataLoader(Dataset):
             cur_obs = obs[self.task_name][self.robot_name][camera]
             # save pose
             camera_pose = camera_pose_dict[camera]
-            pos, quat = camera_pose[0], camera_pose[1]
+            pos, quat = camera_pose[0], camera_pose[1] # quat: w,x,y,z
             pose_save_path = os.path.join(save_dir, 'poses.txt')
             with open(pose_save_path,'a') as f:
                 sep =""
-                f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}")
+                f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}") # prrrocessed in vlmaps/vlmap_builder_map.py
                 sep = "\n"
         
             # stack RGB into memory

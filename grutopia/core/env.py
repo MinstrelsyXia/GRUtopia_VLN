@@ -28,7 +28,7 @@ class BaseEnv:
         import isaacsim
         from omni.isaac.kit import SimulationApp
         self.headless = headless
-        self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0})
+        self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0, 'renderer': 'RayTracing'}) # !!!
 
         if webrtc:
             from omni.isaac.core.utils.extensions import enable_extension  # noqa

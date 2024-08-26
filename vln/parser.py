@@ -1,6 +1,7 @@
 import os,sys
 import argparse
 import yaml
+import shutil
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
@@ -45,8 +46,9 @@ def process_args():
     
     if vln_config.settings.mode == "sample_episodes":
         vln_config.sample_episode_dir = os.path.join(ROOT_DIR, "logs", "sample_episodes")
-        if not os.path.exists(vln_config.sample_episode_dir):
-            os.makedirs(vln_config.sample_episode_dir)
+        if os.path.exists(vln_config.sample_episode_dir) and vln_config.settings.force_sample:
+            shutil.rmtree(vln_config.sample_episode_dir)
+        os.makedirs(vln_config.sample_episode_dir)
 
     return vln_config, sim_config
 

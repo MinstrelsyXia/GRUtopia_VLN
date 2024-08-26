@@ -28,6 +28,9 @@ from vlmaps.utils.matterport3d_categories import mp3dcat
 
 from typing import List, Tuple, Dict, Any, Union
 
+from grutopia.core.util.log import log
+
+
 class IsaacSimLanguageRobot(LangRobot):
     '''
     robot running based on grutopia
@@ -113,23 +116,24 @@ class IsaacSimLanguageRobot(LangRobot):
         """
         Setup  Isaacsim, load habitat scene and relevant mesh data
         """
-        if self.sim is not None:
-            self.sim.close()
-        self.test_scene = os.path.join(self.test_scene_dir, scene_name, scene_name + ".glb")
-        self.sim_setting = {
-            "scene": self.test_scene,
-            **self.config["params"]["sim_setting"],
-        }
+        # Orriginal Habitat version:
+        # if self.sim is not None:
+        #     self.sim.close()
+        # self.test_scene = os.path.join(self.test_scene_dir, scene_name, scene_name + ".glb")
+        # self.sim_setting = {
+        #     "scene": self.test_scene,
+        #     **self.config["params"]["sim_setting"],
+        # }
 
-        cfg = make_cfg(self.sim_setting)
+        # cfg = make_cfg(self.sim_setting)
 
-        # create a simulator instance
-        if self.sim is None or scene_name == self.last_scene_name:
-            self.sim = habitat_sim.Simulator(cfg)
-            agent = self.sim.initialize_agent(self.sim_setting["default_agent"])
-        else:
-            self.sim.reconfigure(cfg)
-        self.last_scene_name = scene_name
+        # # create a simulator instance
+        # if self.sim is None or scene_name == self.last_scene_name:
+        #     self.sim = habitat_sim.Simulator(cfg)
+        #     agent = self.sim.initialize_agent(self.sim_setting["default_agent"])
+        # else:
+        #     self.sim.reconfigure(cfg)
+        # self.last_scene_name = scene_name
 
         # TODO: add in document to enable this features
         # load agent mesh for visualization

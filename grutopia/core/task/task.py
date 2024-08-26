@@ -49,6 +49,21 @@ class BaseTask(OmniBaseTask, ABC):
 
         for metric_config in config.metrics:
             self.metrics[metric_config.name] = create_metric(metric_config)
+    
+    def reload_scene(self, scene_asset_path):
+        log.info(f"Reload scene_path: {self.config.scene_asset_path}")
+        source, prim_path = create_scene(self.config.scene_asset_path,
+                                    prim_path_root=f'World/env_{self.config.env_id}/scene')
+        physics_scene_prim = create_prim(prim_path,
+                    usd_path=source,
+                    scale=self.config.scene_scale,
+                    translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)])
+        self.config.scene_prim_path = prim_path
+
+        from pxr import UsdPhysics
+        meshCollisionAPI = UsdPhysics.MeshCollisionAPI.Apply(physics_scene_prim)
+        meshCollisionAPI.CreateApproximationAttr(defaultValue='convexHull', writeSparsely=False)
+
 
     def load(self):
         # load scenes
@@ -60,6 +75,13 @@ class BaseTask(OmniBaseTask, ABC):
                         usd_path=source,
                         scale=self.config.scene_scale,
                         translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)])
+            
+            self.config.scene_prim_path = prim_path
+
+            # convert the collider type to convexHull !!!
+            from pxr import UsdPhysics
+            meshCollisionAPI = UsdPhysics.MeshCollisionAPI.Apply(physics_scene_prim)
+            meshCollisionAPI.CreateApproximationAttr(defaultValue='convexHull', writeSparsely=False)
             
             # increase the GPU capacity according to https://forums.developer.nvidia.com/t/is-there-a-solution-to-the-buffer-overflow/299449/4
             physxSceneAPI = PhysxSchema.PhysxSceneAPI.Apply(physics_scene_prim)

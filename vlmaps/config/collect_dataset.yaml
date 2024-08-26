@@ -1,0 +1,13 @@
+defaults:
+  - data_paths: mac
+
+scene_names:
+  - 5LpN3gDmAk7
+data_cfg:
+  rgb: true
+  depth: true
+  semantic: true
+  resolution:
+    w: 224
+    h: 224
+  camera_height: 1.5

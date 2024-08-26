@@ -36,11 +36,11 @@ from vlmaps.utils.clip_utils import get_lseg_score
 
 
 class VLMap(Map):
-    def __init__(self, map_config: DictConfig, data_dir: str = ""):
+    def __init__(self, map_config: DictConfig, data_dir: str = "",sim_type: str = "isaacsim") -> None:
         super().__init__(map_config, data_dir=data_dir)
         self.scores_mat = None
         self.categories = None
-
+        self.sim_type = sim_type
     def create_map(self, data_dir: Union[Path, str]) -> None:
         print(f"Creating map for scene at: ", data_dir)
         self._setup_paths(data_dir)
@@ -64,6 +64,7 @@ class VLMap(Map):
                 self.depth_paths,
                 self.base2cam_tf,
                 self.base_transform,
+                self.sim_type,
             )
             self.map_builder.create_camera_map()
         else:
@@ -286,3 +287,4 @@ class VLMap(Map):
                 contours[i][j, 1] += self.cmin
 
         return contours, centers, bbox_list
+

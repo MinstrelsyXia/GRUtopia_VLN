@@ -1,0 +1,102 @@
+[Warning] [omni.isaac.kit.simulation_app] Modules: ['omni.kit_app'] were loaded before SimulationApp was started and might not be loaded correctly.
+[Warning] [omni.isaac.kit.simulation_app] Please check to make sure no extra omniverse or pxr modules are imported before the call to SimulationApp(...)
+[Info] [carb] Logging to file: /ssd/wangliuyi/app/anaconda/2024.02/envs/isaaclab/lib/python3.10/site-packages/omni/logs/Kit/Isaac-Sim/4.0/kit_20240826_094719.log
+2024-08-26 01:47:19 [0ms] [Warning] [omni.kit.app.plugin] No crash reporter present, dumps uploading isn't available.
+[0.070s] [ext: omni.kit.async_engine-0.0.0] startup
+[0.179s] [ext: omni.stats-0.0.0] startup
+[0.180s] [ext: omni.client-1.1.0] startup
+[0.213s] [ext: omni.datastore-0.0.0] startup
+[0.213s] [ext: omni.blobkey-1.1.0] startup
+[0.214s] [ext: omni.ujitso.default-1.0.0] startup
+[0.214s] [ext: omni.hsscclient-0.0.0] startup
+[0.215s] [ext: omni.rtx.shadercache.vulkan-1.0.0] startup
+[0.216s] [ext: omni.assets.plugins-0.0.0] startup
+[0.217s] [ext: omni.gpu_foundation-0.0.0] startup
+[0.226s] [ext: carb.windowing.plugins-1.0.0] startup
+2024-08-26 01:47:19 [205ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2024-08-26 01:47:19 [205ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.4]) (impl: carb.windowing-glfw.plugin)
+[0.227s] [ext: omni.kit.renderer.init-0.0.0] startup
+2024-08-26 01:47:20 [271ms] [Warning] [omni.platforminfo.plugin] failed to open the default display.  Can't verify X Server version.
+2024-08-26 01:47:20 [634ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2024-08-26 01:47:20 [634ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.4]) (impl: carb.windowing-glfw.plugin)
+2024-08-26 01:47:20 [635ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2024-08-26 01:47:20 [635ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.4]) (impl: carb.windowing-glfw.plugin)
+
+|---------------------------------------------------------------------------------------------|
+| Driver Version: 550.90.07     | Graphics API: Vulkan
+|=============================================================================================|
+| GPU | Name                             | Active | LDA | GPU Memory | Vendor-ID | LUID       |
+|     |                                  |        |     |            | Device-ID | UUID       |
+|     |                                  |        |     |            | Bus-ID    |            |
+|---------------------------------------------------------------------------------------------|
+| 0   | NVIDIA GeForce RTX 4090          | Yes: 0 |     | 24810   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2684      | b76d0b87.. |
+|     |                                  |        |     |            | 1         |            |
+|---------------------------------------------------------------------------------------------|
+| 1   | NVIDIA GeForce RTX 4090          | Yes: 1 |     | 24810   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2684      | c40a701e.. |
+|     |                                  |        |     |            | 25        |            |
+|---------------------------------------------------------------------------------------------|
+| 2   | NVIDIA GeForce RTX 4090          | Yes: 2 |     | 24810   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2684      | 97ee10ad.. |
+|     |                                  |        |     |            | 41        |            |
+|---------------------------------------------------------------------------------------------|
+| 3   | NVIDIA GeForce RTX 4090          | Yes: 3 |     | 24810   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2684      | d332ab0e.. |
+|     |                                  |        |     |            | 61        |            |
+|---------------------------------------------------------------------------------------------|
+| 4   | NVIDIA GeForce RTX 4090          | Yes: 4 |     | 24810   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2684      | 527f33cf.. |
+|     |                                  |        |     |            | 81        |            |
+|---------------------------------------------------------------------------------------------|
+| 5   | NVIDIA GeForce RTX 4090          | Yes: 5 |     | 24810   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2684      | 433f8dde.. |
+|     |                                  |        |     |            | a1        |            |
+|---------------------------------------------------------------------------------------------|
+| 6   | NVIDIA GeForce RTX 4090          | Yes: 6 |     | 24810   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2684      | 96b53436.. |
+|     |                                  |        |     |            | c1        |            |
+|---------------------------------------------------------------------------------------------|
+| 7   | NVIDIA GeForce RTX 4090          | Yes: 7 |     | 24810   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2684      | db5f47b4.. |
+|     |                                  |        |     |            | e1        |            |
+|=============================================================================================|
+| OS: 22.04.3 LTS (Jammy Jellyfish) ubuntu, Version: 22.04.3, Kernel: 5.15.0-78-generic
+| Processor: AMD EPYC 7542 32-Core Processor | Cores: 64 | Logical: 128
+|---------------------------------------------------------------------------------------------|
+| Total Memory (MB): 515809 | Free Memory: 426964
+| Total Page/Swap (MB): 8191 | Free Page/Swap: 8157
+|---------------------------------------------------------------------------------------------|
+2024-08-26 01:47:25 [5,889ms] [Warning] [gpu.foundation.plugin] IOMMU is enabled.
+[9.257s] [ext: omni.kit.pipapi-0.0.0] startup
+[9.259s] [ext: omni.kit.pip_archive-0.0.0] startup
+[9.260s] [ext: omni.mtlx-0.1.0] startup
+[9.261s] [ext: omni.usd.config-1.0.3] startup
+[9.265s] [ext: omni.gpucompute.plugins-0.0.0] startup
+[9.266s] [ext: omni.usd.libs-1.0.0] startup
+[9.398s] [ext: omni.kit.telemetry-0.5.0] startup
+[9.473s] [ext: omni.kit.loop-isaac-1.2.0] startup
+[9.474s] [ext: omni.kit.test-0.0.0] startup
+[9.520s] [ext: omni.appwindow-1.1.8] startup
+2024-08-26 01:47:29 [9,499ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2024-08-26 01:47:29 [9,500ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.4]) (impl: carb.windowing-glfw.plugin)
+2024-08-26 01:47:29 [9,501ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2024-08-26 01:47:29 [9,501ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.4]) (impl: carb.windowing-glfw.plugin)
+Fatal Python error: Segmentation fault
+
+Thread 0x000015206cc0c640 (most recent call first):
+  File "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/lib/python3.10/selectors.py", line 469 in select
+  File "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/lib/python3.10/asyncio/base_events.py", line 1871 in _run_once
+  File "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/lib/python3.10/asyncio/base_events.py", line 603 in run_forever
+  File "/home/wangliuyi/code/w61-grutopia/grutopia/core/util/async_req.py", line 42 in start_loop
+  File "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/lib/python3.10/threading.py", line 953 in run
+  File "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/wangliuyi/apps/anaconda/2024.02/envs/isaaclab/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Current thread 0x00001520f821c740 (most recent call first):
+  File "/ssd/wangliuyi/app/anaconda/2024.02/envs/isaaclab/lib/python3.10/site-packages/isaacsim/exts/omni.isaac.kit/omni/isaac/kit/simulation_app.py", line 350 in _start_app
+  File "/ssd/wangliuyi/app/anaconda/2024.02/envs/isaaclab/lib/python3.10/site-packages/isaacsim/exts/omni.isaac.kit/omni/isaac/kit/simulation_app.py", line 197 in __init__
+  File "/home/wangliuyi/code/w61-grutopia/grutopia/core/env.py", line 31 in __init__
+  File "/ssd/wangliuyi/code/w61-grutopia/test/test_reload_env.py", line 14 in <module>
+
+Extension modules: numpy.core._multiarray_umath, numpy.core._multiarray_tests, numpy.linalg._umath_linalg, numpy.fft._pocketfft_internal, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._mt19937, numpy.random.mtrand, numpy.random._philox, numpy.random._pcg64, numpy.random._sfc64, numpy.random._generator, yaml._yaml, pydantic.typing, pydantic.errors, pydantic.version, pydantic.utils, pydantic.class_validators, pydantic.color, pydantic.datetime_parse, pydantic.validators, pydantic.networks, pydantic.types, pydantic.json, pydantic.error_wrappers, pydantic.fields, pydantic.config, pydantic.parse, pydantic.schema, pydantic.main, pydantic.dataclasses, pydantic.annotated_types, pydantic.decorator, pydantic.env_settings, pydantic.tools, pydantic, psutil._psutil_linux, psutil._psutil_posix (total: 39)

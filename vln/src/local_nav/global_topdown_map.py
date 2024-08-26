@@ -101,7 +101,7 @@ class GlobalTopdownMap:
             log.error("Floor height not found in global topdown map")
             return None
 
-    def world_to_pixel(self, world_pose, specific_height=None, is_camera_base=False):
+    def world_to_pixel_old(self, world_pose, specific_height=None, is_camera_base=False):
         if specific_height is None:
             height = self.get_height(world_pose, is_camera_base=is_camera_base)
 
@@ -117,11 +117,31 @@ class GlobalTopdownMap:
         X, Y = world_pose[1]*10/self.camera_aperture*self.width, -world_pose[0]*10/self.camera_aperture*self.height
 
         pixel_x = X - cx + self.width/2
+        pixel_y = self.height - (Y - cy + self.height/2)
+
+        return [pixel_x, pixel_y]
+    
+    def world_to_pixel(self, world_pose, specific_height=None, is_camera_base=False):
+        if specific_height is None:
+            height = self.get_height(world_pose, is_camera_base=is_camera_base)
+
+            if height not in self.floor_maps.keys() and specific_height is None:
+                log.error("Floor height not found in global topdown map")
+                return None
+        else:
+            height = specific_height
+        
+        camera_pose = self.floor_maps[height]['camera_pose']
+
+        cx, cy = camera_pose[0]*10/self.camera_aperture*self.width, -camera_pose[1]*10/self.camera_aperture*self.height
+        X, Y = world_pose[0]*10/self.camera_aperture*self.width, -world_pose[1]*10/self.camera_aperture*self.height
+
+        pixel_x = self.width - (X - cx + self.width/2)
         pixel_y = Y - cy + self.height/2
 
         return [pixel_x, pixel_y]
 
-    def pixel_to_world(self, pixel, camera_pose):
+    def pixel_to_world_old(self, pixel, camera_pose):
         cx, cy = camera_pose[1]*10/self.camera_aperture*self.width, -camera_pose[0]*10/self.camera_aperture*self.height
 
         px = pixel[0] + cx - self.height/2
@@ -129,6 +149,18 @@ class GlobalTopdownMap:
 
         world_x = -py/10/self.height*self.camera_aperture
         world_y = px/10/self.width*self.camera_aperture
+        
+        return [world_x, world_y]
+
+    def pixel_to_world(self, pixel, camera_pose):
+        cx, cy = camera_pose[0]*10/self.camera_aperture*self.width, -camera_pose[1]*10/self.camera_aperture*self.height
+
+        # px = self.height - (pixel[0] + cx - self.height/2)
+        px = self.height - pixel[0] + cx - self.height/2
+        py = pixel[1] + cy - self.width/2
+
+        world_x = px/10/self.height*self.camera_aperture
+        world_y = -py/10/self.width*self.camera_aperture
         
         return [world_x, world_y]
     
@@ -191,11 +223,13 @@ class GlobalTopdownMap:
             goal_pixel = self.world_to_pixel(goal)
 
             # test
-            if len(all_paths) > 0:
+            if verbose and len(all_paths) > 0:
                 plt.clf()
                 plt.imshow(occupancy_map, cmap='binary', origin='upper')
+                path_pixel_list = []
                 for path in all_paths:
                     path_pixel = self.world_to_pixel(path)
+                    path_pixel_list.append(path_pixel)
                     plt.scatter(path_pixel[1], path_pixel[0])
                 plt.savefig('test.jpg')
                 plt.clf()
@@ -221,7 +255,7 @@ class GlobalTopdownMap:
                 transfer_paths = None
 
         # remove the first point
-        if transfer_paths is not None:
+        if transfer_paths is not None and len(transfer_paths)>1:
             transfer_paths.pop(0)
 
         return transfer_paths

@@ -1,4 +1,6 @@
 from typing import Dict
+from PIL import Image
+import numpy as np
 
 from omni.isaac.sensor import Camera as i_Camera
 import omni.replicator.core as rep
@@ -8,6 +10,7 @@ from grutopia.core.robot.robot_model import SensorModel
 from grutopia.core.robot.sensor import BaseSensor
 from grutopia.core.util import log
 
+import carb.settings
 
 @BaseSensor.register('Camera')
 class Camera(BaseSensor):
@@ -66,6 +69,17 @@ class Camera(BaseSensor):
         # normals
         self.normals_receiver = rep.AnnotatorRegistry.get_annotator("normals")
         self.normals_receiver.attach(self.rp)
+
+        # Setting capture on play to False will prevent the replicator from capturing data each frame
+        carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False) # !!!
+
+        # writer
+        # if init_writer in self.config and self.config.init_writer:
+        #     self.writer = rep.WriterRegistry.get("BasicWriter")
+        #     self.writer.initialize(
+        #         output_dir=f"{self.config.}/writer", rgb=True, depth=True
+        #     )
+        #     self.writer.attach(self.rp)
         
         log.debug('camera_prim_path: ' + prim_path)
         log.debug('name            : ' + self.config.name)
@@ -98,7 +112,7 @@ class Camera(BaseSensor):
         if "bbox" in data_type:
             output_data["bbox"] = self.bbox_receiver.get_data()
         if "rgba" in data_type:
-            rep.orchestrator.step(rt_subframes=2) # !!!
+            rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
             output_data["rgba"] = self.rgba_receiver.get_data()
         if "depth" in data_type:
             output_data["depth"] = self.depth_reveiver.get_data()
@@ -112,4 +126,14 @@ class Camera(BaseSensor):
     
     def get_world_pose(self):
         return self._camera.get_world_pose()
+    
+    def write_rgb_data(self, rgb_data, file_path):
+        rgb_img = Image.fromarray(rgb_data[:,:,:3], "RGB")
+        rgb_img.save(file_path + ".png")
         
+    def write_depth_data(self, depth_data, file_path, as_npy=False):
+        depth_img = Image.fromarray(depth_data, "L")
+        if as_npy:
+            np.save(file_path + ".npy", depth_data)
+        else:
+            depth_img.save(file_path + ".png")

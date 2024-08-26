@@ -188,6 +188,7 @@ def get_dynamic_obstacles_map_3d(
     use_multiple_templates=True,
     avg_mode=0,
     vis=False,
+    save_dir=None,
 ):
     all_obstacles_mask = obstacles_cropped == 0
     scores_mat = get_lseg_score(
@@ -218,11 +219,13 @@ def get_dynamic_obstacles_map_3d(
     mask2 = np.logical_and(obs_pts[:, 0] - rmin < new_obstacles.shape[0], obs_pts[ :, 1 ] - cmin < new_obstacles.shape[1])
     mask = np.logical_and(mask1, mask2)
     new_obstacles[obs_pts[mask, 0] - rmin, obs_pts[mask, 1] - cmin] = 1
-    new_obstacles[obs_pts[:, 0] - rmin, obs_pts[:, 1] - cmin] = 1
+    # new_obstacles[obs_pts[:, 0] - rmin, obs_pts[:, 1] - cmin] = 1
     new_obstacles = np.logical_and(new_obstacles, all_obstacles_mask)
     new_obstacles = np.logical_not(new_obstacles)
-
+    
+    save_dir= '/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes/s8pcmisQ38h/id_2606/maps/'
     if vis:
         cv2.imshow("new obstacles_cropped", (new_obstacles * 255).astype(np.uint8))
-        # cv2.waitKey(1)
+        cv2.waitKey(100)
+        cv2.imwrite(save_dir+"new_obstacles_cropped.png",  (new_obstacles * 255).astype(np.uint8))
     return new_obstacles

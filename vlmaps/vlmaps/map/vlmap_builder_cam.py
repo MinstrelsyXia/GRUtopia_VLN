@@ -39,7 +39,30 @@ def visualize_pc(pc: np.ndarray):
     pcd.points = o3d.utility.Vector3dVector(pc)
     o3d.visualization.draw_geometries([pcd])
 
+def save_point_cloud_image(pc, save_path="point_cloud.jpg"):
 
+
+    # 设置无头渲染
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()  # 创建一个不可见的窗口
+    ctr = vis.get_view_control()
+
+    # 设定特定的视角
+    ctr.set_front([0, 0, -1])  # 设置相机朝向正面
+    ctr.set_lookat([0, 0, 0])  # 设置相机目标点为原点
+    ctr.set_up([0, 0, 1])   
+    # 创建点云对象
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc)
+    vis.add_geometry(pcd)
+    vis.update_geometry(pcd)
+    vis.poll_events()
+    vis.update_renderer()
+
+    # 捕获当前视图并保存为图像
+    vis.capture_screen_image(save_path)
+    vis.destroy_window()
+       
 class VLMapBuilderCam:
     def __init__(
         self,
@@ -50,6 +73,7 @@ class VLMapBuilderCam:
         depth_paths: List[Path],
         base2cam_tf: np.ndarray,
         base_transform: np.ndarray,
+        sim_type :str 
     ):
         self.data_dir = data_dir
         self.pose_path = pose_path
@@ -59,7 +83,28 @@ class VLMapBuilderCam:
         self.base2cam_tf = base2cam_tf
         self.base_transform = base_transform
         self.rot_type = map_config.pose_info.rot_type
+        self.sim_type = sim_type
 
+    def preprocess_pose(self,camera_pose):
+        '''
+        match poses: 
+            Input: (x,y,z,pw,px,py,pz): x right, y up, z backward
+            Output: (x,y,z,px,py,pz,pw); x right, y down z forward
+
+        '''
+        position = camera_pose[:, :3]
+        orientation = camera_pose[:, 3:]
+        
+        # Apply the transformations directly
+        vlmap_pos = position * np.array([1, 1, 1])
+        vlmap_pos = vlmap_pos[:, [0,1,2]]
+        vlmap_ori = orientation[:, [1,2,3,0]]
+
+        # Concatenate the position and orientation to form the output
+        return np.hstack((vlmap_pos, vlmap_ori))
+
+    
+     
     def create_camera_map(self):
         """
         build a map centering at the global original frame. The poses are camera pose in the global coordinate frame.
@@ -68,7 +113,12 @@ class VLMapBuilderCam:
         cs = self.map_config.cell_size
         gs = self.map_config.grid_size
         depth_sample_rate = self.map_config.depth_sample_rate
-        self.camera_pose_tfs = np.loadtxt(self.pose_path)
+        if (self.sim_type == "habitat"):
+            self.camera_pose_tfs= np.loadtxt(self.pose_path)
+        elif (self.sim_type  == 'isaacsim'):
+            camera_pose_tf = np.loadtxt(self.pose_path)
+            self.camera_pose_tfs = self.preprocess_pose(camera_pose_tf)
+            print("Isaacsim format transform!!!")
         if self.rot_type == "quat":
             self.camera_pose_tfs = [cvt_pose_vec2tf(x) for x in self.camera_pose_tfs]
         elif self.rot_type == "mat":
@@ -111,6 +161,11 @@ class VLMapBuilderCam:
 
             # if frame_i % 50 == 0:
             #     o3d.visualization.draw_geometries([global_pcd])
+            # filename_without_extension = str(rgb_path).rsplit('.', 1)[0]
+            # last_number_str = filename_without_extension.split('_')[-1]
+            # last_number = int(last_number_str)
+            # save_path = str(self.map_save_dir)+ f"global_pcd_{last_number}.jpg"
+            # save_point_cloud_image(np.asarray(pcd_global.points),save_path=save_path)
 
         self.pcd_min = np.min(np.asarray(global_pcd.points), axis=0)
         self.pcd_max = np.max(np.asarray(global_pcd.points), axis=0)
