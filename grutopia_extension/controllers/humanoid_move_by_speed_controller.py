@@ -131,7 +131,7 @@ class HumanoidMoveBySpeedController(BaseController):
 
         base_height = base_pose_w[0][2]
         ankle_height = self.robot.get_ankle_height()
-        relative_base_height = base_height - ankle_height
+        relative_base_height = base_height - ankle_height + 0.0758 # 0.0758 is the height of the right ankle from the ground. # !!!
         heights = np.clip(relative_base_height - 0.5 - np.zeros(121), -1., 1.) * 5.0
 
         # Set action command.

@@ -25,8 +25,10 @@ class BaseEnv:
         self._column_length = int(np.sqrt(self.env_num))
 
         # Init Isaac Sim
+        import isaacsim
         from omni.isaac.kit import SimulationApp
         self.headless = headless
+        # self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0, 'renderer': 'RayTracing'})
         self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0})
 
         if webrtc:
@@ -69,7 +71,7 @@ class BaseEnv:
     def get_dt(self):
         return self._runner.dt
 
-    def step(self, actions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def step(self, actions: List[Dict[str, Any]], add_rgb_subframes=False) -> List[Dict[str, Any]]:
         """
         run step with given action(with isaac step)
 
@@ -93,7 +95,7 @@ class BaseEnv:
         }
 
         # log.debug(action_after_reshape)
-        self._runner.step(action_after_reshape)
+        self._runner.step(action_after_reshape, add_rgb_subframes=add_rgb_subframes)
         observations = self.get_observations()
         return observations
 
@@ -114,13 +116,13 @@ class BaseEnv:
         self._runner.reset()
         return self.get_observations(), {}
 
-    def get_observations(self) -> List[Dict[str, Any]]:
+    def get_observations(self, add_rgb_subframes=False) -> List[Dict[str, Any]]:
         """
         Get observations from Isaac environment
         Returns:
             List[Dict[str, Any]]: observations
         """
-        _obs = self._runner.get_obs()
+        _obs = self._runner.get_obs(add_rgb_subframes=add_rgb_subframes)
         return _obs
 
     def render(self, mode='human'):
@@ -140,3 +142,8 @@ class BaseEnv:
     def simulation_app(self):
         """simulation app instance"""
         return self._simulation_app
+    
+    def reset_env(self):
+        # tasks = self.runner._world._current_tasks
+        # self.runner._world._current_tasks['h1_locomotion_0'].robots['h1_0'].sensors['camera'].__del__() # !!!!
+        self.runner._world.clear()

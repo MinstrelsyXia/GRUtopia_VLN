@@ -124,6 +124,9 @@ class Humanoid(IsaacRobot):
         name = 'base_legs'
         actuator = self.actuators[name]
 
+        if 'oracle' in controller_name:
+            return
+
         control_joint_pos = torch.tensor(control_action.joint_positions, dtype=torch.float32)
         control_actions = ArticulationActions(
             joint_positions=control_joint_pos,
@@ -230,6 +233,13 @@ class HumanoidRobot(BaseRobot):
     def get_world_pose(self):
         return self._robot_base.get_world_pose()
 
+    def oracle_set_world_pose(self, position, orientation):
+        self.isaac_robot.set_world_pose(position, orientation)
+        self.isaac_robot.set_joint_velocities(np.zeros(len(self.isaac_robot.dof_names)))
+        self.isaac_robot.set_joint_positions(np.zeros(len(self.isaac_robot.dof_names)))
+        self.isaac_robot.set_linear_velocity(np.zeros(3))
+        self.isaac_robot.set_angular_velocity(np.zeros(3))
+
     def apply_action(self, action: dict):
         """
         Args:
@@ -243,7 +253,7 @@ class HumanoidRobot(BaseRobot):
             control = controller.action_to_control(controller_action)
             self.isaac_robot.apply_actuator_model(control, controller_name, self.joint_subset)
 
-    def get_obs(self):
+    def get_obs(self, add_rgb_subframes=False):
         position, orientation = self._robot_base.get_world_pose()
 
         # custom
@@ -256,5 +266,5 @@ class HumanoidRobot(BaseRobot):
         for c_obs_name, controller_obs in self.controllers.items():
             obs[c_obs_name] = controller_obs.get_obs()
         for sensor_name, sensor_obs in self.sensors.items():
-            obs[sensor_name] = sensor_obs.get_data()
+            obs[sensor_name] = sensor_obs.get_data(add_rgb_subframes=add_rgb_subframes)
         return obs

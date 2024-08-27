@@ -1,0 +1,4 @@
+History:
+- Step: {step} 
+- Thought: {thought}
+- Action: {action}
