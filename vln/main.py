@@ -48,6 +48,8 @@ def build_dataset():
     '''
     vln_config, sim_config = process_args()
     vln_datasets = {}
+    if vln_config.env != "":
+        vln_config.datasets.splits = [vln_config.env]
     for split in vln_config.datasets.splits:
         vln_datasets[split] = VLNDataLoader(vln_config, 
                                 sim_config=sim_config,
@@ -575,6 +577,225 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
         if vln_config.windows_head:
             # close the topdown camera
             vln_envs.cam_occupancy_map_local.close_windows_head()
+
+def sample_episodes_scripts(args, vln_envs_all, data_camera_list):
+    # init the action
+    action_name = vln_config.settings.action
+    topdown_maps = {}
+    is_app_up = False
+    split = vln_envs_all[args.env]
+    scan = split.data[scan]
+
+    process_path_id = []
+    # scan_has_init = False
+    scan_first_init = True
+    # if scan_has_init:
+    #     vln_envs.reload_scene(scan)
+    for idx in range(len(vln_envs.data[scan])):
+        # 1. init Omni Env or Reset robot episode
+        if args.test_verbose:
+            args.log_image_dir = os.path.join(args.log_dir, "images", split, scan, str(vln_envs.data[scan][idx]['trajectory_id'])) # Note that this will inflence the global arg value
+            if not os.path.exists(args.log_image_dir):
+                os.makedirs(args.log_image_dir)
+
+        path_id = vln_envs.data[scan][idx]['trajectory_id']
+        if path_id in process_path_id:
+            continue
+
+        episode_path = os.path.join(args.sample_episode_dir, scan, f"id_{str(path_id)}")
+        if os.path.exists(episode_path):
+            if args.settings.force_sample:
+                log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Force to sample again.")
+                # remove the previous sampled data
+                shutil.rmtree(episode_path)
+                os.makedirs(episode_path)
+            else:
+                log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled.")
+                continue
+        else:
+            os.makedirs(episode_path)
+
+        if scan_first_init:
+            # scan = "vyrNrziPKCB"
+            # idx = 9
+            data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True, reset_scene=is_app_up) #TODO: change to global init
+            is_app_up = True
+        else:
+            data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=False)
+        process_path_id.append(path_id)
+
+        env = vln_envs.env
+        paths = data_item['reference_path']
+        path_id = data_item['trajectory_id']
+        current_point = 0
+        # total_points = [vln_envs.agent_init_pose, vln_envs.agent_init_rotatation] # [[x,y,z],[w,x,y,z]]
+        total_points = []
+        total_points.append([np.array(vln_envs.agent_init_pose), np.array(vln_envs.agent_init_rotation)])
+        total_images = defaultdict(lambda: [])
+        is_image_stacked = False
+    
+        if vln_config.windows_head:
+            vln_envs.cam_occupancy_map_local.open_windows_head(text_info=data_item['instruction']['instruction_text'])
+    
+        '''start simulation'''
+        i = 0
+        # if is_app_up:
+        if scan_first_init:
+            warm_step = 240 if args.headless else 500
+            # warm_step = 5 # !!! debug
+            scan_first_init = False
+        else:
+            warm_step = 5
+        move_step = warm_step
+        # Note that warm_step should be the times of the oracle sample interval (now is set to 20)
+
+        action_info = {
+            'current_step': 0,
+            'topdown_camera_local': vln_envs.cam_occupancy_map_local,
+            'topdown_camera_global': vln_envs.cam_occupancy_map_global
+        }
+
+        init_actions = {'h1': {action_name: [[paths[0]], action_info]}}
+
+        start_time = time.time()
+        while env.simulation_app.is_running():
+            if i >= args.settings.max_step:
+                # if i >= 2: # !!! debug
+                log.warning(f"Scan: {scan}, Path_id: {path_id}. Exceed the maximum steps: {args.settings.max_step}")
+                break
+
+            i += 1
+            env_actions = []
+
+            
+            if i < warm_step:
+                init_actions['h1'][action_name][1]['current_step'] = i
+                env_actions.append(init_actions)
+                obs = env.step(actions=env_actions)
+                
+                if i % 50 == 0:
+                    if vln_config.windows_head:
+                        # show the topdown camera
+                        vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
+                
+                continue
+
+            elif i == warm_step:
+                # first warm up finished
+                if scan not in topdown_maps:
+                    topdown_map = vln_envs.GlobalTopdownMap(args, scan)
+                    topdown_maps[scan] = topdown_map
+                    freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
+                    topdown_map.update_map(freemap, camera_pose, verbose=args.test_verbose)
+                    log.info(f"====The global freemap has been initialized for {scan}====")
+                else:
+                    topdown_map = topdown_maps[scan]
+                
+                agent_action_state = {}
+                agent_action_state["finished"] = True
+            
+            if args.test_verbose and args.windows_head:
+                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
+            
+            if agent_action_state['finished']:
+                if current_point == 0:
+                    log.info(f"===The robot starts navigating===")
+                if current_point < len(paths)-1:
+                    log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
+                    
+                    freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
+                    topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
+                    robot_current_position = vln_envs.get_agent_pose()[0]
+                    # exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose, all_paths=paths) # TODO: check world to map coordinate
+                    exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose)
+
+                    action_info.update({'current_step': i})
+                    actions = {'h1': {action_name: [exe_path, action_info]}}
+                    
+                    # total_points.extend(exe_path)
+                    current_point += 1
+
+                    if vln_config.windows_head:
+                        # show the topdown camera
+                        vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
+            
+            actions['h1'][action_name][1]['current_step'] = i
+
+            env_actions.append(actions)
+            if i % args.sample_episodes.step_interval == 0:
+                # data_type = args.settings.camera_data_type
+                # input data_type to retrival the high quality image 
+                add_rgb_subframes = True
+            else:
+                # data_type = None
+                add_rgb_subframes = False
+
+            obs = env.step(actions=env_actions, add_rgb_subframes=add_rgb_subframes)
+
+            exe_point = obs[vln_envs.task_name][vln_envs.robot_name][action_name].get('exe_point', None)
+            if exe_point is not None:
+                total_points.append(exe_point)
+                is_image_stacked = False
+                move_step = deepcopy(i)
+
+            # stack images and information
+            if (i-move_step) != 0 and (i-move_step) % (args.sample_episodes.step_interval-1) == 0:
+                # Since oracle_move_path_controller moves to the next point every 5 steps, the image is fetched every 5+3 steps
+                total_images = vln_envs.save_episode_data(scan=scan, path_id=path_id, camera_list=data_camera_list, add_rgb_subframes=True, step_time=i, total_images=total_images)
+
+                is_image_stacked = True
+
+            if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%(args.sample_episodes.step_interval-1) == 0:
+                vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], add_rgb_subframes=True, step_time=i)
+                freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
+                topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
+
+            # get the action state
+            if len(obs[vln_envs.task_name]) > 0:
+                agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
+                print(i)
+            else:
+                agent_action_state['finished'] = False
+            
+            if agent_action_state['finished']:
+                if current_point == len(paths)-1 and is_image_stacked:
+                    log.info("===The robot has achieved the final target.===")
+                    log.info("===Break this episode.===")
+                    break
+
+        # save data
+        # Iterate through the dictionary and save images
+        for camera, info in total_images.items():
+            for idx, image_info in enumerate(info):
+                step_time = image_info['step_time']
+                rgb_image = Image.fromarray(image_info['rgb'], "RGB")
+                depth_image = image_info['depth']
+
+                # Define filenames
+                save_dir = os.path.join(args.sample_episode_dir, scan, f"id_{str(path_id)}")
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
+
+                rgb_filename = os.path.join(save_dir, f"{camera}_image_step_{step_time}.png")
+                # plt.imsave(rgb_filename, rgb_image)
+                # rgb_img = Image.fromarray(rgb_data[:,:,:3], "RGB")
+                rgb_image.save(rgb_filename)
+
+                depth_filename = os.path.join(save_dir, f"{camera}_depth_step_{step_time}.npy")
+                np.save(depth_filename, depth_image)
+
+                print(f"Saved {rgb_filename} and {depth_filename}")
+    
+
+        end_time = time.time()
+        total_time = (end_time - start_time)/60
+        log.info(f"Total time for the [scan: {scan}] and [path_id: {path_id}] episode: {total_time:.2f} minutes")
+
+        # env.simulation_app.close()
+        print('finish')
+        if vln_config.windows_head:
+            # close the topdown camera
+            vln_envs.cam_occupancy_map_local.close_windows_head()
         
 
 if __name__ == "__main__":
@@ -589,3 +810,5 @@ if __name__ == "__main__":
         llm_inference(vln_config, vln_envs)
     elif vln_config.settings.mode == "sample_episodes":
         sample_episodes(vln_config, vln_envs, data_camera_list)
+    elif vln_config.settings.mode == "sample_episodes_scripts":
+        sample_episodes_scripts(vln_config, vln_envs, data_camera_list)
