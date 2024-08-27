@@ -128,3 +128,6 @@ work_dirs/
 
 # sphinx build dir
 docs/en/_build
+
+# Log
+logs/

@@ -7,7 +7,8 @@ tasks:
   name: "h1_locomotion"
   env_num: 1
   offset_size: 1.0
-  scene_asset_path: GRUtopia/assets/scenes/empty.usd
+  scene_asset_path: assets/scenes/empty.usd
+  light_on: true
   robots:
   - name: h1
     prim_path: "/World/h1"

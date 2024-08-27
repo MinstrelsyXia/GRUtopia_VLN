@@ -65,7 +65,7 @@ class SimulatorRunner:
         self._world.reset()
         self._warm_up()
 
-    def step(self, actions: dict, render: bool = True):
+    def step(self, actions: dict, render: bool = True, add_rgb_subframes=False):
         for task_name, action_dict in actions.items():
             task = self.current_tasks.get(task_name)
             for name, action in action_dict.items():
@@ -77,7 +77,7 @@ class SimulatorRunner:
             self.render_trigger = 0
         self._world.step(render=render)
 
-        obs = self.get_obs()
+        obs = self.get_obs(add_rgb_subframes=add_rgb_subframes)
         for npc in self.npc:
             try:
                 npc.feed(obs)
@@ -87,10 +87,10 @@ class SimulatorRunner:
         if render:
             return obs
 
-    def get_obs(self):
+    def get_obs(self, add_rgb_subframes=False):
         obs = {}
         for task_name, task in self.current_tasks.items():
-            obs[task_name] = task.get_observations()
+            obs[task_name] = task.get_observations(add_rgb_subframes=add_rgb_subframes)
         return obs
 
     def get_current_time_step_index(self) -> int:

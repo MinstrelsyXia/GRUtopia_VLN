@@ -53,7 +53,7 @@ class BaseRobot:
         """
         raise NotImplementedError()
 
-    def get_obs(self) -> dict:
+    def get_obs(self, add_rgb_subframes=False) -> dict:
         """Get observation of robot, including controllers, sensors, and world pose.
 
         Raises:
