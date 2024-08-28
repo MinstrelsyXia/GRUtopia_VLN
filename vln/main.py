@@ -487,9 +487,10 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
 
         start_time = time.time()
         while env.simulation_app.is_running():
-            if i >= args.settings.max_step:
+            max_step = 500 if args.debug else args.settings.max_step
+            if i >= max_step:
                 # if i >= 2: # !!! debug
-                log.warning(f"Scan: {scan}, Path_id: {path_id}. Exceed the maximum steps: {args.settings.max_step}")
+                log.warning(f"Scan: {scan}, Path_id: {path_id}. Exceed the maximum steps: {max_step}")
                 break
 
             i += 1
