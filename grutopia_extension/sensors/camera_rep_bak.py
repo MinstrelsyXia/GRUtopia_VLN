@@ -132,16 +132,6 @@ class Camera(BaseSensor):
                 return {'rgba': rgba, 'depth': depth, 'camera_params': camera_params}
             return {}
 
-    def __del__(self):
-        """Unsubscribes from callbacks and detach from the replicator registry."""
-        # unsubscribe callbacks
-        self._camera.__del__()
-        # delete from replicator registry
-        self.rp.destroy()
-        # for _, annotators in self._rep_registry.items():
-        #     for annotator, render_product_path in zip(annotators, self._render_product_paths):
-        #         annotator.detach([render_product_path])
-        #         annotator = None
     
     def get_camera_data(self, data_type: list) -> Dict:
         output_data = {}

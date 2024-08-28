@@ -4,16 +4,16 @@ datasets:
   mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
   mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
   splits:
+    - train
     - val_seen
-    # - train
-    # - val_unseen
+    - val_unseen
     # - test
 
 settings:
   mode: "sample_episodes"
   batch_size: 1
-  # action: "move_along_path"
-  action: "oracle_move_along_path"
+  action: "move_along_path"
+  # action: "oracle_move_along_path"
   check_and_reset_robot: true
   use_llm: true
   sample_camera_list:
@@ -22,11 +22,12 @@ settings:
     - rgba
     - depth
     - camera_params
-  max_step: 300
+  max_step: 20000
   force_sample: true
+  filter_stairs: true
 
 sample_episodes:
-  step_interval: 3
+  step_interval: 40
 
 robots:
   - name: "CylinderRobot"
