@@ -76,6 +76,9 @@ class CamOccupancyMap:
         # self.topdown_camera_init_robot_pose = False
         print("Topdown camera pose init:", self.topdown_camera.get_world_pose())
     
+    def get_world_pose(self):
+        return self.topdown_camera.get_world_pose()
+    
     def edit_to_unparant(self, camera_prim_path):
         # new_path = "/".join(camera_prim_path.split("/")[:-1])
         camera_prim = self.topdown_camera.prim

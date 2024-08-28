@@ -40,6 +40,11 @@ class GlobalTopdownMap:
                             windows_head=self.args.windows_head,
                             for_llm=self.args.settings.use_llm,
                             verbose=True)
+
+        # init vis settings
+        self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
+        self.bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
+        self.norm = mcolors.BoundaryNorm(self.bounds, self.cmap.N)
     
     def save_map(self, robot_pos=None, is_camera_base=False):
         height = self.get_height(robot_pos, is_camera_base=is_camera_base)
@@ -225,13 +230,15 @@ class GlobalTopdownMap:
             # test
             if verbose and len(all_paths) > 0:
                 plt.clf()
-                plt.imshow(occupancy_map, cmap='binary', origin='upper')
+                plt.imshow(occupancy_map, cmap=self.cmap, norm=self.norm, origin='upper')
                 path_pixel_list = []
                 for path in all_paths:
                     path_pixel = self.world_to_pixel(path)
                     path_pixel_list.append(path_pixel)
                     plt.scatter(path_pixel[1], path_pixel[0])
-                plt.savefig('test.jpg')
+                all_paths_save_path = os.path.join(self.args.log_image_dir, "all_paths.jpg")
+                plt.savefig(all_paths_save_path)
+                log.info(f"Saved all paths visualization to {all_paths_save_path}")
                 plt.clf()
 
             # self.path_planner.update_obs_map(occupancy_map)
@@ -261,13 +268,9 @@ class GlobalTopdownMap:
         return transfer_paths
 
     def vis_nav_path(self, start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
-        cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
-        bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
-        norm = mcolors.BoundaryNorm(bounds, cmap.N)
-    
         plt.figure(figsize=(10, 10))
         # plt.imshow(occupancy_map, cmap='binary', origin='lower')
-        plt.imshow(occupancy_map, cmap=cmap, norm=norm, origin='upper')
+        plt.imshow(occupancy_map, cmap=self.cmap, norm=self.norm, origin='upper')
 
         # Plot start and goal points
         plt.plot(start_pixel[1], start_pixel[0], 'ro', markersize=6, label='Start')

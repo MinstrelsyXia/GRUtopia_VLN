@@ -14,7 +14,7 @@ from vln.src.utils.utils import dict_to_namespace
 def process_args():
     '''Init parser arguments'''
     parser = argparse.ArgumentParser(description="Main function for VLN in GRUtopia")
-    parser.add_argument("--env", default="", type=str, help="The split of the dataset", choices=['train', 'val_seen', 'val_unseen'])
+    parser.add_argument("--split", default="", type=str, help="The split of the dataset", choices=['train', 'val_seen', 'val_unseen'])
     parser.add_argument("--path_id", default=5593, type=int, help="The number of path id") # 5593
     parser.add_argument("--headless", action="store_true", default=False)
     parser.add_argument("--test_verbose", action="store_true", default=False)
@@ -41,11 +41,11 @@ def process_args():
     '''Init save directory'''
     vln_config.root_dir = ROOT_DIR
     vln_config.log_dir = os.path.join(ROOT_DIR, "logs")
-    vln_config.log_image_dir = os.path.join(vln_config.log_dir, "images", str(vln_config.env), str(vln_config.path_id))
+    vln_config.log_image_dir = os.path.join(vln_config.log_dir, "images", str(vln_config.split), str(vln_config.path_id))
     if not os.path.exists(vln_config.log_image_dir):
         os.makedirs(vln_config.log_image_dir)
     
-    if vln_config.settings.mode == "sample_episodes":
+    if "sample_episodes" in vln_config.settings.mode:
         vln_config.sample_episode_dir = os.path.join(ROOT_DIR, "logs", "sample_episodes")
         if os.path.exists(vln_config.sample_episode_dir) and vln_config.settings.force_sample:
             shutil.rmtree(vln_config.sample_episode_dir)
