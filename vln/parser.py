@@ -28,6 +28,7 @@ def process_args():
     parser.add_argument("--windows_head", default=False, action="store_true", help="Open a matplotlib window to show the topdown camera for view the robot's action")
     parser.add_argument("--windows_head_type", default="show", choices=['show', 'save'], help="The type of the window head")
     parser.add_argument("--debug", action="store_true", default=False)
+    parser.add_argument("--clear_sample_dir", action="store_true", default=False)
     args = parser.parse_args()
 
     '''Init simulation config'''
@@ -49,9 +50,11 @@ def process_args():
     
     if "sample_episodes" in vln_config.settings.mode:
         vln_config.sample_episode_dir = os.path.join(ROOT_DIR, "logs", "sample_episodes")
-        if os.path.exists(vln_config.sample_episode_dir) and vln_config.settings.force_sample:
+        # if os.path.exists(vln_config.sample_episode_dir) and vln_config.settings.force_sample:
+        if os.path.exists(vln_config.sample_episode_dir) and args.clear_sample_dir:
             shutil.rmtree(vln_config.sample_episode_dir)
-        os.makedirs(vln_config.sample_episode_dir)
+        if not os.path.exists(vln_config.sample_episode_dir):
+            os.makedirs(vln_config.sample_episode_dir)
 
     return vln_config, sim_config
 

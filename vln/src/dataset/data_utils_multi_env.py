@@ -1,6 +1,7 @@
 # Author: w61
-# Date: 2024.7.19
-''' Class to load dataset for VLN
+# Date: 2024.8.28
+''' Class to load dataset for VLN for multiple envs
+# TODO
 '''
 
 import os
@@ -10,7 +11,6 @@ import copy
 import numpy as np
 import time
 from collections import defaultdict
-from copy import deepcopy
 
 import torch
 from torch.utils.data import Dataset
@@ -102,7 +102,7 @@ def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, 
     # Check if the pitch or roll exceeds the thresholds
     if abs(pitch) > pitch_threshold or abs(roll) > roll_threshold:
         is_fall = True
-        log.info(f"Robot falls down!!!")
+        log.error(f"Robot falls down!!!")
         cur_pos, cur_rot = obs["position"], quat_to_euler_angles(obs["orientation"])
         log.info(f"Current Position: {cur_pos}, Orientation: {cur_rot}")
     else:
@@ -194,7 +194,7 @@ class VLNDataLoader(Dataset):
                 for i, path in enumerate(item["reference_path"]):
                     item["reference_path"][i] += self.robot_offset
 
-        # self.env_num = sim_config.tasks.env_num
+        self.env_num = sim_config.tasks.env_num
         self.task_name = sim_config.config.tasks[0].name # only one task
         self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot type
         
@@ -214,14 +214,11 @@ class VLNDataLoader(Dataset):
     def init_agents(self):
         '''call after self.init_env'''
         self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
-
+        self.agent_last_pose = None
         self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
         self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
 
-        # self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
-        self.reset_robot(self.agent_init_pose, self.agent_init_rotation)
-        self.agent_last_pose = None
-
+        self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
         # if 'oracle' in self.args.settings.action:
         #     from pxr import Usd, UsdPhysics
         #     robot_prim = self.agents.prim
@@ -296,13 +293,8 @@ class VLNDataLoader(Dataset):
         self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
         # self.env._runner._world._current_tasks[0].reload_scene(scene_usd_path)
 
-    def init_one_scan(self, scan, idx=0, init_omni_env=False, reset_scene=False, save_log=False, path_id=-1):
+    def init_one_scan(self, scan, idx=0, init_omni_env=False, reset_scene=False):
         # for extract episodes within one scan (for dataset extraction)
-        if path_id != -1:
-            # debug mode
-            for idx, item in enumerate(self.data[scan]):
-                if item['trajectory_id'] == path_id:
-                    break
         item = self.data[scan][idx]
         scene_usd_path = load_scene_usd(self.args, scan)
         self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
@@ -324,24 +316,10 @@ class VLNDataLoader(Dataset):
         self.init_agents()
         if init_omni_env:
             self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
-        
-        status_info = []
-
-        status_info.append(f"trajectory id {item['trajectory_id']}")
-        status_info.append(f"Initialized scan {scan}")
-        status_info.append(f"Instruction: {item['instruction']['instruction_text']}")
-        status_info.append(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
-        status_info.append(f"GT paths length: {len(item['reference_path'])}, points: {item['reference_path']}")
-
-        for info in status_info:
-            log.info(info)
-
-        if save_log:
-            self.args.episode_status_info_file = os.path.join(self.args.episode_path, 'status_info.txt')
-            with open(self.args.episode_status_info_file, 'w') as f:
-                for info in status_info:
-                    f.write(info + '\n')         
-
+        log.info("trajectory id %d", item['trajectory_id'])
+        log.info("Initialized scan %s", scan)
+        log.info("Instruction: %s", item['instruction']['instruction_text'])
+        log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
         return item
     
     def get_agent_pose(self):
@@ -449,12 +427,10 @@ class VLNDataLoader(Dataset):
 
             # save camera_intrinsic
             # camera_params = cur_obs['camera_params']
-            # 构造要保存的字典
-            camera_info = {
-                "camera": camera,
-                "step_time": step_time,
-                "position": camera_pose[0].tolist(),
-                'orientation': camera_pose[1].tolist()}
+            # # 构造要保存的字典
+            # camera_info = {
+            #     "camera": camera,
+            #     "step_time": step_time,
             #     "intrinsic_matrix": camera_params['cameraProjection'].tolist(),
             #     "extrinsic_matrix": camera_params['cameraViewTransform'].tolist(),
             #     "cameraAperture": camera_params['cameraAperture'].tolist(),
@@ -463,12 +439,12 @@ class VLNDataLoader(Dataset):
             #     "robot_init_pose": self.agent_init_pose.tolist()
             # }
             # # print(self.agent_init_pose)
-            cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
+            # cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
 
             # # 将信息追加保存到 jsonl 文件
-            with open(cam_save_path, 'a') as f:
-                json.dump(camera_info, f)
-                f.write('\n')
+            # with open(cam_save_path, 'a') as f:
+            #     json.dump(camera_info, f)
+            #     f.write('\n')
         
         # save robot information
         robot_info = {
@@ -489,36 +465,31 @@ class VLNDataLoader(Dataset):
 
         return total_images
     
-    def save_episode_images(self, total_images, sample_episode_dir, split, scan, path_id, lock, verbose=False, FLAG_FINISH=False, is_saving=False):
+    def save_episode_images(self, total_images, sample_episode_dir, split, scan, path_id, verbose=False, FLAG_FINISH=False):
         while True:
-            time.sleep(5)  # 每x秒保存一次数据，避免过于频繁
-            with lock:
-                camera_keys = list(total_images.keys())
-            for camera in camera_keys:
-                with lock:
-                    if camera in total_images:
-                        for idx, image_info in enumerate(total_images[camera]):
-                            step_time = image_info['step_time']
-                            rgb_image = Image.fromarray(image_info['rgb'], "RGB")
-                            depth_image = image_info['depth']
+            time.sleep(10)  # 每x秒保存一次数据，避免过于频繁
+            for camera, info in total_images.items():
+                for idx, image_info in enumerate(info):
+                    step_time = image_info['step_time']
+                    rgb_image = Image.fromarray(image_info['rgb'], "RGB")
+                    depth_image = image_info['depth']
 
-                            # 定义文件名
-                            save_dir = os.path.join(sample_episode_dir, split, scan, f"id_{str(path_id)}")
-                            if not os.path.exists(save_dir):
-                                os.makedirs(save_dir)
+                    # 定义文件名
+                    save_dir = os.path.join(sample_episode_dir, split, scan, f"id_{str(path_id)}")
+                    if not os.path.exists(save_dir):
+                        os.makedirs(save_dir)
 
-                            rgb_filename = os.path.join(save_dir, f"{camera}_image_step_{step_time}.png")
-                            rgb_image.save(rgb_filename)
+                    rgb_filename = os.path.join(save_dir, f"{camera}_image_step_{step_time}.png")
+                    rgb_image.save(rgb_filename)
 
-                            depth_filename = os.path.join(save_dir, f"{camera}_depth_step_{step_time}.npy")
-                            np.save(depth_filename, depth_image)
+                    depth_filename = os.path.join(save_dir, f"{camera}_depth_step_{step_time}.npy")
+                    np.save(depth_filename, depth_image)
 
-                            if verbose:
-                                print(f"Saved {rgb_filename} and {depth_filename}")
+                    if verbose:
+                        print(f"Saved {rgb_filename} and {depth_filename}")
 
-                # 清空已保存的数据，避免重复保存
-                total_images.clear()
-                is_saving = False
+            # 清空已保存的数据，避免重复保存
+            total_images.clear()
             if FLAG_FINISH:
                 break
 
@@ -583,8 +554,8 @@ class VLNDataLoader(Dataset):
         # Check if the pitch or roll exceeds the thresholds
         if abs(pitch) > pitch_threshold or abs(roll) > roll_threshold:
             is_fall = True
-            log.info(f"Robot falls down!!!")
-            log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
+            # log.info(f"Robot falls down!!!")
+            # log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
         else:
             is_fall = False
         
@@ -593,8 +564,8 @@ class VLNDataLoader(Dataset):
         robot_base_z = self.get_agent_pose()[0][2]
         if robot_base_z - robot_ankle_z < height_threshold:
             is_fall = True
-            log.info(f"Robot falls down!!!")
-            log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
+            # log.info(f"Robot falls down!!!")
+            # log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
 
         return is_fall
     
@@ -682,7 +653,7 @@ class VLNDataLoader(Dataset):
     
     def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False):
         is_fall = self.check_robot_fall(self.agents, adjust=False)
-        is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=2000, threshold=0.2)
+        is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=300, threshold=0.2)
         if (not is_fall) and (not is_stuck):
             if update_freemap:
                 self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map

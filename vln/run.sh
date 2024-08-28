@@ -17,7 +17,7 @@ flags_sample_episodes_script_single_scan="
     --headless
     --vln_cfg_file vln/configs/vln_extract_data_script.yaml
     --sim_cfg_file vln/configs/sample_episodes_sim_cfg.yaml
-    --env train
+    --split train
     --scan JeFG25nYj2p
     --test_verbose
     --windows_head

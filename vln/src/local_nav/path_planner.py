@@ -653,6 +653,11 @@ class AStarPlanner:
         goal_node = self.Node(self.calc_xy_index(gx, self.min_x),
                               self.calc_xy_index(gy, self.min_y), 0.0, -1)
 
+        if self.obstacle_map[goal_node.x, goal_node.y] == 255:
+            # goal is in the obstacle
+            log.warning("Goal is in the obstacle.")
+            return [], False
+
         open_set, closed_set = dict(), dict()
         open_set[self.calc_grid_index(start_node)] = start_node
 
