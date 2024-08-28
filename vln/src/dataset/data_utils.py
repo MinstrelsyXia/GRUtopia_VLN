@@ -385,11 +385,11 @@ class VLNDataLoader(Dataset):
                         log.error(f"Error in saving camera image: {e}")
         return obs
 
-    def save_episode_data(self, scan, path_id, total_images, camera_list:list, add_rgb_subframes=True, step_time=0, init_param_data=False):
+    def save_episode_data(self, split, scan, path_id, total_images, camera_list:list, add_rgb_subframes=True, step_time=0, init_param_data=False):
         ''' Save episode data
         '''
         # make dir
-        save_dir = os.path.join(self.args.sample_episode_dir, scan, f"id_{str(path_id)}")
+        save_dir = os.path.join(self.args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
@@ -464,7 +464,7 @@ class VLNDataLoader(Dataset):
 
         return total_images
     
-    def save_episode_images(self, total_images, sample_episode_dir, scan, path_id, verbose=False):
+    def save_episode_images(self, total_images, sample_episode_dir, split, scan, path_id, verbose=False, FLAG_FINISH=False):
         while True:
             time.sleep(10)  # 每x秒保存一次数据，避免过于频繁
             for camera, info in total_images.items():
@@ -474,7 +474,7 @@ class VLNDataLoader(Dataset):
                     depth_image = image_info['depth']
 
                     # 定义文件名
-                    save_dir = os.path.join(sample_episode_dir, scan, f"id_{str(path_id)}")
+                    save_dir = os.path.join(sample_episode_dir, split, scan, f"id_{str(path_id)}")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
 
@@ -489,6 +489,8 @@ class VLNDataLoader(Dataset):
 
             # 清空已保存的数据，避免重复保存
             total_images.clear()
+            if FLAG_FINISH:
+                break
 
     def process_pointcloud(self, camera_list: list, draw=False, convert_to_local=False):
         ''' Process pointcloud for combining multiple cameras

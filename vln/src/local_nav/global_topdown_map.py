@@ -208,9 +208,11 @@ class GlobalTopdownMap:
 
         return sampled_points
 
-    def navigate_p2p(self, start, goal, step_time=0, verbose=False, all_paths=[]):
+    def navigate_p2p(self, start, goal, step_time=0, verbose=False, all_paths=[], save_dir=None):
         # start_height = int(start[2])
         # goal_height = int(goal[2])
+        if save_dir is None:
+            save_dir = self.args.log_image_dir
 
         if abs(start[2] - goal[2]) >= 0.3:
             # different floor! we directly sample the nodes
@@ -219,7 +221,7 @@ class GlobalTopdownMap:
             if verbose:
                 occupancy_map = self.get_map(start)
                 map_nodes = [self.world_to_pixel(x, specific_height=self.get_height(start)) for x in transfer_paths]
-                self.path_planner.vis_path(occupancy_map, map_nodes[0][0], map_nodes[0][1], map_nodes[-1][0], map_nodes[-1][1], map_nodes, os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"), legend=True)
+                self.path_planner.vis_path(occupancy_map, map_nodes[0][0], map_nodes[0][1], map_nodes[-1][0], map_nodes[-1][1], map_nodes, os.path.join(save_dir, "global_path_"+str(step_time)+".jpg"), legend=True)
         
         else:
             occupancy_map, camera_pose = self.get_map(start, return_camera_pose=True)
@@ -236,7 +238,7 @@ class GlobalTopdownMap:
                     path_pixel = self.world_to_pixel(path)
                     path_pixel_list.append(path_pixel)
                     plt.scatter(path_pixel[1], path_pixel[0])
-                all_paths_save_path = os.path.join(self.args.log_image_dir, "all_paths.jpg")
+                all_paths_save_path = os.path.join(save_dir, "all_paths.jpg")
                 plt.savefig(all_paths_save_path)
                 log.info(f"Saved all paths visualization to {all_paths_save_path}")
                 plt.clf()
@@ -247,11 +249,10 @@ class GlobalTopdownMap:
                                             goal_pixel[0], goal_pixel[1],
                                             obs_map=occupancy_map,
                                             min_final_meter=self.planner_config.last_scope,
-                                            img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"),
                                             vis_path=False)
             if verbose:
                 if len(paths) > 0:
-                    self.vis_nav_path(start_pixel, goal_pixel, paths, occupancy_map, img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
+                    self.vis_nav_path(start_pixel, goal_pixel, paths, occupancy_map, img_save_path=os.path.join(save_dir, "global_path_"+str(step_time)+".jpg"))
 
             if find_flag:
                 transfer_paths = []

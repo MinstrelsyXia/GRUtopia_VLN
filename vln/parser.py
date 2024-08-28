@@ -18,6 +18,7 @@ def process_args():
     parser.add_argument("--path_id", default=5593, type=int, help="The number of path id") # 5593
     parser.add_argument("--headless", action="store_true", default=False)
     parser.add_argument("--test_verbose", action="store_true", default=False)
+    parser.add_argument("--save_path_planning", action="store_true", default=False)
     parser.add_argument("--wait", action="store_true", default=False)
     parser.add_argument("--mode", type=str, default="vis_one_path", help="The mode of the program")
     parser.add_argument("--scan", type=str, default="", help="The target scan")
