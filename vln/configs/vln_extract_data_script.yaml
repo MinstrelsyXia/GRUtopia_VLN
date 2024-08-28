@@ -22,12 +22,12 @@ settings:
     - rgba
     - depth
     - camera_params
-  max_step: 8000
+  max_step: 20000
   force_sample: true
   filter_stairs: true
 
 sample_episodes:
-  step_interval: 20
+  step_interval: 40
 
 robots:
   - name: "CylinderRobot"
