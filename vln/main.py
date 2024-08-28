@@ -378,6 +378,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
 def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None, scan=None, is_app_up=False):
     # Init the variables
     FLAG_FINISH = False
+    lock = threading.Lock()
     action_name = vln_config.settings.action
     topdown_maps = {}
     is_app_up = is_app_up
@@ -395,7 +396,11 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
         data_item = scan_data[idx]        
         paths = data_item['reference_path']
         path_id = data_item['trajectory_id']
-        total_images = defaultdict(lambda: [])
+        is_saving = False
+        if scan_first_init:
+            total_images = defaultdict(lambda: [])
+        else:
+            total_images.clear()
 
         if hasattr(args.settings, 'filter_stairs') and args.settings.filter_stairs:
             if 'stair' in data_item['instruction']['instruction_text']:
@@ -422,6 +427,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 os.makedirs(args.log_image_dir)
 
         episode_path = os.path.join(args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
+        args.episode_path = episode_path
         if os.path.exists(episode_path):
             if args.settings.force_sample:
                 log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Force to sample again.")
@@ -435,20 +441,31 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             os.makedirs(episode_path)
 
         if scan_first_init:
-            # scan = "vyrNrziPKCB"
-            # idx = 9
-            data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True, reset_scene=is_app_up) #TODO: change to global init
+            # !!!
+            scan = "sT4fr6TAbpF"
+            idx = 9
+            path_id = 116
+            # !!!
+            # path_id = -1
+            data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True, reset_scene=is_app_up, save_log=True, path_id=path_id) #TODO: change to global init
             is_app_up = True
 
             # init threading for image saving
-            stop_event = threading.Event()  # 创建停止事件
-            save_thread = threading.Thread(target=vln_envs.save_episode_images, args=(total_images, args.sample_episode_dir, split, scan, path_id, False, FLAG_FINISH))
-            save_thread.daemon = True  # 设置为守护线程
-            save_thread.start()
-            log.info(f"Thread for saving images has been started.")
+            # stop_event = threading.Event()  # 创建停止事件
+            # save_thread = threading.Thread(target=vln_envs.save_episode_images, args=(total_images, args.sample_episode_dir, split, scan, path_id, False, FLAG_FINISH))
+            # save_thread.daemon = True  # 设置为守护线程
+            # save_thread.start()
+            # log.info(f"Thread for saving images has been started.")
 
         else:
-            data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=False)
+            data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=False, save_log=True, path_id=path_id)
+
+        stop_event = threading.Event()  # 创建停止事件
+        # lock = threading.Lock()
+        save_thread = threading.Thread(target=vln_envs.save_episode_images, args=(total_images, args.sample_episode_dir, split, scan, path_id, lock, False, FLAG_FINISH, False))
+        save_thread.daemon = True  # 设置为守护线程
+        save_thread.start()
+        log.info(f"Thread for saving images has been started.")
 
         env = vln_envs.env
         current_point = 0
@@ -464,6 +481,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
         '''start simulation'''
         i = 0
         init_param_data = True
+        is_episode_success = False
         # if is_app_up:
         if scan_first_init:
             warm_step = 240 if args.headless else 500
@@ -526,6 +544,11 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
 
                 agent_action_state = {}
                 agent_action_state["finished"] = True
+                
+                vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
+                env_actions.append(init_actions)
+                obs = env.step(actions=env_actions)
+                continue
             
             if 'oracle' not in action_name and i % 50 == 0:
                 reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=vln_config.test_verbose)
@@ -541,6 +564,9 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                     log.info(f"===The robot starts navigating===")
                 if current_point < len(paths)-1:
                     log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
+
+                    with open(args.episode_status_info_file, 'a') as f:
+                        f.write(f"Current point number: {current_point}\n")
                     
                     freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                     topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
@@ -548,7 +574,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                     # exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose, all_paths=paths) # TODO: check world to map coordinate
                     
                     exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=(args.test_verbose or args.save_path_planning), save_dir=os.path.join(args.sample_episode_dir, split, scan, f"id_{str(path_id)}")) 
-                    if len(exe_path) == 0:
+                    if exe_path is None or len(exe_path) == 0:
                         # path planning fails
                         log.error(f"Scan: {scan}, Path_id: {path_id}. Path planning fails to find the path from the current point to the next point.")
                         break
@@ -581,6 +607,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             obs = env.step(actions=env_actions, add_rgb_subframes=add_rgb_subframes)
             if 'oracle' not in action_name:
                 vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
+                # obs = env.step([{'h1': {'stand_still': []}}])
 
             if 'oracle' in action_name:
                 exe_point = obs[vln_envs.task_name][vln_envs.robot_name][action_name].get('exe_point', None)
@@ -594,7 +621,11 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             # stack images and information
             if (i-move_step) != 0 and (i-move_step) % (args.sample_episodes.step_interval-1) == 0:
                 # Since oracle_move_path_controller moves to the next point every 5 steps, the image is fetched every 5+3 steps
-                total_images = vln_envs.save_episode_data(split=split, scan=scan, path_id=path_id, camera_list=data_camera_list, add_rgb_subframes=True, step_time=i, total_images=total_images, init_param_data=init_param_data)
+                # if not is_saving:
+                with lock:
+                    is_saving = True
+                    total_images = vln_envs.save_episode_data(split=split, scan=scan, path_id=path_id, camera_list=data_camera_list, add_rgb_subframes=True, step_time=i, total_images=total_images, init_param_data=init_param_data)
+                    is_saving = False
 
                 is_image_stacked = True
                 init_param_data = False
@@ -607,7 +638,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             # get the action state
             if len(obs[vln_envs.task_name]) > 0:
                 agent_action_state = obs[vln_envs.task_name][vln_envs.robot_name][action_name]
-                print(i)
+                # print(i)
             else:
                 agent_action_state['finished'] = False
             
@@ -615,7 +646,11 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 if current_point == len(paths)-1 and is_image_stacked:
                     log.info("===The robot has achieved the final target.===")
                     log.info("===Break this episode.===")
+                    is_episode_success = True
                     break
+        
+        with open(args.episode_status_info_file, 'a') as f:
+            f.write(f"Episode finished: {is_episode_success}\n")
 
         end_time = time.time()
         total_time = (end_time - start_time)/60

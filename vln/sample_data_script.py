@@ -16,6 +16,9 @@ from PIL import Image
 from copy import deepcopy
 from tqdm import tqdm
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import subprocess
+
 # enable multiple gpus
 # import isaacsim
 # import carb.settings
@@ -57,31 +60,43 @@ def build_dataset():
     
     return scan_data
 
-def run_scans(scan_data):
+def process_scan(scan, key):
+    """处理单个扫描的函数"""
+    print(f"正在处理scan: {scan}")
+    
+    # 构建命令
+    command = [sys.executable, 'vln/main.py', '--scan', scan, '--split', key,
+               '--headless', 
+               '--vln_cfg_file', 'vln/configs/vln_extract_data_script.yaml', 
+               '--sim_cfg_file', 'vln/configs/sample_episodes_sim_cfg.yaml',
+               '--save_path_planning']
+    
+    try:
+        # 执行main.py，并等待其完成
+        subprocess.run(command, check=True)
+        return f"Scan {scan} 处理完成"
+    except subprocess.CalledProcessError as e:
+        return f"处理scan {scan} 时发生错误: {e}"
+
+def run_scans(scan_data, num_workers):
     start_time = time.time()
     
-    # 遍历每个数据集分割
-    for key, scans in scan_data.items():
-        print(f"处理数据集分割: {key}，包含 {len(scans)} 个扫描")
+    # 创建一个进程池
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = []
         
-        # 使用 tqdm 显示进度条
-        for scan in tqdm(scans, desc=f"Processing scans in {key}", unit="scan"):
-            print(f"正在处理scan: {scan}")
+        # 遍历每个数据集分割
+        for key, scans in scan_data.items():
+            print(f"处理数据集分割: {key}，包含 {len(scans)} 个扫描")
             
-            # 构建命令
-            command = [sys.executable, 'vln/main.py', '--scan', scan, '--split', key,
-                       '--headless', 
-                       '--vln_cfg_file', 'vln/configs/vln_extract_data_script.yaml', 
-                       '--sim_cfg_file', 'vln/configs/sample_episodes_sim_cfg.yaml',
-                       '--save_path_planning']
-            
-            try:
-                # 执行main.py，并等待其完成
-                subprocess.run(command, check=True)
-                print(f"Scan {scan} 处理完成")
-            except subprocess.CalledProcessError as e:
-                print(f"处理scan {scan} 时发生错误: {e}")
-            
+            # 使用 tqdm 显示进度条
+            for scan in tqdm(scans, desc=f"Processing scans in {key}", unit="scan"):
+                # 提交任务到进程池
+                futures.append(executor.submit(process_scan, scan, key))
+
+        # 等待所有任务完成并处理结果
+        for future in as_completed(futures):
+            print(future.result())
             print("---")
     
     end_time = time.time()
@@ -92,4 +107,4 @@ def run_scans(scan_data):
 if __name__ == "__main__":
     scan_data = build_dataset()
 
-    run_scans(scan_data)
+    run_scans(scan_data, num_workers=4)

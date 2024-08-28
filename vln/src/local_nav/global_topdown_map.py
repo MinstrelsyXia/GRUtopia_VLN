@@ -72,9 +72,12 @@ class GlobalTopdownMap:
         log.info(f"Saved global topdown map at height {height} to {img_save_path}")
     
     def get_height(self, pos, is_camera_base=False):
+        # if is_camera_base:
+        #     return math.floor(pos[2] - self.camera_height)
+        # return math.floor(pos[2])
         if is_camera_base:
-            return math.floor(pos[2] - self.camera_height)
-        return math.floor(pos[2])
+            return round(pos[2] - self.camera_height)
+        return round(pos[2])
     
     def update_map(self, freemap, camera_pose, update_map=False, verbose=False):
         height = self.get_height(camera_pose, is_camera_base=True)

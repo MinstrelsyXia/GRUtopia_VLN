@@ -41,7 +41,7 @@ maps:
   agent_radius: 0.25 # Robot's radius (original: 0.25)
   voxel_size: 0.1  # Size of a voxel (original: 0.05)
   add_dilation: true # Add dilation to the map
-  dilation_iterations: 3 # Number of dilation iterations
+  dilation_iterations: 2 # Number of dilation iterations
   quadtree_config:
     width: 50 # Quadtree map size
     height: 50

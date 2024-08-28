@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-import open3d as o3d
+# import open3d as o3d
 from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
