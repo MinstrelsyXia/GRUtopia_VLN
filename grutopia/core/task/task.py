@@ -49,21 +49,6 @@ class BaseTask(OmniBaseTask, ABC):
 
         for metric_config in config.metrics:
             self.metrics[metric_config.name] = create_metric(metric_config)
-    
-    def reload_scene(self, scene_asset_path):
-        log.info(f"Reload scene_path: {self.config.scene_asset_path}")
-        source, prim_path = create_scene(self.config.scene_asset_path,
-                                    prim_path_root=f'World/env_{self.config.env_id}/scene')
-        physics_scene_prim = create_prim(prim_path,
-                    usd_path=source,
-                    scale=self.config.scene_scale,
-                    translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)])
-        self.config.scene_prim_path = prim_path
-
-        from pxr import UsdPhysics
-        meshCollisionAPI = UsdPhysics.MeshCollisionAPI.Apply(physics_scene_prim)
-        meshCollisionAPI.CreateApproximationAttr(defaultValue='convexHull', writeSparsely=False)
-
 
     def load(self):
         # load scenes
@@ -87,42 +72,9 @@ class BaseTask(OmniBaseTask, ABC):
             physxSceneAPI = PhysxSchema.PhysxSceneAPI.Apply(physics_scene_prim)
             physxSceneAPI.CreateGpuTempBufferCapacityAttr(16 * 1024 * 1024 * 2)        
             physxSceneAPI.CreateGpuHeapCapacityAttr(64 * 1024 * 1024 * 2) # debug !!!
-            
-            # prim_path = f"/World/env_{self.config.env_id}/scene"
-            # _xform_prim = prim_utils.create_prim(
-            #     prim_path= f"/World/env_{self.config.env_id}/scene", 
-            #     translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)], 
-            #     usd_path=self.config.scene_asset_path
-            # )
-
-            # # add colliders and physics material
-            # # apply collider properties
-            # collider_cfg = sim_utils.CollisionPropertiesCfg(collision_enabled=True)
-            # sim_utils.define_collision_properties(_xform_prim.GetPrimPath(), collider_cfg)
-
-            # # create physics material
-            # physics_material = RigidBodyMaterialCfg(
-            #     static_friction=0.5, 
-            #     dynamic_friction=0.5, 
-            #     restitution=0.0,
-            #     improve_patch_friction=True,
-            #     friction_combine_mode='average',
-            #     restitution_combine_mode='average',
-            #     compliant_contact_stiffness=0.0,
-            #     compliant_contact_damping=0.0
-            # )
-
-            # physics_material_cfg: sim_utils.RigidBodyMaterialCfg = physics_material
-            # # spawn the material
-            # physics_material_cfg.func(f"{prim_path}/physicsMaterial", physics_material)
-            # sim_utils.bind_physics_material(_xform_prim.GetPrimPath(), f"{prim_path}/physicsMaterial")
-            
-            # ground_plane_cfg = sim_utils.GroundPlaneCfg(physics_material=physics_material)
-            # ground_plane = ground_plane_cfg.func(f"{prim_path}/GroundPlane", ground_plane_cfg)
-            # ground_plane.visible = True
 
             # Turn on the lights
-            if self.config.light_on:
+            if hasattr(self.config, 'light_on') and self.config.light_on:
                 action_registry = omni.kit.actions.core.get_action_registry()
                 # switches to camera lighting
                 action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")

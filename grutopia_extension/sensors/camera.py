@@ -102,11 +102,11 @@ class Camera(BaseSensor):
         if self.config.enable:
             self._camera.initialize()
             self._camera.add_distance_to_image_plane_to_frame()
-            self._camera.add_semantic_segmentation_to_frame()
-            self._camera.add_instance_segmentation_to_frame()
-            self._camera.add_instance_id_segmentation_to_frame()
-            self._camera.add_bounding_box_2d_tight_to_frame()
-            self._camera.add_normals_to_frame()
+            # self._camera.add_semantic_segmentation_to_frame()
+            # self._camera.add_instance_segmentation_to_frame()
+            # self._camera.add_instance_id_segmentation_to_frame()
+            # self._camera.add_bounding_box_2d_tight_to_frame()
+            # self._camera.add_normals_to_frame()
     
     def camera_get_rgba(self, add_subframes=True):
         if add_subframes:
@@ -125,17 +125,6 @@ class Camera(BaseSensor):
             # camera_params = self._camera.get_camera_params()
             return {'rgba': rgba, 'depth': depth, 'frame': frame}
         return {}
-
-    def __del__(self):
-        """Unsubscribes from callbacks and detach from the replicator registry."""
-        # unsubscribe callbacks
-        self._camera.__del__()
-        # delete from replicator registry
-        self.rp.destroy()
-        # for _, annotators in self._rep_registry.items():
-        #     for annotator, render_product_path in zip(annotators, self._render_product_paths):
-        #         annotator.detach([render_product_path])
-        #         annotator = None
     
     # def get_camera_data(self, data_type: list) -> Dict:
     #     output_data = {}

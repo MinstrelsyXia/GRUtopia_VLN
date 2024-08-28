@@ -365,7 +365,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
     is_app_up = False
     for split, vln_envs in vln_envs_all.items():
         for scan in vln_envs.data:
-            env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+            env = sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
             is_app_up = True
 
         # env.simulation_app.close()
@@ -402,8 +402,8 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 continue
 
             different_height = False
-            for path_id in range(len(paths)-1):
-                if abs(paths[path_id+1][2] - paths[path_id][2]) > 0.3:
+            for path_idx in range(len(paths)-1):
+                if abs(paths[path_idx+1][2] - paths[path_idx][2]) > 0.3:
                     different_height = True
                     break
 
@@ -442,7 +442,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
 
             # init threading for image saving
             stop_event = threading.Event()  # 创建停止事件
-            save_thread = threading.Thread(target=vln_envs.save_episode_images, args=(total_images, args.sample_episode_dir, split, scan, path_id, FLAG_FINISH))
+            save_thread = threading.Thread(target=vln_envs.save_episode_images, args=(total_images, args.sample_episode_dir, split, scan, path_id, False, FLAG_FINISH))
             save_thread.daemon = True  # 设置为守护线程
             save_thread.start()
             log.info(f"Thread for saving images has been started.")
@@ -503,11 +503,12 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 obs = env.step(actions=env_actions)
                 
                 if i % 50 == 0:
+                    vln_envs.update_cam_occupancy_map_pose()
                     if vln_config.windows_head:
                         # show the topdown camera
                         vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode=args.windows_head_type)
                 
-                if i % 2 == 0:              
+                if (not scan_first_init) and i % 2 == 0:              
                     vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
                 
                 continue
@@ -547,6 +548,10 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                     # exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose, all_paths=paths) # TODO: check world to map coordinate
                     
                     exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=(args.test_verbose or args.save_path_planning), save_dir=os.path.join(args.sample_episode_dir, split, scan, f"id_{str(path_id)}")) 
+                    if len(exe_path) == 0:
+                        # path planning fails
+                        log.error(f"Scan: {scan}, Path_id: {path_id}. Path planning fails to find the path from the current point to the next point.")
+                        break
 
                     if 'oracle' in action_name:
                         action_info.update({'current_step': i})

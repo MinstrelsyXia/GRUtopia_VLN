@@ -41,6 +41,8 @@ class BaseRobot:
 
     def post_reset(self):
         """Set up things that happen after the world resets."""
+        # for sensor in self.sensors.values():
+        #     sensor.sensor_init()
         pass
 
     def apply_action(self, action: dict):
