@@ -12,8 +12,8 @@ datasets:
 settings:
   mode: "sample_episodes_scripts"
   batch_size: 1
-  # action: "move_along_path"
-  action: "oracle_move_along_path"
+  action: "move_along_path"
+  # action: "oracle_move_along_path"
   check_and_reset_robot: true
   use_llm: true
   sample_camera_list:
@@ -22,11 +22,12 @@ settings:
     - rgba
     - depth
     - camera_params
-  max_step: 1000
+  max_step: 8000
   force_sample: true
+  filter_stairs: true
 
 sample_episodes:
-  step_interval: 3
+  step_interval: 20
 
 robots:
   - name: "CylinderRobot"

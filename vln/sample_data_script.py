@@ -69,7 +69,7 @@ def run_scans(scan_data):
             print(f"正在处理scan: {scan}")
             
             # 构建命令
-            command = [sys.executable, 'vln/main.py', '--scan', scan, '--env', key,
+            command = [sys.executable, 'vln/main.py', '--scan', scan, '--script', key,
                        '--headless', 
                        '--vln_cfg_file', 'vln/configs/vln_extract_data_script.yaml', 
                        '--sim_cfg_file', 'vln/configs/sample_episodes_sim_cfg.yaml']
