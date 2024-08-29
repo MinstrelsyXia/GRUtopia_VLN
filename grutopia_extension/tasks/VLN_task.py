@@ -20,16 +20,24 @@ class VLNTask(BaseTask):
         for name, metric in self.metrics.items():
             metric.reset()
     
-    def set_robot_poses_without_offset(self, position_list, orientation_list):
-        for idx, robot in enumerate(self.robots):
-            position = position_list[idx] + self.config.offset
-            robot.isaac_robot.set_world_pose(position, orientation_list[idx])
+    def set_robot_poses_without_offset(self, position, orientation):
+        for idx, (robot_name, robot) in enumerate(self.robots.items()):
+            position = position + self._offset 
+            robot.isaac_robot.set_world_pose(position, orientation)
     
-    def get_robot_poses_without_offset(self):
-        positions = [robot.isaac_robot.get_world_pose()[0]-self.config.offset for robot in self.robots]
-        orientations = [robot.isaac_robot.get_world_pose()[1] for robot in self.robots]
+    def get_robot_poses_without_offset(self, robot_idx=0):
+        for robot_name, robot in self.robots.items():
+           positions = robot.isaac_robot.get_world_pose()[0]-self._offset 
+           orientations = robot.isaac_robot.get_world_pose()[1]
         return positions, orientations
     
     def set_single_robot_poses_without_offset(self, position, orientation, robot_idx=0):
-        position = position + self.config.offset
-        self.robots[robot_idx].isaac_robot.set_world_pose(position, orientation)
+        position = position + self._offset 
+        for robot_name, robot in self.robots.items():
+            robot.isaac_robot.set_world_pose(position, orientation)
+    
+    def get_camera_poses_without_offset(self, camera, robot_idx=0):
+        for robot_name, robot in self.robots.items():
+            camera_positions = robot.sensors[camera].get_world_pose()[0]-self._offset 
+            camera_orientation = robot.sensors[camera].get_world_pose()[1]
+        return camera_positions, camera_orientation

@@ -4,13 +4,13 @@ datasets:
   mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
   mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
   splits:
+    - train
     - val_seen
-    # - train
-    # - val_unseen
+    - val_unseen
     # - test
 
 settings:
-  mode: "sample_episodes_scripts"
+  mode: "sample_episodes"
   batch_size: 1
   action: "move_along_path"
   # action: "oracle_move_along_path"
