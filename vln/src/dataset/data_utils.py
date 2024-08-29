@@ -60,7 +60,7 @@ def load_data(args, split):
     log.info(f"Loaded data with a total of {len(load_data)} items from {split}")
     return load_data, list(set(total_scans))
 
-def load_gather_data(args, split, gather_scan=False):
+def load_gather_data(args, split, gather_scan=False, filter_same_trajectory=False):
     dataset_root_dir = args.datasets.base_data_dir
     with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
         data = json.load(f)
@@ -68,7 +68,13 @@ def load_gather_data(args, split, gather_scan=False):
         scan = json.load(f)
     if gather_scan:
         new_data = defaultdict(list)
+        if filter_same_trajectory:
+            trajectory_list = []
         for item in data:
+            if item['trajectory_id'] in trajectory_list:
+                continue
+            else:
+                trajectory_list.append(item['trajectory_id'])
             scan = item['scene_id'].split('/')[1]
             new_data[scan].append(item)
         data = new_data
@@ -164,12 +170,12 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
                 log.error(f"Error in saving camera image: {e}")
 
 class VLNDataLoader(Dataset):
-    def __init__(self, args, sim_config, split):
+    def __init__(self, args, sim_config, split, filter_same_trajectory=False):
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size
         if "sample_episodes" in args.settings.mode:
-            self.data, self._scans = load_gather_data(args, split)
+            self.data, self._scans = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory)
         else:
             self.data, self._scans = load_data(args, split)
         self.robot_type = sim_config.config.tasks[0].robots[0].type
