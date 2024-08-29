@@ -15,6 +15,7 @@ from collections import defaultdict
 from PIL import Image
 from copy import deepcopy
 import threading
+from multiprocessing import Pipe, Process
 
 # enable multiple gpus
 # import isaacsim
@@ -34,7 +35,7 @@ from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
 from vln.src.dataset.data_utils import VLNDataLoader
-from vln.src.utils.utils import dict_to_namespace
+from vln.src.dataset.data_collector import dataCollector
 # from vln.src.local_nav.global_topdown_map import GlobalTopdownMap
 
 
@@ -377,8 +378,6 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
 
 def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None, scan=None, is_app_up=False):
     # Init the variables
-    FLAG_FINISH = False
-    lock = threading.Lock()
     action_name = vln_config.settings.action
     topdown_maps = {}
     is_app_up = is_app_up
@@ -396,11 +395,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
         data_item = scan_data[idx]        
         paths = data_item['reference_path']
         path_id = data_item['trajectory_id']
-        is_saving = False
-        if scan_first_init:
-            total_images = defaultdict(lambda: [])
-        else:
-            total_images.clear()
+        total_images = defaultdict(lambda: [])
 
         if hasattr(args.settings, 'filter_stairs') and args.settings.filter_stairs:
             if 'stair' in data_item['instruction']['instruction_text']:
@@ -450,29 +445,13 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True, reset_scene=is_app_up, save_log=True, path_id=path_id) #TODO: change to global init
             is_app_up = True
 
-            # init threading for image saving
-            # stop_event = threading.Event()  # 创建停止事件
-            # save_thread = threading.Thread(target=vln_envs.save_episode_images, args=(total_images, args.sample_episode_dir, split, scan, path_id, False, FLAG_FINISH))
-            # save_thread.daemon = True  # 设置为守护线程
-            # save_thread.start()
-            # log.info(f"Thread for saving images has been started.")
-
         else:
             data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=False, save_log=True, path_id=path_id)
 
-        stop_event = threading.Event()  # 创建停止事件
-        # lock = threading.Lock()
-        save_thread = threading.Thread(target=vln_envs.save_episode_images, args=(total_images, args.sample_episode_dir, split, scan, path_id, lock, False, FLAG_FINISH, False))
-        save_thread.daemon = True  # 设置为守护线程
-        save_thread.start()
-        log.info(f"Thread for saving images has been started.")
-
         env = vln_envs.env
         current_point = 0
-        # total_points = [vln_envs.agent_init_pose, vln_envs.agent_init_rotatation] # [[x,y,z],[w,x,y,z]]
         total_points = []
         total_points.append([np.array(vln_envs.agent_init_pose), np.array(vln_envs.agent_init_rotation)])
-        # total_images = defaultdict(lambda: [])
         is_image_stacked = False
     
         if vln_config.windows_head:
@@ -482,7 +461,6 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
         i = 0
         init_param_data = True
         is_episode_success = False
-        # if is_app_up:
         if scan_first_init:
             warm_step = 240 if args.headless else 500
             # warm_step = 5 # !!! debug
@@ -491,6 +469,13 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             warm_step = 5
         move_step = warm_step
         # Note that warm_step should be the times of the oracle sample interval (now is set to 20)
+
+        # init pipe for saving images
+        parent_conn, child_conn = Pipe()
+        data_collector = dataCollector(args, parent_conn, child_conn, split, scan, path_id)
+        save_process = Process(target=data_collector.save_episode_data, args=())
+        save_process.start()
+        log.info(f"Save process starts.")
 
         if 'oracle' in action_name:
             action_info = {
@@ -607,7 +592,6 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             obs = env.step(actions=env_actions, add_rgb_subframes=add_rgb_subframes)
             if 'oracle' not in action_name:
                 vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
-                # obs = env.step([{'h1': {'stand_still': []}}])
 
             if 'oracle' in action_name:
                 exe_point = obs[vln_envs.task_name][vln_envs.robot_name][action_name].get('exe_point', None)
@@ -621,11 +605,9 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             # stack images and information
             if (i-move_step) != 0 and (i-move_step) % (args.sample_episodes.step_interval-1) == 0:
                 # Since oracle_move_path_controller moves to the next point every 5 steps, the image is fetched every 5+3 steps
-                # if not is_saving:
-                with lock:
-                    is_saving = True
-                    total_images = vln_envs.save_episode_data(split=split, scan=scan, path_id=path_id, camera_list=data_camera_list, add_rgb_subframes=True, step_time=i, total_images=total_images, init_param_data=init_param_data)
-                    is_saving = False
+
+                camera_pose_dict = vln_envs.get_camera_pose()
+                data_collector.collect_and_send_data(i, env, camera_list=data_camera_list, camera_pose_dict=camera_pose_dict, add_rgb_subframes=True, finish_flag=False)
 
                 is_image_stacked = True
                 init_param_data = False
@@ -656,10 +638,9 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
         total_time = (end_time - start_time)/60
         log.info(f"Total time for the [scan: {scan}] and [path_id: {path_id}] episode: {total_time:.2f} minutes")
 
-    FLAG_FINISH = True
     print('finish')
-    stop_event.set()  # 设置停止事件
-    save_thread.join()  # 等待线程结束
+    parent_conn.send({'finish_flag': True})
+    save_process.join()  # 等待线程结束
 
     return env
 
@@ -675,7 +656,7 @@ if __name__ == "__main__":
     
     if vln_config.settings.mode == "vis_one_path":
         vis_one_path(vln_config, vln_envs)
-    elif vln_config.settings.mode == "keyboard_control":
+    elif vln_config.settings.mode == "keyboard_control":    
         keyboard_control(vln_config, vln_envs)
     elif vln_config.settings.mode == "llm_inference":
         # TODO
