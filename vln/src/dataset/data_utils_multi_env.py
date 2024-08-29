@@ -60,39 +60,41 @@ def load_data(args, split):
     log.info(f"Loaded data with a total of {len(load_data)} items from {split}")
     return load_data, list(set(total_scans))
 
-def load_gather_data(args, split, gather_scan=False, filter_same_trajectory=False, filter_stairs=False):
+def load_gather_data(args, split, filter_same_trajectory=False, filter_stairs=False):
     dataset_root_dir = args.datasets.base_data_dir
     with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
         data = json.load(f)
     with open(os.path.join(dataset_root_dir, "gather_data", "env_scan.json"), 'r') as f:
         scan = json.load(f)
-    if gather_scan:
-        new_data = defaultdict(list)
+
+    new_data = defaultdict(list)
+    if filter_same_trajectory or filter_stairs:
         if filter_same_trajectory:
             trajectory_list = []
-        for item in data:
-            if filter_same_trajectory:
-                if item['trajectory_id'] in trajectory_list:
-                    continue
-                else:
-                    trajectory_list.append(item['trajectory_id'])
+        for scan, data_item in data.items():
+            for item in data_item:
+                if filter_same_trajectory:
+                    if item['trajectory_id'] in trajectory_list:
+                        continue
+                    else:
+                        trajectory_list.append(item['trajectory_id'])
 
-            if filter_stairs:
-                if 'stair' in item['instruction']['instruction_text']:
-                    continue
+                if filter_stairs:
+                    if 'stair' in item['instruction']['instruction_text']:
+                        continue
 
-                different_height = False
-                paths = item['reference_path']
-                for path_idx in range(len(paths)-1):
-                    if abs(paths[path_idx+1][2] - paths[path_idx][2]) > 0.3:
-                        different_height = True
-                        break
-                if different_height:
-                    continue
+                    different_height = False
+                    paths = item['reference_path']
+                    for path_idx in range(len(paths)-1):
+                        if abs(paths[path_idx+1][2] - paths[path_idx][2]) > 0.3:
+                            different_height = True
+                            break
+                    if different_height:
+                        continue
 
-            scan = item['scene_id'].split('/')[1]
-            new_data[scan].append(item)
+                new_data[scan].append(item)
         data = new_data
+
     return data, scan
 
 def load_scene_usd(args, scan):
@@ -216,7 +218,7 @@ class VLNDataLoader(Dataset):
                     item["reference_path"][i] += self.robot_offset
 
         '''Init multiple list'''
-        self.env_num = sim_config.tasks[0].env_num # only one task
+        self.env_num = sim_config.config.tasks[0].env_num # only one task
         # self.task_name = sim_config.config.tasks[0].name # only one task
         self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot
         
@@ -224,6 +226,9 @@ class VLNDataLoader(Dataset):
         self.surrounding_freemap_connected_list = [None]*self.env_num
         self.surrounding_freemap_list = [None]*self.env_num
         self.surrounding_freemap_camera_pose_list = [None]*self.env_num
+
+        '''Init env data manager'''
+        self.init_env_manager()
     
     def __len__(self):
         return len(self.data)
@@ -234,22 +239,33 @@ class VLNDataLoader(Dataset):
     def init_env(self, sim_config, headless=False):
         '''init env''' 
         self.env = BaseEnv(sim_config, headless=headless, webrtc=False)
-        self.init_env_manager()
+        # self.init_env_manager()
     
     def init_robots(self):
         '''call after self.init_env'''
         self.tasks = self.env._runner.current_tasks
+        self.robot_names = [list(task.robots.keys())[0] for task in self.tasks.values()]
+        self.task_names = list(self.tasks.keys())
         self.robots = []
         self.isaac_robots = []
-        for task_name, task in self.tasks.items():
-            self.robots.append(task.robots[self.robot_name])
-            self.isaac_robots.append(task.robots[self.robot_name].isaac_robot)
-        
-        self.robot_init_poses = [x.position for x in self.robots]
-        self.robot_init_orientations = [x.orientation for x in self.robots]
+        self.robot_init_poses = []
+        self.robot_init_orientations = []
+        self.robot_init_poses_offset = []
+        for idx, (task_name, task) in enumerate(self.tasks.items()):
+            self.robots.append(task.robots[self.robot_names[idx]])
+            self.isaac_robots.append(task.robots[self.robot_names[idx]].isaac_robot)
+            robot_pose = self.isaac_robots[idx].get_world_pose()
+            # robot_pose = task.get_robot_poses_without_offset()
+            self.robot_init_poses.append(robot_pose[0])
+            self.robot_init_orientations.append(robot_pose[1])
 
+            robot_offset_pose = robot_pose[0] + task._offset
+            self.robot_init_poses_offset.append(robot_offset_pose)
+
+        self.robot_last_poses = [None]*self.env_num
         self.reset_robot(self.robot_init_poses, self.robot_init_orientations)
-        self.robot_last_poses = []
+
+        robot_poses = self.get_robot_poses()
 
         self.init_cam_occunpancy_map() # init camera occupancy map
     
@@ -276,7 +292,7 @@ class VLNDataLoader(Dataset):
         self.end_list = [False] * self.env_num
         self.success_list = [False] * self.env_num
         self.env_data = [[] for _ in range(self.env_num)]
-        self.current_index = 0
+        self.env_index = [0] * self.env_num
     
     def allocate_data(self, scan):
         self.scan_data = self.data[scan]
@@ -284,19 +300,34 @@ class VLNDataLoader(Dataset):
             env_idx = idx % self.env_num
             self.env_data[env_idx].append(data)
 
-    def get_next_data(self, env_idx):
-        if self.current_index < len(self.env_data[env_idx]):
-            data = self.env_data[env_idx][self.current_index]
-            self.current_index += 1
+    def get_next_single_data(self, env_idx):
+        if self.env_index[env_idx] < len(self.env_data[env_idx]):
+            data = self.env_data[env_idx][self.env_index[env_idx]]
+            self.env_index[env_idx] += 1
             return data
         return None
+
+    def get_next_data(self):
+        data_item_list = []
+        path_id_list = []
+        paths_list = []
+        for env_idx in range(self.env_num):
+            item = self.get_next_single_data(env_idx)
+            if item is None:
+                self.end_list[env_idx] = True
+
+            data_item_list.append(item)
+            path_id_list.append(item['trajectory_id'])
+            paths_list.append(item['reference_path'])
+
+        return data_item_list, path_id_list, paths_list
     
     def update_cam_occupancy_map_pose(self):
         '''update camera pose'''
+        robot_poses = self.get_robot_poses()
         for i in range(self.env_num):
-            robot_pose = self.isaac_robots[i].get_world_pose()
-            self.cam_occupancy_map_local_list[i].set_world_pose(robot_pose)
-            self.cam_occupancy_map_global_list[i].set_world_pose(robot_pose)
+            self.cam_occupancy_map_local_list[i].set_world_pose(robot_poses[i])
+            self.cam_occupancy_map_global_list[i].set_world_pose(robot_poses[i])
     
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
@@ -380,23 +411,21 @@ class VLNDataLoader(Dataset):
 
         return item
 
-    def init_multiple_episodes(self, scan_list, idx_list, path_id_list=None, init_omni_env=False, reset_scene=False, save_log=False):
+    def init_multiple_episodes(self, scan, data_item_list, path_id_list=None, init_omni_env=False, reset_scene=False, save_log=False):
         '''init multiple episodes'''
         if path_id_list is not None:
             idx_list = []
             for path_id in path_id_list:
-                for idx, item in enumerate(self.data[scan_list[0]]):
+                for idx, item in enumerate(self.data[scan]):
                     if item['trajectory_id'] == path_id:
                         idx_list.append(idx)
                         break
 
-        data_item_list = []
+        # data_item_list = []
         path_id_list = []
         self.args.episode_status_info_files = [None]*self.env_num
 
-        for i, scan in enumerate(scan_list):
-            item = self.data[scan][idx_list[i]]
-            data_item_list.append(item)
+        for i, item in enumerate(data_item_list):
             path_id_list.append(item['trajectory_id'])
             scene_usd_path = load_scene_usd(self.args, scan)
             self.sim_config.config.tasks[i].scene_asset_path = scene_usd_path
@@ -415,8 +444,8 @@ class VLNDataLoader(Dataset):
                 log.info(info)
 
             if save_log:
-                self.args.episode_status_info_files[i] = os.path.join(self.args.episode_paths[i], 'status_info.txt')
-                with open(self.args.episode_status_info_file[i], 'w') as f:
+                self.args.episode_status_info_files[i] = os.path.join(self.args.episode_path_list[i], 'status_info.txt')
+                with open(self.args.episode_status_info_files[i], 'w') as f:
                     for info in status_info:
                         f.write(info + '\n')   
 
@@ -439,8 +468,8 @@ class VLNDataLoader(Dataset):
     
     def get_robot_poses(self):
         robot_poses = []
-        for idx in range(self.env_num):
-            robot_poses.append(self.tasks[idx].get_robot_poses_without_offset())
+        for task_name, task in self.tasks.items():
+            robot_poses.append(task.get_robot_poses_without_offset())
         return robot_poses
 
     def set_robot_poses(self, position_list, orientation_list):
@@ -471,16 +500,17 @@ class VLNDataLoader(Dataset):
         '''
         camera_dict = self.args.camera_list
         camera_poses = {}
-        for task_name, task in self.tasks:
+        for i, (task_name, task) in enumerate(self.tasks):
             task_camera_pose = {}
             for camera in camera_dict:
-                task_camera_pose[camera] = task.robots[self.robot_name].sensors[camera].get_world_pose() # only one robot
+                task_camera_pose[camera] = task.get_camera_poses_without_offset(camera)
             camera_poses[task_name] = task_camera_pose
         return camera_poses
     
     def save_observations(self, camera_list:list, data_types=[], save_image_list=None, save_imgs=True, add_rgb_subframes=False, step_time=0):
         ''' Save observations from the agent
         '''
+        # TODO
         obs = self.env.get_observations(add_rgb_subframes=add_rgb_subframes)
             
         for camera in camera_list:
@@ -699,13 +729,41 @@ class VLNDataLoader(Dataset):
         robots_bottom_z = self.get_robot_bottom_z()
         robot_poses = self.get_robot_poses()
         pointclouds_info = self.process_pointcloud(self.args.camera_list)
-        for idx in range(self.env_num):
-            task_name = self.tasks[idx].keys()[0]
+        for idx, (task_name, task) in enumerate(self.tasks.items()):
             self.bev_list[idx].update_occupancy_map(pointclouds_info[task_name]['camera_pc_data'],
                                                     robots_bottom_z[idx], 
                                                     add_dilation=self.args.maps.add_dilation,
                                                     verbose=verbose, 
-                                                    robot_coords=robot_poses[idx][0])        
+                                                    robot_coords=robot_poses[idx][0]) 
+
+    def get_global_free_map_single(self, env_idx, verbose=False):
+        ''' Use top-down orthogonal camera to get the ground-truth surrounding free map
+            This is useful to reset the robot's location when it get stuck or falling down.
+        '''
+        if not hasattr(self, 'global_freemap_list'):
+            self.global_freemap_list = [None] * self.env_num
+            self.global_freemap_camera_pose_list = [None] * self.env_num
+
+        robot_pose = self.get_robot_poses()[env_idx]
+        global_freemap, global_freemap_camera_pose = self.cam_occupancy_map_global_list[env_idx].get_global_free_map(robot_pos=robot_pose[0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
+        self.global_freemap_list[env_idx] = global_freemap
+        self.global_freemap_camera_pose_list[env_idx] = global_freemap_camera_pose
+
+        return global_freemap, global_freemap_camera_pose
+    
+    def update_occupancy_map_single(self, env_idx, verbose=False):
+        '''Use BEVMap to update the occupancy map based on pointcloud
+        '''
+        robots_bottom_z = self.get_robot_bottom_z()
+        robot_poses = self.get_robot_poses()
+        pointclouds_info = self.process_pointcloud(self.args.camera_list)
+
+        task_name = self.task_names[env_idx].keys()[0]
+        self.bev_list[env_idx].update_occupancy_map(pointclouds_info[task_name]['camera_pc_data'],
+                                                robots_bottom_z[env_idx], 
+                                                add_dilation=self.args.maps.add_dilation,
+                                                verbose=verbose, 
+                                                robot_coords=robot_poses[env_idx][0])        
 
     def check_robot_fall(self, agent, robots_bottom_z, pitch_threshold=35, roll_threshold=15, height_threshold=0.5):
         '''
@@ -816,7 +874,7 @@ class VLNDataLoader(Dataset):
     def reset_robot(self, position_list, orientation_list):
         ''' Reset the robots' pose
         '''
-        for idx, task in enumerate(self.tasks):
+        for idx, (task_name, task) in enumerate(self.tasks.items()):
             task.set_robot_poses_without_offset(position_list[idx], orientation_list[idx])
             isaac_robot = self.isaac_robots[idx]
             isaac_robot.set_joint_velocities(np.zeros(len(isaac_robot.dof_names)))

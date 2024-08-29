@@ -259,7 +259,7 @@ class HumanoidRobot(BaseRobot):
         if 'topdown_camera_500' in self.sensors:
             orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
             robot_pos = self.isaac_robot.get_world_pose()[0]
-            self.sensors['topdown_camera_500'].set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
+            self.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
 
     def get_obs(self, add_rgb_subframes=False):
         position, orientation = self._robot_base.get_world_pose()

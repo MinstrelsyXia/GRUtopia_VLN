@@ -4,12 +4,12 @@ simulator:
   rendering_interval: 2
 
 tasks:
-- type: "SingleInferenceTask"
+- type: "VLNTask"
   name: "vln"
   scene_asset_path: ""
   scene_scale: [1, 1, 1]
   env_num: 6
-  offset_size: 100
+  offset_size: 100.0
   light_on: true
   robots:
   - name: h1
