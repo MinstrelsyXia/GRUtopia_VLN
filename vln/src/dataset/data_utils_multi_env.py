@@ -60,7 +60,7 @@ def load_data(args, split):
     log.info(f"Loaded data with a total of {len(load_data)} items from {split}")
     return load_data, list(set(total_scans))
 
-def load_gather_data(args, split, gather_scan=False):
+def load_gather_data(args, split, gather_scan=False, filter_same_trajectory=False, filter_stairs=False):
     dataset_root_dir = args.datasets.base_data_dir
     with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
         data = json.load(f)
@@ -68,7 +68,28 @@ def load_gather_data(args, split, gather_scan=False):
         scan = json.load(f)
     if gather_scan:
         new_data = defaultdict(list)
+        if filter_same_trajectory:
+            trajectory_list = []
         for item in data:
+            if filter_same_trajectory:
+                if item['trajectory_id'] in trajectory_list:
+                    continue
+                else:
+                    trajectory_list.append(item['trajectory_id'])
+
+            if filter_stairs:
+                if 'stair' in item['instruction']['instruction_text']:
+                    continue
+
+                different_height = False
+                paths = item['reference_path']
+                for path_idx in range(len(paths)-1):
+                    if abs(paths[path_idx+1][2] - paths[path_idx][2]) > 0.3:
+                        different_height = True
+                        break
+                if different_height:
+                    continue
+
             scan = item['scene_id'].split('/')[1]
             new_data[scan].append(item)
         data = new_data
@@ -164,12 +185,12 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
                 log.error(f"Error in saving camera image: {e}")
 
 class VLNDataLoader(Dataset):
-    def __init__(self, args, sim_config, split):
+    def __init__(self, args, sim_config, split, filter_same_trajectory=False):
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size
         if "sample_episodes" in args.settings.mode:
-            self.data, self._scans = load_gather_data(args, split)
+            self.data, self._scans = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs)
         else:
             self.data, self._scans = load_data(args, split)
         self.robot_type = sim_config.config.tasks[0].robots[0].type
@@ -213,8 +234,9 @@ class VLNDataLoader(Dataset):
     def init_env(self, sim_config, headless=False):
         '''init env''' 
         self.env = BaseEnv(sim_config, headless=headless, webrtc=False)
+        self.init_env_manager()
     
-    def init_agents(self):
+    def init_robots(self):
         '''call after self.init_env'''
         self.tasks = self.env._runner.current_tasks
         self.robots = []
@@ -228,13 +250,15 @@ class VLNDataLoader(Dataset):
 
         self.reset_robot(self.robot_init_poses, self.robot_init_orientations)
         self.robot_last_poses = []
+
+        self.init_cam_occunpancy_map() # init camera occupancy map
     
     def init_BEVMap(self, robot_init_poses):
         '''init BEV map'''
         for i in range(self.env_num):
             self.bev_list[i] = BEVMap(self.args, robot_init_pose=robot_init_poses[i])
     
-    def init_cam_occunpancy_map(self, robot_prim="/World/env_0/robots/World/h1",start_point=[0,0,0]):
+    def init_cam_occunpancy_map(self):
         # some pacakages can only be imported after app.run()
         from ..local_nav.camera_occupancy_map import CamOccupancyMap
         from ..local_nav.global_topdown_map import GlobalTopdownMap
@@ -245,6 +269,27 @@ class VLNDataLoader(Dataset):
         for i in range(self.env_num):
             self.cam_occupancy_map_local_list[i] = CamOccupancyMap(self.args, self.robots[i].sensors['topdown_camera_50'])
             self.cam_occupancy_map_global_list[i] = CamOccupancyMap(self.args, self.robots[i].sensors['topdown_camera_500'])
+    
+    def init_env_manager(self):
+        '''Init env data manager'''
+        self.path_id_list = [None] * self.env_num
+        self.end_list = [False] * self.env_num
+        self.success_list = [False] * self.env_num
+        self.env_data = [[] for _ in range(self.env_num)]
+        self.current_index = 0
+    
+    def allocate_data(self, scan):
+        self.scan_data = self.data[scan]
+        for idx, data in enumerate(self.scan_data):
+            env_idx = idx % self.env_num
+            self.env_data[env_idx].append(data)
+
+    def get_next_data(self, env_idx):
+        if self.current_index < len(self.env_data[env_idx]):
+            data = self.env_data[env_idx][self.current_index]
+            self.current_index += 1
+            return data
+        return None
     
     def update_cam_occupancy_map_pose(self):
         '''update camera pose'''
@@ -335,8 +380,8 @@ class VLNDataLoader(Dataset):
 
         return item
 
-    def init_multiple_scans(self, scan_list, idx_list, path_id_list=None, init_omni_env=False, reset_scene=False, save_log=False):
-        '''init multiple scans'''
+    def init_multiple_episodes(self, scan_list, idx_list, path_id_list=None, init_omni_env=False, reset_scene=False, save_log=False):
+        '''init multiple episodes'''
         if path_id_list is not None:
             idx_list = []
             for path_id in path_id_list:
@@ -344,30 +389,63 @@ class VLNDataLoader(Dataset):
                     if item['trajectory_id'] == path_id:
                         idx_list.append(idx)
                         break
-        
+
+        data_item_list = []
+        path_id_list = []
+        self.args.episode_status_info_files = [None]*self.env_num
+
         for i, scan in enumerate(scan_list):
             item = self.data[scan][idx_list[i]]
+            data_item_list.append(item)
+            path_id_list.append(item['trajectory_id'])
             scene_usd_path = load_scene_usd(self.args, scan)
-            self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
-            self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
-            self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"]
+            self.sim_config.config.tasks[i].scene_asset_path = scene_usd_path
+            self.sim_config.config.tasks[i].robots[0].position = item["start_position"] # only one robot
+            self.sim_config.config.tasks[i].robots[0].orientation = item["start_rotation"]
 
-        item = self.data[scan][idx]
-        scene_usd_path = load_scene_usd(self.args, scan)
-        self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
-        self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
-        self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"]
+            status_info = []
 
+            status_info.append(f"trajectory id {item['trajectory_id']}")
+            status_info.append(f"Initialized scan {scan}")
+            status_info.append(f"Instruction: {item['instruction']['instruction_text']}")
+            status_info.append(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
+            status_info.append(f"GT paths length: {len(item['reference_path'])}, points: {item['reference_path']}")
+
+            for info in status_info:
+                log.info(info)
+
+            if save_log:
+                self.args.episode_status_info_files[i] = os.path.join(self.args.episode_paths[i], 'status_info.txt')
+                with open(self.args.episode_status_info_file[i], 'w') as f:
+                    for info in status_info:
+                        f.write(info + '\n')   
+
+        if reset_scene:
+            # reset scene without restart app
+            # TODO: this not works!
+            # TODO: 尝试开多个task。
+            start_time = time.time()
+            self.env._runner._world.clear()
+            self.env._runner.add_tasks(self.sim_config.config.tasks)
+            log.info(f"Reset scene {scan} without restarting app for using {((time.time()-start_time)/60):.2f} minutes.")
+        elif init_omni_env:
+            # start app.
+            # should only be called at the first time.
+            self.init_env(self.sim_config, headless=self.args.headless)
+            self.init_omni_env()
+        self.init_robots()      
+
+        return item
     
     def get_robot_poses(self):
         robot_poses = []
-        for isaac_robot in self.isaac_robots:
-            robot_poses.append(isaac_robot.get_world_pose())
+        for idx in range(self.env_num):
+            robot_poses.append(self.tasks[idx].get_robot_poses_without_offset())
         return robot_poses
 
     def set_robot_poses(self, position_list, orientation_list):
-        for isaac_robot, position, orientation in zip(self.isaac_robots, position_list, orientation_list):
-            isaac_robot.set_world_pose(position, orientation)
+        for idx in range(self.env_num):
+            self.tasks[idx].set_robot_poses_without_offset(position_list, orientation_list)
     
     def move_along_path(self, prev_position, current_position):
         ''' Move the agent along the path
@@ -738,8 +816,9 @@ class VLNDataLoader(Dataset):
     def reset_robot(self, position_list, orientation_list):
         ''' Reset the robots' pose
         '''
-        for idx, isaac_robot in enumerate(self.isaac_robots):
-            isaac_robot.set_world_pose(position_list[idx], orientation_list[idx])
+        for idx, task in enumerate(self.tasks):
+            task.set_robot_poses_without_offset(position_list[idx], orientation_list[idx])
+            isaac_robot = self.isaac_robots[idx]
             isaac_robot.set_joint_velocities(np.zeros(len(isaac_robot.dof_names)))
             isaac_robot.set_joint_positions(np.zeros(len(isaac_robot.dof_names)))
             self.robot_last_poses[idx] = position_list[idx]
@@ -747,7 +826,7 @@ class VLNDataLoader(Dataset):
     def reset_single_robot(self, idx, position, orientation):
         ''' Reset a single robot's pose
         '''
-        self.isaac_robots[idx].set_world_pose(position, orientation)
+        self.tasks[idx].set_single_robot_poses_without_offset(position, orientation)
         self.isaac_robots[idx].set_joint_velocities(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.isaac_robots[idx].set_joint_positions(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.robot_last_poses[idx] = position

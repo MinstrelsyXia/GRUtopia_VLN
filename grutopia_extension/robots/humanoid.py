@@ -235,6 +235,7 @@ class HumanoidRobot(BaseRobot):
         return self._robot_base.get_world_pose()
 
     def oracle_set_world_pose(self, position, orientation):
+        # Note that this is without offset
         self.isaac_robot.set_world_pose(position, orientation)
         self.isaac_robot.set_joint_velocities(np.zeros(len(self.isaac_robot.dof_names)))
         self.isaac_robot.set_joint_positions(np.zeros(len(self.isaac_robot.dof_names)))
