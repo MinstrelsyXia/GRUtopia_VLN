@@ -491,13 +491,14 @@ class VLNDataLoader(Dataset):
     
     def save_episode_images(self, total_images, sample_episode_dir, split, scan, path_id, lock, verbose=False, FLAG_FINISH=False, is_saving=False):
         while True:
-            time.sleep(5)  # 每x秒保存一次数据，避免过于频繁
+            time.sleep(2)  # 每x秒保存一次数据，避免过于频繁
             with lock:
                 camera_keys = list(total_images.keys())
             for camera in camera_keys:
                 with lock:
                     if camera in total_images:
                         for idx, image_info in enumerate(total_images[camera]):
+
                             step_time = image_info['step_time']
                             rgb_image = Image.fromarray(image_info['rgb'], "RGB")
                             depth_image = image_info['depth']
