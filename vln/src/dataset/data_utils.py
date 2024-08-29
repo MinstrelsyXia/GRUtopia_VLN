@@ -214,6 +214,7 @@ class VLNDataLoader(Dataset):
     def init_agents(self):
         '''call after self.init_env'''
         self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
+        self.robots = self.env._runner.current_tasks[self.task_name].robots[self.robot_name]
 
         self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
         self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
@@ -246,8 +247,8 @@ class VLNDataLoader(Dataset):
         from ..local_nav.camera_occupancy_map import CamOccupancyMap
         from ..local_nav.global_topdown_map import GlobalTopdownMap
         self.GlobalTopdownMap = GlobalTopdownMap
-        self.cam_occupancy_map_local = CamOccupancyMap(self.args, robot_prim, start_point, local=True)
-        self.cam_occupancy_map_global = CamOccupancyMap(self.args, robot_prim, start_point, local=False)
+        self.cam_occupancy_map_local = CamOccupancyMap(self.args, self.robots.sensors['topdown_camera_50'])
+        self.cam_occupancy_map_global = CamOccupancyMap(self.args, self.robots.sensors['topdown_camera_500'])
     
     def update_cam_occupancy_map_pose(self):
         '''update camera pose'''

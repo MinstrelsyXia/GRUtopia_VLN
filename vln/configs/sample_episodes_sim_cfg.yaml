@@ -8,8 +8,8 @@ tasks:
   name: "vln"
   scene_asset_path: ""
   scene_scale: [1, 1, 1]
-  env_num: 1
-  offset_size: 0.0
+  env_num: 6
+  offset_size: 100
   light_on: true
   robots:
   - name: h1
@@ -34,6 +34,12 @@ tasks:
     - name: "pano_camera_0"
       enable: true
       size: [640, 480]
+    - name: "topdown_camera_50"
+      enable: false
+      size: [512, 512]
+    - name: "topdown_camera_500"
+      enable: true
+      size: [512, 512]
     # - name: "pano_camera_45"
     #   enable: true
     #   size: [256, 256]

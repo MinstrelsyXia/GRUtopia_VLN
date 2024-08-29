@@ -395,7 +395,6 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
         data_item = scan_data[idx]        
         paths = data_item['reference_path']
         path_id = data_item['trajectory_id']
-        total_images = defaultdict(lambda: [])
 
         if hasattr(args.settings, 'filter_stairs') and args.settings.filter_stairs:
             if 'stair' in data_item['instruction']['instruction_text']:
@@ -459,10 +458,9 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
     
         '''start simulation'''
         i = 0
-        init_param_data = True
         is_episode_success = False
         if scan_first_init:
-            warm_step = 240 if args.headless else 500
+            warm_step = 240 if args.headless else 2000
             # warm_step = 5 # !!! debug
             scan_first_init = False
         else:
@@ -590,8 +588,8 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 add_rgb_subframes = False
 
             obs = env.step(actions=env_actions, add_rgb_subframes=add_rgb_subframes)
-            if 'oracle' not in action_name:
-                vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
+            # if 'oracle' not in action_name:
+                # vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
 
             if 'oracle' in action_name:
                 exe_point = obs[vln_envs.task_name][vln_envs.robot_name][action_name].get('exe_point', None)
@@ -610,7 +608,6 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 data_collector.collect_and_send_data(i, env, camera_list=data_camera_list, camera_pose_dict=camera_pose_dict, add_rgb_subframes=True, finish_flag=False)
 
                 is_image_stacked = True
-                init_param_data = False
 
             if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%(args.sample_episodes.step_interval-1) == 0:
                 vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], add_rgb_subframes=True, step_time=i)
@@ -640,7 +637,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
 
     print('finish')
     parent_conn.send({'finish_flag': True})
-    save_process.join()  # 等待线程结束
+    save_process.join() 
 
     return env
 

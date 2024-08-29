@@ -1,7 +1,6 @@
 # Author: w61
-# Date: 2024.8.28
-''' Class to load dataset for VLN for multiple envs
-# TODO
+# Date: 2024.7.19
+''' Class to load dataset for VLN
 '''
 
 import os
@@ -11,6 +10,7 @@ import copy
 import numpy as np
 import time
 from collections import defaultdict
+from copy import deepcopy
 
 import torch
 from torch.utils.data import Dataset
@@ -102,7 +102,7 @@ def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, 
     # Check if the pitch or roll exceeds the thresholds
     if abs(pitch) > pitch_threshold or abs(roll) > roll_threshold:
         is_fall = True
-        log.error(f"Robot falls down!!!")
+        log.info(f"Robot falls down!!!")
         cur_pos, cur_rot = obs["position"], quat_to_euler_angles(obs["orientation"])
         log.info(f"Current Position: {cur_pos}, Orientation: {cur_rot}")
     else:
@@ -194,12 +194,15 @@ class VLNDataLoader(Dataset):
                 for i, path in enumerate(item["reference_path"]):
                     item["reference_path"][i] += self.robot_offset
 
-        self.env_num = sim_config.tasks.env_num
-        self.task_name = sim_config.config.tasks[0].name # only one task
-        self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot type
+        '''Init multiple list'''
+        self.env_num = sim_config.tasks[0].env_num # only one task
+        # self.task_name = sim_config.config.tasks[0].name # only one task
+        self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot
         
-        self.bev = None
-        self.surrounding_freemap_connected = None
+        self.bev_list = [None]*self.env_num
+        self.surrounding_freemap_connected_list = [None]*self.env_num
+        self.surrounding_freemap_list = [None]*self.env_num
+        self.surrounding_freemap_camera_pose_list = [None]*self.env_num
     
     def __len__(self):
         return len(self.data)
@@ -213,52 +216,50 @@ class VLNDataLoader(Dataset):
     
     def init_agents(self):
         '''call after self.init_env'''
-        self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
-        self.agent_last_pose = None
-        self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
-        self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
+        self.tasks = self.env._runner.current_tasks
+        self.robots = []
+        self.isaac_robots = []
+        for task_name, task in self.tasks.items():
+            self.robots.append(task.robots[self.robot_name])
+            self.isaac_robots.append(task.robots[self.robot_name].isaac_robot)
+        
+        self.robot_init_poses = [x.position for x in self.robots]
+        self.robot_init_orientations = [x.orientation for x in self.robots]
 
-        self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
-        # if 'oracle' in self.args.settings.action:
-        #     from pxr import Usd, UsdPhysics
-        #     robot_prim = self.agents.prim
-        #     physics_schema = UsdPhysics.RigidBodyAPI(robot_prim)
-        #     if physics_schema:
-        #         physics_schema.CreateCollisionEnabledAttr(False)
-        #         log.info("In oracle mode, set robot collision to False")
-        #     else:
-        #         log.warning("In oracle mode, set robot collision to False failed")
+        self.reset_robot(self.robot_init_poses, self.robot_init_orientations)
+        self.robot_last_poses = []
     
-    def init_BEVMap(self, robot_init_pose=(0,0,0)):
+    def init_BEVMap(self, robot_init_poses):
         '''init BEV map'''
-        self.bev = BEVMap(self.args, robot_init_pose=robot_init_pose)
-    
-    def init_isaac_occupancy_map(self):
-        '''init Isaac Occupancy map'''
-        from ..local_nav.isaac_occupancy_map import IsaacOccupancyMap
-        self.isaac_occupancy_map = IsaacOccupancyMap(self.args)
+        for i in range(self.env_num):
+            self.bev_list[i] = BEVMap(self.args, robot_init_pose=robot_init_poses[i])
     
     def init_cam_occunpancy_map(self, robot_prim="/World/env_0/robots/World/h1",start_point=[0,0,0]):
         # some pacakages can only be imported after app.run()
         from ..local_nav.camera_occupancy_map import CamOccupancyMap
         from ..local_nav.global_topdown_map import GlobalTopdownMap
         self.GlobalTopdownMap = GlobalTopdownMap
-        self.cam_occupancy_map_local = CamOccupancyMap(self.args, robot_prim, start_point, local=True)
-        self.cam_occupancy_map_global = CamOccupancyMap(self.args, robot_prim, start_point, local=False)
+
+        self.cam_occupancy_map_local_list = [None]*self.env_num
+        self.cam_occupancy_map_global_list = [None]*self.env_num
+        for i in range(self.env_num):
+            self.cam_occupancy_map_local_list[i] = CamOccupancyMap(self.args, self.robots[i].sensors['topdown_camera_50'])
+            self.cam_occupancy_map_global_list[i] = CamOccupancyMap(self.args, self.robots[i].sensors['topdown_camera_500'])
     
     def update_cam_occupancy_map_pose(self):
         '''update camera pose'''
-        robot_pose = self.agents.get_world_pose()[0]
-        self.cam_occupancy_map_local.set_world_pose(robot_pose)
-        self.cam_occupancy_map_global.set_world_pose(robot_pose)
+        for i in range(self.env_num):
+            robot_pose = self.isaac_robots[i].get_world_pose()
+            self.cam_occupancy_map_local_list[i].set_world_pose(robot_pose)
+            self.cam_occupancy_map_global_list[i].set_world_pose(robot_pose)
     
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
-        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_height()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
-    
-    @property
-    def current_task_stage(self):
-        return self.env._runner.current_tasks[self.task_name]._scene.stage
+        robot_bottom_z_list = []
+        for i in range(self.env_num):
+            robot_bottom_z = self.robots[i].get_ankle_height() - self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+            robot_bottom_z_list.append(robot_bottom_z)
+        return robot_bottom_z_list
 
     def init_omni_env(self):
         rotations_utils = importlib.import_module("omni.isaac.core.utils.rotations")
@@ -285,16 +286,14 @@ class VLNDataLoader(Dataset):
                 return item
         log.error("Path id %d not found in the dataset", path_id)
         return None
-    
-    def reload_scene(self, scan):
-        ''' Reload scene USD
-        '''
-        scene_usd_path = load_scene_usd(self.args, scan)
-        self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
-        # self.env._runner._world._current_tasks[0].reload_scene(scene_usd_path)
 
-    def init_one_scan(self, scan, idx=0, init_omni_env=False, reset_scene=False):
+    def init_one_scan(self, scan, idx=0, init_omni_env=False, reset_scene=False, save_log=False, path_id=-1):
         # for extract episodes within one scan (for dataset extraction)
+        if path_id != -1:
+            # debug mode
+            for idx, item in enumerate(self.data[scan]):
+                if item['trajectory_id'] == path_id:
+                    break
         item = self.data[scan][idx]
         scene_usd_path = load_scene_usd(self.args, scan)
         self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
@@ -316,17 +315,59 @@ class VLNDataLoader(Dataset):
         self.init_agents()
         if init_omni_env:
             self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
-        log.info("trajectory id %d", item['trajectory_id'])
-        log.info("Initialized scan %s", scan)
-        log.info("Instruction: %s", item['instruction']['instruction_text'])
-        log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
-        return item
-    
-    def get_agent_pose(self):
-        return self.agents.get_world_pose()
+        
+        status_info = []
 
-    def set_agent_pose(self, position, rotation):
-        self.agents.set_world_pose(position, rotation)
+        status_info.append(f"trajectory id {item['trajectory_id']}")
+        status_info.append(f"Initialized scan {scan}")
+        status_info.append(f"Instruction: {item['instruction']['instruction_text']}")
+        status_info.append(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
+        status_info.append(f"GT paths length: {len(item['reference_path'])}, points: {item['reference_path']}")
+
+        for info in status_info:
+            log.info(info)
+
+        if save_log:
+            self.args.episode_status_info_file = os.path.join(self.args.episode_path, 'status_info.txt')
+            with open(self.args.episode_status_info_file, 'w') as f:
+                for info in status_info:
+                    f.write(info + '\n')         
+
+        return item
+
+    def init_multiple_scans(self, scan_list, idx_list, path_id_list=None, init_omni_env=False, reset_scene=False, save_log=False):
+        '''init multiple scans'''
+        if path_id_list is not None:
+            idx_list = []
+            for path_id in path_id_list:
+                for idx, item in enumerate(self.data[scan_list[0]]):
+                    if item['trajectory_id'] == path_id:
+                        idx_list.append(idx)
+                        break
+        
+        for i, scan in enumerate(scan_list):
+            item = self.data[scan][idx_list[i]]
+            scene_usd_path = load_scene_usd(self.args, scan)
+            self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
+            self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
+            self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"]
+
+        item = self.data[scan][idx]
+        scene_usd_path = load_scene_usd(self.args, scan)
+        self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
+        self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
+        self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"]
+
+    
+    def get_robot_poses(self):
+        robot_poses = []
+        for isaac_robot in self.isaac_robots:
+            robot_poses.append(isaac_robot.get_world_pose())
+        return robot_poses
+
+    def set_robot_poses(self, position_list, orientation_list):
+        for isaac_robot, position, orientation in zip(self.isaac_robots, position_list, orientation_list):
+            isaac_robot.set_world_pose(position, orientation)
     
     def move_along_path(self, prev_position, current_position):
         ''' Move the agent along the path
@@ -351,10 +392,13 @@ class VLNDataLoader(Dataset):
         Output: position, orientation
         '''
         camera_dict = self.args.camera_list
-        camera_pose = {}
-        for camera in camera_dict:
-            camera_pose[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
-        return camera_pose
+        camera_poses = {}
+        for task_name, task in self.tasks:
+            task_camera_pose = {}
+            for camera in camera_dict:
+                task_camera_pose[camera] = task.robots[self.robot_name].sensors[camera].get_world_pose() # only one robot
+            camera_poses[task_name] = task_camera_pose
+        return camera_poses
     
     def save_observations(self, camera_list:list, data_types=[], save_image_list=None, save_imgs=True, add_rgb_subframes=False, step_time=0):
         ''' Save observations from the agent
@@ -427,10 +471,12 @@ class VLNDataLoader(Dataset):
 
             # save camera_intrinsic
             # camera_params = cur_obs['camera_params']
-            # # 构造要保存的字典
-            # camera_info = {
-            #     "camera": camera,
-            #     "step_time": step_time,
+            # 构造要保存的字典
+            camera_info = {
+                "camera": camera,
+                "step_time": step_time,
+                "position": camera_pose[0].tolist(),
+                'orientation': camera_pose[1].tolist()}
             #     "intrinsic_matrix": camera_params['cameraProjection'].tolist(),
             #     "extrinsic_matrix": camera_params['cameraViewTransform'].tolist(),
             #     "cameraAperture": camera_params['cameraAperture'].tolist(),
@@ -439,12 +485,12 @@ class VLNDataLoader(Dataset):
             #     "robot_init_pose": self.agent_init_pose.tolist()
             # }
             # # print(self.agent_init_pose)
-            # cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
+            cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
 
             # # 将信息追加保存到 jsonl 文件
-            # with open(cam_save_path, 'a') as f:
-            #     json.dump(camera_info, f)
-            #     f.write('\n')
+            with open(cam_save_path, 'a') as f:
+                json.dump(camera_info, f)
+                f.write('\n')
         
         # save robot information
         robot_info = {
@@ -465,84 +511,125 @@ class VLNDataLoader(Dataset):
 
         return total_images
     
-    def save_episode_images(self, total_images, sample_episode_dir, split, scan, path_id, verbose=False, FLAG_FINISH=False):
+    def save_episode_images(self, total_images, sample_episode_dir, split, scan, path_id, lock, verbose=False, FLAG_FINISH=False, is_saving=False):
         while True:
-            time.sleep(10)  # 每x秒保存一次数据，避免过于频繁
-            for camera, info in total_images.items():
-                for idx, image_info in enumerate(info):
-                    step_time = image_info['step_time']
-                    rgb_image = Image.fromarray(image_info['rgb'], "RGB")
-                    depth_image = image_info['depth']
+            time.sleep(2)  # 每x秒保存一次数据，避免过于频繁
+            with lock:
+                camera_keys = list(total_images.keys())
+            for camera in camera_keys:
+                with lock:
+                    if camera in total_images:
+                        for idx, image_info in enumerate(total_images[camera]):
 
-                    # 定义文件名
-                    save_dir = os.path.join(sample_episode_dir, split, scan, f"id_{str(path_id)}")
-                    if not os.path.exists(save_dir):
-                        os.makedirs(save_dir)
+                            step_time = image_info['step_time']
+                            rgb_image = Image.fromarray(image_info['rgb'], "RGB")
+                            depth_image = image_info['depth']
 
-                    rgb_filename = os.path.join(save_dir, f"{camera}_image_step_{step_time}.png")
-                    rgb_image.save(rgb_filename)
+                            # 定义文件名
+                            save_dir = os.path.join(sample_episode_dir, split, scan, f"id_{str(path_id)}")
+                            if not os.path.exists(save_dir):
+                                os.makedirs(save_dir)
 
-                    depth_filename = os.path.join(save_dir, f"{camera}_depth_step_{step_time}.npy")
-                    np.save(depth_filename, depth_image)
+                            rgb_filename = os.path.join(save_dir, f"{camera}_image_step_{step_time}.png")
+                            rgb_image.save(rgb_filename)
 
-                    if verbose:
-                        print(f"Saved {rgb_filename} and {depth_filename}")
+                            depth_filename = os.path.join(save_dir, f"{camera}_depth_step_{step_time}.npy")
+                            np.save(depth_filename, depth_image)
 
-            # 清空已保存的数据，避免重复保存
-            total_images.clear()
+                            if verbose:
+                                print(f"Saved {rgb_filename} and {depth_filename}")
+
+                # 清空已保存的数据，避免重复保存
+                total_images.clear()
+                is_saving = False
             if FLAG_FINISH:
                 break
 
-    def process_pointcloud(self, camera_list: list, draw=False, convert_to_local=False):
+    def process_pointcloud(self, camera_list: list, convert_to_local=False, add_subframes=False):
         ''' Process pointcloud for combining multiple cameras
         '''
-        obs = self.env.get_observations(data_type=['pointcloud', 'camera_params'])
-        camera_positions = []
-        camera_orientations = []
-        camera_pc_data = []
+        obs = self.env.get_observations(add_subframes=add_subframes)
+        camera_info = {}
         
-        for camera in camera_list:
-            cur_obs = obs[self.task_name][self.robot_name][camera]
-            camera_pose = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
-            camera_position, camera_orientation = camera_pose[0], camera_pose[1]
-            camera_positions.append(camera_position)
-            camera_orientations.append(camera_orientation)
-            
-            if convert_to_local:
-                pc_local = pc_to_local_pose(cur_obs)
-                camera_pc_data.append(pc_local)
-            else:
-                camera_pc_data.append(cur_obs['pointcloud']['data'])
-        
-        if draw:
-            combined_pcd = generate_pano_pointcloud_local(camera_positions, camera_orientations, camera_pc_data, draw=draw, log_dir=self.args.log_image_dir)
-        return camera_pc_data, camera_positions, camera_orientations
+        for task_name, task in obs:
+            for robot_name, robot in task:
+                camera_positions = []
+                camera_orientations = []
+                camera_pc_data = []
+                for camera in camera_list:
+                    cur_obs = obs[task_name][robot_name][camera]
+                    camera_pose = robot.sensors[camera].get_world_pose()
+                    camera_position, camera_orientation = camera_pose[0], camera_pose[1]
+                    camera_positions.append(camera_position)
+                    camera_orientations.append(camera_orientation)
+                    
+                    if convert_to_local:
+                        pc_local = pc_to_local_pose(cur_obs)
+                        camera_pc_data.append(pc_local)
+                    else:
+                        camera_pc_data.append(cur_obs['pointcloud']['data'])
+                
+                camera_info[task_name] = {
+                    'camera_positions': camera_positions,
+                    'camera_orientations': camera_orientations,
+                    'camera_pc_data': camera_pc_data
+                }
+
+        return camera_info
     
     def get_surrounding_free_map(self, verbose=False):
         ''' Use top-down orthogonal camera to get the ground-truth surrounding free map
             This is useful to reset the robot's location when it get stuck or falling down.
         '''
-        # agent_current_pose = self.get_agent_pose()[0]
-        # agent_bottom_z = self.get_robot_bottom_z()
-        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map_local.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.65, verbose=verbose)
-        self.surrounding_freemap_camera_pose = self.cam_occupancy_map_local.topdown_camera.get_world_pose()[0]
+        robot_poses = self.get_robot_poses()
+        for idx in range(len(self.robots)):
+            surrounding_freemap, surrounding_freemap_connected = self.cam_occupancy_map_local.get_surrounding_free_map(robot_pos=robot_poses[idx][0],robot_height=1.65, verbose=verbose)
+            surrounding_freemap_camera_pose = self.cam_occupancy_map_local_list[idx].topdown_camera.get_world_pose()[0]
+            self.surrounding_freemap_list[idx] = surrounding_freemap
+            self.surrounding_freemap_connected_list[idx] = surrounding_freemap_connected
+            self.surrounding_freemap_camera_pose_list[idx] = surrounding_freemap_camera_pose
+    
+    def get_single_surrounding_free_map(self, idx):
+        ''' Use top-down orthogonal camera to get the ground-truth surrounding free map
+            This is useful to reset the robot's location when it get stuck or falling down.
+        '''
+        robot_poses = self.get_robot_poses()[idx]
+        surrounding_freemap, surrounding_freemap_connected = self.cam_occupancy_map_local_list[idx].get_surrounding_free_map(robot_pos=robot_poses[idx][0],robot_height=1.65)
+        surrounding_freemap_camera_pose = self.cam_occupancy_map_local_list[idx].topdown_camera.get_world_pose()[0]
+        self.surrounding_freemap_list[idx] = surrounding_freemap
+        self.surrounding_freemap_connected_list[idx] = surrounding_freemap_connected
+        self.surrounding_freemap_camera_pose_list[idx] = surrounding_freemap_camera_pose
 
     def get_global_free_map(self, verbose=False):
         ''' Use top-down orthogonal camera to get the ground-truth surrounding free map
             This is useful to reset the robot's location when it get stuck or falling down.
         '''
-        self.global_freemap_camera_pose = self.cam_occupancy_map_global.topdown_camera.get_world_pose()[0]
-        self.global_freemap, _ = self.cam_occupancy_map_global.get_global_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
-        return self.global_freemap, self.global_freemap_camera_pose
+        self.global_freemap_list = []
+        self.global_freemap_camera_pose_list = []
+
+        robot_poses = self.get_robot_poses()
+        for idx in range(self.env_num):
+            global_freemap, global_freemap_camera_pose = self.cam_occupancy_map_global_list[idx].get_global_free_map(robot_pos=robot_poses[idx][0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
+            self.global_freemap_list.append(global_freemap)
+            self.global_freemap_camera_pose_list.append(global_freemap_camera_pose)
+
+        return self.global_freemap_list, self.global_freemap_camera_pose_list
     
     def update_occupancy_map(self, verbose=False):
         '''Use BEVMap to update the occupancy map based on pointcloud
         '''
-        pointclouds, _, _ = self.process_pointcloud(self.args.camera_list)
-        robot_ankle_z = self.get_robot_bottom_z()
-        self.bev.update_occupancy_map(pointclouds, robot_ankle_z, add_dilation=self.args.maps.add_dilation, verbose=verbose, robot_coords=self.get_agent_pose()[0])
+        robots_bottom_z = self.get_robot_bottom_z()
+        robot_poses = self.get_robot_poses()
+        pointclouds_info = self.process_pointcloud(self.args.camera_list)
+        for idx in range(self.env_num):
+            task_name = self.tasks[idx].keys()[0]
+            self.bev_list[idx].update_occupancy_map(pointclouds_info[task_name]['camera_pc_data'],
+                                                    robots_bottom_z[idx], 
+                                                    add_dilation=self.args.maps.add_dilation,
+                                                    verbose=verbose, 
+                                                    robot_coords=robot_poses[idx][0])        
 
-    def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, height_threshold=0.5, adjust=False, initial_pose=None, initial_rotation=None):
+    def check_robot_fall(self, agent, robots_bottom_z, pitch_threshold=35, roll_threshold=15, height_threshold=0.5):
         '''
         Determine if the robot is falling based on its rotation quaternion.
         '''
@@ -554,60 +641,65 @@ class VLNDataLoader(Dataset):
         # Check if the pitch or roll exceeds the thresholds
         if abs(pitch) > pitch_threshold or abs(roll) > roll_threshold:
             is_fall = True
-            # log.info(f"Robot falls down!!!")
-            # log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
+            log.info(f"Robot falls down!!!")
+            log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
         else:
             is_fall = False
         
         # Check if the height between the robot base and the robot ankle is smaller than a threshold
-        robot_ankle_z = self.get_robot_bottom_z()
-        robot_base_z = self.get_agent_pose()[0][2]
+        robot_ankle_z = robots_bottom_z
+        robot_base_z = current_position[2]
         if robot_base_z - robot_ankle_z < height_threshold:
             is_fall = True
-            # log.info(f"Robot falls down!!!")
-            # log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
+            log.info(f"Robot falls down!!!")
+            log.info(f"Current Position: {current_position}, Orientation: {self.quat_to_euler_angles(current_quaternion)}")
 
         return is_fall
+
+    def init_check_robot_stuck(self, cur_iter=0):
+        ''' Init the variables for checking if the robot is stuck
+        '''
+        self.agent_last_pose = [None]*self.env_num
+        self.agent_last_rotation = [None]*self.env_num
+        self.agent_last_valid_pose = [None]*self.env_num
+        self.agent_last_valid_rotation = [None]*self.env_num
+        self.stuck_threshold = [0]*self.env_num
+        self.stuck_last_iter = [cur_iter]*self.env_num
     
-    def check_robot_stuck(self, cur_iter, max_iter=300, threshold=0.2):
+    def check_robot_stuck(self, idx, agent, cur_iter, max_iter=300, threshold=0.2):
         ''' Check if the robot is stuck
         '''
         is_stuck = False
-        if self.agent_last_pose is None:
-            self.agent_last_valid_pose = self.get_agent_pose()[0]
-            self.agent_last_pose, self.agent_last_rotation = self.get_agent_pose()
-            self.agent_last_valid_pose = self.agent_last_pose
-            self.agent_last_valid_rotation = self.agent_last_rotation
-            self.stuck_threshold = 0
-            self.stuck_last_iter = cur_iter
+        if not hasattr(self, 'agent_last_pose'):
+            self.init_check_robot_stuck(cur_iter)
             return is_stuck
 
-        current_pose, current_rotation = self.get_agent_pose()
+        current_pose, current_rotation = agent.get_world_pose()
         diff = np.linalg.norm(current_pose - self.agent_last_pose)
-        self.stuck_threshold += diff
+        self.stuck_threshold[idx] += diff
 
-        if (cur_iter - self.stuck_last_iter) >= max_iter:
-            if self.stuck_threshold < threshold:
+        if (cur_iter - self.stuck_last_iter[idx]) >= max_iter:
+            if self.stuck_threshold[idx] < threshold:
                 is_stuck = True
             else:
-                self.stuck_threshold = 0
-                self.stuck_last_iter = cur_iter
-                self.agent_last_valid_pose = current_pose
-                self.agent_last_valid_rotation = current_rotation
+                self.stuck_threshold[idx] = 0
+                self.stuck_last_iter[idx] = cur_iter
+                self.agent_last_valid_pose[idx] = current_pose
+                self.agent_last_valid_rotation[idx] = current_rotation
 
-        self.agent_last_pose = current_pose
+        self.agent_last_pose[idx] = current_pose
 
         return is_stuck
     
-    def randomly_pick_position_from_freemap(self, verbose=False):
+    def randomly_pick_position_from_freemap(self, idx, verbose=False):
         ''' Randomly pick a position from the free map
         '''
-        if self.surrounding_freemap_connected is None:
-            self.get_surrounding_free_map(verbose=verbose)
+        if self.surrounding_freemap_connected_list[idx] is None:
+            self.get_single_surrounding_free_map(idx=idx)
             return None
         
-        free_map = self.surrounding_freemap_connected
-        camera_pose = self.surrounding_freemap_camera_pose
+        free_map = self.surrounding_freemap_connected[idx]
+        camera_pose = self.surrounding_freemap_camera_pose[idx]
 
         freemap_center = np.array(free_map.shape) // 2
         free_indices = np.argwhere(free_map == 1)
@@ -637,34 +729,56 @@ class VLNDataLoader(Dataset):
         random_index = np.random.choice(free_indices.shape[0], p=combined_weights)
         random_position = free_indices[random_index]
 
-        random_position = self.cam_occupancy_map_local.pixel_to_world(random_position, camera_pose)
+        random_position = self.cam_occupancy_map_local_list[idx].pixel_to_world(random_position, camera_pose)
         # random_position = [random_position[0], random_position[1], self.agent_last_valid_pose[2]]
-        random_position = [random_position[0], random_position[1], self.agent_init_pose[2]]
+        random_position = [random_position[0], random_position[1], self.robot_init_poses[idx][2]]
 
         return random_position
 
-    def reset_robot(self, position, rotation):
-        ''' Reset the robot's pose
+    def reset_robot(self, position_list, orientation_list):
+        ''' Reset the robots' pose
         '''
-        self.agents.set_world_pose(position, rotation)
-        self.agent_last_pose = position
-        self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
-        self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))
+        for idx, isaac_robot in enumerate(self.isaac_robots):
+            isaac_robot.set_world_pose(position_list[idx], orientation_list[idx])
+            isaac_robot.set_joint_velocities(np.zeros(len(isaac_robot.dof_names)))
+            isaac_robot.set_joint_positions(np.zeros(len(isaac_robot.dof_names)))
+            self.robot_last_poses[idx] = position_list[idx]
     
-    def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False):
-        is_fall = self.check_robot_fall(self.agents, adjust=False)
-        is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=300, threshold=0.2)
-        if (not is_fall) and (not is_stuck):
-            if update_freemap:
-                self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
-            return False
-        else:
-            if is_fall:
-                log.info("Robot falls down. Reset robot pose.")
-            if is_stuck:
-                log.info("Robot is stuck. Reset robot pose.")
-            random_position = self.randomly_pick_position_from_freemap()
-            # self.reset_robot(random_position, self.agent_last_valid_rotation)
-            self.reset_robot(random_position, self.agent_init_rotation)
-            log.info(f"Reset robot pose to {random_position}.")
-            return True
+    def reset_single_robot(self, idx, position, orientation):
+        ''' Reset a single robot's pose
+        '''
+        self.isaac_robots[idx].set_world_pose(position, orientation)
+        self.isaac_robots[idx].set_joint_velocities(np.zeros(len(self.isaac_robots[idx].dof_names)))
+        self.isaac_robots[idx].set_joint_positions(np.zeros(len(self.isaac_robots[idx].dof_names)))
+        self.robot_last_poses[idx] = position
+    
+    def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False, reset=False):
+        is_fall_list = []
+        is_stuck_list = []
+
+        robots_bottom_z = self.get_robot_bottom_z()
+        for idx, (isaac_robot, robots_bottom_z) in enumerate(zip(self.isaac_robots, robots_bottom_z)):
+            is_fall = self.check_robot_fall(isaac_robot, robots_bottom_z)
+            is_fall_list.append(is_fall)
+            is_stuck = self.check_robot_stuck(idx, isaac_robot, cur_iter=cur_iter, max_iter=2000, threshold=0.2)
+            is_stuck_list.append(is_stuck)
+
+            if (not is_fall) and (not is_stuck):
+                if update_freemap:
+                    self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
+                # return False
+            else:
+                if is_fall:
+                    log.info(f"The {idx}-th Robot falls down. Reset robot pose.")
+                if is_stuck:
+                    log.info(f"The {idx}-th Robot is stuck. Reset robot pose.")
+
+                if reset:
+                    random_position = self.randomly_pick_position_from_freemap()
+                    # self.reset_robot(random_position, self.agent_last_valid_rotation)
+                    self.reset_single_robot(idx, random_position, self.robot_init_orientations[idx])
+                    log.info(f"Reset robot pose to {random_position}.")
+                # return True
+        
+        status_abnormal_list = [fall and stuck for fall, stuck in zip(is_fall_list, is_stuck_list)]
+        return status_abnormal_list

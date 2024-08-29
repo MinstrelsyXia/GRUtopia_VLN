@@ -10,6 +10,7 @@ from omni.isaac.core.scenes import Scene
 from omni.isaac.core.utils.nucleus import get_assets_root_path
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.types import ArticulationAction, ArticulationActions
+import omni.isaac.core.utils.numpy.rotations as rot_utils
 
 import grutopia.core.util.string as string_utils
 from grutopia.actuators import ActuatorBase, ActuatorBaseCfg, DCMotorCfg
@@ -252,6 +253,12 @@ class HumanoidRobot(BaseRobot):
             controller = self.controllers[controller_name]
             control = controller.action_to_control(controller_action)
             self.isaac_robot.apply_actuator_model(control, controller_name, self.joint_subset)
+        
+        # top-down camera reset
+        if 'topdown_camera_500' in self.sensors:
+            orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+            robot_pos = self.isaac_robot.get_world_pose()[0]
+            self.sensors['topdown_camera_500'].set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
 
     def get_obs(self, add_rgb_subframes=False):
         position, orientation = self._robot_base.get_world_pose()
