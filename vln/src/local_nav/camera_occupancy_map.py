@@ -28,7 +28,7 @@ class CamOccupancyMap:
         self.center_x, self.center_y = self.width // 2, self.height// 2
         self.aperture = self.issac_camera.get_horizontal_aperture() * 10
 
-        print("Topdown camera pose init:", self.topdown_camera.get_world_pose())
+        # print("Topdown camera pose init:", self.topdown_camera.get_world_pose())
     
     def get_world_pose(self):
         return self.topdown_camera.get_world_pose()
@@ -269,7 +269,7 @@ class CamOccupancyMap:
         orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
         self.issac_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
 
-    def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, update_camera_pose=True, verbose=False):
+    def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, update_camera_pose=True, verbose=False, env_idx=None):
         # Define height range for free map
         # free_map: 1 for free space, 0 for occupied space
 
@@ -332,9 +332,12 @@ class CamOccupancyMap:
             # free_map_normalized = ((free_map - free_map.min()) * (1/(free_map.max() - free_map.min()) * 255)).astype('uint8')
             free_map_image = Image.fromarray(free_map_normalized)
             # Save the image
-            free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "topdown_global_freemap.png")
+            if env_idx is not None and hasattr(self.args, 'episode_path_list'):
+                free_map_path = os.path.join(self.args.episode_path_list[env_idx], f"global_topdown_freemap.jpg")
+            else:
+                free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "topdown_global_freemap.png")
             free_map_image.save(free_map_path)
-            log.info(f"Global free map saved at {free_map_path}.")
+            # log.info(f"Global free map saved at {free_map_path}.")
         
         # extract connectd free area
         if connect_filter:

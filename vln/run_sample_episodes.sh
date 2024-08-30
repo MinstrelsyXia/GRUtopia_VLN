@@ -1,0 +1,8 @@
+#!/bin/bash
+flags_sample_episodes="
+    --vln_cfg_file vln/configs/vln_extract_data_script.yaml
+    --sim_cfg_file vln/configs/sample_episodes_sim_cfg.yaml
+    --headless
+"
+
+python vln/main_sample_episode.py $flags_sample_episodes

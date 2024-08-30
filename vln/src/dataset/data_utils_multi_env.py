@@ -221,14 +221,9 @@ class VLNDataLoader(Dataset):
         self.env_num = sim_config.config.tasks[0].env_num # only one task
         # self.task_name = sim_config.config.tasks[0].name # only one task
         self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot
-        
-        self.bev_list = [None]*self.env_num
-        self.surrounding_freemap_connected_list = [None]*self.env_num
-        self.surrounding_freemap_list = [None]*self.env_num
-        self.surrounding_freemap_camera_pose_list = [None]*self.env_num
 
         '''Init env data manager'''
-        self.init_env_manager()
+        # self.init_env_manager()
     
     def __len__(self):
         return len(self.data)
@@ -288,14 +283,23 @@ class VLNDataLoader(Dataset):
     
     def init_env_manager(self):
         '''Init env data manager'''
+        self.bev_list = [None]*self.env_num
+        self.surrounding_freemap_connected_list = [None]*self.env_num
+        self.surrounding_freemap_list = [None]*self.env_num
+        self.surrounding_freemap_camera_pose_list = [None]*self.env_num
+
         self.path_id_list = [None] * self.env_num
         self.end_list = [False] * self.env_num
+        self.just_end_list = [True] * self.env_num
         self.success_list = [False] * self.env_num
         self.env_data = [[] for _ in range(self.env_num)]
         self.env_index = [0] * self.env_num
+        self.all_episodes_end_list = [False] * self.env_num
     
     def allocate_data(self, scan):
         self.scan_data = self.data[scan]
+        self.sim_config.config.tasks[0].env_num = self.env_num = min(len(self.scan_data), self.env_num)
+        self.init_env_manager() # update env_num according to the data length
         for idx, data in enumerate(self.scan_data):
             env_idx = idx % self.env_num
             self.env_data[env_idx].append(data)
@@ -315,6 +319,7 @@ class VLNDataLoader(Dataset):
             item = self.get_next_single_data(env_idx)
             if item is None:
                 self.end_list[env_idx] = True
+                self.all_episodes_end_list[env_idx] = True
 
             data_item_list.append(item)
             path_id_list.append(item['trajectory_id'])
@@ -423,7 +428,7 @@ class VLNDataLoader(Dataset):
 
         # data_item_list = []
         path_id_list = []
-        self.args.episode_status_info_files = [None]*self.env_num
+        self.args.episode_status_info_file_list = [None]*self.env_num
 
         for i, item in enumerate(data_item_list):
             path_id_list.append(item['trajectory_id'])
@@ -444,8 +449,8 @@ class VLNDataLoader(Dataset):
                 log.info(info)
 
             if save_log:
-                self.args.episode_status_info_files[i] = os.path.join(self.args.episode_path_list[i], 'status_info.txt')
-                with open(self.args.episode_status_info_files[i], 'w') as f:
+                self.args.episode_status_info_file_list[i] = os.path.join(self.args.episode_path_list[i], 'status_info.txt')
+                with open(self.args.episode_status_info_file_list[i], 'w') as f:
                     for info in status_info:
                         f.write(info + '\n')   
 
@@ -500,7 +505,7 @@ class VLNDataLoader(Dataset):
         '''
         camera_dict = self.args.camera_list
         camera_poses = {}
-        for i, (task_name, task) in enumerate(self.tasks):
+        for i, (task_name, task) in enumerate(self.tasks.items()):
             task_camera_pose = {}
             for camera in camera_dict:
                 task_camera_pose[camera] = task.get_camera_poses_without_offset(camera)
@@ -717,7 +722,8 @@ class VLNDataLoader(Dataset):
 
         robot_poses = self.get_robot_poses()
         for idx in range(self.env_num):
-            global_freemap, global_freemap_camera_pose = self.cam_occupancy_map_global_list[idx].get_global_free_map(robot_pos=robot_poses[idx][0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
+            global_freemap_camera_pose = self.cam_occupancy_map_global_list[idx].topdown_camera.get_world_pose()[0] - self.tasks[self.task_names[idx]]._offset
+            global_freemap, _ = self.cam_occupancy_map_global_list[idx].get_global_free_map(robot_pos=robot_poses[idx][0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
             self.global_freemap_list.append(global_freemap)
             self.global_freemap_camera_pose_list.append(global_freemap_camera_pose)
 
@@ -745,7 +751,8 @@ class VLNDataLoader(Dataset):
             self.global_freemap_camera_pose_list = [None] * self.env_num
 
         robot_pose = self.get_robot_poses()[env_idx]
-        global_freemap, global_freemap_camera_pose = self.cam_occupancy_map_global_list[env_idx].get_global_free_map(robot_pos=robot_pose[0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
+        global_freemap_camera_pose = self.cam_occupancy_map_global_list[env_idx].topdown_camera.get_world_pose()[0] - self.tasks[self.task_names[env_idx]]._offset
+        global_freemap, _ = self.cam_occupancy_map_global_list[env_idx].get_global_free_map(robot_pos=robot_pose[0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
         self.global_freemap_list[env_idx] = global_freemap
         self.global_freemap_camera_pose_list[env_idx] = global_freemap_camera_pose
 
@@ -801,6 +808,13 @@ class VLNDataLoader(Dataset):
         self.agent_last_valid_rotation = [None]*self.env_num
         self.stuck_threshold = [0]*self.env_num
         self.stuck_last_iter = [cur_iter]*self.env_num
+
+        robot_poses = self.get_robot_poses()
+        for env_idx in range(self.env_num):
+            self.agent_last_pose[env_idx] = robot_poses[env_idx][0]
+            self.agent_last_rotation[env_idx] = robot_poses[env_idx][1]
+            self.agent_last_valid_pose[env_idx] = robot_poses[env_idx][0]
+            self.agent_last_valid_rotation[env_idx] = robot_poses[env_idx][1]
     
     def check_robot_stuck(self, idx, agent, cur_iter, max_iter=300, threshold=0.2):
         ''' Check if the robot is stuck
@@ -810,8 +824,10 @@ class VLNDataLoader(Dataset):
             self.init_check_robot_stuck(cur_iter)
             return is_stuck
 
-        current_pose, current_rotation = agent.get_world_pose()
-        diff = np.linalg.norm(current_pose - self.agent_last_pose)
+        agent_world_pose = agent.get_world_pose()
+        current_pose = agent_world_pose[0] - self.tasks[self.task_names[idx]]._offset
+        current_rotation = agent_world_pose[1]
+        diff = np.linalg.norm(current_pose - self.agent_last_pose[idx])
         self.stuck_threshold[idx] += diff
 
         if (cur_iter - self.stuck_last_iter[idx]) >= max_iter:
@@ -890,15 +906,18 @@ class VLNDataLoader(Dataset):
         self.robot_last_poses[idx] = position
     
     def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False, reset=False):
-        is_fall_list = []
-        is_stuck_list = []
-
-        robots_bottom_z = self.get_robot_bottom_z()
-        for idx, (isaac_robot, robots_bottom_z) in enumerate(zip(self.isaac_robots, robots_bottom_z)):
+        is_fall_list = [None]*self.env_num
+        is_stuck_list = [None]*self.env_num
+        robots_bottom_z_list = self.get_robot_bottom_z()
+        for idx, (isaac_robot, robots_bottom_z) in enumerate(zip(self.isaac_robots, robots_bottom_z_list)):
+            if self.end_list[idx]:
+                is_fall_list[idx] = True
+                is_stuck_list[idx] = True
+                continue
             is_fall = self.check_robot_fall(isaac_robot, robots_bottom_z)
-            is_fall_list.append(is_fall)
+            is_fall_list[idx] = is_fall
             is_stuck = self.check_robot_stuck(idx, isaac_robot, cur_iter=cur_iter, max_iter=2000, threshold=0.2)
-            is_stuck_list.append(is_stuck)
+            is_stuck_list[idx] = is_stuck
 
             if (not is_fall) and (not is_stuck):
                 if update_freemap:
@@ -906,9 +925,9 @@ class VLNDataLoader(Dataset):
                 # return False
             else:
                 if is_fall:
-                    log.info(f"The {idx}-th Robot falls down. Reset robot pose.")
+                    log.error(f"The {idx}-th Robot falls down.")
                 if is_stuck:
-                    log.info(f"The {idx}-th Robot is stuck. Reset robot pose.")
+                    log.error(f"The {idx}-th Robot is stuck.")
 
                 if reset:
                     random_position = self.randomly_pick_position_from_freemap()
@@ -917,19 +936,21 @@ class VLNDataLoader(Dataset):
                     log.info(f"Reset robot pose to {random_position}.")
                 # return True
         
-        status_abnormal_list = [fall and stuck for fall, stuck in zip(is_fall_list, is_stuck_list)]
+        status_abnormal_list = [fall or stuck for fall, stuck in zip(is_fall_list, is_stuck_list)]
         return status_abnormal_list
 
     def calc_env_action_offset(self, env_actions, action_name):
         robot_type = self.robot_names[0].split('_')[0]
+        env_actions_new = deepcopy(env_actions)
         for idx, action in enumerate(env_actions):
-            env_actions[idx][robot_type][action_name][0][0] += np.array(self.tasks[self.task_names[idx]]._offset)
+            env_actions_new[idx][robot_type][action_name][0][0] += np.array(self.tasks[self.task_names[idx]]._offset)
         
-        return env_actions
+        return env_actions_new
     
     def calc_single_env_action_offset(self, env_idx, exe_path):
         task_name = self.task_names[env_idx]
+        exe_path_new = deepcopy(exe_path)
         for idx in range(len(exe_path)):
-            exe_path[idx] += self.tasks[task_name]._offset
+            exe_path_new[idx] += np.array(self.tasks[task_name]._offset)
         
-        return exe_path
+        return exe_path_new
