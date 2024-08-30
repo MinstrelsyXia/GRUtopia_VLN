@@ -91,7 +91,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
     vln_envs.allocate_data(scan)
     stand_still_action = {'h1': {'stand_still': []}}
 
-    while not all(vln_envs.end_list):
+    while not all(vln_envs.all_episodes_end_list):
         '''1. Get the data'''
         data_item_list, path_id_list, paths_list = vln_envs.get_next_data()
         '''2. Init episode saving dir'''
@@ -161,7 +161,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
         start_time = time.time()
         
         '''(0) Enter the env loop'''
-        while env.simulation_app.is_running():
+        while not all(vln_envs.end_list) and env.simulation_app.is_running():
             max_step = 500 if args.debug else args.settings.max_step
             if i >= max_step:
                 for env_idx, env_finish_status in enumerate(vln_envs.end_list):
@@ -175,14 +175,17 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             if i < warm_step:
                 if 'oracle' in action_name:
                     init_actions['h1'][action_name][1]['current_step'] = i
-                env_actions = update_env_actions(action_name, paths_list, path_idx=0)
-                env_actions = vln_envs.calc_env_action_offset(env_actions,action_name)
+                # env_actions = update_env_actions(action_name, paths_list, path_idx=0)
+                # env_actions = vln_envs.calc_env_action_offset(env_actions,action_name)
                 obs = env.step(actions=env_actions)
                 
                 if i % 50 == 0:
                     if vln_config.windows_head:
                         # show the topdown camera
                         vln_envs.cam_occupancy_map_local_list[0].update_windows_head(robot_pos=vln_envs.isaac_robots[0].get_world_pose()[0], mode=args.windows_head_type)
+                        # log the FPS
+                        current_time = time.time()
+                        log.info(f"Current step: {i}. FPS: {i/(current_time-start_time):.2f}")
                 
                 
                 continue
@@ -192,23 +195,23 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 for env_idx in range(env_num):
                     topdown_map = vln_envs.GlobalTopdownMap(args, scan)
                     freemap, camera_pose = vln_envs.get_global_free_map_single(env_idx, verbose=args.test_verbose)
-                    topdown_map.update_map(freemap, camera_pose, verbose=args.test_verbose)
-                    topdown_maps.append(topdown_map)
+                    topdown_map.update_map(freemap, camera_pose, verbose=args.test_verbose, env_idx=env_idx)
+                    topdown_maps[env_idx] = topdown_map
                     log.info(f"====The global freemap has been initialized for Path_id {path_id_list[env_idx]}====")
 
                 env_action_finish_states = [True] * env_num
                 
                 # vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
-                env_actions = update_env_actions(action_name, paths_list, path_idx=0)
-                env_actions = vln_envs.calc_env_action_offset(env_actions,action_name)
+                # env_actions = update_env_actions(action_name, paths_list, path_idx=0)
+                # env_actions = vln_envs.calc_env_action_offset(env_actions,action_name)
                 obs = env.step(actions=env_actions)
                 continue
             
             if 'oracle' not in action_name and i % 50 == 0:
                 status_abnormal_list = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=vln_config.test_verbose)
                 for status_idx, status in enumerate(status_abnormal_list):
-                    if status == False:
-                        log.error(f"Scan: {scan}, Path_id: {path_id_list[status_idx]}: The robot is reset. Break this episode for this env.")
+                    if status:
+                        # log.error(f"Scan: {scan}, Path_id: {path_id_list[status_idx]}: The robot is reset. Break this episode for this env.")
                         vln_envs.end_list[status_idx] = True
             
             if args.test_verbose and args.windows_head:
@@ -227,19 +230,20 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                     current_point = nav_point_list[env_idx]
                     paths = paths_list[env_idx]
                     topdown_map = topdown_maps[env_idx]
+                    log.info(f"======Path_id: {path_id_list[env_idx]}========")
                     if current_point == 0:
-                        log.info(f"===The robot starts navigating===")
+                        log.info(f"The robot starts navigating")
                     if current_point < len(paths)-1:
-                        log.info(f"===The robot is navigating to the {current_point+1}-th target place.===")
+                        log.info(f"The robot is navigating to the {current_point+1}-th target place.")
 
                         with open(args.episode_status_info_file_list[env_idx], 'a') as f:
                             f.write(f"Current point number: {current_point}\n")
                         
                         freemap, camera_pose = vln_envs.get_global_free_map_single(env_idx=env_idx, verbose=args.test_verbose)
-                        topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
+                        topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose, env_idx=env_idx)
                         robot_current_position = vln_envs.get_robot_poses()[env_idx][0]
                         
-                        exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=(args.test_verbose or args.save_path_planning), save_dir=os.path.join(args.sample_episode_dir, split, scan, f"id_{str(path_id)}"))
+                        exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=(args.test_verbose or args.save_path_planning), save_dir=args.episode_path_list[env_idx])
                         exe_paths.append(exe_path) 
                         if exe_path is None or len(exe_path) == 0:
                             # path planning fails
@@ -291,20 +295,23 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             if (i-move_step) != 0 and (i-move_step) % (args.sample_episodes.step_interval-1) == 0:
                 # Since oracle_move_path_controller moves to the next point every 5 steps, the image is fetched every 5+3 steps
                 camera_pose_dict = vln_envs.get_camera_pose()
+                robot_pose_dict = vln_envs.get_robot_poses()
                 data_collector.collect_and_send_data(i, env, 
                             camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
+                            robot_pose_dict=robot_pose_dict,
                             end_list=vln_envs.end_list, 
                             add_rgb_subframes=True, finish_flag=False)
 
                 is_image_stacked = True
 
             if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%(args.sample_episodes.step_interval-1) == 0:
+                # TODO
                 vln_envs.save_observations(camera_list=data_camera_list, data_types=["rgba", "depth"], add_rgb_subframes=True, step_time=i)
                 freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                 topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
 
             # get the action state
-            if len(obs[vln_envs.task_name]) > 0:
+            if len(obs) > 0:
                 for env_idx, (task_name, task) in enumerate(obs.items()):
                     for robot_name, robot in task.items():
                         action_state = robot[action_name]
@@ -320,10 +327,14 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             '''(3) Justify the episode finish status'''
             for env_idx, action_finish_state in enumerate(env_action_finish_states):
                 if action_finish_state:
-                    if nav_point_list[env_idx] == len(paths_list[env_idx])-1:
+                    if nav_point_list[env_idx] == len(paths_list[env_idx])-1 and vln_envs.just_end_list[env_idx] == True:
                         log.info(f"[Success] Scan: {scan}, Path_id: {path_id_list[env_idx]}. The robot has finished this episode !!!")
                         vln_envs.end_list[env_idx] = True
                         vln_envs.success_list[env_idx] = True
+                        vln_envs.just_end_list[env_idx] = False
+
+                        with open(args.episode_status_info_file_list[env_idx], 'a') as f:
+                            f.write(f"Episode finished: {vln_envs.success_list[env_idx]}\n")
         
         for status_info_file in args.episode_status_info_file_list:
             with open(status_info_file, 'a') as f:

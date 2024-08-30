@@ -109,8 +109,8 @@ class Camera(BaseSensor):
             # self._camera.add_normals_to_frame()
     
     def camera_get_rgba(self, add_subframes=True):
-        if add_subframes:
-            rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False)
+        # if add_subframes:
+        #     rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
         return self.rgba_receiver.get_data()
 
     def get_data(self, add_rgb_subframes=False) -> Dict:

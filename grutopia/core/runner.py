@@ -6,6 +6,7 @@ from omni.isaac.core.prims.xform_prim import XFormPrim
 from omni.isaac.core.utils.stage import add_reference_to_stage  # noqa F401
 from omni.physx.scripts import utils
 from pxr import Usd  # noqa
+import omni.replicator.core as rep
 
 # Init
 from grutopia.core.config import SimulatorConfig, TaskUserConfig
@@ -81,9 +82,16 @@ class SimulatorRunner:
         render = render and self.render_trigger > self.render_interval
         if self.render_trigger > self.render_interval:
             self.render_trigger = 0
+        
+        if add_rgb_subframes:
+            rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
         self._world.step(render=render)
+        if add_rgb_subframes:
+            rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False) # !!!
 
         obs = self.get_obs(add_rgb_subframes=add_rgb_subframes)
+
+
         for npc in self.npc:
             try:
                 npc.feed(obs)

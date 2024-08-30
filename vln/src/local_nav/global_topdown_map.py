@@ -46,7 +46,7 @@ class GlobalTopdownMap:
         self.bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
         self.norm = mcolors.BoundaryNorm(self.bounds, self.cmap.N)
     
-    def save_map(self, robot_pos=None, is_camera_base=False):
+    def save_map(self, robot_pos=None, is_camera_base=False, env_idx=None):
         height = self.get_height(robot_pos, is_camera_base=is_camera_base)
         occupancy_map = self.get_map(robot_pos, is_camera_base=is_camera_base)
         if occupancy_map is None:
@@ -66,7 +66,10 @@ class GlobalTopdownMap:
             plt.scatter(robot_pixel[0], robot_pixel[1], color='blue', marker='o', label="current position (%.2f, %.2f, %.2f)" % (robot_pos[0], robot_pos[1], robot_pos[2]))
         plt.legend()
         
-        img_save_path = os.path.join(self.args.log_image_dir, f"global_topdown_map_{self.scan_name}_{height}.jpg")
+        if env_idx is not None and hasattr(self.args, 'episode_path_list'):
+            img_save_path = os.path.join(self.args.episode_path_list[env_idx], f"global_topdown_map_{height}.jpg")
+        else:
+            img_save_path = os.path.join(self.args.log_image_dir, f"global_topdown_map_{self.scan_name}_{height}.jpg")
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
 
         log.info(f"Saved global topdown map at height {height} to {img_save_path}")
@@ -79,7 +82,7 @@ class GlobalTopdownMap:
             return round(pos[2] - self.camera_height)
         return round(pos[2])
     
-    def update_map(self, freemap, camera_pose, update_map=False, verbose=False):
+    def update_map(self, freemap, camera_pose, update_map=False, verbose=False, env_idx=None):
         height = self.get_height(camera_pose, is_camera_base=True)
         if height not in self.floor_maps:
             self.floor_heights.append(height)
@@ -90,7 +93,7 @@ class GlobalTopdownMap:
             } 
             log.info("update global topdown map at height: {}".format(height))
             if verbose:
-                self.save_map(robot_pos=camera_pose, is_camera_base=True)
+                self.save_map(robot_pos=camera_pose, is_camera_base=True, env_idx=env_idx)
         else:
             if update_map:
                 self.floor_maps[height] = {
