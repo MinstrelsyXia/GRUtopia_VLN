@@ -335,6 +335,7 @@ class VLNDataLoader(Dataset):
                 return None
             
             '''2. Create log path'''
+            path_id = new_data['trajectory_id']
             episode_path = os.path.join(self.args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
             self.args.episode_path_list[env_idx] = episode_path
             if os.path.exists(episode_path):
@@ -353,7 +354,6 @@ class VLNDataLoader(Dataset):
                 os.makedirs(episode_path)
 
             '''Reset env list'''
-            path_id = new_data['trajectory_id']
             self.path_id_list[env_idx] = path_id
             self.data_item_list[env_idx] = new_data
             self.paths_list[env_idx] = new_data['reference_path']
@@ -940,7 +940,7 @@ class VLNDataLoader(Dataset):
     def reset_single_robot(self, idx, position, orientation):
         ''' Reset a single robot's pose
         '''
-        self.tasks[idx].set_single_robot_poses_without_offset(position, orientation)
+        self.tasks[self.task_names[idx]].set_single_robot_poses_without_offset(position, orientation)
         self.isaac_robots[idx].set_joint_velocities(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.isaac_robots[idx].set_joint_positions(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.robot_last_poses[idx] = position
