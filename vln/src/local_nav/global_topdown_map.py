@@ -73,6 +73,7 @@ class GlobalTopdownMap:
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
 
         log.info(f"Saved global topdown map at height {height} to {img_save_path}")
+        plt.close()
     
     def get_height(self, pos, is_camera_base=False):
         # if is_camera_base:

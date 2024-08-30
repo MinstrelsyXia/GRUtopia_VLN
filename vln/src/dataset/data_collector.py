@@ -96,7 +96,7 @@ class dataCollector:
             # Save camera information
             all_finish_flag = True
             finish_flag = True
-            for episode_data_item in episode_datas:
+            for i, episode_data_item in enumerate(episode_datas):
                 if episode_data_item is not None:
                     for robot_name, episode_data in episode_data_item.items():
                         idx = episode_data['env_idx']
@@ -126,8 +126,9 @@ class dataCollector:
                         
                     finish_flag = episode_data['finish_flag']
                 all_finish_flag = finish_flag and all_finish_flag
-            
-            self.child_pipe.send({'save_flag': True})
+
+                if not self.parent_pipe.poll():
+                    self.child_pipe.send({'save_flag': True})
             if all_finish_flag:
                 break
     
