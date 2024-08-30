@@ -1,14 +1,14 @@
 simulator:
   physics_dt: 1/240
   rendering_dt: 1/240
-  rendering_interval: 2
+  rendering_interval: 10
 
 tasks:
 - type: "VLNTask"
   name: "vln"
   scene_asset_path: ""
   scene_scale: [1, 1, 1]
-  env_num: 24
+  env_num: 12
   offset_size: 100.0
   light_on: true
   robots:

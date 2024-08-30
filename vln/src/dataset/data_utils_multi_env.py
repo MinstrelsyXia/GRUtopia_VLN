@@ -11,6 +11,7 @@ import numpy as np
 import time
 from collections import defaultdict
 from copy import deepcopy
+import shutil
 
 import torch
 from torch.utils.data import Dataset
@@ -18,7 +19,7 @@ from torch.utils.data import Dataset
 from PIL import Image
 import matplotlib.pyplot as plt
 import importlib
-from scipy.ndimage import convolve, gaussian_filter
+# from scipy.ndimage import convolve, gaussian_filter
 
 try:
     from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
@@ -245,7 +246,6 @@ class VLNDataLoader(Dataset):
         self.isaac_robots = []
         self.robot_init_poses = []
         self.robot_init_orientations = []
-        self.robot_init_poses_offset = []
         for idx, (task_name, task) in enumerate(self.tasks.items()):
             self.robots.append(task.robots[self.robot_names[idx]])
             self.isaac_robots.append(task.robots[self.robot_names[idx]].isaac_robot)
@@ -254,13 +254,8 @@ class VLNDataLoader(Dataset):
             self.robot_init_poses.append(robot_pose[0])
             self.robot_init_orientations.append(robot_pose[1])
 
-            robot_offset_pose = robot_pose[0] + task._offset
-            self.robot_init_poses_offset.append(robot_offset_pose)
-
         self.robot_last_poses = [None]*self.env_num
         self.reset_robot(self.robot_init_poses, self.robot_init_orientations)
-
-        robot_poses = self.get_robot_poses()
 
         self.init_cam_occunpancy_map() # init camera occupancy map
     
@@ -295,6 +290,15 @@ class VLNDataLoader(Dataset):
         self.env_data = [[] for _ in range(self.env_num)]
         self.env_index = [0] * self.env_num
         self.all_episodes_end_list = [False] * self.env_num
+
+        self.data_item_list = [None] * self.env_num
+        self.path_id_list = [None] * self.env_num
+        self.paths_list = [None] * self.env_num
+        self.env_action_finish_states = [False] * self.env_num
+        self.nav_point_list = [0] * self.env_num
+        self.topdown_maps = [None] * self.env_num
+
+        self.args.episode_path_list = [None]*self.env_num
     
     def allocate_data(self, scan):
         self.scan_data = self.data[scan]
@@ -312,20 +316,56 @@ class VLNDataLoader(Dataset):
         return None
 
     def get_next_data(self):
-        data_item_list = []
-        path_id_list = []
-        paths_list = []
         for env_idx in range(self.env_num):
             item = self.get_next_single_data(env_idx)
             if item is None:
                 self.end_list[env_idx] = True
                 self.all_episodes_end_list[env_idx] = True
 
-            data_item_list.append(item)
-            path_id_list.append(item['trajectory_id'])
-            paths_list.append(item['reference_path'])
+            self.data_item_list[env_idx] = item
+            self.path_id_list[env_idx] = item['trajectory_id']
+            self.paths_list[env_idx] = item['reference_path']
 
-        return data_item_list, path_id_list, paths_list
+    def update_next_single_data(self, env_idx, split, scan):
+        is_data_valid = False
+        while not is_data_valid:
+            '''1. Get new data'''
+            new_data = self.get_next_single_data(env_idx)
+            if new_data is None:
+                return None
+            
+            '''2. Create log path'''
+            episode_path = os.path.join(self.args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
+            self.args.episode_path_list[env_idx] = episode_path
+            if os.path.exists(episode_path):
+                if self.args.settings.force_sample:
+                    log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Force to sample again.")
+                    # remove the previous sampled data
+                    shutil.rmtree(episode_path)
+                    os.makedirs(episode_path)
+                    is_data_valid = True
+                else:
+                    log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Pass.")
+                    is_data_valid = False
+                    continue
+            else:
+                is_data_valid = True
+                os.makedirs(episode_path)
+
+            '''Reset env list'''
+            path_id = new_data['trajectory_id']
+            self.path_id_list[env_idx] = path_id
+            self.data_item_list[env_idx] = new_data
+            self.paths_list[env_idx] = new_data['reference_path']
+            self.end_list[env_idx] = False
+            self.just_end_list[env_idx] = True
+            self.success_list[env_idx] = False
+            self.env_action_finish_states[env_idx] = False
+            self.nav_point_list[env_idx] = 0
+            self.topdown_maps[env_idx] = None
+
+            '''Reset the robot'''
+            self.reset_single_robot(env_idx, new_data['start_position'], new_data['start_rotation'])
     
     def update_cam_occupancy_map_pose(self):
         '''update camera pose'''

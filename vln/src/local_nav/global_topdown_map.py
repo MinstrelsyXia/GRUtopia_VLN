@@ -298,3 +298,4 @@ class GlobalTopdownMap:
         # Save the plot
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
         log.info(f"Saved path planning visualization to {img_save_path}")
+        plt.close()

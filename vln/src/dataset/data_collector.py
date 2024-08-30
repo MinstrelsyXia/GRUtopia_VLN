@@ -126,5 +126,13 @@ class dataCollector:
                         
                     finish_flag = episode_data['finish_flag']
                 all_finish_flag = finish_flag and all_finish_flag
+            
+            self.child_pipe.send({'save_flag': True})
             if all_finish_flag:
                 break
+    
+    def get_save_finish_flag(self):
+        flag = self.parent_pipe.recv()
+        if flag is not None and 'save_flag' in flag:
+            return True
+        return False

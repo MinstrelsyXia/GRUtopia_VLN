@@ -115,15 +115,16 @@ class Camera(BaseSensor):
 
     def get_data(self, add_rgb_subframes=False) -> Dict:
         if self.config.enable:
-            if add_rgb_subframes:
-                rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False)
+            # if add_rgb_subframes:
+            #     rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False)
             rgba = self._camera.get_rgba()
-            if add_rgb_subframes:
-                rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
+            # if add_rgb_subframes:
+                # rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
             depth = self._camera.get_depth()
-            frame = self._camera.get_current_frame()
+            # frame = self._camera.get_current_frame()
             # camera_params = self._camera.get_camera_params()
-            return {'rgba': rgba, 'depth': depth, 'frame': frame}
+            # return {'rgba': rgba, 'depth': depth, 'frame': frame}
+            return {'rgba': rgba, 'depth': depth}
         return {}
     
     # def get_camera_data(self, data_type: list) -> Dict:
