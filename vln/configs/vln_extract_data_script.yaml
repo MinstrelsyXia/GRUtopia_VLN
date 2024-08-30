@@ -25,6 +25,7 @@ settings:
   max_step: 20000
   force_sample: true
   filter_stairs: true
+  sample_env_flow: true # allow the env flow
 
 sample_episodes:
   step_interval: 40
