@@ -156,6 +156,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             init_actions = {'h1': {action_name: [[paths[0]], action_info]}}
         else:
             env_actions = update_env_actions(action_name, paths_list, path_idx=0)
+            env_actions = vln_envs.calc_env_action_offset(env_actions,action_name)
 
         start_time = time.time()
         
@@ -175,6 +176,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 if 'oracle' in action_name:
                     init_actions['h1'][action_name][1]['current_step'] = i
                 env_actions = update_env_actions(action_name, paths_list, path_idx=0)
+                env_actions = vln_envs.calc_env_action_offset(env_actions,action_name)
                 obs = env.step(actions=env_actions)
                 
                 if i % 50 == 0:
@@ -198,6 +200,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 
                 # vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
                 env_actions = update_env_actions(action_name, paths_list, path_idx=0)
+                env_actions = vln_envs.calc_env_action_offset(env_actions,action_name)
                 obs = env.step(actions=env_actions)
                 continue
             
@@ -249,6 +252,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                             action_info.update({'current_step': i})
                             actions = {'h1': {action_name: [exe_path, action_info]}}
                         else:
+                            exe_path = vln_envs.calc_single_env_action_offset(env_idx, exe_path)
                             actions = {'h1': {action_name: [exe_path]}}
                             env_actions[env_idx] = actions
                         

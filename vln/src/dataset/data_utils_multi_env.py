@@ -919,3 +919,17 @@ class VLNDataLoader(Dataset):
         
         status_abnormal_list = [fall and stuck for fall, stuck in zip(is_fall_list, is_stuck_list)]
         return status_abnormal_list
+
+    def calc_env_action_offset(self, env_actions, action_name):
+        robot_type = self.robot_names[0].split('_')[0]
+        for idx, action in enumerate(env_actions):
+            env_actions[idx][robot_type][action_name][0][0] += np.array(self.tasks[self.task_names[idx]]._offset)
+        
+        return env_actions
+    
+    def calc_single_env_action_offset(self, env_idx, exe_path):
+        task_name = self.task_names[env_idx]
+        for idx in range(len(exe_path)):
+            exe_path[idx] += self.tasks[task_name]._offset
+        
+        return exe_path
