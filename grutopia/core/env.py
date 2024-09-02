@@ -71,7 +71,7 @@ class BaseEnv:
     def get_dt(self):
         return self._runner.dt
 
-    def step(self, actions: List[Dict[str, Any]], add_rgb_subframes=False) -> List[Dict[str, Any]]:
+    def step(self, actions: List[Dict[str, Any]], add_rgb_subframes=False, render=False) -> List[Dict[str, Any]]:
         """
         run step with given action(with isaac step)
 
@@ -95,7 +95,7 @@ class BaseEnv:
         }
 
         # log.debug(action_after_reshape)
-        self._runner.step(action_after_reshape, add_rgb_subframes=add_rgb_subframes)
+        self._runner.step(action_after_reshape, add_rgb_subframes=add_rgb_subframes, render=render)
         observations = self.get_observations()
         return observations
 
