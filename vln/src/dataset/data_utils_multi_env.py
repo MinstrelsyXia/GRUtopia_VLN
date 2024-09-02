@@ -325,10 +325,10 @@ class VLNDataLoader(Dataset):
             if item is None:
                 self.end_list[env_idx] = True
                 self.all_episodes_end_list[env_idx] = True
-
-            self.data_item_list[env_idx] = item
-            self.path_id_list[env_idx] = item['trajectory_id']
-            self.paths_list[env_idx] = item['reference_path']
+            else:
+                self.data_item_list[env_idx] = item
+                self.path_id_list[env_idx] = item['trajectory_id']
+                self.paths_list[env_idx] = item['reference_path']
 
     def update_next_single_data(self, env_idx, split, scan):
         is_data_valid = False
@@ -356,6 +356,22 @@ class VLNDataLoader(Dataset):
             else:
                 is_data_valid = True
                 os.makedirs(episode_path)
+
+            '''log the data'''
+            status_info = []
+            status_info.append(f"trajectory id {new_data['trajectory_id']}")
+            status_info.append(f"Initialized scan {scan}")
+            status_info.append(f"Instruction: {new_data['instruction']['instruction_text']}")
+            status_info.append(f"Start Position: {self.sim_config.config.tasks[env_idx].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[env_idx].robots[0].orientation}")
+            status_info.append(f"GT paths length: {len(new_data['reference_path'])}, points: {new_data['reference_path']}")
+
+            for info in status_info:
+                log.info(info)
+
+            self.args.episode_status_info_file_list[env_idx] = os.path.join(self.args.episode_path_list[env_idx], 'status_info.txt')
+            with open(self.args.episode_status_info_file_list[env_idx], 'w') as f:
+                for info in status_info:
+                    f.write(info + '\n')   
 
             '''Reset env list'''
             self.path_id_list[env_idx] = path_id
@@ -488,7 +504,7 @@ class VLNDataLoader(Dataset):
             status_info.append(f"trajectory id {item['trajectory_id']}")
             status_info.append(f"Initialized scan {scan}")
             status_info.append(f"Instruction: {item['instruction']['instruction_text']}")
-            status_info.append(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
+            status_info.append(f"Start Position: {self.sim_config.config.tasks[i].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[i].robots[0].orientation}")
             status_info.append(f"GT paths length: {len(item['reference_path'])}, points: {item['reference_path']}")
 
             for info in status_info:
