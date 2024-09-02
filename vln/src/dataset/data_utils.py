@@ -18,7 +18,7 @@ from torch.utils.data import Dataset
 from PIL import Image
 import matplotlib.pyplot as plt
 import importlib
-from scipy.ndimage import convolve, gaussian_filter
+# from scipy.ndimage import convolve, gaussian_filter
 
 try:
     from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat

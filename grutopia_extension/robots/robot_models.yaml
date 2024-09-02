@@ -120,6 +120,9 @@ robots:
   - name: "topdown_camera_500"
     type: "Camera"
     prim_path: "topdown_camera_500"
+  - name: "h1_camera_debug"
+    type: "Camera"
+    prim_path: "torso_link/h1_camera_debug"
     
   # - name: "pano_camera_45"
   #   type: "Camera"

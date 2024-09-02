@@ -31,7 +31,6 @@ from grutopia.core.util.log import log
 
 # from grutopia_extension.utils import get_stage_prim_paths
 
-from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
 from vln.src.dataset.data_utils import VLNDataLoader

@@ -267,7 +267,7 @@ class CamOccupancyMap:
         # update the pose of the camera based on robot's pose
         # orientation_quat = euler_angles_to_quat([0,180,0])
         orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
-        self.issac_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
+        self.issac_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8], orientation_quat)
 
     def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, update_camera_pose=True, verbose=False, env_idx=None):
         # Define height range for free map

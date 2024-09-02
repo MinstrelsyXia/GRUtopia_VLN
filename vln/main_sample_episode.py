@@ -33,6 +33,14 @@ sys.path.append(ISSAC_SIM_DIR)
 
 from parser import process_args
 
+def save_obs_images(obs, env_num, camera='pano_camera_0'):
+    for i in range(env_num):
+        rgb = obs[f'vln_{i}'][f'h1_{i}'][camera]['rgba']
+        plt.clf()
+        plt.imshow(rgb)
+        plt.savefig(f'logs/images/obs_{camera}_{i}.png')
+        plt.clf()
+
 def build_dataset():
     ''' Build dataset for VLN
     '''
@@ -126,6 +134,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
     
         '''start simulation'''
         i = 0
+        render = False
         if scan_first_init:
             warm_step = 240 if args.headless else 2000
             scan_first_init = False
@@ -165,6 +174,16 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                 break
 
             i += 1
+
+            if i % sim_config.config.simulator.rendering_interval == 0:
+                render = True
+            else:
+                render = False
+
+            # update warm up list
+            for warm_up_idx in range(vln_envs.env_num):
+                if vln_envs.warm_up_list[warm_up_idx] > 0:
+                    vln_envs.warm_up_list[warm_up_idx] -= 1
             
             '''(1) warm up process'''
             if i < warm_step:
@@ -188,29 +207,31 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             elif i == warm_step:
                 # first warm up finished
                 for env_idx in range(env_num):
-                    topdown_map = vln_envs.GlobalTopdownMap(args, scan)
-                    freemap, camera_pose = vln_envs.get_global_free_map_single(env_idx, verbose=args.test_verbose)
-                    topdown_map.update_map(freemap, camera_pose, verbose=args.test_verbose, env_idx=env_idx)
-                    vln_envs.topdown_maps[env_idx] = topdown_map
-                    log.info(f"====The global freemap has been initialized for Path_id {vln_envs.path_id_list[env_idx]}====")
+                    if vln_envs.warm_up_list[env_idx] == 0:
+                        topdown_map = vln_envs.GlobalTopdownMap(args, scan)
+                        freemap, camera_pose = vln_envs.get_global_free_map_single(env_idx, verbose=args.test_verbose)
+                        topdown_map.update_map(freemap, camera_pose, verbose=args.test_verbose, env_idx=env_idx)
+                        vln_envs.topdown_maps[env_idx] = topdown_map
+                        log.info(f"====The global freemap has been initialized for Path_id {vln_envs.path_id_list[env_idx]}====")
 
                 vln_envs.env_action_finish_states = [True] * env_num
                 
                 # vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
                 # env_actions = update_env_actions(action_name, vln_envs.paths_list, path_idx=0)
                 # env_actions = vln_envs.calc_env_action_offset(env_actions,action_name)
-                obs = env.step(actions=env_actions)
+                obs = env.step(actions=env_actions, add_rgb_subframes=True, render=True)
                 continue
             
             '''Check for the robot status'''
-            if 'oracle' not in action_name and i % 50 == 0:
+            if 'oracle' not in action_name and i % 20 == 0:
                 status_abnormal_list = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=vln_config.test_verbose)
                 for status_idx, status in enumerate(status_abnormal_list):
-                    if status:
-                        # log.error(f"Scan: {scan}, Path_id: {vln_envs.path_id_list[status_idx]}: The robot is reset. Break this episode for this env.")
-                        vln_envs.end_list[status_idx] = True
-                        vln_envs.env_action_finish_states[status_idx] = True
-                        vln_envs.just_end_list[env_idx] = True
+                    if vln_envs.warm_up_list[status_idx] == 0:
+                        if status:
+                            # log.error(f"Scan: {scan}, Path_id: {vln_envs.path_id_list[status_idx]}: The robot is reset. Break this episode for this env.")
+                            vln_envs.end_list[status_idx] = True
+                            vln_envs.env_action_finish_states[status_idx] = True
+                            vln_envs.just_end_list[env_idx] = True
             
             if args.test_verbose and args.windows_head:
                 # TODO
@@ -219,7 +240,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             '''(2) check for action finish status and update navigation'''
             for env_idx in range(env_num):
                 exe_paths = [[]] * env_num
-                if vln_envs.end_list[env_idx]:
+                if vln_envs.end_list[env_idx] or vln_envs.warm_up_list[env_idx] > 0:
                     # this episode has ended.
                     # env_actions[env_idx] = stand_still_action
                     continue
@@ -248,9 +269,10 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                         exe_paths.append(exe_path) 
                         if exe_path is None or len(exe_path) == 0:
                             # path planning fails
-                            log.error(f"Scan: {scan}, Path_id: {path_id}. Path planning fails to find the path from the current point to the next point.")
+                            log.error(f"{env_idx}-th env fails. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Path planning fails to find the path from the current point to the next point.")
                             vln_envs.end_list[env_idx] = True
                             vln_envs.just_end_list[env_idx] = True
+                            vln_envs.env_action_finish_states[env_idx] = False
                             continue
 
                         if 'oracle' in action_name:
@@ -283,7 +305,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
 
             '''(3) Justify the episode finish status'''
             for env_idx, action_finish_state in enumerate(vln_envs.env_action_finish_states):
-                if action_finish_state or vln_envs.end_list[env_idx]:
+                if vln_envs.warm_up_list[env_idx] == 0 and action_finish_state or vln_envs.end_list[env_idx]:
                     if vln_envs.nav_point_list[env_idx] == len(vln_envs.paths_list[env_idx])-1 and vln_envs.just_end_list[env_idx] == True:
                         log.info(f"[Success] Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. The robot has finished this episode !!!")
                         vln_envs.end_list[env_idx] = True
@@ -298,13 +320,15 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                         # assign new path to the finished env
                         if vln_envs.end_list[env_idx] and not vln_envs.env_action_finish_states[env_idx]:
                             vln_envs.update_next_single_data(env_idx, split, scan)
-                            log.info(f"Assign new path_id: {vln_envs.path_id_list[env_idx]} to the {env_idx}-th robot. Reset this env!")
+                            log.error(f"{env_idx}-th Env: Assign new path_id: {vln_envs.path_id_list[env_idx]}. Reset this env!")
                             robot_pose = vln_envs.get_robot_poses()[env_idx][0]
                             robot_pose_offset = vln_envs.calc_single_env_action_offset(env_idx, [robot_pose])
                             env_actions[env_idx] = {'h1':{action_name: [robot_pose_offset]}}
+                            render = True
+                            add_rgb_subframes = True
 
             '''(4) Step and get new observations'''
-            obs = env.step(actions=env_actions, add_rgb_subframes=add_rgb_subframes)
+            obs = env.step(actions=env_actions, add_rgb_subframes=add_rgb_subframes, render=render)
             # if 'oracle' not in action_name:
                 # vln_envs.update_cam_occupancy_map_pose() # adjust the camera pose
 
@@ -349,23 +373,6 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             else:
                 for env_idx in range(env_num):
                     vln_envs.env_action_finish_states[env_idx] = False
-            
-            # '''(3) Justify the episode finish status'''
-            # for env_idx, action_finish_state in enumerate(vln_envs.env_action_finish_states):
-            #     if action_finish_state:
-            #         if vln_envs.nav_point_list[env_idx] == len(vln_envs.paths_list[env_idx])-1 and vln_envs.just_end_list[env_idx] == True:
-            #             log.info(f"[Success] Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. The robot has finished this episode !!!")
-            #             vln_envs.end_list[env_idx] = True
-            #             vln_envs.success_list[env_idx] = True
-            #             vln_envs.just_end_list[env_idx] = False
-
-            #             with open(args.episode_status_info_file_list[env_idx], 'a') as f:
-            #                 f.write(f"Episode finished: {vln_envs.success_list[env_idx]}\n")
-                    
-            #         if args.settings.sample_env_flow:
-            #             # assign new path to the finished env
-            #             if vln_envs.end_list[env_idx] and data_collector.get_save_finish_flag():
-            #                 vln_envs.update_next_single_data(env_idx)
         
         for status_info_file in args.episode_status_info_file_list:
             with open(status_info_file, 'a') as f:

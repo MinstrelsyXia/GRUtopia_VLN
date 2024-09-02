@@ -101,7 +101,7 @@ class HumanoidMoveBySpeedController(BaseController):
         rotation_speed: float = 0,
         lateral_speed: float = 0,
     ) -> ArticulationAction:
-        if self._apply_times_left > 0:
+        if self._apply_times_left > 0: # !!!
             self._apply_times_left -= 1
             if self.joint_subset is None:
                 return ArticulationAction(joint_positions=self.applied_joint_positions)

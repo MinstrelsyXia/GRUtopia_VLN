@@ -249,10 +249,13 @@ class VLNDataLoader(Dataset):
         for idx, (task_name, task) in enumerate(self.tasks.items()):
             self.robots.append(task.robots[self.robot_names[idx]])
             self.isaac_robots.append(task.robots[self.robot_names[idx]].isaac_robot)
-            robot_pose = self.isaac_robots[idx].get_world_pose()
+            robot_pose = self.sim_config.config.tasks[idx].robots[0].position # only one robot
+            robot_orientation = self.sim_config.config.tasks[idx].robots[0].orientation
+
+            # robot_pose = self.isaac_robots[idx].get_world_pose()
             # robot_pose = task.get_robot_poses_without_offset()
-            self.robot_init_poses.append(robot_pose[0])
-            self.robot_init_orientations.append(robot_pose[1])
+            self.robot_init_poses.append(robot_pose)
+            self.robot_init_orientations.append(robot_orientation)
 
         self.robot_last_poses = [None]*self.env_num
         self.reset_robot(self.robot_init_poses, self.robot_init_orientations)
@@ -290,6 +293,7 @@ class VLNDataLoader(Dataset):
         self.env_data = [[] for _ in range(self.env_num)]
         self.env_index = [0] * self.env_num
         self.all_episodes_end_list = [False] * self.env_num
+        self.warm_up_list = [10] * self.env_num # This is for warm-up after resetting
 
         self.data_item_list = [None] * self.env_num
         self.path_id_list = [None] * self.env_num
@@ -363,6 +367,7 @@ class VLNDataLoader(Dataset):
             self.env_action_finish_states[env_idx] = False
             self.nav_point_list[env_idx] = 0
             self.topdown_maps[env_idx] = None
+            self.warm_up_list[env_idx] = 10
 
             '''Reset the robot'''
             self.reset_single_robot(env_idx, new_data['start_position'], new_data['start_rotation'])
@@ -386,6 +391,7 @@ class VLNDataLoader(Dataset):
         rotations_utils = importlib.import_module("omni.isaac.core.utils.rotations")
         self.quat_to_euler_angles = rotations_utils.quat_to_euler_angles
         self.euler_angles_to_quat = rotations_utils.euler_angles_to_quat
+        # self.rot_utils = rotations_utils.rot_utils
         # from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
 
     def init_one_path(self, path_id):
@@ -943,7 +949,18 @@ class VLNDataLoader(Dataset):
         self.tasks[self.task_names[idx]].set_single_robot_poses_without_offset(position, orientation)
         self.isaac_robots[idx].set_joint_velocities(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.isaac_robots[idx].set_joint_positions(np.zeros(len(self.isaac_robots[idx].dof_names)))
+        self.isaac_robots[idx].set_joint_efforts(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.robot_last_poses[idx] = position
+        self.robot_init_poses[idx] = position
+        self.robot_init_orientations[idx] = orientation
+
+        # update top-down camera
+        # orientation_quat = self.rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+        # robot_pos = self.get_robot_poses()[idx][0]
+        # self.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
+
+        robot_pos = self.get_robot_poses()[idx][0]
+        self.cam_occupancy_map_global_list[idx].set_world_pose(robot_pos)
     
     def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False, reset=False):
         is_fall_list = [None]*self.env_num
