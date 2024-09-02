@@ -318,7 +318,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                     
                     if args.settings.sample_env_flow:
                         # assign new path to the finished env
-                        if vln_envs.end_list[env_idx] and not vln_envs.env_action_finish_states[env_idx]:
+                        if vln_envs.end_list[env_idx] and not vln_envs.env_action_finish_states[env_idx] and not vln_envs.all_episodes_end_list[env_idx]:
                             vln_envs.update_next_single_data(env_idx, split, scan)
                             log.error(f"{env_idx}-th Env: Assign new path_id: {vln_envs.path_id_list[env_idx]}. Reset this env!")
                             robot_pose = vln_envs.get_robot_poses()[env_idx][0]
@@ -350,6 +350,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
                             camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
                             robot_pose_dict=robot_pose_dict,
                             end_list=vln_envs.end_list, 
+                            path_id_list=vln_envs.path_id_list,
                             add_rgb_subframes=True, finish_flag=False)
 
                 is_image_stacked = True

@@ -21,8 +21,25 @@ class dataCollector:
         self.cam_save_path_list = []
         self.robot_save_path_list = []
 
-        for path_id in self.path_id_list:
-            save_dir = os.path.join(args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
+        self.generate_save_dir_list(path_id_list)
+        # for path_id in self.path_id_list:
+        #     save_dir = os.path.join(args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
+        #     if not os.path.exists(save_dir):
+        #         os.makedirs(save_dir)
+        
+        #     pose_save_path = os.path.join(save_dir, 'poses.txt')
+        #     cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
+        #     robot_save_path = os.path.join(save_dir, 'robot_param.jsonl')
+
+        #     self.save_dir_list.append(save_dir)
+        #     self.pose_save_path_list.append(pose_save_path)
+        #     self.cam_save_path_list.append(cam_save_path)
+        #     self.robot_save_path_list.append(robot_save_path)
+    
+    def generate_save_dir_list(self, path_id_list):
+        save_dir_list, pose_save_path_list, cam_save_path_list, robot_save_path_list = [], [], [], []
+        for path_id in path_id_list:
+            save_dir = os.path.join(self.args.sample_episode_dir, self.split, self.scan, f"id_{str(path_id)}")
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
         
@@ -30,13 +47,18 @@ class dataCollector:
             cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
             robot_save_path = os.path.join(save_dir, 'robot_param.jsonl')
 
-            self.save_dir_list.append(save_dir)
-            self.pose_save_path_list.append(pose_save_path)
-            self.cam_save_path_list.append(cam_save_path)
-            self.robot_save_path_list.append(robot_save_path)
+            save_dir_list.append(save_dir)
+            pose_save_path_list.append(pose_save_path)
+            cam_save_path_list.append(cam_save_path)
+            robot_save_path_list.append(robot_save_path)
+        
+        return save_dir_list, pose_save_path_list, cam_save_path_list, robot_save_path_list
 
 
-    def collect_and_send_data(self, step_time, env, camera_list, camera_pose_dict, robot_pose_dict, end_list, add_rgb_subframes=True, finish_flag=False):
+    def collect_and_send_data(self, step_time, env, camera_list, camera_pose_dict, robot_pose_dict, end_list, path_id_list, add_rgb_subframes=True, finish_flag=False):
+        # generate path id list
+        save_dir_list, pose_save_path_list, cam_save_path_list, robot_save_path_list = self.generate_save_dir_list(path_id_list)
+
         obs = env.get_observations(add_rgb_subframes=add_rgb_subframes)
 
         # episode_data = {
@@ -55,7 +77,11 @@ class dataCollector:
                             'camera_data': {},
                             'robot_info': {},
                             'finish_flag': finish_flag,
-                            'env_idx': env_idx
+                            'env_idx': env_idx,
+                            'save_dir_list': save_dir_list,
+                            'pose_save_path_list': pose_save_path_list,
+                            'cam_save_path_list': cam_save_path_list,
+                            'robot_save_path_list': robot_save_path_list
                         }
                     }
                     for camera in camera_list:
@@ -99,13 +125,18 @@ class dataCollector:
             for i, episode_data_item in enumerate(episode_datas):
                 if episode_data_item is not None:
                     for robot_name, episode_data in episode_data_item.items():
+                        save_dir_list = episode_data['save_dir_list']
+                        pose_save_path_list = episode_data['pose_save_path_list']
+                        cam_save_path_list = episode_data['cam_save_path_list']
+                        robot_save_path_list = episode_data['robot_save_path_list']
+
                         idx = episode_data['env_idx']
                         if 'camera_data' in episode_data:
                             for camera, camera_data in episode_data['camera_data'].items():
                                 # Save camera pose
                                 pos = camera_data['position']
                                 quat = camera_data['orientation']
-                                with open(self.pose_save_path_list[idx], 'a') as f:
+                                with open(pose_save_path_list[idx], 'a') as f:
                                     f.write(f"{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}\n")
 
                                 # Save images
@@ -113,14 +144,14 @@ class dataCollector:
                                 rgb_image = Image.fromarray(camera_data['rgb'], "RGB")
                                 depth_image = camera_data['depth']
 
-                                rgb_filename = os.path.join(self.save_dir_list[idx], f"{camera}_image_step_{step_time}.png")
+                                rgb_filename = os.path.join(save_dir_list[idx], f"{camera}_image_step_{step_time}.png")
                                 rgb_image.save(rgb_filename)
 
-                                depth_filename = os.path.join(self.save_dir_list[idx], f"{camera}_depth_step_{step_time}.npy")
+                                depth_filename = os.path.join(save_dir_list[idx], f"{camera}_depth_step_{step_time}.npy")
                                 np.save(depth_filename, depth_image)
 
                             # Save robot information
-                            with open(self.robot_save_path_list[idx], 'a') as f:
+                            with open(robot_save_path_list[idx], 'a') as f:
                                 json.dump(episode_data['robot_info'], f)
                                 f.write('\n')
                         

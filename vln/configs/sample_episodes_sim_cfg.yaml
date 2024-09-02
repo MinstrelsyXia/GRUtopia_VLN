@@ -41,7 +41,7 @@ tasks:
       enable: true
       size: [500, 500]
     - name: "h1_camera_debug"
-      enable: true
+      enable: false
       size: [640, 480]
     # - name: "pano_camera_45"
     #   enable: true
