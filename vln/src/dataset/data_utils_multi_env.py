@@ -220,11 +220,8 @@ class VLNDataLoader(Dataset):
 
         '''Init multiple list'''
         self.env_num = sim_config.config.tasks[0].env_num # only one task
-        # self.task_name = sim_config.config.tasks[0].name # only one task
         self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot
-
-        '''Init env data manager'''
-        # self.init_env_manager()
+        self.all_episode_finish = False
     
     def __len__(self):
         return len(self.data)
@@ -282,7 +279,7 @@ class VLNDataLoader(Dataset):
     def init_env_manager(self):
         '''Init env data manager'''
         self.data_idx = 0
-        
+
         self.bev_list = [None]*self.env_num
         self.surrounding_freemap_connected_list = [None]*self.env_num
         self.surrounding_freemap_list = [None]*self.env_num
@@ -292,12 +289,10 @@ class VLNDataLoader(Dataset):
         self.end_list = [False] * self.env_num
         self.just_end_list = [True] * self.env_num
         self.success_list = [False] * self.env_num
-        self.env_data = [[] for _ in range(self.env_num)]
-        self.env_index = [0] * self.env_num
-        self.all_episodes_end_list = [False] * self.env_num
+        self.env_data_list = [None] * self.env_num
+        self.env_step_start_index = [0] * self.env_num
         self.warm_up_list = [10] * self.env_num # This is for warm-up after resetting
 
-        self.data_item_list = [None] * self.env_num
         self.path_id_list = [None] * self.env_num
         self.paths_list = [None] * self.env_num
         self.env_action_finish_states = [False] * self.env_num
@@ -305,38 +300,30 @@ class VLNDataLoader(Dataset):
         self.topdown_maps = [None] * self.env_num
 
         self.args.episode_path_list = [None]*self.env_num
+        self.args.episode_status_info_file_list = [None]*self.env_num
     
-    def allocate_data(self, scan):
+    def allocate_data(self, split, scan):
         self.scan_data = self.data[scan]
         self.sim_config.config.tasks[0].env_num = self.env_num = min(len(self.scan_data), self.env_num)
         self.init_env_manager() # update env_num according to the data length
-        for idx, data in enumerate(self.scan_data):
-            env_idx = idx % self.env_num
-            self.env_data[env_idx].append(data)
 
-    def get_next_single_data(self, env_idx):
-        if self.env_index[env_idx] < len(self.env_data[env_idx]):
-            data = self.env_data[env_idx][self.env_index[env_idx]]
-            self.env_index[env_idx] += 1
-            return data
+        for idx in range(self.env_num):
+            self.update_next_single_data(idx, split, scan, current_step=0, reset_robot=False)
+
+    def get_next_single_data(self):
+        if self.data_idx < len(self.scan_data):
+            item = self.scan_data[self.data_idx]
+            self.data_idx += 1
+            return item
+        self.all_episode_finish = True
         return None
 
-    def get_next_data(self):
-        for env_idx in range(self.env_num):
-            item = self.get_next_single_data(env_idx)
-            if item is None:
-                self.end_list[env_idx] = True
-                self.all_episodes_end_list[env_idx] = True
-            else:
-                self.data_item_list[env_idx] = item
-                self.path_id_list[env_idx] = item['trajectory_id']
-                self.paths_list[env_idx] = item['reference_path']
-
-    def update_next_single_data(self, env_idx, split, scan):
+    def update_next_single_data(self, env_idx, split, scan, current_step=0, reset_robot=True):
+        '''Get the next single data and init all settings'''
         is_data_valid = False
         while not is_data_valid:
             '''1. Get new data'''
-            new_data = self.get_next_single_data(env_idx)
+            new_data = self.get_next_single_data()
             if new_data is None:
                 return False
             
@@ -364,7 +351,7 @@ class VLNDataLoader(Dataset):
             status_info.append(f"trajectory id {new_data['trajectory_id']}")
             status_info.append(f"Initialized scan {scan}")
             status_info.append(f"Instruction: {new_data['instruction']['instruction_text']}")
-            status_info.append(f"Start Position: {self.sim_config.config.tasks[env_idx].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[env_idx].robots[0].orientation}")
+            status_info.append(f"Start Position: {new_data['start_position']}, Start Rotation: {new_data['start_rotation']}")
             status_info.append(f"GT paths length: {len(new_data['reference_path'])}, points: {new_data['reference_path']}")
 
             for info in status_info:
@@ -377,7 +364,7 @@ class VLNDataLoader(Dataset):
 
             '''Reset env list'''
             self.path_id_list[env_idx] = path_id
-            self.data_item_list[env_idx] = new_data
+            self.env_data_list[env_idx] = new_data
             self.paths_list[env_idx] = new_data['reference_path']
             self.end_list[env_idx] = False
             self.just_end_list[env_idx] = True
@@ -386,9 +373,13 @@ class VLNDataLoader(Dataset):
             self.nav_point_list[env_idx] = 0
             self.topdown_maps[env_idx] = None
             self.warm_up_list[env_idx] = 10
+            self.success_list[env_idx] = False
+            self.env_action_finish_states[env_idx] = False
+            self.env_step_start_index[env_idx] = current_step
 
             '''Reset the robot'''
-            self.reset_single_robot(env_idx, new_data['start_position'], new_data['start_rotation'])
+            if reset_robot:
+                self.reset_single_robot(env_idx, new_data['start_position'], new_data['start_rotation'])
 
         return True
     
@@ -482,7 +473,7 @@ class VLNDataLoader(Dataset):
 
         return item
 
-    def init_multiple_episodes(self, scan, data_item_list, path_id_list=None, init_omni_env=False, reset_scene=False, save_log=False):
+    def init_multiple_episodes(self, scan, path_id_list=None, init_omni_env=False, reset_scene=False):
         '''init multiple episodes'''
         if path_id_list is not None:
             idx_list = []
@@ -492,38 +483,15 @@ class VLNDataLoader(Dataset):
                         idx_list.append(idx)
                         break
 
-        # data_item_list = []
-        path_id_list = []
-        self.args.episode_status_info_file_list = [None]*self.env_num
-
-        for i, item in enumerate(data_item_list):
-            path_id_list.append(item['trajectory_id'])
+        for i, item in enumerate(self.env_data_list):
             scene_usd_path = load_scene_usd(self.args, scan)
             self.sim_config.config.tasks[i].scene_asset_path = scene_usd_path
             self.sim_config.config.tasks[i].robots[0].position = item["start_position"] # only one robot
-            self.sim_config.config.tasks[i].robots[0].orientation = item["start_rotation"]
-
-            status_info = []
-
-            status_info.append(f"trajectory id {item['trajectory_id']}")
-            status_info.append(f"Initialized scan {scan}")
-            status_info.append(f"Instruction: {item['instruction']['instruction_text']}")
-            status_info.append(f"Start Position: {self.sim_config.config.tasks[i].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[i].robots[0].orientation}")
-            status_info.append(f"GT paths length: {len(item['reference_path'])}, points: {item['reference_path']}")
-
-            for info in status_info:
-                log.info(info)
-
-            if save_log:
-                self.args.episode_status_info_file_list[i] = os.path.join(self.args.episode_path_list[i], 'status_info.txt')
-                with open(self.args.episode_status_info_file_list[i], 'w') as f:
-                    for info in status_info:
-                        f.write(info + '\n')   
+            self.sim_config.config.tasks[i].robots[0].orientation = item["start_rotation"]  
 
         if reset_scene:
             # reset scene without restart app
-            # TODO: this not works!
-            # TODO: 尝试开多个task。
+            # TODO: 关闭world后重启task，加载不同的scene
             start_time = time.time()
             self.env._runner._world.clear()
             self.env._runner.add_tasks(self.sim_config.config.tasks)
@@ -533,6 +501,7 @@ class VLNDataLoader(Dataset):
             # should only be called at the first time.
             self.init_env(self.sim_config, headless=self.args.headless)
             self.init_omni_env()
+
         self.init_robots()      
 
         return item

@@ -8,7 +8,7 @@ tasks:
   name: "vln"
   scene_asset_path: ""
   scene_scale: [1, 1, 1]
-  env_num: 12
+  env_num: 2
   offset_size: 100.0
   light_on: true
   robots:

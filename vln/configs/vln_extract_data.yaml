@@ -23,7 +23,7 @@ settings:
     - depth
     - camera_params
   max_step: 20000
-  force_sample: true
+  force_sample: false
   filter_stairs: true
 
 sample_episodes:
