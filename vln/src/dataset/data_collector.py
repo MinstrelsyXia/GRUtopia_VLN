@@ -55,7 +55,10 @@ class dataCollector:
         return save_dir_list, pose_save_path_list, cam_save_path_list, robot_save_path_list
 
 
-    def collect_and_send_data(self, step_time, env, camera_list, camera_pose_dict, robot_pose_dict, end_list, path_id_list, add_rgb_subframes=True, finish_flag=False):
+    def collect_and_send_data(self, step_time, env, camera_list, 
+                              camera_pose_dict, robot_pose_dict, end_list, 
+                              path_id_list, start_step_list, 
+                              add_rgb_subframes=True, finish_flag=False):
         # generate path id list
         save_dir_list, pose_save_path_list, cam_save_path_list, robot_save_path_list = self.generate_save_dir_list(path_id_list)
 
@@ -95,7 +98,7 @@ class dataCollector:
                         depth_info[depth_info > max_depth] = 0
 
                         episode_data[robot_name]['camera_data'][camera] = {
-                            'step_time': step_time,
+                            'step_time': step_time-start_step_list[env_idx],
                             'rgb': rgb_info,
                             'depth': depth_info,
                             'position': pos.tolist(),
@@ -103,7 +106,7 @@ class dataCollector:
                         }
 
                     episode_data[robot_name]['robot_info'] = {
-                        "step_time": step_time,
+                        "step_time": step_time-start_step_list[env_idx],
                         "position": robot_pose_dict[env_idx][0].tolist(),
                         "orientation": robot_pose_dict[env_idx][1].tolist()
                     }
@@ -116,8 +119,13 @@ class dataCollector:
         while True:
             time.sleep(self.data_collection_interval)
             episode_datas = self.child_pipe.recv()
+
             if len(episode_datas) == 0:
                 continue
+
+            if 'finish_flag' in episode_datas:
+                if episode_data['finish_flag'] == True:
+                    break
 
             # Save camera information
             all_finish_flag = True
