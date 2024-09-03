@@ -305,27 +305,29 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
 
             '''(3) Justify the episode finish status'''
             for env_idx, action_finish_state in enumerate(vln_envs.env_action_finish_states):
-                if vln_envs.warm_up_list[env_idx] == 0 and action_finish_state or vln_envs.end_list[env_idx]:
+                if vln_envs.warm_up_list[env_idx] == 0 and (action_finish_state or vln_envs.end_list[env_idx]):
                     if vln_envs.nav_point_list[env_idx] == len(vln_envs.paths_list[env_idx])-1 and vln_envs.just_end_list[env_idx] == True:
+                        # success
                         log.info(f"[Success] Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. The robot has finished this episode !!!")
                         vln_envs.end_list[env_idx] = True
                         vln_envs.success_list[env_idx] = True
-                        vln_envs.just_end_list[env_idx] = False
 
                     if vln_envs.just_end_list[env_idx]:
                         with open(args.episode_status_info_file_list[env_idx], 'a') as f:
                             f.write(f"Episode finished: {vln_envs.success_list[env_idx]}\n")
+                        vln_envs.just_end_list[env_idx] = False
                     
                     if args.settings.sample_env_flow:
                         # assign new path to the finished env
                         if vln_envs.end_list[env_idx] and not vln_envs.env_action_finish_states[env_idx] and not vln_envs.all_episodes_end_list[env_idx]:
-                            vln_envs.update_next_single_data(env_idx, split, scan)
-                            log.error(f"{env_idx}-th Env: Assign new path_id: {vln_envs.path_id_list[env_idx]}. Reset this env!")
-                            robot_pose = vln_envs.get_robot_poses()[env_idx][0]
-                            robot_pose_offset = vln_envs.calc_single_env_action_offset(env_idx, [robot_pose])
-                            env_actions[env_idx] = {'h1':{action_name: [robot_pose_offset]}}
-                            render = True
-                            add_rgb_subframes = True
+                            update_flag = vln_envs.update_next_single_data(env_idx, split, scan)
+                            if update_flag:
+                                log.error(f"{env_idx}-th Env: Assign new path_id: {vln_envs.path_id_list[env_idx]}. Reset this env!")
+                                robot_pose = vln_envs.get_robot_poses()[env_idx][0]
+                                robot_pose_offset = vln_envs.calc_single_env_action_offset(env_idx, [robot_pose])
+                                env_actions[env_idx] = {'h1':{action_name: [robot_pose_offset]}}
+                                render = True
+                                add_rgb_subframes = True
 
             '''(4) Step and get new observations'''
             obs = env.step(actions=env_actions, add_rgb_subframes=add_rgb_subframes, render=render)
@@ -381,7 +383,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
 
         end_time = time.time()
         total_time = (end_time - start_time)/60
-        log.info(f"Total time for this banch: {total_time:.2f} minutes")
+        log.info(f"Total time for this batch: {total_time:.2f} minutes")
 
     print('finish')
     parent_conn.send({'finish_flag': True})

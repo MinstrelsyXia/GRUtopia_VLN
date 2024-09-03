@@ -281,6 +281,8 @@ class VLNDataLoader(Dataset):
     
     def init_env_manager(self):
         '''Init env data manager'''
+        self.data_idx = 0
+        
         self.bev_list = [None]*self.env_num
         self.surrounding_freemap_connected_list = [None]*self.env_num
         self.surrounding_freemap_list = [None]*self.env_num
@@ -336,7 +338,7 @@ class VLNDataLoader(Dataset):
             '''1. Get new data'''
             new_data = self.get_next_single_data(env_idx)
             if new_data is None:
-                return None
+                return False
             
             '''2. Create log path'''
             path_id = new_data['trajectory_id']
@@ -387,6 +389,8 @@ class VLNDataLoader(Dataset):
 
             '''Reset the robot'''
             self.reset_single_robot(env_idx, new_data['start_position'], new_data['start_rotation'])
+
+        return True
     
     def update_cam_occupancy_map_pose(self):
         '''update camera pose'''
@@ -604,121 +608,6 @@ class VLNDataLoader(Dataset):
                     except Exception as e:
                         log.error(f"Error in saving camera image: {e}")
         return obs
-
-    def save_episode_data(self, split, scan, path_id, total_images, camera_list:list, add_rgb_subframes=True, step_time=0, init_param_data=False):
-        ''' Save episode data
-        '''
-        # make dir
-        save_dir = os.path.join(self.args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-
-        obs = self.env.get_observations(add_rgb_subframes=add_rgb_subframes)
-        camera_pose_dict = self.get_camera_pose()
-
-        # save camera information
-        for camera in camera_list:
-            cur_obs = obs[self.task_name][self.robot_name][camera]
-            # save pose
-            camera_pose = camera_pose_dict[camera]
-            pos, quat = camera_pose[0], camera_pose[1]
-            pose_save_path = os.path.join(save_dir, 'poses.txt')
-            if init_param_data:
-                # remove the previous sampling data before saving
-                if os.path.exists(pose_save_path):
-                    os.remove(pose_save_path)
-
-            with open(pose_save_path,'a') as f:
-                sep =""
-                f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}")
-                sep = "\n"
-        
-            # stack RGB into memory
-            rgb_info = cur_obs['rgba'][...,:3]
-            depth_info = cur_obs['depth']
-            max_depth = 10
-            depth_info[depth_info > max_depth] = 0 
-
-            total_images[camera].append({
-                'step_time': step_time,
-                'rgb': rgb_info,
-                'depth': depth_info})
-
-            # save camera_intrinsic
-            # camera_params = cur_obs['camera_params']
-            # 构造要保存的字典
-            camera_info = {
-                "camera": camera,
-                "step_time": step_time,
-                "position": camera_pose[0].tolist(),
-                'orientation': camera_pose[1].tolist()}
-            #     "intrinsic_matrix": camera_params['cameraProjection'].tolist(),
-            #     "extrinsic_matrix": camera_params['cameraViewTransform'].tolist(),
-            #     "cameraAperture": camera_params['cameraAperture'].tolist(),
-            #     "cameraApertureOffset": camera_params['cameraApertureOffset'].tolist(),
-            #     "cameraFocalLength": camera_params['cameraFocalLength'],
-            #     "robot_init_pose": self.agent_init_pose.tolist()
-            # }
-            # # print(self.agent_init_pose)
-            cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
-
-            # # 将信息追加保存到 jsonl 文件
-            with open(cam_save_path, 'a') as f:
-                json.dump(camera_info, f)
-                f.write('\n')
-        
-        # save robot information
-        robot_info = {
-            "step_time": step_time,
-            "position": obs[self.task_name][self.robot_name]['position'].tolist(),
-            "orientation": obs[self.task_name][self.robot_name]['orientation'].tolist()
-        }
-        robot_save_path = os.path.join(save_dir, 'robot_param.jsonl')
-
-        if init_param_data:
-            if os.path.exists(robot_save_path):
-                os.remove(robot_save_path)
-
-        # 将信息追加保存到 jsonl 文件
-        with open(robot_save_path, 'a') as f:
-            json.dump(robot_info, f)
-            f.write('\n')
-
-        return total_images
-    
-    def save_episode_images(self, total_images, sample_episode_dir, split, scan, path_id, lock, verbose=False, FLAG_FINISH=False, is_saving=False):
-        while True:
-            time.sleep(2)  # 每x秒保存一次数据，避免过于频繁
-            with lock:
-                camera_keys = list(total_images.keys())
-            for camera in camera_keys:
-                with lock:
-                    if camera in total_images:
-                        for idx, image_info in enumerate(total_images[camera]):
-
-                            step_time = image_info['step_time']
-                            rgb_image = Image.fromarray(image_info['rgb'], "RGB")
-                            depth_image = image_info['depth']
-
-                            # 定义文件名
-                            save_dir = os.path.join(sample_episode_dir, split, scan, f"id_{str(path_id)}")
-                            if not os.path.exists(save_dir):
-                                os.makedirs(save_dir)
-
-                            rgb_filename = os.path.join(save_dir, f"{camera}_image_step_{step_time}.png")
-                            rgb_image.save(rgb_filename)
-
-                            depth_filename = os.path.join(save_dir, f"{camera}_depth_step_{step_time}.npy")
-                            np.save(depth_filename, depth_image)
-
-                            if verbose:
-                                print(f"Saved {rgb_filename} and {depth_filename}")
-
-                # 清空已保存的数据，避免重复保存
-                total_images.clear()
-                is_saving = False
-            if FLAG_FINISH:
-                break
 
     def process_pointcloud(self, camera_list: list, convert_to_local=False, add_subframes=False):
         ''' Process pointcloud for combining multiple cameras
@@ -970,11 +859,7 @@ class VLNDataLoader(Dataset):
         self.robot_init_poses[idx] = position
         self.robot_init_orientations[idx] = orientation
 
-        # update top-down camera
-        # orientation_quat = self.rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
-        # robot_pos = self.get_robot_poses()[idx][0]
-        # self.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
-
+        # reset the camera
         robot_pos = self.get_robot_poses()[idx][0]
         self.cam_occupancy_map_global_list[idx].set_world_pose(robot_pos)
     
