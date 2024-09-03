@@ -22,8 +22,8 @@ settings:
     - rgba
     - depth
     - camera_params
-  max_step: 20000
-  force_sample: true
+  max_step: 500000
+  force_sample: false
   filter_stairs: true
   sample_env_flow: true # allow the env flow
 
