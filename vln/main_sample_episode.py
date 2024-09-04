@@ -284,7 +284,8 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                     topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose, env_idx=env_idx)
                     robot_current_position = vln_envs.get_robot_poses()[env_idx][0]
                     
-                    exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=(args.test_verbose or args.save_path_planning), save_dir=args.episode_path_list[env_idx]) 
+                    exe_path = topdown_map.navigate_p2p(robot_current_position, 
+                    paths[current_point+1], step_time=(i-vln_envs.env_step_start_index[env_idx]), verbose=(args.test_verbose or args.save_path_planning), save_dir=args.episode_path_list[env_idx]) 
                     if exe_path is None or len(exe_path) == 0:
                         # path planning fails
                         log.error(f"{env_idx}-th env fails. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Path planning fails to find the path from the current point to the next point.")

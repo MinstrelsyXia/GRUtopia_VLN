@@ -258,6 +258,7 @@ class VLNDataLoader(Dataset):
         self.reset_robot(self.robot_init_poses, self.robot_init_orientations)
 
         self.init_cam_occunpancy_map() # init camera occupancy map
+        self.init_check_robot_stuck(cur_iter=0)
     
     def init_BEVMap(self, robot_init_poses):
         '''init BEV map'''
@@ -298,6 +299,9 @@ class VLNDataLoader(Dataset):
         self.env_action_finish_states = [False] * self.env_num
         self.nav_point_list = [0] * self.env_num
         self.topdown_maps = [None] * self.env_num
+
+        self.stuck_last_iter = [0] * self.env_num
+        self.stuck_threshold = [0] * self.env_num
 
         self.args.episode_path_list = [None]*self.env_num
         self.args.episode_status_info_file_list = [None]*self.env_num
@@ -379,6 +383,8 @@ class VLNDataLoader(Dataset):
             self.success_list[env_idx] = False
             self.env_action_finish_states[env_idx] = False
             self.env_step_start_index[env_idx] = current_step
+            self.stuck_last_iter[env_idx] = 0
+            self.stuck_threshold[env_idx] = 0
 
             '''Reset the robot'''
             if reset_robot:
@@ -505,7 +511,7 @@ class VLNDataLoader(Dataset):
             self.init_env(self.sim_config, headless=self.args.headless)
             self.init_omni_env()
 
-        self.init_robots()      
+        self.init_robots()
 
         return item
     
@@ -734,18 +740,32 @@ class VLNDataLoader(Dataset):
 
         robot_poses = self.get_robot_poses()
         for env_idx in range(self.env_num):
-            self.agent_last_pose[env_idx] = robot_poses[env_idx][0]
-            self.agent_last_rotation[env_idx] = robot_poses[env_idx][1]
-            self.agent_last_valid_pose[env_idx] = robot_poses[env_idx][0]
-            self.agent_last_valid_rotation[env_idx] = robot_poses[env_idx][1]
+            self.init_check_single_robot_stuck(robot_poses, cur_iter, idx=env_idx)
+    
+    def init_check_single_robot_stuck(self, robot_poses, cur_iter=0, idx=0):
+        ''' Init the variables for checking if the robot is stuck
+        '''
+        self.agent_last_pose[idx] = robot_poses[idx][0]
+        self.agent_last_rotation[idx] = robot_poses[idx][1]
+        self.agent_last_valid_pose[idx] = robot_poses[idx][0]
+        self.agent_last_valid_rotation[idx] = robot_poses[idx][1]
+        self.stuck_threshold[idx] = 0
+        self.stuck_last_iter[idx] = cur_iter
     
     def check_robot_stuck(self, idx, agent, cur_iter, max_iter=300, threshold=0.2):
         ''' Check if the robot is stuck
         '''
         is_stuck = False
-        if not hasattr(self, 'agent_last_pose'):
-            self.init_check_robot_stuck(cur_iter)
+        if self.stuck_last_iter[idx] == 0:
+            agent_world_pose = agent.get_world_pose()
+            self.stuck_last_iter[idx] = cur_iter
+            self.agent_last_pose[idx] = agent_world_pose[0]
+            self.agent_last_rotation[idx] = agent_world_pose[1]
             return is_stuck
+
+        # if not hasattr(self, 'agent_last_pose'):
+        #     self.init_check_robot_stuck(cur_iter)
+        #     return is_stuck
 
         agent_world_pose = agent.get_world_pose()
         current_pose = agent_world_pose[0] - self.tasks[self.task_names[idx]]._offset
@@ -846,7 +866,7 @@ class VLNDataLoader(Dataset):
                 continue
             is_fall = self.check_robot_fall(isaac_robot, robots_bottom_z)
             is_fall_list[idx] = is_fall
-            is_stuck = self.check_robot_stuck(idx, isaac_robot, cur_iter=cur_iter, max_iter=2000, threshold=0.2)
+            is_stuck = self.check_robot_stuck(idx, isaac_robot, cur_iter=cur_iter, max_iter=1000, threshold=0.2)
             is_stuck_list[idx] = is_stuck
 
             if (not is_fall) and (not is_stuck):
