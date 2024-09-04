@@ -274,6 +274,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                     log.info(f"[Success] Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. The robot has finished this episode !!!")
                     vln_envs.end_list[env_idx] = True
                     vln_envs.success_list[env_idx] = True
+                    vln_envs.scan_success_path_id_list.append(vln_envs.path_id_list[env_idx])
 
                 if vln_envs.just_end_list[env_idx]:
                     with open(args.episode_status_info_file_list[env_idx], 'a') as f:
@@ -338,9 +339,11 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
             for env_idx in range(vln_envs.env_num):
                 vln_envs.env_action_finish_states[env_idx] = False
     
-    for status_info_file in args.episode_status_info_file_list:
-        with open(status_info_file, 'a') as f:
-            f.write(f"Episode finished: {vln_envs.success_list[env_idx]}\n")
+    '''7. Finish this scan'''
+    success_path_id_file = os.path.join(args.sample_episode_dir, split, scan, 'success_path_id.txt')
+    with open(success_path_id_file, 'w') as f:
+        for path_id in vln_envs.scan_success_path_id_list:
+            f.write(f"{path_id}\n")
 
     end_time = time.time()
     total_time = (end_time - start_time)/60

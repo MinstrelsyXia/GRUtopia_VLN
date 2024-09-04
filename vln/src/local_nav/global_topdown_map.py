@@ -232,6 +232,7 @@ class GlobalTopdownMap:
         
         else:
             occupancy_map, camera_pose = self.get_map(start, return_camera_pose=True)
+            goal[-1] = start[-1] # depend on start height 
             
             start_pixel = self.world_to_pixel(start)
             goal_pixel = self.world_to_pixel(goal)

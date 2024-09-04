@@ -301,6 +301,9 @@ class VLNDataLoader(Dataset):
 
         self.args.episode_path_list = [None]*self.env_num
         self.args.episode_status_info_file_list = [None]*self.env_num
+        
+        self.all_episode_finish = False
+        self.scan_success_path_id_list = []
     
     def allocate_data(self, split, scan):
         self.scan_data = self.data[scan]
