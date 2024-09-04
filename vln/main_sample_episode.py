@@ -75,37 +75,44 @@ def update_env_actions(action_name, paths_list, path_idx=-1):
         env_actions.append(init_actions)
     return env_actions
 
-def sample_episode_worker(args, vln_envs, data_camera_list, split, scan, is_app_up=False):
+def sample_episode_worker(args, vln_envs_all, data_camera_list, data_list):
     """
     Worker function to be executed in parallel.
     """
-    try:
-        scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
-        if not args.settings.force_sample and os.path.exists(scan_log_dir):
-            log.info(f'Scan {scan} has been sampled. Pass.')
-            return
-        env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
-        # Assuming `sample_episodes_single_scan` handles its own exceptions and cleanup
-    except Exception as e:
-        log.error(f"Error processing {scan} in {split}: {e}")
-    finally:
-        if hasattr(env, 'simulation_app'):
-            env.simulation_app.close()
+    is_app_up = False
+    for split, scan in data_list:
+        try:
+            vln_envs = vln_envs_all[split]
+            scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
+            if not args.settings.force_sample and os.path.exists(scan_log_dir):
+                log.info(f'Scan {scan} has been sampled. Pass.')
+                continue
+            env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+            is_app_up = True
+            # Assuming `sample_episodes_single_scan` handles its own exceptions and cleanup
+        except Exception as e:
+            log.error(f"Error processing {scan} in {split}: {e}")
+        # finally:
+        #     # if hasattr(env, 'simulation_app'):
+        #     env.simulation_app.close()
+        #     return
+    env.simulation_app.close()
 
 def sample_episodes_multiprocess(args, num_workers, vln_envs_all, data_camera_list):
     '''Use multiprocess to handle different scans'''
-    is_app_up = False  # This flag might need to be rethought depending on its purpose
-
-    tasks = []
+    tasks = [[] for _ in range(num_workers)]
+    scans = [[] for _ in range(num_workers)]
+    
+    i = 0
     for split, vln_envs in vln_envs_all.items():
         for scan in vln_envs.data:
-            tasks.append((args, vln_envs, data_camera_list, split, scan, is_app_up))
+            scans[i%num_workers].append((split, scan))
+            i += 1
+            # tasks.append((args, vln_envs, data_camera_list, split, scan, is_app_up))
 
-    # Use a Pool of workers to execute tasks in parallel
-    # with Pool(processes=num_workers) as pool:
-    #     pool.starmap(sample_episode_worker, tasks)
-    
-    # Use ProcessPoolExecutor to execute tasks in parallel
+    for task_idx in range(num_workers):
+        tasks[task_idx] = (args, vln_envs_all, data_camera_list, scans[task_idx])
+
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         # Using the executor to submit all tasks and immediately creating a list of futures
         futures = [executor.submit(sample_episode_worker, *task) for task in tasks]

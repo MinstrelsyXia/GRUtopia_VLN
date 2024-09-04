@@ -124,7 +124,7 @@ class dataCollector:
                 continue
 
             if 'finish_flag' in episode_datas:
-                if episode_data['finish_flag'] == True:
+                if episode_datas['finish_flag'] == True:
                     break
 
             # Save camera information

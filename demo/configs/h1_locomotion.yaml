@@ -23,6 +23,6 @@ tasks:
     - name: "rotate"
     sensor_params:
     - name: "camera"
-      enable: False
+      enable: True
     - name: "tp_camera"
-      enable: False
+      enable: True

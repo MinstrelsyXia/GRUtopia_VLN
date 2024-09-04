@@ -66,10 +66,10 @@ class SimulatorRunner:
 
         self._world.reset()
 
-        for task in self.current_tasks.values():
-            for robot in task.robots.values():
-                for sensor in robot.sensors.values():
-                    sensor.sensor_init()
+        # for task in self.current_tasks.values():
+        #     for robot in task.robots.values():
+        #         for sensor in robot.sensors.values():
+        #             sensor.sensor_init()
 
         self._warm_up()
 

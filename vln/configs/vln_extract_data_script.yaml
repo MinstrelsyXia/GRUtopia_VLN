@@ -35,7 +35,7 @@ robots:
   - name: "CylinderRobot"
     z_offset: 0.7 # !!!
   - name: "HumanoidRobot"
-    z_offset: 1.05 # !!!
+    z_offset: 0.975 # !!! 1.05
   
 maps:
   robot_z: [0.1, 1.7]  # Robot's height range on the Z-axis

@@ -162,6 +162,10 @@ class Camera(BaseSensor):
         #     output_data["camera_params"] = self._camera.get_camera_params()
         return output_data
     
+    def reset(self):
+        del self._camera
+        self._camera = self.create_camera()
+    
     def get_world_pose(self):
         return self._camera.get_world_pose()
     
