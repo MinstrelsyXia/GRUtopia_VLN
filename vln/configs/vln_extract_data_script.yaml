@@ -10,7 +10,7 @@ datasets:
     # - test
 
 settings:
-  mode: "sample_episodes"
+  mode: "sample_episodes_multiprocess" # sample_episodes_reset_scans
   batch_size: 1
   action: "move_along_path"
   # action: "oracle_move_along_path"
@@ -26,6 +26,7 @@ settings:
   force_sample: false
   filter_stairs: true
   sample_env_flow: true # allow the env flow
+  num_workers: 3
 
 sample_episodes:
   step_interval: 40
