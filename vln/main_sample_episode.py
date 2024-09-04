@@ -15,9 +15,10 @@ from collections import defaultdict
 from PIL import Image
 from copy import deepcopy
 import threading
-from multiprocessing import Pipe, Process
+from multiprocessing import Pipe, Process, Pool
+from threading import Thread
 import matplotlib.pyplot as plt
-
+from concurrent.futures import ProcessPoolExecutor
 
 from grutopia.core.config import SimulatorConfig
 from grutopia.core.env import BaseEnv
@@ -74,7 +75,52 @@ def update_env_actions(action_name, paths_list, path_idx=-1):
         env_actions.append(init_actions)
     return env_actions
 
-def sample_episodes(args, vln_envs_all, data_camera_list):
+def sample_episode_worker(args, vln_envs, data_camera_list, split, scan, is_app_up=False):
+    """
+    Worker function to be executed in parallel.
+    """
+    try:
+        scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
+        if not args.settings.force_sample and os.path.exists(scan_log_dir):
+            log.info(f'Scan {scan} has been sampled. Pass.')
+            return
+        env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+        # Assuming `sample_episodes_single_scan` handles its own exceptions and cleanup
+    except Exception as e:
+        log.error(f"Error processing {scan} in {split}: {e}")
+    finally:
+        if hasattr(env, 'simulation_app'):
+            env.simulation_app.close()
+
+def sample_episodes_multiprocess(args, num_workers, vln_envs_all, data_camera_list):
+    '''Use multiprocess to handle different scans'''
+    is_app_up = False  # This flag might need to be rethought depending on its purpose
+
+    tasks = []
+    for split, vln_envs in vln_envs_all.items():
+        for scan in vln_envs.data:
+            tasks.append((args, vln_envs, data_camera_list, split, scan, is_app_up))
+
+    # Use a Pool of workers to execute tasks in parallel
+    # with Pool(processes=num_workers) as pool:
+    #     pool.starmap(sample_episode_worker, tasks)
+    
+    # Use ProcessPoolExecutor to execute tasks in parallel
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        # Using the executor to submit all tasks and immediately creating a list of futures
+        futures = [executor.submit(sample_episode_worker, *task) for task in tasks]
+
+        # Optionally, you can wait for all futures to complete and handle their results or exceptions
+        for future in futures:
+            try:
+                result = future.result()  # This will block until the future is complete
+                # Handle the result (if any) here
+            except Exception as exc:
+                # Handle exceptions
+                print(f'Generated an exception: {exc}')
+
+def sample_episodes_reset_scans(args, vln_envs_all, data_camera_list):
+    '''Use one app to handle different scans'''
     is_app_up = False
     for split, vln_envs in vln_envs_all.items():
         for scan in vln_envs.data:
@@ -113,7 +159,8 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
     '''4. init pipe for saving images'''
     parent_conn, child_conn = Pipe()
     data_collector = dataCollector(args, parent_conn, child_conn, split, scan, vln_envs.path_id_list)
-    save_process = Process(target=data_collector.save_episode_data, args=())
+    # save_process = Process(target=data_collector.save_episode_data, args=())
+    save_process = Thread(target=data_collector.save_episode_data, args=())
     save_process.start()
     log.info(f"Save process starts.")
 
@@ -284,7 +331,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                 if args.settings.sample_env_flow:
                     # assign new path to the finished env
                     if vln_envs.end_list[env_idx]:
-                        update_flag = vln_envs.update_next_single_data(env_idx, split, scan)
+                        update_flag = vln_envs.update_next_single_data(env_idx, split, scan, current_step=i)
                         if update_flag:
                             log.error(f"{env_idx}-th Env: Assign new path_id: {vln_envs.path_id_list[env_idx]}. Reset this env!")
                             robot_pose = vln_envs.get_robot_poses()[env_idx][0]
@@ -365,7 +412,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
 if __name__ == "__main__":
     vln_envs, vln_config, sim_config, data_camera_list = build_dataset()
     
-    if vln_config.settings.mode == "sample_episodes":
-        sample_episodes(vln_config, vln_envs, data_camera_list)
-    elif vln_config.settings.mode == "sample_episodes_scripts":
-        sample_episodes_single_scan(vln_config, vln_envs, data_camera_list)
+    if vln_config.settings.mode == "sample_episodes_multiprocess":
+        sample_episodes_multiprocess(vln_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
+    elif vln_config.settings.mode == "sample_episodes_reset_scans":
+        sample_episodes_reset_scans(vln_config, vln_envs, data_camera_list)
