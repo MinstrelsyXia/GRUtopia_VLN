@@ -770,8 +770,8 @@ class VLNDataLoader(Dataset):
         agent_world_pose = agent.get_world_pose()
         current_pose = agent_world_pose[0] - self.tasks[self.task_names[idx]]._offset
         current_rotation = agent_world_pose[1]
-        diff = np.linalg.norm(current_pose - self.agent_last_pose[idx])
-        self.stuck_threshold[idx] += diff
+        diff = np.linalg.norm(current_pose[:2] - self.agent_last_pose[idx][:2])
+        self.stuck_threshold[idx] = diff
 
         if (cur_iter - self.stuck_last_iter[idx]) >= max_iter:
             if self.stuck_threshold[idx] < threshold:
@@ -781,8 +781,7 @@ class VLNDataLoader(Dataset):
                 self.stuck_last_iter[idx] = cur_iter
                 self.agent_last_valid_pose[idx] = current_pose
                 self.agent_last_valid_rotation[idx] = current_rotation
-
-        self.agent_last_pose[idx] = current_pose
+                self.agent_last_pose[idx] = current_pose
 
         return is_stuck
     
@@ -874,10 +873,11 @@ class VLNDataLoader(Dataset):
                     self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
                 # return False
             else:
-                if is_fall:
-                    log.error(f"The {idx}-th Robot falls down.")
-                if is_stuck:
-                    log.error(f"The {idx}-th Robot is stuck.")
+                if verbose:
+                    if is_fall:
+                        log.error(f"The {idx}-th Robot falls down.")
+                    if is_stuck:
+                        log.error(f"The {idx}-th Robot is stuck.")
 
                 if reset:
                     random_position = self.randomly_pick_position_from_freemap()
@@ -887,7 +887,7 @@ class VLNDataLoader(Dataset):
                 # return True
         
         status_abnormal_list = [fall or stuck for fall, stuck in zip(is_fall_list, is_stuck_list)]
-        return status_abnormal_list
+        return status_abnormal_list, is_fall_list, is_stuck_list
 
     def calc_env_action_offset(self, env_actions, action_name):
         robot_type = self.robot_names[0].split('_')[0]
@@ -904,3 +904,32 @@ class VLNDataLoader(Dataset):
             exe_path_new[idx] += np.array(self.tasks[task_name]._offset)
         
         return exe_path_new
+    
+    def episode_end_setting(self, scan, env_idx, reason):
+        '''record the episode ending status
+        :reason: fall / stuck / maximum step / success
+        '''
+        if reason == 'success':
+            self.end_list[env_idx] = True
+            self.success_list[env_idx] = True
+            self.scan_success_path_id_list.append(self.path_id_list[env_idx])
+            log.info(f"[Success] Scan: {scan}, Path_id: {self.path_id_list[env_idx]}. The robot has finished this episode !!!")
+            if self.just_end_list[env_idx]:
+                with open(self.args.episode_status_info_file_list[env_idx], 'a') as f:
+                    f.write(f"Episode finished: {self.success_list[env_idx]}\n")
+                self.just_end_list[env_idx] = False
+        
+        elif reason in ['fall', 'stuck', 'maximum step', 'path planning']:
+            self.end_list[env_idx] = True
+            self.success_list[env_idx] = False
+            self.env_action_finish_states[env_idx] = True
+            log.error(f"[Fail: {reason}] Scan: {scan}, Path_id: {self.path_id_list[env_idx]}.")
+            if self.just_end_list[env_idx]:
+                with open(self.args.episode_status_info_file_list[env_idx], 'a') as f:
+                    f.write(f"Episode finished: Failed. {reason}\n")
+                self.just_end_list[env_idx] = False
+        else:
+            raise KeyError
+
+
+

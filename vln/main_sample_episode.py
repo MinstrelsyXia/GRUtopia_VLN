@@ -84,7 +84,7 @@ def sample_episode_worker(args, vln_envs_all, data_camera_list, data_list):
         try:
             vln_envs = vln_envs_all[split]
             scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
-            if not args.settings.force_sample and os.path.exists(scan_log_dir):
+            if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
                 log.info(f'Scan {scan} has been sampled. Pass.')
                 continue
             env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
@@ -126,17 +126,21 @@ def sample_episodes_multiprocess(args, num_workers, vln_envs_all, data_camera_li
                 # Handle exceptions
                 print(f'Generated an exception: {exc}')
 
-def sample_episodes_reset_scans(args, vln_envs_all, data_camera_list):
+def sample_episodes_reset_scans(args, vln_envs_all, data_camera_list, assigned_split=None, assigned_scan=None):
     '''Use one app to handle different scans'''
     is_app_up = False
-    for split, vln_envs in vln_envs_all.items():
-        for scan in vln_envs.data:
-            scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
-            if not args.settings.force_sample and os.path.exists(scan_log_dir):
-                log.info(f'Scan {scan} has been sampled. Pass.')
-                continue
-            env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
-            is_app_up = True
+    if assigned_split is not None and assigned_scan is not None:
+        vln_envs = vln_envs_all[assigned_split]
+        env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=assigned_split, scan=assigned_scan, is_app_up=is_app_up)
+    else:
+        for split, vln_envs in vln_envs_all.items():
+            for scan in vln_envs.data:
+                scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
+                if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
+                    log.info(f'Scan {scan} has been sampled. Pass.')
+                    continue
+                env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+                is_app_up = True
 
     env.simulation_app.close()
 
@@ -194,13 +198,12 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
     
     '''6. Enter the env flow loop'''
     while (not all(vln_envs.end_list)) and (not vln_envs.all_episode_finish) and env.simulation_app.is_running():
-        ''' (0) check the maximum steps'''
+        ''' (0) check the maximum steps for each env'''
         max_step = 500 if args.debug else args.settings.max_step
-        if i >= max_step:
-            for env_idx, env_finish_status in enumerate(vln_envs.end_list):
-                if not env_finish_status:
-                    log.warning(f"Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Exceed the maximum steps: {max_step}")
-            break
+        for env_idx in range(vln_envs.env_num):
+            if (i - vln_envs.env_step_start_index[env_idx]) >= max_step:
+                log.error(f"[Failed]. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Exceed the maximum steps: {max_step}")
+                vln_envs.episode_end_setting(scan, env_idx, reason='maximum step')
 
         i += 1
 
@@ -246,14 +249,19 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
         
         ''' (2) Check for the robot weather falls or stucks'''
         if 'oracle' not in action_name and i % 20 == 0:
-            status_abnormal_list = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=args.test_verbose)
+            status_abnormal_list, fall_list, stuck_list = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=args.test_verbose)
             for status_idx, status in enumerate(status_abnormal_list):
                 if vln_envs.warm_up_list[status_idx] == 0:
                     if status:
+                        if fall_list[status_idx]:
+                            reason = 'fall'
+                        elif stuck_list[status_idx]:
+                            reason = 'stuck'
+                        vln_envs.episode_end_setting(scan, status_idx, reason)
                         # log.error(f"Scan: {scan}, Path_id: {vln_envs.path_id_list[status_idx]}: The robot is reset. Break this episode for this env.")
-                        vln_envs.end_list[status_idx] = True
-                        vln_envs.env_action_finish_states[status_idx] = True
-                        vln_envs.just_end_list[env_idx] = True
+                        # vln_envs.end_list[status_idx] = True
+                        # vln_envs.env_action_finish_states[status_idx] = True
+                        # vln_envs.just_end_list[env_idx] = True
         
         if args.test_verbose and args.windows_head:
             # TODO
@@ -288,10 +296,11 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                     paths[current_point+1], step_time=(i-vln_envs.env_step_start_index[env_idx]), verbose=(args.test_verbose or args.save_path_planning), save_dir=args.episode_path_list[env_idx]) 
                     if exe_path is None or len(exe_path) == 0:
                         # path planning fails
-                        log.error(f"{env_idx}-th env fails. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Path planning fails to find the path from the current point to the next point.")
-                        vln_envs.end_list[env_idx] = True
-                        vln_envs.just_end_list[env_idx] = True
-                        vln_envs.env_action_finish_states[env_idx] = True
+                        vln_envs.episode_end_setting(scan, env_idx, reason='path planning')
+                        # log.error(f"{env_idx}-th env fails. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Path planning fails to find the path from the current point to the next point.")
+                        # vln_envs.end_list[env_idx] = True
+                        # vln_envs.just_end_list[env_idx] = True
+                        # vln_envs.env_action_finish_states[env_idx] = True
                         continue
 
                     if 'oracle' in action_name:
@@ -326,15 +335,16 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
             if vln_envs.warm_up_list[env_idx] == 0 and (action_finish_state or vln_envs.end_list[env_idx]):
                 if vln_envs.nav_point_list[env_idx] == len(vln_envs.paths_list[env_idx])-1 and vln_envs.just_end_list[env_idx] == True:
                     # success
-                    log.info(f"[Success] Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. The robot has finished this episode !!!")
-                    vln_envs.end_list[env_idx] = True
-                    vln_envs.success_list[env_idx] = True
-                    vln_envs.scan_success_path_id_list.append(vln_envs.path_id_list[env_idx])
+                    vln_envs.episode_end_setting(scan, env_idx, reason='success')
+                    # log.info(f"[Success] Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. The robot has finished this episode !!!")
+                    # vln_envs.end_list[env_idx] = True
+                    # vln_envs.success_list[env_idx] = True
+                    # vln_envs.scan_success_path_id_list.append(vln_envs.path_id_list[env_idx])
 
-                if vln_envs.just_end_list[env_idx]:
-                    with open(args.episode_status_info_file_list[env_idx], 'a') as f:
-                        f.write(f"Episode finished: {vln_envs.success_list[env_idx]}\n")
-                    vln_envs.just_end_list[env_idx] = False
+                # if vln_envs.just_end_list[env_idx]:
+                #     with open(args.episode_status_info_file_list[env_idx], 'a') as f:
+                #         f.write(f"Episode finished: {vln_envs.success_list[env_idx]}\n")
+                #     vln_envs.just_end_list[env_idx] = False
                 
                 if args.settings.sample_env_flow:
                     # assign new path to the finished env
@@ -423,4 +433,5 @@ if __name__ == "__main__":
     if vln_config.settings.mode == "sample_episodes_multiprocess":
         sample_episodes_multiprocess(vln_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
+        # sample_episodes_reset_scans(vln_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='VzqfbhrpDEA')
         sample_episodes_reset_scans(vln_config, vln_envs, data_camera_list)
