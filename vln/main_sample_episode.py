@@ -46,14 +46,12 @@ def build_dataset():
     ''' Build dataset for VLN
     '''
     vln_config, sim_config = process_args()
-    vln_datasets = {}
     if vln_config.split != "":
         vln_config.datasets.splits = [vln_config.split]
-    for split in vln_config.datasets.splits:
-        vln_datasets[split] = VLNDataLoader(vln_config, 
-                                sim_config=sim_config,
-                                split=split,
-                                filter_same_trajectory=True)
+    vln_datasets = VLNDataLoader(vln_config, 
+                            sim_config=sim_config,
+                            splits=vln_config.datasets.splits,
+                            filter_same_trajectory=True)
     camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params if x.enable]
     if 'sample_episodes' in vln_config.settings.mode:
         data_camera_list = vln_config.settings.sample_camera_list
@@ -75,43 +73,42 @@ def update_env_actions(action_name, paths_list, path_idx=-1):
         env_actions.append(init_actions)
     return env_actions
 
-def sample_episode_worker(args, vln_envs_all, data_camera_list, data_list):
+def sample_episode_worker(args, vln_envs, data_camera_list, data_list):
     """
     Worker function to be executed in parallel.
     """
     is_app_up = False
     for split, scan in data_list:
-        try:
-            vln_envs = vln_envs_all[split]
-            scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
-            if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
-                log.info(f'Scan {scan} has been sampled. Pass.')
-                continue
-            env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
-            is_app_up = True
+        # try:
+        scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
+        if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
+            log.info(f'Scan {scan} has been sampled. Pass.')
+            continue
+        env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+        is_app_up = True
             # Assuming `sample_episodes_single_scan` handles its own exceptions and cleanup
-        except Exception as e:
-            log.error(f"Error processing {scan} in {split}: {e}")
+        # except Exception as e:
+        #     log.error(f"Error processing {scan} in {split}: {e}")
         # finally:
         #     # if hasattr(env, 'simulation_app'):
         #     env.simulation_app.close()
         #     return
     env.simulation_app.close()
 
-def sample_episodes_multiprocess(args, num_workers, vln_envs_all, data_camera_list):
+def sample_episodes_multiprocess(args, num_workers, vln_envs, data_camera_list):
     '''Use multiprocess to handle different scans'''
     tasks = [[] for _ in range(num_workers)]
     scans = [[] for _ in range(num_workers)]
     
     i = 0
-    for split, vln_envs in vln_envs_all.items():
-        for scan in vln_envs.data:
+    # for split, vln_envs in vln_envs_all.items():
+    for split in vln_envs.data.keys():
+        for scan in vln_envs.data[split].keys():
             scans[i%num_workers].append((split, scan))
             i += 1
-            # tasks.append((args, vln_envs, data_camera_list, split, scan, is_app_up))
 
     for task_idx in range(num_workers):
-        tasks[task_idx] = (args, vln_envs_all, data_camera_list, scans[task_idx])
+        tasks[task_idx] = (args, vln_envs, data_camera_list, scans[task_idx])
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         # Using the executor to submit all tasks and immediately creating a list of futures
@@ -126,15 +123,14 @@ def sample_episodes_multiprocess(args, num_workers, vln_envs_all, data_camera_li
                 # Handle exceptions
                 print(f'Generated an exception: {exc}')
 
-def sample_episodes_reset_scans(args, vln_envs_all, data_camera_list, assigned_split=None, assigned_scan=None):
+def sample_episodes_reset_scans(args, vln_envs, data_camera_list, assigned_split=None, assigned_scan=None):
     '''Use one app to handle different scans'''
     is_app_up = False
     if assigned_split is not None and assigned_scan is not None:
-        vln_envs = vln_envs_all[assigned_split]
         env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=assigned_split, scan=assigned_scan, is_app_up=is_app_up)
     else:
-        for split, vln_envs in vln_envs_all.items():
-            for scan in vln_envs.data:
+        for split in vln_envs.data.keys():
+            for scan in vln_envs.data[split].keys():
                 scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
                 if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
                     log.info(f'Scan {scan} has been sampled. Pass.')
@@ -158,9 +154,9 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
     '''3. Init the app or Reset the scene'''
     if not is_app_up:
         # First needs to start the app
-        data_item = vln_envs.init_multiple_episodes(scan, init_omni_env=True)
+        data_item = vln_envs.init_multiple_episodes(split, scan, init_omni_env=True)
     else:
-        data_item = vln_envs.init_multiple_episodes(scan, init_omni_env=False, reset_scene=True)
+        data_item = vln_envs.init_multiple_episodes(split, scan, init_omni_env=False, reset_scene=True)
 
     env = vln_envs.env
 

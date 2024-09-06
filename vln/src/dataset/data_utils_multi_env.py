@@ -188,14 +188,19 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
                 log.error(f"Error in saving camera image: {e}")
 
 class VLNDataLoader(Dataset):
-    def __init__(self, args, sim_config, split, filter_same_trajectory=False):
+    def __init__(self, args, sim_config, splits, filter_same_trajectory=False):
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size
-        if "sample_episodes" in args.settings.mode:
-            self.data, self._scans = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs)
-        else:
-            self.data, self._scans = load_data(args, split)
+        self.splits = splits
+        self.data = {}
+        for split in splits:
+            if "sample_episodes" in args.settings.mode:
+                data, _ = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs)
+            else:
+                data, _ = load_data(args, split)
+            self.data[split] = data
+
         self.robot_type = sim_config.config.tasks[0].robots[0].type
         for cand_robot in args.robots:
             if cand_robot["name"] == self.robot_type:
@@ -207,16 +212,18 @@ class VLNDataLoader(Dataset):
         
         # process paths offset
         if "sample_episodes" in args.settings.mode:
-            for scan, data in self.data.items():
-                for item in data:
+            for split in self.splits:
+                for scan, data in self.data[split].items():
+                    for item in data:
+                        item["start_position"] += self.robot_offset
+                        for i, path in enumerate(item["reference_path"]):
+                            item["reference_path"][i] += self.robot_offset
+        else:
+            for split in self.splits:
+                for split, item in self.data.items():
                     item["start_position"] += self.robot_offset
                     for i, path in enumerate(item["reference_path"]):
                         item["reference_path"][i] += self.robot_offset
-        else:
-            for item in self.data:
-                item["start_position"] += self.robot_offset
-                for i, path in enumerate(item["reference_path"]):
-                    item["reference_path"][i] += self.robot_offset
 
         '''Init multiple list'''
         self.env_num = sim_config.config.tasks[0].env_num # only one task
@@ -310,7 +317,7 @@ class VLNDataLoader(Dataset):
         self.scan_success_path_id_list = []
     
     def allocate_data(self, split, scan):
-        self.scan_data = self.data[scan]
+        self.scan_data = self.data[split][scan]
         self.sim_config.config.tasks[0].env_num = self.env_num = min(len(self.scan_data), self.env_num)
         self.init_env_manager() # update env_num according to the data length
 
@@ -414,9 +421,9 @@ class VLNDataLoader(Dataset):
         # self.rot_utils = rotations_utils.rot_utils
         # from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
 
-    def init_one_path(self, path_id):
+    def init_one_path(self, split, path_id):
         # Demo for visualizing simply one path
-        for item in self.data:
+        for item in self.data[split]:
             if item['trajectory_id'] == path_id:
                 scene_usd_path = load_scene_usd(self.args, item['scan'])
                 self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
@@ -434,14 +441,14 @@ class VLNDataLoader(Dataset):
         log.error("Path id %d not found in the dataset", path_id)
         return None
 
-    def init_one_scan(self, scan, idx=0, init_omni_env=False, reset_scene=False, save_log=False, path_id=-1):
+    def init_one_scan(self, split, scan, idx=0, init_omni_env=False, reset_scene=False, save_log=False, path_id=-1):
         # for extract episodes within one scan (for dataset extraction)
         if path_id != -1:
             # debug mode
-            for idx, item in enumerate(self.data[scan]):
+            for idx, item in enumerate(self.data[split][scan]):
                 if item['trajectory_id'] == path_id:
                     break
-        item = self.data[scan][idx]
+        item = self.data[split][scan][idx]
         scene_usd_path = load_scene_usd(self.args, scan)
         self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
         self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
@@ -482,12 +489,12 @@ class VLNDataLoader(Dataset):
 
         return item
 
-    def init_multiple_episodes(self, scan, path_id_list=None, init_omni_env=False, reset_scene=False):
+    def init_multiple_episodes(self, split, scan, path_id_list=None, init_omni_env=False, reset_scene=False):
         '''init multiple episodes'''
         if path_id_list is not None:
             idx_list = []
             for path_id in path_id_list:
-                for idx, item in enumerate(self.data[scan]):
+                for idx, item in enumerate(self.data[split][scan]):
                     if item['trajectory_id'] == path_id:
                         idx_list.append(idx)
                         break
@@ -500,7 +507,6 @@ class VLNDataLoader(Dataset):
 
         if reset_scene:
             # reset scene without restart app
-            # TODO: 关闭world后重启task，加载不同的scene
             start_time = time.time()
             self.env._runner._world.clear()
             self.env._runner.add_tasks(self.sim_config.config.tasks)
