@@ -4,9 +4,10 @@ datasets:
   mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
   mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
   splits:
-    - train
-    - val_seen
-    - val_unseen
+    - envdrop
+    # - train
+    # - val_seen
+    # - val_unseen
     # - test
 
 settings:
@@ -19,6 +20,7 @@ settings:
   use_llm: true
   sample_camera_list:
     - pano_camera_0
+    # - h1_pano_camera_debug
   camera_data_type:
     - rgba
     - depth
@@ -29,6 +31,7 @@ settings:
   filter_stairs: true
   sample_env_flow: true # allow the env flow
   num_workers: 3
+  max_episodes_per_scan: 100
 
 sample_episodes:
   step_interval: 40

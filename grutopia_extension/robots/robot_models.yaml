@@ -112,12 +112,6 @@ robots:
     sub_controllers:
     - name: oracle_move_to_point
   sensors:
-  # - name: "camera"
-  #   type: "Camera"
-  #   prim_path: "logo_link/Camera"
-  # - name: "tp_camera"
-  #   type: "Camera"
-  #   prim_path: "torso_link/TPCamera"
   - name: "pano_camera_0"
     type: "Camera"
     prim_path: "torso_link/h1_pano_camera_0"
@@ -127,9 +121,16 @@ robots:
   - name: "topdown_camera_500"
     type: "Camera"
     prim_path: "topdown_camera_500"
-  - name: "h1_camera_debug"
+  - name: "h1_pano_camera_debug"
     type: "Camera"
-    prim_path: "torso_link/h1_camera_debug"
+    prim_path: "torso_link/h1_pano_camera_debug"
+
+  # - name: "camera"
+  #   type: "Camera"
+  #   prim_path: "logo_link/Camera"
+  # - name: "tp_camera"
+  #   type: "Camera"
+  #   prim_path: "torso_link/TPCamera"
     
   # - name: "pano_camera_45"
   #   type: "Camera"

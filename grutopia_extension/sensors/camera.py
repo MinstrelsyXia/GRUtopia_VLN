@@ -168,6 +168,9 @@ class Camera(BaseSensor):
     
     def get_world_pose(self):
         return self._camera.get_world_pose()
+
+    def get_world_w_cam_u_T(self):
+        return self._camera.world_w_cam_u_T
     
     def write_rgb_data(self, rgb_data, file_path):
         rgb_img = Image.fromarray(rgb_data[:,:,:3], "RGB")

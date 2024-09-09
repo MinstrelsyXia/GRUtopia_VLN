@@ -22,19 +22,6 @@ class dataCollector:
         self.robot_save_path_list = []
 
         self.generate_save_dir_list(path_id_list)
-        # for path_id in self.path_id_list:
-        #     save_dir = os.path.join(args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
-        #     if not os.path.exists(save_dir):
-        #         os.makedirs(save_dir)
-        
-        #     pose_save_path = os.path.join(save_dir, 'poses.txt')
-        #     cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
-        #     robot_save_path = os.path.join(save_dir, 'robot_param.jsonl')
-
-        #     self.save_dir_list.append(save_dir)
-        #     self.pose_save_path_list.append(pose_save_path)
-        #     self.cam_save_path_list.append(cam_save_path)
-        #     self.robot_save_path_list.append(robot_save_path)
     
     def generate_save_dir_list(self, path_id_list):
         save_dir_list, pose_save_path_list, cam_save_path_list, robot_save_path_list = [], [], [], []
