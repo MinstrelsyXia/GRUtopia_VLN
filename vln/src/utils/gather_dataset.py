@@ -7,7 +7,8 @@ from vln.src.dataset.data_utils import load_data
 class datasetGather:
     def __init__(self, args):
         self.args = args
-        self.splits = ['train', 'val_seen', 'val_unseen', 'test']
+        # self.splits = ['train', 'val_seen', 'val_unseen', 'test']
+        self.splits = ['envdrop']
         self.data = {split: [] for split in self.splits}
         self.scan = {}
         for split in self.splits:

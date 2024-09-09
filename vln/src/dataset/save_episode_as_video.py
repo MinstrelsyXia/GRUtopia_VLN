@@ -1,9 +1,25 @@
 import os
 import cv2
 from natsort import natsorted
+from collections import defaultdict
 
-def images_to_video(image_folder, output_video_name, fps=30):
-    images = [img for img in os.listdir(image_folder) if img.endswith(".png")]
+def cameras_to_video(image_folder, output_video_name, camera_list=['pano_camera_0'], fps=30):
+    img_dict = defaultdict(list)
+    for file in os.listdir(image_folder):
+        if file.endswith(".png"):
+            for camera in camera_list:
+                if camera in file:
+                    img_dict[camera].append(os.path.join(image_folder, file))
+    
+    for camera_name, images in img_dict.items():
+        images_to_video(image_folder, output_video_name, camera_name, images, fps)
+
+def images_to_video(image_folder, output_video_name, camera_name=None, images=None, fps=30):
+    if images is None:
+        images = [img for img in os.listdir(image_folder) if img.endswith(".png")]
+    
+    if camera_name is not None:
+        output_video_name = output_video_name.replace('.mp4', f'_{camera_name}.mp4')
     
     # 自然排序图片
     images = natsorted(images)
@@ -25,9 +41,11 @@ def images_to_video(image_folder, output_video_name, fps=30):
     print(f"Video saved as {output_video_name}")
 
 # 使用示例
-image_folder = '/ssd/wangliuyi/code/w61_grutopia_new/logs/sample_episodes/train/E9uDoFAP3SH/id_3456'
+image_folder = '/ssd/wangliuyi/code/w61_grutopia_new/logs/sample_episodes/train/7y3sRwLe3Va/id_991'
 path_id = image_folder.split('/')[-1]
 output_video = f'logs/images/output_video_{path_id}.mp4'
 fps = 2  # 你可以根据需要调整帧率
+camera_list = ['pano_camera_0', 'h1_pano_camera_debug']
 
-images_to_video(image_folder, output_video, fps)
+cameras_to_video(image_folder, output_video, camera_list, fps)
+# images_to_video(image_folder, output_video, fps)

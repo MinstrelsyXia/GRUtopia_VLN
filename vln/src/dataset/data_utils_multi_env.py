@@ -911,7 +911,7 @@ class VLNDataLoader(Dataset):
         
         return exe_path_new
     
-    def episode_end_setting(self, scan, env_idx, reason):
+    def episode_end_setting(self, split, scan, env_idx, reason):
         '''record the episode ending status
         :reason: fall / stuck / maximum step / success
         '''
@@ -923,6 +923,9 @@ class VLNDataLoader(Dataset):
             if self.just_end_list[env_idx]:
                 with open(self.args.episode_status_info_file_list[env_idx], 'a') as f:
                     f.write(f"Episode finished: {self.success_list[env_idx]}\n")
+                success_path_id_file = os.path.join(self.args.sample_episode_dir, split, scan, 'success_path_id.txt')
+                with open(success_path_id_file, 'a') as f:
+                    f.write(f"{self.path_id_list[env_idx]}\n")
                 self.just_end_list[env_idx] = False
         
         elif reason in ['fall', 'stuck', 'maximum step', 'path planning']:

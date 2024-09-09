@@ -199,7 +199,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
         for env_idx in range(vln_envs.env_num):
             if (i - vln_envs.env_step_start_index[env_idx]) >= max_step:
                 log.error(f"[Failed]. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Exceed the maximum steps: {max_step}")
-                vln_envs.episode_end_setting(scan, env_idx, reason='maximum step')
+                vln_envs.episode_end_setting(split, scan, env_idx, reason='maximum step')
 
         i += 1
 
@@ -253,11 +253,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                             reason = 'fall'
                         elif stuck_list[status_idx]:
                             reason = 'stuck'
-                        vln_envs.episode_end_setting(scan, status_idx, reason)
-                        # log.error(f"Scan: {scan}, Path_id: {vln_envs.path_id_list[status_idx]}: The robot is reset. Break this episode for this env.")
-                        # vln_envs.end_list[status_idx] = True
-                        # vln_envs.env_action_finish_states[status_idx] = True
-                        # vln_envs.just_end_list[env_idx] = True
+                        vln_envs.episode_end_setting(split, scan, status_idx, reason)
         
         if args.test_verbose and args.windows_head:
             # TODO
@@ -292,11 +288,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                     paths[current_point+1], step_time=(i-vln_envs.env_step_start_index[env_idx]), verbose=(args.test_verbose or args.save_path_planning), save_dir=args.episode_path_list[env_idx]) 
                     if exe_path is None or len(exe_path) == 0:
                         # path planning fails
-                        vln_envs.episode_end_setting(scan, env_idx, reason='path planning')
-                        # log.error(f"{env_idx}-th env fails. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Path planning fails to find the path from the current point to the next point.")
-                        # vln_envs.end_list[env_idx] = True
-                        # vln_envs.just_end_list[env_idx] = True
-                        # vln_envs.env_action_finish_states[env_idx] = True
+                        vln_envs.episode_end_setting(split, scan, env_idx, reason='path planning')
                         continue
 
                     if 'oracle' in action_name:
@@ -331,16 +323,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
             if vln_envs.warm_up_list[env_idx] == 0 and (action_finish_state or vln_envs.end_list[env_idx]):
                 if vln_envs.nav_point_list[env_idx] == len(vln_envs.paths_list[env_idx])-1 and vln_envs.just_end_list[env_idx] == True:
                     # success
-                    vln_envs.episode_end_setting(scan, env_idx, reason='success')
-                    # log.info(f"[Success] Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. The robot has finished this episode !!!")
-                    # vln_envs.end_list[env_idx] = True
-                    # vln_envs.success_list[env_idx] = True
-                    # vln_envs.scan_success_path_id_list.append(vln_envs.path_id_list[env_idx])
-
-                # if vln_envs.just_end_list[env_idx]:
-                #     with open(args.episode_status_info_file_list[env_idx], 'a') as f:
-                #         f.write(f"Episode finished: {vln_envs.success_list[env_idx]}\n")
-                #     vln_envs.just_end_list[env_idx] = False
+                    vln_envs.episode_end_setting(split, scan, env_idx, reason='success')
                 
                 if args.settings.sample_env_flow:
                     # assign new path to the finished env
@@ -353,6 +336,11 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                             env_actions[env_idx] = {'h1':{action_name: [robot_pose_offset]}}
                             render = True
                             add_rgb_subframes = True
+                    
+                    if vln_envs.data_idx > args.settings.max_episodes_per_scan:
+                        vln_envs.all_episode_finish = True
+                        log.info(f"Scan {scan} has been sampled over maximum episodes settings {args.settings.max_episodes_per_scan}.")
+                        break
 
         '''(4) Step and get new observations'''
         obs = env.step(actions=env_actions, add_rgb_subframes=add_rgb_subframes, render=render)
@@ -401,11 +389,6 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                 vln_envs.env_action_finish_states[env_idx] = False
     
     '''7. Finish this scan'''
-    success_path_id_file = os.path.join(args.sample_episode_dir, split, scan, 'success_path_id.txt')
-    with open(success_path_id_file, 'w') as f:
-        for path_id in vln_envs.scan_success_path_id_list:
-            f.write(f"{path_id}\n")
-
     end_time = time.time()
     total_time = (end_time - start_time)/60
     log.info(f"Total time for scan {scan}: {total_time:.2f} minutes")
