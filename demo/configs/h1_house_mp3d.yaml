@@ -6,13 +6,15 @@ tasks:
 - type: "SingleInferenceTask"
   name: "h1_house"
   # scene_asset_path: GRUtopia/assets/scenes/demo_house/demo_house.usd
-  scene_asset_path: /wangliuyi/IsaacLab/w61/mp3d_mesh/vyrNrziPKCB/matterport_mesh/e9510fcbae554d6cb8136a7274521ff3/e9510fcbae554d6cb8136a7274521ff3.usd
+  # scene_asset_path: /wangliuyi/IsaacLab/w61/mp3d_mesh/vyrNrziPKCB/matterport_mesh/e9510fcbae554d6cb8136a7274521ff3/e9510fcbae554d6cb8136a7274521ff3.usd
   # scene_asset_path: /wangliuyi/IsaacLab/w61/mp3d_ext.usd
   # scene_asset_path:  /wangliuyi/IsaacLab/w61/mp3d_mesh/vyrNrziPKCB/matterport_mesh/e9510fcbae554d6cb8136a7274521ff3/e9510-mp3d-extensions.usd
   # scene_asset_path: /wangliuyi/IsaacLab/w61/test.usd
+  scene_asset_path : /ssd/xiaxinyuan/code/Matterport3D/data/v1/scans/s8pcmisQ38h/matterport_mesh/b2f1bf0a0de54856b1d9c8816633c0bb/isaacsim_b2f1bf0a0de54856b1d9c8816633c0bb.usd
   scene_scale: [1, 1, 1]
   env_num: 1
   offset_size: 0.0
+  light_on: true
   robots:
   - name: h1
     prim_path: "/World/h1"

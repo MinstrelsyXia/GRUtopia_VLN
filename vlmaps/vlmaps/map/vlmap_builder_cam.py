@@ -12,8 +12,8 @@ import gdown
 import open3d as o3d
 import h5py
 
-from vlmaps.utils.lseg_utils import get_lseg_feat
-from vlmaps.utils.mapping_utils import (
+from vlmaps.vlmaps.utils.lseg_utils import get_lseg_feat
+from vlmaps.vlmaps.utils.mapping_utils import (
     load_3d_map,
     save_3d_map,
     cvt_pose_vec2tf,
@@ -26,8 +26,10 @@ from vlmaps.utils.mapping_utils import (
     get_sim_cam_mat,
     depth2pc_real_world
 )
-from vlmaps.lseg.modules.models.lseg_net import LSegEncNet
+from vlmaps.vlmaps.lseg.modules.models.lseg_net import LSegEncNet
+import json
 
+# from omni.isaac.lab.utils.math import unproject_points
 
 def visualize_pc(pc: np.ndarray):
     """Take (N, 3) point cloud and visualize it using open3d.
@@ -39,7 +41,7 @@ def visualize_pc(pc: np.ndarray):
     pcd.points = o3d.utility.Vector3dVector(pc)
     o3d.visualization.draw_geometries([pcd])
 
-def save_point_cloud_image(pc, save_path="point_cloud.jpg"):
+def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
 
 
     # 设置无头渲染
@@ -52,8 +54,8 @@ def save_point_cloud_image(pc, save_path="point_cloud.jpg"):
     ctr.set_lookat([0, 0, 0])  # 设置相机目标点为原点
     ctr.set_up([0, 0, 1])   
     # 创建点云对象
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(pc)
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(pc)
     vis.add_geometry(pcd)
     vis.update_geometry(pcd)
     vis.poll_events()
@@ -97,14 +99,163 @@ class VLMapBuilderCam:
         
         # Apply the transformations directly
         vlmap_pos = position * np.array([1, 1, 1])
-        vlmap_pos = vlmap_pos[:, [0,1,2]]
-        vlmap_ori = orientation[:, [1,2,3,0]]
-
+        vlmap_pos = vlmap_pos[:, [0,1,2]] # 0,1,2; 1,2,0; 1,0,2;0,2,1;2,0,1;
+        vlmap_ori = orientation[:, [0,1,2,3]]
+# 0,1,2 @ 1,3,2,0
         # Concatenate the position and orientation to form the output
         return np.hstack((vlmap_pos, vlmap_ori))
-
     
-     
+    def preprocess_pose_iter(self,camera_pose,position_neg_iter,position_axis_iter,ori_iter):
+        '''
+        match poses: 
+            Input: (x,y,z,pw,px,py,pz): x right, y up, z backward
+            Output: (x,y,z,px,py,pz,pw); x right, y down z forward
+
+        '''
+        position = camera_pose[:, :3]
+        orientation = camera_pose[:, 3:]
+        
+        # Apply the transformations directly
+        vlmap_pos = position * position_neg_iter
+        vlmap_pos = vlmap_pos[:, position_axis_iter] # 0,1,2; 1,2,0; 1,0,2;0,2,1;2,0,1;
+        vlmap_ori = orientation[:, ori_iter]
+# 0,1,2 @ 1,3,2,0
+        # Concatenate the position and orientation to form the output
+        return np.hstack((vlmap_pos, vlmap_ori))
+    
+    def obtain_extrinsic_matrix(self):
+        '''
+        extrinsic matrix saved at : self.map_save_dir 上一层目录下camera_param.jsonl, 其中，*.jsonl的格式为：{"camera": "pano_camera_0", "step_time": 20, "intrinsic_matrix": [1.7320506250651373, 0.0, 0.0, 0.0, 0.0, 1.7320506250651373, 0.0, 0.0, 0.0, 0.0, 9.999999786482582e-10, -1.0, 0.0, 0.0, 0.0, 0.009999999786482581, 0.0], "extrinsic_matrix": [0.056683700800917856, 0.2584028078992191, -0.9643728256920717, 0.0, -0.9983921864996285, 0.014670867947184377, -0.05475223803797657, 0.0, 5.432980188652124e-08, 0.9659258535226581, 0.25881894346535267, -0.0, -3.284106750093168, -3.0817290382692075, 8.602530001821231, 1.0000000000000002], "cameraAperture": [20.954999923706055, 15.290800094604492], "cameraApertureOffset": [0.0, 0.0], "cameraFocalLength": 18.147560119628906, "robot_init_pose": [6.707250118255615, -2.811959981918335, -0.41238827705383296]}，取出extrinsic_matrix 并加到list类型的变量EM里
+        '''
+        EM = []
+        camera_param_path = os.path.join(self.data_dir, 'camera_param.jsonl')
+        
+        if os.path.exists(camera_param_path):
+            with open(camera_param_path, 'r') as file:
+                for line in file:
+                    data = json.loads(line)
+                    if 'extrinsic_matrix' in data:
+                        EM.append(data['extrinsic_matrix'])
+        else:
+            print(f"File {camera_param_path} does not exist.")
+        
+        return EM
+    def create_camera_map_isaacsim(self):
+        cs = self.map_config.cell_size
+        gs = self.map_config.grid_size
+        depth_sample_rate = self.map_config.depth_sample_rate
+        self.camera_pose_tfs = self.obtain_extrinsic_matrix()
+
+        camera_pose_origin = np.loadtxt(self.pose_path)
+
+        calib_mat = np.array(self.map_config.cam_calib_mat).reshape((4, 4))
+        pbar = tqdm(
+            zip(self.rgb_paths, self.depth_paths, self.camera_pose_tfs),
+            total=len(self.rgb_paths),
+            desc="Get Global Map",
+        )
+        global_pcd = o3d.geometry.PointCloud()
+        for frame_i, (rgb_path, depth_path, camera_pose_tf) in enumerate(zip(self.rgb_paths, self.depth_paths, self.camera_pose_tfs)):
+                if frame_i>3:
+                    break
+                if frame_i % self.map_config.skip_frame != 0:
+                    continue
+                bgr = cv2.imread(str(rgb_path))
+                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+                depth = load_depth_npy(depth_path.as_posix())
+                pc = self._backproject_depth(depth, calib_mat, depth_sample_rate, min_depth=0.1, max_depth=10)
+                pc = np.transpose(pc)
+                points_sensor = np.pad(pc, ((0, 0), (0, 1)), constant_values=1)
+                camera_pose_tf = np.array(camera_pose_tf).reshape([4,4])
+                camera_pose_tf = np.linalg.inv(camera_pose_tf)
+                pc_global =  np.matmul(points_sensor, camera_pose_tf)[..., :3]
+                
+                pcd_global = o3d.geometry.PointCloud()
+                pcd_global.points = o3d.utility.Vector3dVector(pc_global)
+                
+                c_pose_origin = camera_pose_origin[frame_i][:3]
+                cam_global = o3d.geometry.PointCloud()
+                cam_global.points = o3d.utility.Vector3dVector(np.array(c_pose_origin).reshape((-1, 3)))
+                filename_without_extension = str(rgb_path).rsplit('.', 1)[0]
+                last_number_str = filename_without_extension.split('_')[-1]
+                last_number = int(last_number_str)
+                if (last_number==11 or last_number==8):
+                    global_pcd += pcd_global
+                    global_pcd += cam_global
+                # downsample global_pcd
+                # if frame_i % (100 * self.map_config.skip_frame) == 99:
+                #     global_pcd = global_pcd.voxel_down_sample(voxel_size=0.05)
+
+                # if frame_i % 50 == 0:
+                #     o3d.visualization.draw_geometries([global_pcd])
+
+                # o3d.visualization.draw_geometries([global_pcd])
+
+                if (frame_i==3):
+                    
+                    save_path = str(self.data_dir)+ f"/vlmap_cam/global_pcd_{last_number}.jpg"
+                    save_point_cloud_image(global_pcd,save_path=save_path)
+                    break
+        return
+
+    def test_pc(self):
+        cs = self.map_config.cell_size
+        gs = self.map_config.grid_size
+        depth_sample_rate = self.map_config.depth_sample_rate
+        camera_pose_tf = np.loadtxt(self.pose_path)
+        camera_pose_original= camera_pose_tf[:4,:]
+        self.map_save_dir = self.data_dir / "vlmap_cam"
+        os.makedirs(self.map_save_dir, exist_ok=True)
+        self.map_save_path = self.map_save_dir / "vlmaps_cam.h5df"
+        camera_pose_tf_iter=np.array([[1,1,1],[1,1,-1],[1,-1,1],[1,-1,-1],[-1,1,1],[-1,1,-1],[-1,-1,1],[-1,-1,-1]])
+        camera_pose_axis_iter = np.array([[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]])
+        camera_quat_iter = np.array([[0, 1, 2, 3],[0, 1, 3, 2],[0, 2, 1, 3],[0, 2, 3, 1],[0, 3, 1, 2],[0, 3, 2, 1],
+                                     [1, 0, 2, 3],[1, 0, 3, 2],[1, 2, 0, 3],[1, 2, 3, 0],[1, 3, 0, 2],[1, 3, 2, 0],
+                                     [2, 0, 1, 3],[2, 0, 3, 1],[2, 1, 0, 3],[2, 1, 3, 0],[2, 3, 0, 1],[2, 3, 1, 0],
+                                     [3, 0, 1, 2],[3, 0, 2, 1],[3, 1, 0, 2],[3, 1, 2, 0],[3, 2, 0, 1],[3, 2, 1, 0]])
+        calib_mat = np.array(self.map_config.cam_calib_mat).reshape((3, 3))
+        for i,c_pose_tf in enumerate(camera_pose_tf_iter):
+            for j,c_pose_axis in enumerate(camera_pose_axis_iter):
+                for k, c_quat_iter in enumerate(camera_quat_iter):
+                    camerra_pose = self.preprocess_pose_iter(camera_pose_original,c_pose_tf,c_pose_axis,c_quat_iter)
+                    self.camera_pose_tfs =[cvt_pose_vec2tf(x) for x in camerra_pose]
+                    global_pcd = o3d.geometry.PointCloud()
+
+                    for frame_i, (rgb_path, depth_path, camera_pose_tf) in enumerate(zip(self.rgb_paths, self.depth_paths, self.camera_pose_tfs)):
+                        if frame_i>3:
+                            break
+                        if frame_i % self.map_config.skip_frame != 0:
+                            continue
+                        bgr = cv2.imread(str(rgb_path))
+                        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+                        depth = load_depth_npy(depth_path.as_posix())
+                        pc = self._backproject_depth(depth, calib_mat, depth_sample_rate, min_depth=0.1, max_depth=10)
+                        
+                        transform_tf = np.linalg.inv(camera_pose_tf)
+                        pc_global = transform_pc(pc, transform_tf)  # (3, N)
+                        pcd_global = o3d.geometry.PointCloud()
+                        pcd_global.points = o3d.utility.Vector3dVector(pc_global.T)
+
+                        filename_without_extension = str(rgb_path).rsplit('.', 1)[0]
+                        last_number_str = filename_without_extension.split('_')[-1]
+                        last_number = int(last_number_str)
+                        # if (last_number==11 or last_number==8):
+                        global_pcd += pcd_global
+                        # downsample global_pcd
+                        # if frame_i % (100 * self.map_config.skip_frame) == 99:
+                        #     global_pcd = global_pcd.voxel_down_sample(voxel_size=0.05)
+
+                        # if frame_i % 50 == 0:
+                        #     o3d.visualization.draw_geometries([global_pcd])
+
+                        # o3d.visualization.draw_geometries([global_pcd])
+
+                        if (frame_i==3):
+                            
+                            save_path = str(self.map_save_dir)+ f"/gb_pcd_{last_number}_{i}_{j}_{k}.jpg"
+                            save_point_cloud_image(global_pcd,save_path=save_path)
+                            break
+        return
     def create_camera_map(self):
         """
         build a map centering at the global original frame. The poses are camera pose in the global coordinate frame.
@@ -118,6 +269,7 @@ class VLMapBuilderCam:
         elif (self.sim_type  == 'isaacsim'):
             camera_pose_tf = np.loadtxt(self.pose_path)
             self.camera_pose_tfs = self.preprocess_pose(camera_pose_tf)
+            tmp_camera_pose_tfs = self.camera_pose_tfs  
             print("Isaacsim format transform!!!")
         if self.rot_type == "quat":
             self.camera_pose_tfs = [cvt_pose_vec2tf(x) for x in self.camera_pose_tfs]
@@ -167,6 +319,8 @@ class VLMapBuilderCam:
             # save_path = str(self.map_save_dir)+ f"global_pcd_{last_number}.jpg"
             # save_point_cloud_image(np.asarray(pcd_global.points),save_path=save_path)
 
+            # save_path = str(self.map_save_dir)+ f"/global_pcd_{last_number}_{i}.jpg"
+            # save_point_cloud_image(global_pcd,save_path=save_path)
         self.pcd_min = np.min(np.asarray(global_pcd.points), axis=0)
         self.pcd_max = np.max(np.asarray(global_pcd.points), axis=0)
 
@@ -188,7 +342,7 @@ class VLMapBuilderCam:
             depth = load_depth_npy(depth_path.as_posix())
 
             # # get pixel-aligned LSeg features
-            pix_feats = get_lseg_feat(
+            pix_feats,_ = get_lseg_feat(
                 lseg_model, rgb, ["example"], lseg_transform, self.device, crop_size, base_size, norm_mean, norm_std
             )
             pix_feats_intr = get_sim_cam_mat(pix_feats.shape[2], pix_feats.shape[3])

@@ -6,9 +6,9 @@ import cv2
 from omegaconf import DictConfig
 import hydra
 
-from vlmaps.utils.time_utils import Tic
-from vlmaps.utils.mapping_utils import cvt_pose_vec2tf, base_pos2grid_id_3d, grid_id2base_pos_3d, base_rot_mat2theta
-from vlmaps.map.map import Map
+from vlmaps.vlmaps.utils.time_utils import Tic
+from vlmaps.vlmaps.utils.mapping_utils import cvt_pose_vec2tf, base_pos2grid_id_3d, grid_id2base_pos_3d, base_rot_mat2theta
+from vlmaps.vlmaps.map.map import Map
 
 # from utils.clip_mapping_utils import *
 # from utils.clip_utils import *

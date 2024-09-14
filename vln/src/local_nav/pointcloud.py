@@ -4,7 +4,7 @@ import numpy as np
 import cv2
         
 from grutopia.core.util.log import log
-from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
+# from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
 
 
 # Function to transform a point cloud given a transformation matrix
@@ -16,6 +16,17 @@ def transform_point_cloud(point_cloud, transformation):
     transformed_pc = transformed_pc.T[:, :3]
     point_cloud = o3d.utility.Vector3dVector(transformed_pc)
     return point_cloud
+
+def downsample_pc(pc, depth_sample_rate):
+    '''
+    INput: points:(N,3); rate:downsample rate:int
+    Output: downsampled_points:(N/rate,3)
+    '''
+    shuffle_mask = np.arange(pc.shape[0])
+    np.random.shuffle(shuffle_mask)
+    shuffle_mask = shuffle_mask[::depth_sample_rate]
+    pc = pc[shuffle_mask,:]
+    return pc
 
 # Function to get transformation matrix from position and orientation (e.g., Euler angles)
 def get_transformation_matrix(position, orientation):
@@ -135,6 +146,7 @@ def pc_to_local_pose(cur_obs):
 # Example positions and orientations for 3 cameras
 # positions = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
 # orientations = [(0, 0, 0), (0, 0, np.pi/4), (0, np.pi/4, 0)]
+
 
 
 import torch

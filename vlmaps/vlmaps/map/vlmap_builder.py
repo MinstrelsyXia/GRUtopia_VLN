@@ -11,8 +11,8 @@ import torch
 import gdown
 import open3d as o3d
 
-from vlmaps.utils.lseg_utils import get_lseg_feat
-from vlmaps.utils.mapping_utils import (
+from vlmaps.vlmaps.utils.lseg_utils import get_lseg_feat
+from vlmaps.vlmaps.utils.mapping_utils import (
     load_3d_map,
     save_3d_map,
     cvt_pose_vec2tf,
@@ -23,7 +23,7 @@ from vlmaps.utils.mapping_utils import (
     project_point,
     get_sim_cam_mat,
 )
-from vlmaps.lseg.modules.models.lseg_net import LSegEncNet
+from vlmaps.vlmaps.lseg.modules.models.lseg_net import LSegEncNet
 
 
 def visualize_pc(pc: np.ndarray):
@@ -144,7 +144,7 @@ class VLMapBuilder:
             depth = load_depth_npy(depth_path)
 
             # # get pixel-aligned LSeg features
-            pix_feats = get_lseg_feat(
+            pix_feats,_ = get_lseg_feat(
                 lseg_model, rgb, ["example"], lseg_transform, self.device, crop_size, base_size, norm_mean, norm_std
             )
             pix_feats_intr = get_sim_cam_mat(pix_feats.shape[2], pix_feats.shape[3])

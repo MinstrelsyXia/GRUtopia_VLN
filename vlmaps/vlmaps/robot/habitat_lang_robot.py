@@ -11,25 +11,25 @@ import habitat_sim
 import cv2
 import open3d as o3d
 
-from vlmaps.robot.lang_robot import LangRobot
-from vlmaps.dataloader.habitat_dataloader import VLMapsDataloaderHabitat
-from vlmaps.navigator.navigator import Navigator
-from vlmaps.controller.discrete_nav_controller import DiscreteNavController
+from vlmaps.vlmaps.robot.lang_robot import LangRobot
+from vlmaps.vlmaps.dataloader.habitat_dataloader import VLMapsDataloaderHabitat
+from vlmaps.vlmaps.navigator.navigator import Navigator
+from vlmaps.vlmaps.controller.discrete_nav_controller import DiscreteNavController
 
-from vlmaps.utils.mapping_utils import (
+from vlmaps.vlmaps.utils.mapping_utils import (
     grid_id2base_pos_3d,
     grid_id2base_pos_3d_batch,
     base_pos2grid_id_3d,
     cvt_pose_vec2tf,
 )
-from vlmaps.utils.index_utils import find_similar_category_id
-from vlmaps.utils.habitat_utils import make_cfg, tf2agent_state, agent_state2tf, display_sample
-from vlmaps.utils.matterport3d_categories import mp3dcat
+from vlmaps.vlmaps.utils.index_utils import find_similar_category_id
+from vlmaps.vlmaps.utils.habitat_utils import make_cfg, tf2agent_state, agent_state2tf, display_sample
+from vlmaps.vlmaps.utils.matterport3d_categories import mp3dcat
 
 from typing import List, Tuple, Dict, Any, Union
 
 
-class HabitatLanguageRobot(LangRobot):
+class  HabitatLanguageRobot(LangRobot):
     """
     This class inherits the LangRobot interface for the user.
     It also handles the interface with the Habitat simulator,

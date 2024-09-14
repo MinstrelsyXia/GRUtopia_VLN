@@ -1,0 +1,17 @@
+defaults:
+  - data_paths: isaacsim_test
+  - map_config: issacsim_test
+  - params: issacsim_test
+  - vln_config: isaacsim_test
+  - _self_
+nav:
+  valid_range: 1
+  vis: True
+  tasks_per_scene: 20
+scene_id: 37
+
+# indexing params
+decay_rate: 0.01
+index_2d: True
+init_categories: True
+

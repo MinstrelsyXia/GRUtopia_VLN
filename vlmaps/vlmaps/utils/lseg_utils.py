@@ -6,13 +6,13 @@ import torch
 
 from matplotlib import pyplot as plt
 
-from vlmaps.utils.mapping_utils import *
+from vlmaps.vlmaps.utils.mapping_utils import *
 
-from vlmaps.lseg.modules.models.lseg_net import LSegEncNet
-from vlmaps.lseg.additional_utils.models import resize_image, pad_image, crop_image
+from vlmaps.vlmaps.lseg.modules.models.lseg_net import LSegEncNet
+from vlmaps.vlmaps.lseg.additional_utils.models import resize_image, pad_image, crop_image
 
 
-def get_lseg_feat(
+def  get_lseg_feat(
     model: LSegEncNet,
     image: np.array,
     labels,
@@ -23,6 +23,7 @@ def get_lseg_feat(
     norm_mean=[0.5, 0.5, 0.5],
     norm_std=[0.5, 0.5, 0.5],
     vis=False,
+    save_path = ""
 ):
     vis_image = image.copy()
     image = transform(image).unsqueeze(0).to(device)
@@ -53,6 +54,7 @@ def get_lseg_feat(
             # outputs = model(pad_img)
             outputs, logits = model(pad_img, labels)
         outputs = crop_image(outputs, 0, height, 0, width)
+        logits_outputs = crop_image(logits, 0, height, 0, width)  # 裁剪logits_outputs
     else:
         if short_size < crop_size:
             # pad if needed
@@ -101,14 +103,16 @@ def get_lseg_feat(
         new_palette = get_new_pallete(len(labels))
         mask, patches = get_new_mask_pallete(pred, new_palette, out_label_flag=True, labels=labels)
         seg = mask.convert("RGBA")
-        cv2.imshow("image", vis_image[:, :, [2, 1, 0]])
-        cv2.waitKey(1)
-        fig = plt.figure()
-        plt.imshow(seg)
-        plt.legend(handles=patches, loc="upper left", bbox_to_anchor=(1.0, 1), prop={"size": 20})
-        plt.axis("off")
-
+        fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+        axes[0].imshow(vis_image[:, :, [2, 1, 0]])
+        axes[0].set_title("Image")
+        axes[0].axis("off")
+        axes[1].imshow(seg)
+        axes[1].set_title("Segmentation Result")
+        axes[1].legend(handles=patches, loc="upper left", bbox_to_anchor=(1.0, 1), prop={"size": 20})
+        axes[1].axis("off")
         plt.tight_layout()
-        plt.show()
+        plt.savefig(save_path, bbox_inches='tight')
 
-    return outputs
+
+    return outputs, pred

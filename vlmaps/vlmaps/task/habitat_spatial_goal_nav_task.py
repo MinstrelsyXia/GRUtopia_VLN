@@ -7,10 +7,10 @@ import numpy as np
 import hydra
 import habitat_sim
 
-from vlmaps.task.habitat_task import HabitatTask
-from vlmaps.utils.habitat_utils import agent_state2tf, get_position_floor_objects
-from vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
-from vlmaps.utils.habitat_utils import display_sample
+from vlmaps.vlmaps.task.habitat_task import HabitatTask
+from vlmaps.vlmaps.utils.habitat_utils import agent_state2tf, get_position_floor_objects
+from vlmaps.vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
+from vlmaps.vlmaps.utils.habitat_utils import display_sample
 
 
 class HabitatSpatialGoalNavigationTask(HabitatTask):
@@ -123,7 +123,7 @@ class HabitatSpatialGoalNavigationTask(HabitatTask):
     config_name="test_config.yaml",
 )
 def main(config: DictConfig) -> None:
-    from vlmaps.dataloader.habitat_dataloader import VLMapsDataloaderHabitat
+    from vlmaps.vlmaps.dataloader.habitat_dataloader import VLMapsDataloaderHabitat
 
     data_dir = Path(config.data_paths.vlmaps_data_dir) / "vlmaps_dataset"
     data_dirs = sorted([x for x in data_dir.iterdir() if x.is_dir()])

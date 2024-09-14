@@ -14,7 +14,7 @@ from tqdm import tqdm
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 print(sys.path)
-from vlmaps.utils.habitat_utils import get_obj2cls_dict, make_cfg, save_obs
+from vlmaps.vlmaps.utils.habitat_utils import get_obj2cls_dict, make_cfg, save_obs
 
 
 def generate_scene_data(save_dir: Union[Path, str], config: DictConfig, scene_path: Path, poses: np.ndarray) -> None:

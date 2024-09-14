@@ -8,10 +8,10 @@ import torch
 import torchvision.transforms as transforms
 import clip
 
-from vlmaps.utils.mapping_utils import load_pose, load_semantic_npy, load_obj2cls_dict, save_map, cvt_obj_id_2_cls_id, depth2pc, transform_pc, get_sim_cam_mat, pos2grid_id, project_point ,load_depth_npy
+from vlmaps.vlmaps.utils.mapping_utils import load_pose, load_semantic_npy, load_obj2cls_dict, save_map, cvt_obj_id_2_cls_id, depth2pc, transform_pc, get_sim_cam_mat, pos2grid_id, project_point ,load_depth_npy
 
-from vlmaps.lseg.modules.models.lseg_net import LSegEncNet
-from vlmaps.lseg.additional_utils.models import resize_image, pad_image, crop_image
+from vlmaps.vlmaps.lseg.modules.models.lseg_net import LSegEncNet
+from vlmaps.vlmaps.lseg.additional_utils.models import resize_image, pad_image, crop_image
 
 
 def create_lseg_map_batch(img_save_dir, camera_height, cs=0.05, gs=1000, depth_sample_rate=100):

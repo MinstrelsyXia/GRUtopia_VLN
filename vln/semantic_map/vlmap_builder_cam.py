@@ -12,8 +12,8 @@ import gdown
 import open3d as o3d
 import h5py
 
-from vlmaps.utils.lseg_utils import get_lseg_feat
-from vlmaps.utils.mapping_utils import (
+from vlmaps.vlmaps.utils.lseg_utils import get_lseg_feat
+from vlmaps.vlmaps.utils.mapping_utils import (
     load_3d_map,
     save_3d_map,
     cvt_pose_vec2tf,
@@ -25,7 +25,7 @@ from vlmaps.utils.mapping_utils import (
     project_point,
     get_sim_cam_mat,
 )
-from vlmaps.lseg.modules.models.lseg_net import LSegEncNet
+from vlmaps.vlmaps.lseg.modules.models.lseg_net import LSegEncNet
 
 
 def visualize_pc(pc: np.ndarray):

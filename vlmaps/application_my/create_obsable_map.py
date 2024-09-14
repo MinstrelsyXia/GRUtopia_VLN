@@ -10,8 +10,8 @@ from omegaconf import DictConfig
 import sys,os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 print(sys.path)
-# from vlmaps.utils.matterport3d_categories import mp3dcat
-from vlmaps.robot.lang_robot import LangRobot
+# from vlmaps.vlmaps.utils.matterport3d_categories import mp3dcat
+from vlmaps.vlmaps.robot.lang_robot import LangRobot
 
 
 @hydra.main(

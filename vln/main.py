@@ -43,12 +43,18 @@ from vln.src.utils.utils import dict_to_namespace
 # from vln.src.local_nav.global_topdown_map import GlobalTopdownMap
 
 
-from parser import process_args
-
+from vln.parser import process_args
+import faulthandler
+import pickle
+faulthandler.enable()
 def build_dataset():
     ''' Build dataset for VLN
     '''
     vln_config, sim_config = process_args()
+    # with open('sim_config.pkl','rb') as f:
+    #     sim_config=pickle.load(f)
+    # with open('vln_config.pkl','rb') as f:
+    #     vln_config=pickle.load(f)
     vln_datasets = {}
     for split in vln_config.datasets.splits:
         vln_datasets[split] = VLNDataLoader(args=vln_config, 
@@ -65,7 +71,7 @@ def build_dataset():
     return vln_datasets, vln_config, sim_config, data_camera_list
 
 
-def vis_one_path(args, vln_envs):
+def vis_one_path(args, vln_envs): # vln_config, vln_envs
     if args.path_id == -1:
         log.error("Please specify the path id")
         return
@@ -190,7 +196,7 @@ def vis_one_path(args, vln_envs):
                     actions = {'h1': {'move_along_path': [exe_path]}}
                             
         env_actions.append(actions)
-        obs = env.step(actions=env_actions)
+        obs = env.step(actions=env_actions) # 
 
         # get the action state
         if len(obs[vln_envs.task_name]) > 0:
@@ -487,7 +493,7 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                             freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                             topdown_map.update_map(freemap, camera_pose, update_map=True, verbose=args.test_verbose)
                             robot_current_position = vln_envs.get_agent_pose()[0]
-                            exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose, all_paths=paths) # TODO: check world to map coordinate
+                            exe_path = topdown_map.navigate_p2p(robot_current_position, paths[current_point+1], step_time=i, verbose=args.test_verbose, all_paths=paths)
 
                             action_info.update({'current_step': i})
                             actions = {'h1': {action_name: [exe_path, action_info]}}
@@ -519,7 +525,8 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                     # stack images and information
                     if (i-move_step) != 0 and (i-move_step) % (args.sample_episodes.step_interval-1) == 0:
                         # Since oracle_move_path_controller moves to the next point every 5 steps, the image is fetched every 5+3 steps
-                        total_images = vln_envs.save_episode_data(scan=scan, path_id=path_id, camera_list=data_camera_list, data_types=args.settings.camera_data_type, step_time=i, total_images=total_images)
+                        # total_images = vln_envs.save_episode_data(scan=scan, path_id=path_id, camera_list=data_camera_list, data_types=args.settings.camera_data_type, step_time=i, total_images=total_images)
+                        total_images = vln_envs.save_episode_data(scan=scan, path_id=path_id, camera_list=data_camera_list, data_types=["rgba", "depth",'pointcloud', 'camera_params'], step_time=i, total_images=total_images)
 
                         is_image_stacked = True
 
@@ -553,7 +560,10 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
                         save_dir = os.path.join(args.sample_episode_dir, scan, f"id_{str(path_id)}")
                         if not os.path.exists(save_dir):
                             os.makedirs(save_dir)
-
+                        if not os.path.exists(os.path.join(save_dir,'rgb')):
+                            os.makedirs(os.path.join(save_dir,'rgb'))
+                        if not os.path.exists(os.path.join(save_dir,'depth')):
+                            os.makedirs(os.path.join(save_dir,'depth'))
                         rgb_filename = os.path.join(save_dir, 'rgb', f"{camera}_image_step_{step_time}.png")
                         # plt.imsave(rgb_filename, rgb_image)
                         # rgb_img = Image.fromarray(rgb_data[:,:,:3], "RGB")
@@ -578,7 +588,10 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
 
 if __name__ == "__main__":
     vln_envs, vln_config, sim_config, data_camera_list = build_dataset()
-    
+    # with open('sim_config.pkl','wb') as f:
+    #     pickle.dump(sim_config,f)
+    # with open('vln_config.pkl','wb') as f:
+    #     pickle.dump(vln_config,f)
     if vln_config.settings.mode == "vis_one_path":
         vis_one_path(vln_config, vln_envs)
     elif vln_config.settings.mode == "keyboard_control":

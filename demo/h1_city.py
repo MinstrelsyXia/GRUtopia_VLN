@@ -17,6 +17,7 @@ env = BaseEnv(sim_config, headless=headless, webrtc=webrtc)
 task_name = env.config.tasks[0].name
 robot_name = env.config.tasks[0].robots[0].name
 
+
 i = 0
 
 actions = {'h1': {'move_with_keyboard': []}}

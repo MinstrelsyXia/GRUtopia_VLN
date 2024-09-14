@@ -33,10 +33,95 @@ from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_p
 from ..local_nav.BEVmap import BEVMap
 from ..local_nav.sementic_map import BEVSemMap
 
+import open3d as o3d
+
+def get_dummy_2d_grid(width,height):
+    # Generate a meshgrid of pixel coordinates
+    x = np.arange(width)
+    y = np.arange(height)
+    xx, yy = np.meshgrid(x, y)
+
+    # Flatten the meshgrid arrays to correspond to the flattened depth map
+    xx_flat = xx.flatten()
+    yy_flat = yy.flatten()
+
+    # Combine the flattened x and y coordinates into a 2D array of points
+    points_2d = np.vstack((xx_flat, yy_flat)).T  # Shape will be (N, 2), where N = height * width
+    return points_2d
+
+def downsample_pc(pc, depth_sample_rate):
+    '''
+    INput: points:(N,3); rate:downsample rate:int
+    Output: downsampled_points:(N/rate,3)
+    '''
+    # np.random.seed(42)
+    shuffle_mask = np.arange(pc.shape[0])
+    np.random.shuffle(shuffle_mask)
+    shuffle_mask = shuffle_mask[::depth_sample_rate]
+    pc = pc[shuffle_mask,:]
+    return pc
+
+
+def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
+    # 设置无头渲染
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()  # 创建一个不可见的窗口
+    ctr = vis.get_view_control()
+
+    # 设定特定的视角
+    ctr.set_front([0, 0, -1])  # 设置相机朝向正面
+    ctr.set_lookat([0, 0, 0])  # 设置相机目标点为原点
+    ctr.set_up([0, 0, 1])   
+    # 创建点云对象
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(pc)
+    vis.add_geometry(pcd)
+    vis.update_geometry(pcd)
+    vis.poll_events()
+    vis.update_renderer()
+
+    # 捕获当前视图并保存为图像
+    vis.capture_screen_image(save_path)
+    vis.destroy_window()
+              
+def visualize_pc(pcd,headless,save_path = 'pc.jpg'):
+    '''
+    pcd:     after:    pcd_global = o3d.geometry.PointCloud()
+    pcd_global.points = o3d.utility.Vector3dVector(points_3d)
+    '''
+    if headless==True:
+        save_point_cloud_image(pcd,save_path=save_path)
+        return
+    else:
+        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
+    size=1.0, origin=[0, 0, 0]) 
+        o3d.io.write_point_cloud("point_cloud.pcd", pcd)
+        o3d.io.write_triangle_mesh("coordinate_frame.ply", coordinate_frame)
+        return
+
+
+
+PCD_GLOBAL = o3d.geometry.PointCloud()
+
+    
+def test_pc(camera,depth):
+    global PCD_GLOBAL
+    grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
+    wp = camera.get_world_pose()
+    camera.set_world_pose(wp[0],wp[1])
+    pc = camera.get_world_points_from_image_coords(grid_2d, depth.flatten())
+    pc_downsampled = downsample_pc(pc, 150)
+    pcd_global = o3d.geometry.PointCloud()
+    pcd_global.points = o3d.utility.Vector3dVector(pc_downsampled)
+    PCD_GLOBAL+=pcd_global
+    # visualize_pc(PCD_GLOBAL,headless=False, save_path = "1.jpg")
+
+
+
 def load_data(args, split):
     ''' Load data based on VLN-CE
     '''
-    dataset_root_dir = args.datasets.base_data_dir
+    dataset_root_dir = args.datasets.base_data_dir # '../VLN/VLNCE/R2R_VLNCE_v1-3'
     total_scans = []
     load_data = []
     with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
@@ -349,6 +434,13 @@ class VLNDataLoader(Dataset):
             camera_pose[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
         return camera_pose
     
+    def get_isaacsim_camera(self):
+        camera_dict = self.args.camera_list
+        camera_all = {}
+        for camera in camera_dict:
+            camera_all[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera]._camera
+        return camera_all
+            
     def save_observations(self, camera_list:list, data_types:list, save_image_list=None, save_imgs=True, step_time=0):
         ''' Save observations from the agent
         '''
@@ -393,21 +485,25 @@ class VLNDataLoader(Dataset):
         # save camera information
         for camera in camera_list:
             cur_obs = obs[self.task_name][self.robot_name][camera]
+
             # save pose
             camera_pose = camera_pose_dict[camera]
             pos, quat = camera_pose[0], camera_pose[1] # quat: w,x,y,z
             pose_save_path = os.path.join(save_dir, 'poses.txt')
             with open(pose_save_path,'a') as f:
                 sep =""
-                f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}") # prrrocessed in vlmaps/vlmap_builder_map.py
+                f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}\n") # prrrocessed in vlmaps/vlmap_builder_map.py
                 sep = "\n"
         
             # stack RGB into memory
             rgb_info = cur_obs['rgba'][...,:3]
+            cv2.imwrite("rgb_info.jpg", rgb_info)
             depth_info = cur_obs['depth']
             max_depth = 10
             depth_info[depth_info > max_depth] = 0 
 
+            ca = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera]._camera
+            test_pc(ca, depth_info)
             total_images[camera].append({
                 'step_time': step_time,
                 'rgb': rgb_info,
@@ -424,7 +520,7 @@ class VLNDataLoader(Dataset):
                 "cameraAperture": camera_params['cameraAperture'].tolist(),
                 "cameraApertureOffset": camera_params['cameraApertureOffset'].tolist(),
                 "cameraFocalLength": camera_params['cameraFocalLength'],
-                "robot_init_pose": self.agent_init_pose.tolist()
+                "robot_init_pose": self.agent_init_pose.tolist(),
             }
             # print(self.agent_init_pose)
             cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
@@ -504,10 +600,11 @@ class VLNDataLoader(Dataset):
     
     def update_semantic_map(self,verbose=False):
         # single robot
-        obs = self.get_observations(data_types=['rgba', 'depth', 'camera_params'])
+        obs = self.get_observations(data_types=['rgba', 'depth'])
         cur_obs = obs[self.task_name][self.robot_name]
-        camera_pose = self.get_camera_pose()
-        self.bev_sem.update_semantic_map(obs_tr=cur_obs,camera_dict=self.args.camera_list,camera_poses=camera_pose,verbose=verbose,robot_coords=self.get_agent_pose()[0])
+        # camera_pose = self.get_camera_pose()
+        isaacsim_cameras = self.get_isaacsim_camera()
+        self.bev_sem.update_semantic_map(obs_tr=cur_obs,camera_dict=self.args.camera_list,cameras = isaacsim_cameras,verbose=verbose,robot_coords=self.get_agent_pose()[0])
         
     
 
@@ -642,3 +739,5 @@ class VLNDataLoader(Dataset):
             self.reset_robot(random_position, self.agent_init_rotation)
             log.info(f"Reset robot pose to {random_position}.")
             return True
+    
+    

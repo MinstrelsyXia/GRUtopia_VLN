@@ -14,8 +14,9 @@ from omegaconf import DictConfig, OmegaConf
 from scipy.ndimage import binary_closing, binary_dilation, gaussian_filter
 import torch
 
-from vlmaps.utils.clip_utils import get_text_feats_multiple_templates
-from vlmaps.utils.visualize_utils import pool_3d_label_to_2d
+
+from vlmaps.vlmaps.utils.clip_utils import get_text_feats_multiple_templates
+from vlmaps.vlmaps.utils.visualize_utils import pool_3d_label_to_2d
 
 # from utils.ai2thor_constant import ai2thor_class_list
 # from utils.clip_mapping_utils import load_map
@@ -27,20 +28,20 @@ from vlmaps.utils.visualize_utils import pool_3d_label_to_2d
 #     mp3dcat,
 #     segment_lseg_map,
 # )
-from vlmaps.map.vlmap_builder import VLMapBuilder
-from vlmaps.map.vlmap_builder_cam import VLMapBuilderCam
-from vlmaps.utils.mapping_utils import load_3d_map
-from vlmaps.map.map import Map
-from vlmaps.utils.index_utils import find_similar_category_id, get_segment_islands_pos, get_dynamic_obstacles_map_3d
-from vlmaps.utils.clip_utils import get_lseg_score
+from vlmaps.vlmaps.map.vlmap_builder import VLMapBuilder
+from vlmaps.vlmaps.map.vlmap_builder_cam import VLMapBuilderCam
+from vlmaps.vlmaps.utils.mapping_utils import load_3d_map
+from vlmaps.vlmaps.map.map import Map
+from vlmaps.vlmaps.utils.index_utils import find_similar_category_id, get_segment_islands_pos, get_dynamic_obstacles_map_3d
+from vlmaps.vlmaps.utils.clip_utils import get_lseg_score
 
 
 class VLMap(Map):
-    def __init__(self, map_config: DictConfig, data_dir: str = "",sim_type: str = "isaacsim") -> None:
+    def __init__(self, map_config: DictConfig, data_dir: str = "") -> None:
         super().__init__(map_config, data_dir=data_dir)
         self.scores_mat = None
         self.categories = None
-        self.sim_type = sim_type
+
     def create_map(self, data_dir: Union[Path, str]) -> None:
         print(f"Creating map for scene at: ", data_dir)
         self._setup_paths(data_dir)
@@ -66,7 +67,7 @@ class VLMap(Map):
                 self.base_transform,
                 self.sim_type,
             )
-            self.map_builder.create_camera_map()
+            self.map_builder.test_pc()
         else:
             raise ValueError("Invalid pose type")
 
@@ -161,7 +162,6 @@ class VLMap(Map):
                 use_multiple_templates=True,
                 add_other=True,
             )  # score for name and other
-            cat_id = 0
 
         max_ids = np.argmax(scores_mat, axis=1)
         mask = max_ids == cat_id

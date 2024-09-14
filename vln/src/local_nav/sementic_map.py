@@ -1,200 +1,13 @@
 import torch
 import numpy as np
 import torch.nn as nn
-# class Semantic_Mapping(nn.Module):
-
-#     """
-#     Semantic_Mapping
-#     Input: obs, pose_obs, maps_last, poses_last
-#     Output: fp_map_pred, map_pred, pose_pred, current_poses
-#     """
-
-#     def __init__(self, args):
-#         super(Semantic_Mapping, self).__init__()
-
-#         self.device = args.device
-#         self.screen_h = args.frame_height
-#         self.screen_w = args.frame_width
-#         self.resolution = args.map_resolution
-#         self.z_resolution = args.map_resolution
-#         self.map_size_cm = args.map_size_cm // args.global_downscaling
-#         self.n_channels = 3
-#         self.vision_range = args.vision_range
-#         self.dropout = 0.5
-#         self.fov = args.hfov
-#         self.du_scale = args.du_scale
-#         self.cat_pred_threshold = args.cat_pred_threshold
-#         self.exp_pred_threshold = args.exp_pred_threshold
-#         self.map_pred_threshold = args.map_pred_threshold
-#         self.num_sem_categories = args.num_sem_categories
-
-#         self.max_height = int(360 / self.z_resolution)
-#         self.min_height = int(-40 / self.z_resolution)
-#         self.agent_height = args.camera_height * 100.
-#         self.shift_loc = [self.vision_range *
-#                           self.resolution // 2, 0, np.pi / 2.0]
-#         self.camera_matrix = du.get_camera_matrix(
-#             self.screen_w, self.screen_h, self.fov)
-
-#         self.pool = ChannelPool(1)
-
-#         vr = self.vision_range
-
-#         self.init_grid = torch.zeros(
-#             args.num_processes, 1 + self.num_sem_categories, vr, vr,
-#             self.max_height - self.min_height
-#         ).float().to(self.device)
-#         self.feat = torch.ones(
-#             args.num_processes, 1 + self.num_sem_categories,
-#             self.screen_h // self.du_scale * self.screen_w // self.du_scale
-#         ).float().to(self.device)
-
-#     def forward(self, obs, pose_obs, maps_last, poses_last):
-#         bs, c, h, w = obs.size()
-#         depth = obs[:, 3, :, :]
-
-#         point_cloud_t = du.get_point_cloud_from_z_t(
-#             depth, self.camera_matrix, self.device, scale=self.du_scale)
-
-#         agent_view_t = du.transform_camera_view_t(
-#             point_cloud_t, self.agent_height, 0, self.device)
-
-#         agent_view_centered_t = du.transform_pose_t(
-#             agent_view_t, self.shift_loc, self.device)
-
-#         max_h = self.max_height
-#         min_h = self.min_height
-#         xy_resolution = self.resolution
-#         z_resolution = self.z_resolution
-#         vision_range = self.vision_range
-#         XYZ_cm_std = agent_view_centered_t.float()
-#         XYZ_cm_std[..., :2] = (XYZ_cm_std[..., :2] / xy_resolution)
-#         XYZ_cm_std[..., :2] = (XYZ_cm_std[..., :2] -
-#                                vision_range // 2.) / vision_range * 2.
-#         XYZ_cm_std[..., 2] = XYZ_cm_std[..., 2] / z_resolution
-#         XYZ_cm_std[..., 2] = (XYZ_cm_std[..., 2] -
-#                               (max_h + min_h) // 2.) / (max_h - min_h) * 2.
-#         self.feat[:, 1:, :] = nn.AvgPool2d(self.du_scale)(
-#             obs[:, 4:, :, :]
-#         ).view(bs, c - 4, h // self.du_scale * w // self.du_scale)
-
-#         XYZ_cm_std = XYZ_cm_std.permute(0, 3, 1, 2)
-#         XYZ_cm_std = XYZ_cm_std.view(XYZ_cm_std.shape[0],
-#                                      XYZ_cm_std.shape[1],
-#                                      XYZ_cm_std.shape[2] * XYZ_cm_std.shape[3])
-
-#         voxels = du.splat_feat_nd(
-#             self.init_grid * 0., self.feat, XYZ_cm_std).transpose(2, 3)
-
-#         min_z = int(25 / z_resolution - min_h)
-#         max_z = int((self.agent_height + 1) / z_resolution - min_h)
-
-#         agent_height_proj = voxels[..., min_z:max_z].sum(4)
-#         all_height_proj = voxels.sum(4)
-
-#         fp_map_pred = agent_height_proj[:, 0:1, :, :]
-#         fp_exp_pred = all_height_proj[:, 0:1, :, :]
-#         fp_map_pred = fp_map_pred / self.map_pred_threshold
-#         fp_exp_pred = fp_exp_pred / self.exp_pred_threshold
-#         fp_map_pred = torch.clamp(fp_map_pred, min=0.0, max=1.0)
-#         fp_exp_pred = torch.clamp(fp_exp_pred, min=0.0, max=1.0)
-
-#         pose_pred = poses_last
-
-#         agent_view = torch.zeros(bs, c,
-#                                  self.map_size_cm // self.resolution,
-#                                  self.map_size_cm // self.resolution
-#                                  ).to(self.device)
-
-#         x1 = self.map_size_cm // (self.resolution * 2) - self.vision_range // 2
-#         x2 = x1 + self.vision_range
-#         y1 = self.map_size_cm // (self.resolution * 2)
-#         y2 = y1 + self.vision_range
-#         agent_view[:, 0:1, y1:y2, x1:x2] = fp_map_pred
-#         agent_view[:, 1:2, y1:y2, x1:x2] = fp_exp_pred
-#         agent_view[:, 4:, y1:y2, x1:x2] = torch.clamp(
-#             agent_height_proj[:, 1:, :, :] / self.cat_pred_threshold,
-#             min=0.0, max=1.0)
-
-#         corrected_pose = pose_obs
-
-#         def get_new_pose_batch(pose, rel_pose_change):
-
-#             pose[:, 1] += rel_pose_change[:, 0] * \
-#                 torch.sin(pose[:, 2] / 57.29577951308232) \
-#                 + rel_pose_change[:, 1] * \
-#                 torch.cos(pose[:, 2] / 57.29577951308232)
-#             pose[:, 0] += rel_pose_change[:, 0] * \
-#                 torch.cos(pose[:, 2] / 57.29577951308232) \
-#                 - rel_pose_change[:, 1] * \
-#                 torch.sin(pose[:, 2] / 57.29577951308232)
-#             pose[:, 2] += rel_pose_change[:, 2] * 57.29577951308232
-
-#             pose[:, 2] = torch.fmod(pose[:, 2] - 180.0, 360.0) + 180.0
-#             pose[:, 2] = torch.fmod(pose[:, 2] + 180.0, 360.0) - 180.0
-
-#             return pose
-
-#         current_poses = get_new_pose_batch(poses_last, corrected_pose)
-#         st_pose = current_poses.clone().detach()
-
-#         st_pose[:, :2] = - (st_pose[:, :2]
-#                             * 100.0 / self.resolution
-#                             - self.map_size_cm // (self.resolution * 2)) /\
-#             (self.map_size_cm // (self.resolution * 2))
-#         st_pose[:, 2] = 90. - (st_pose[:, 2])
-
-#         rot_mat, trans_mat = get_grid(st_pose, agent_view.size(),
-#                                       self.device)
-
-#         rotated = F.grid_sample(agent_view, rot_mat, align_corners=True)
-#         translated = F.grid_sample(rotated, trans_mat, align_corners=True)
-
-#         maps2 = torch.cat((maps_last.unsqueeze(1), translated.unsqueeze(1)), 1)
-
-#         map_pred, _ = torch.max(maps2, 1)
-
-#         return fp_map_pred, map_pred, pose_pred, current_poses
-
-# # Usage:
-# # obs:(4+C) x H x W
-# sem_mapping = Semantic_Mapping(args)
-# rgb = 
-# pose_obs = np.concatenate((rgb, depth, sem_seg_pred),
-#                                axis=2).transpose(2, 0, 1)
-# _,map_pred,_,current_poses = sem_mapping(obs, pose_obs, maps_last, poses_last)
+import cv2
 
 
-
-
-# ####################
-
-# def get_segmentation(image):
-#     '''
-#     Input: rgb image the camera sees
-#     Output: [nc,]
-#     point cloud: [N,[x,y,z,d,r,]]
-#     '''
-#     return segmentation
-
-
-# #####################
-# from ..src.dataset.data_utils import VLNDataLoader
-
-# class VLNSemanticMap(VLNDataLoader):
-#     def __init__(self, args):
-#         super(VLNSemanticMap, self).__init__(args)
-
-#     def get_semantic_occupation_map(self,camera_list:list, data_types:list):
-#         obs = self.get_observations(data_type=data_types)
-#         for camera in camera_list:
-#             rgb = obs[camera]['rgb']
-#             depth = obs[camera]['depth']
-#             sem_seg_pred = get_segmentation(rgb)
-
-
-
-from .path_planner import QuadTreeNode
+import sys, os
+sys.path.append((os.path.dirname(os.path.abspath(__file__))))
+sys.path.append((os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from path_planner import QuadTreeNode
 import numpy as np
 from transformers import SegformerForSemanticSegmentation, SegformerImageProcessor
 from PIL import Image
@@ -204,11 +17,35 @@ import os
 from grutopia.core.util.log import log
 import torch.nn.functional as F
 from matplotlib.lines import Line2D
-from .BEVmap import BEVMap
-from .pointcloud import create_pointcloud_from_depth, compute_intrinsic_matrix
+
+from pointcloud import create_pointcloud_from_depth, compute_intrinsic_matrix,downsample_pc
 
 import open3d as o3d
+import os,sys
 
+sys.path.append("/ssd/xiaxinyuan/code/w61-grutopia/vlmaps")
+print(sys.path)
+from vlmaps.vlmaps.utils.lseg_utils import get_lseg_feat
+
+from vlmaps.vlmaps.utils.clip_utils import get_lseg_score
+
+from vlmaps.vlmaps.lseg.modules.models.lseg_net import LSegEncNet
+
+from vlmaps.vlmaps.utils.index_utils import find_similar_category_id
+
+import os
+from pathlib import Path
+from typing import Any, Dict, List, Tuple, Union, Set
+
+from tqdm import tqdm
+import cv2
+import torchvision.transforms as transforms
+import numpy as np
+from omegaconf import DictConfig
+import torch
+import gdown
+import open3d as o3d
+import h5py
 
 
 class BEVSemMap:
@@ -227,68 +64,14 @@ class BEVSemMap:
 
         self.semantic_map = np.zeros((self.quadtree_height, self.quadtree_width, args.segmentation.num_categories))
 
-        self.quad_tree_root = QuadTreeNode(x=0, y=0, width=self.quadtree_width, height=self.quadtree_height,
-                                           map_data = self.semantic_map, 
-                                           max_depth=self.quadtree_config.max_depth, threshold=self.quadtree_config.threshold)  
         self.init_world_pos = np.array(robot_init_pose)
         self.robot_z = args.maps.robot_z  # The height(m) range of robot
-
-        self.model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b0-finetuned-ade-512-512")
-        self.feature_extractor = SegformerImageProcessor.from_pretrained("nvidia/segformer-b0-finetuned-ade-512-512")
-
+        self.data_dir = "" # !!!!
+        self.map_save_dir = self.data_dir / "vlmap_cam"
+        os.makedirs(self.map_save_dir, exist_ok=True)
+        self.map_save_path = self.map_save_dir / "vlmaps_cam.h5df"
 
     
-    def get_seg_feat(self,image):
-        inputs = self.feature_extractor(images=image, return_tensors="pt")
-        outputs = self.model(**inputs)
-        logits = outputs.logits
-        predicted_mask = logits.argmax(dim=1)[0]  # Shape: [128, 128]
-
-        # Add batch dimension and channel dimension for the interpolate function
-        predicted_mask = predicted_mask.unsqueeze(0).unsqueeze(0).float()  # Shape: [1, 1, 128, 128]
-
-        # Define the target size
-        target_size = (224, 224)
-
-        # Resize the mask to the original input size
-        resized_mask = F.interpolate(predicted_mask, size=target_size, mode='nearest')  # Mode 'nearest' for categorical data
-        resized_mask = resized_mask.squeeze().long()  # Shape: [224, 224]
-
-
-        return resized_mask
-
-
-    def depth_to_world_xy(self, depth_map, cameraProjection, cameraViewTransform):
-        np.save('vln/semantic_map/depth_map.npy', depth_map)
-        np.save('vln/semantic_map/cameraProjection.npy', cameraProjection)
-        np.save('vln/semantic_map/cameraViewTransform.npy', cameraViewTransform)
-
-        cameraProjection_inverse = np.linalg.inv(cameraProjection)
-        cameraViewTransform_inverse = np.linalg.inv(cameraViewTransform)
-
-        height, width = depth_map.shape
-        u_coords, v_coords = np.meshgrid(np.arange(width), np.arange(height))
-
-        u_ndc = (2.0 * u_coords / width) - 1.0
-        v_ndc = 1.0 - (2.0 * v_coords / height)
-
-        u_ndc_flat = u_ndc.flatten()
-        v_ndc_flat = v_ndc.flatten()
-        z_camera_flat = depth_map.flatten()
-
-        ndc_points = np.stack([u_ndc_flat, v_ndc_flat, np.ones_like(z_camera_flat), -z_camera_flat], axis=1)
-
-        camera_points_homogeneous = np.dot(cameraProjection_inverse, ndc_points.T).T
-        camera_points = camera_points_homogeneous[:, :3] / camera_points_homogeneous[:, 3:4]
-        camera_points_homogeneous = np.column_stack([camera_points, np.ones_like(z_camera_flat)])
-
-        world_points_homogeneous = np.dot(cameraViewTransform_inverse, camera_points_homogeneous.T).T
-
-        X_world = world_points_homogeneous[:, 0].reshape(height, width)
-        Y_world = world_points_homogeneous[:, 1].reshape(height, width)
-        
-        return X_world, Y_world
-
     def convert_world_to_map(self, point_cloud):
         # Note that the pointclouds have the world corrdinates that some values are very negative
         # We need to convert it into the map coordinates
@@ -299,176 +82,206 @@ class BEVSemMap:
 
         return point_cloud
     
-    def framewise_update_semantic_map(self, depth_map, focal_length, aperture, position, quaternion, semantic_segmentation,robot_bottom_z):
-        """
-        Update the semantic map with new depth and semantic segmentation data.
-        
-        :param depth_image: 2D numpy array of depth values
-        :param camera_pose: 4x4 transformation matrix (camera to world)
-        :param camera_matrix: 3x3 camera intrinsic matrix
-        :param dist_coeffs: Distortion coefficients
-        :param semantic_segmentation: 2D numpy array of semantic segmentation labels
-        """
-        # Get world coordinates from depth image
-        # cameraProjection = cameraProjection.reshape(4,4)
-        # cameraViewTransform = cameraViewTransform.reshape(4,4)
 
-        intrinsic_matrix = compute_intrinsic_matrix(focal_length=focal_length,aperture=aperture,image_shape=depth_map.shape)
-        points = create_pointcloud_from_depth(intrinsic_matrix=intrinsic_matrix, depth=depth_map, position=position, orientation=quaternion,keep_invalid=False)
-        if isinstance(points, list):
-            pos_point_cloud = [self.convert_world_to_map(p) for p in points]
-            pos_point_cloud = [p for p in pos_point_cloud if p is not None]
-            pos_point_cloud = np.vstack(pos_point_cloud)
-        else:
-            pos_point_cloud = self.convert_world_to_map(points)
-
-        adjusted_coords = (pos_point_cloud[:, :2]/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2]).astype(int) 
-        adjusted_coords_with_z = np.hstack((adjusted_coords, pos_point_cloud[:,2].reshape(-1,1)))
-        X_world, Y_world = adjusted_coords[:,0],adjusted_coords[:,1]
-        
-        # self.visualize_pc(adjusted_coords)
-        # Get semantic labels
-        semantic_labels = semantic_segmentation.flatten()
-
-        # Get image dimensions
-        height, width = depth_map.shape
-
-        # # Reshape world coordinates
-        # X_world = X_world.flatten()
-        # Y_world = Y_world.flatten()
-        if len(X_world) != len(semantic_labels):
-            raise ValueError("X_world 和 semantic_labels 的长度不一致")
-
-        # Get valid indices
-        point_to_consider = np.where((X_world >= 0) & (X_world < self.quadtree_height) & (Y_world >= 0) & (Y_world <  self.quadtree_width) & adjusted_coords_with_z[:,2]>=(robot_bottom_z+self.robot_z[0] & adjusted_coords_with_z[:,2]<(robot_bottom_z+self.robot_z[1])) )[0]
-        # TODO: check why the range are different
-        point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z+self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))].astype(int)
-
-        # Update semantic map
-        for i in point_to_consider:
-            x = int(X_world[i])
-            y = int(Y_world[i])
-            category = int(semantic_labels[i])
-            self.semantic_map[x, y, category] = 1
-            # TODO: check whether creating  a QuadTreeNode is necessary
-        return adjusted_coords_with_z
-    
-    def update_semantic_map(self,obs_tr,camera_poses,camera_dict:dict,robot_bottom_z,verbose=False,global_bev=False):
+    def update_semantic_map(self,obs_tr,cameras,camera_dict:dict,robot_bottom_z,mode='static'):
+        '''
+        mode: static: read in all the data and update the map
+        mode: dynamic: read in data framewise and update the map
+        '''
         # single robot
-        for camera in camera_dict:
-            cur_obs = obs_tr[camera]
+        grid_feat, grid_pos, weight, occupied_ids, grid_rgb, mapped_iter_set, max_id = self.load_3d_map(self.map_save_path)
+        for camera_name in camera_dict:
+            # get: rgb, depth, camera_params
+            cur_obs = obs_tr[camera_name]
             rgb_obs = cur_obs['rgba'][...,:3]
             depth_obs = cur_obs['depth']
             max_depth = 10
             depth_obs[depth_obs > max_depth] = 0
-            camera_params = cur_obs['camera_params']
-            semantic_segmentation = self.get_seg_feat(rgb_obs)
-            camera_pose = camera_poses[camera]
+            # camera_params = cur_obs['camera_params']
+
+            camera = cameras[camera_name]
+            camera_pose = camera.get_world_pose()
             camera_position, camera_orientation = camera_pose[0], camera_pose[1]
 
+            # create image coord description
+            height, width = depth_obs.shape
+            x = np.arange(width)
+            y = np.arange(height)
+            xx, yy = np.meshgrid(x, y)
+            xx_flat = xx.flatten()
+            yy_flat = yy.flatten()
+            points_2d = np.vstack((xx_flat, yy_flat)).T  
 
-            pc=self.framewise_update_semantic_map(depth_map=depth_obs, focal_length=camera_params['cameraFocalLength'], aperture=camera_params['cameraAperture'], semantic_segmentation=semantic_segmentation,position=camera_position,quaternion=camera_orientation)
-        
-        if verbose:
-            if global_bev:
-                img_save_path = os.path.join(self.args.log_image_dir, "semantic_"+str(self.step_time)+".jpg")
-            else:
-                img_save_path = os.path.join(self.args.log_image_dir, "semantic_"+str(self.step_time)+".jpg")
+            # create point cloud
+            
+            pc=camera.get_world_points_from_image_coords(points_2d, depth_obs)
+            downsampled_cloud = downsample_pc(pc)
 
-            # draw the robot's position using the red 'x' mark
-            # self.plot_semantic_map(img_save_path)
-            # log.info(f"Semantic map saved at {img_save_path}")
-            # img_save_path = os.path.join(self.args.log_image_dir, "segformer_"+str(self.step_time)+".jpg")
-            # self.plot_segmentation_result(rgb_obs, semantic_segmentation, img_save_path)
-            self.plot_rgb_segmentation_semantic_pc(depth_obs,rgb_obs, semantic_segmentation, self.semantic_map, pc,img_save_path,robot_bottom_z)
-        return True
-        
-    def visualize_world_points(self,world_points_homogeneous):
-        # 提取 x, y, z 坐标
-        x = world_points_homogeneous[:, 0]
-        y = world_points_homogeneous[:, 1]
-        z = world_points_homogeneous[:, 2]
+            downsampled_cloud = downsampled_cloud[np.isfinite(downsampled_cloud).all(axis=1)]
+            # further obtain points within the robot's height range
+            downsampled_cloud = self.convert_world_to_map(downsampled_cloud)
+            adjusted_coords = (downsampled_cloud[:, :2]/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2]).astype(int) 
+            adjusted_coords_with_z = np.hstack((adjusted_coords, downsampled_cloud[:,2].reshape(-1,1)))
+            point_to_consider = adjusted_coords_with_z[(adjusted_coords_with_z[:, 0] < self.quadtree_width) & (adjusted_coords_with_z[:, 1] < self.quadtree_height)] 
 
-        # 过滤 y 值比 400 小的点
-        mask = y <100
-        x_filtered = x[mask]
-        y_filtered = y[mask]
-        z_filtered = z[mask]
+            pc_global = point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z+self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))].astype(int) # points that are within the robot's height range (occupancy)
 
-        # 创建一个新的图形
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection='3d')
+            # create semantic description
+            rgb = cv2.cvtColor(rgb_obs, cv2.COLOR_BGR2RGB)
+            lseg_model, lseg_transform, crop_size, base_size, norm_mean, norm_std = self._init_lseg()
 
-        # 绘制散点图
-        scatter = ax.scatter(x_filtered, y_filtered, z_filtered, c=z_filtered, cmap='viridis', s=1)
+            pix_feats ,pix_mask= get_lseg_feat(
+                            lseg_model, rgb, ["example"], lseg_transform, self.device, crop_size, base_size, norm_mean, norm_std
+                        ) # [B,D,H,W];[H,W]
+            pc_image = camera.get_image_coords_from_world_points(point_within_robot_z) # [N,2]:[[x,y],...]
+            pc_image = pc_image.astype(int)
 
-        # 设置轴标签
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-
-        # 添加颜色条
-        plt.colorbar(scatter)
-
-        # 设置标题
-        plt.title('World Points Visualization')
-
-        # 显示图形
-        plt.savefig('vln/semantic_map/world_points.png')
+            # transform from global coord to semantic map:
 
 
-    def plot_semantic_map(self, img_save_path):
+            radial_dist_sq = np.array([np.sum(np.square(pc_dd-camera_pose)) for pc_dd in point_within_robot_z]).T
+            sigma_sq = 0.6
+            alpha = np.exp(-radial_dist_sq / (2 * sigma_sq))
+
+            
+            pc_pixel_map, new_map_coord, delta_map_coord, min_max = self.cvt_global_to_pixel_map(pc_global)
+            grid_feat, grid_pos, weight, occupied_ids, grid_rgb, mapped_iter_set, max_id = self._retrive_map(
+            self.pcd_min, self.pcd_max, self.voxel_size, self.map_save_path)
+            # mapped_iter_set: literally empty
+            grid_feat = self.update_map(grid_feat,new_map_coord,delta_map_coord)
+            grid_pos = self.update_map(grid_pos,new_map_coord,delta_map_coord)
+            weight = self.update_map(weight,new_map_coord,delta_map_coord)
+            grid_rgb = self.update_map(grid_rgb,new_map_coord,delta_map_coord)
+            occupied_ids = self.update_map(occupied_ids,new_map_coord,delta_map_coord)
+
+
+            #  pc_image: [py,px]:pixel coord in 2d-image; 
+            #  row,height column: pixel coord in 3d-map
+            for (p_i,p_m) in zip(pc_image,pc_pixel_map): # p: [x,y,z]
+                px,py = p_i[0],p_i[1]
+                row,height,col = p_m[0],p_m[1],p_m[2]
+                rgb_v = rgb[py,px] # for given point p, its label and feature is pix_feats[px,py] and pix_mask[px,py] 
+
+                if not (px < 0 or py < 0 or px >= pix_feats.shape[3] or py >= pix_feats.shape[2]):
+                    feat = pix_feats[0, :, py, px]
+                    occupied_id = occupied_ids[row, height, col]
+                    if occupied_id == -1:
+                        occupied_ids[row, height, col] = max_id
+                        grid_feat[max_id] = feat.flatten() * alpha
+                        grid_rgb[max_id] = rgb_v
+                        weight[max_id] += alpha
+                        grid_pos[max_id] = [row, height, col]
+                        max_id += 1
+                    else:
+                        grid_feat[occupied_id] = (
+                            grid_feat[occupied_id] * weight[occupied_id] + feat.flatten() * alpha
+                        ) / (weight[occupied_id] + alpha)
+                        if weight[occupied_id] + alpha == 0:
+                            print("weight is 0")
+                        grid_rgb[occupied_id] = (grid_rgb[occupied_id] * weight[occupied_id] + rgb_v * alpha) / (
+                            weight[occupied_id] + alpha
+                        )
+                        weight[occupied_id] += alpha
+
+            # update min_max
+            self.min_max = min_max
+
+            self.save_3d_map(grid_feat, grid_pos, weight, grid_rgb, occupied_ids, mapped_iter_set, max_id)
+
+
+    def update_map(self,old_map,new_map_coord,delta_map_coord):
         '''
-        Visualize and save the semantic map at img_save_path. Draw the map for each channel ([H,W]) with different colors and transparency 0.3 (so that overlapping is visible) on the same map with different color. Draw the caption of each channel referring to each color
-        Input: semantic_map: [H,W,Channel]
+        old_map: shape: [x,y,z,:];[x,y,:]
+        new_map: shape: [new_map_coord]
         '''
-        H, W, C = self.semantic_map.shape
+        if (len(new_map)==3):
+            new_map = np.zeros(new_map_coord)
+            new_map[:(old_map.shape[0]+delta_map_coord[0]),:(old_map.shape[1]+delta_map_coord[1]),:] = old_map
+        else:
+            new_map = np.zeros(new_map_coord)
+            new_map[:(old_map.shape[0]+delta_map_coord[0]),:(old_map.shape[1]+delta_map_coord[1]),:(old_map.shape[2]+delta_map_coord[2]),:] = old_map
+        return new_map
     
-        # Create a figure and axis
-        fig, ax = plt.subplots(figsize=(8, 8))
-        
-        # Define a colormap with 40 colors
-        num_colors = 40
-        colormap = plt.get_cmap('tab20c', num_colors)  # You can use other colormaps like 'tab20', 'viridis', etc.
+    def cvt_global_to_pixel_map(self,pc_global):
+        '''
+        pc_global: [N,3]
+        '''
+        x_max = max(self.min_max[0,0],pc_global[:,0])
+        x_min = min(self.min_max[0,1],pc_global[:,0])
+        y_max = max(self.min_max[1,0],pc_global[:,1])
+        y_min = min(self.min_max[1,1],pc_global[:,1])
+        z_max = max(self.min_max[2,0],pc_global[:,2])
+        z_min = min(self.min_max[2,1],pc_global[:,2])
+        new_row = (max(self.x_max,pc_global[:,0])-min(self.x_min,pc_global[:,0]))/self.voxel_size +1
+        new_height = (max(self.y_max,pc_global[:,1])-min(self.y_min,pc_global[:,1]))/self.voxel_size +1
+        new_col = (max(self.z_max,pc_global[:,2])-min(self.z_min,pc_global[:,2]))/self.voxel_size +1
 
-        # Track which channels have non-zero values
-        valid_channels = []
+        delta_row = min(self.x_min,pc_global[:,0])/self.voxel_size
+        delta_height = min(self.y_min,pc_global[:,1])/self.voxel_size
+        delta_col = min(self.z_min,pc_global[:,2])/self.voxel_size
+        # map the local map to a global map
+        pc_pixel_map = np.zeros(pc_global.shape)
 
-        # Plot each channel
-        for i in range(C):
-            channel = self.semantic_map[:, :, i]
-            if np.any(channel > 0):
-                valid_channels.append(i)
-                color = colormap(i % num_colors)  # Use color mapping for up to 40 colors
-                color_rgba = list(color)
-                color_rgba[3] = 1  # Set alpha to 0.3 for transparency
-                ax.imshow(np.ma.masked_where(channel == 0, channel), cmap=plt.cm.colors.ListedColormap([color_rgba]), interpolation='nearest')
+        for i in range(pc_global.shape[0]):
+            x = int((pc_global[i,0]-min(self.x_min,pc_global[:,0]))/self.voxel_size)
+            y = int((pc_global[i,1]-min(self.y_min,pc_global[:,1]))/self.voxel_size)
+            z = int((pc_global[i,2]-min(self.z_min,pc_global[:,2]))/self.voxel_size)
+            pc_pixel_map[i] = [x,y,z]
+        return pc_pixel_map,[new_row,new_height,new_col],[delta_row,delta_height,delta_col],[[x_max,x_min],[y_max,y_min],[z_max,z_min]]
+    
+    def save_3d_map(
+        self,
+        grid_feat: np.ndarray,
+        grid_pos: np.ndarray,
+        weight: np.ndarray,
+        grid_rgb: np.ndarray,
+        occupied_ids: Set,
+        mapped_iter_set: Set,
+        max_id: int,
+    ) -> None:
+        grid_feat = grid_feat[:max_id]
+        grid_pos = grid_pos[:max_id]
+        weight = weight[:max_id]
+        grid_rgb = grid_rgb[:max_id]
+        with h5py.File(self.map_save_path, "w") as f:
+            f.create_dataset("mapped_iter_list", data=np.array(list(mapped_iter_set), dtype=np.int32))
+            f.create_dataset("grid_feat", data=grid_feat)
+            f.create_dataset("grid_pos", data=grid_pos)
+            f.create_dataset("weight", data=weight)
+            f.create_dataset("occupied_ids", data=occupied_ids)
+            f.create_dataset("grid_rgb", data=grid_rgb)
+            f.create_dataset("pcd_min", data=self.pcd_min)
+            f.create_dataset("pcd_max", data=self.pcd_max)
+            f.create_dataset("cs", data=self.map_config.cell_size)
 
-        # Remove axis ticks
-        ax.set_xticks([])
-        ax.set_yticks([])
-        
-        # Add a legend for valid channels only
-        legend_elements = []
-        for i in valid_channels:
-            color = colormap(i % num_colors)
-            color_rgba = list(color)
-            color_rgba[3] = 0.3
-            legend_elements.append(Line2D([0], [0], color=color_rgba, lw=4, alpha=0.3, label=f'Channel {i+1}'))
-        
-        if legend_elements:
-            ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.1, 1))
-        
-        # Set the background color to white
-        fig.patch.set_facecolor('white')
-        
-        # Adjust the plot to remove extra whitespace
-        plt.tight_layout()
-        
-        # Save the figure
-        plt.savefig(img_save_path, dpi=300, bbox_inches='tight')
-        plt.close()
+    def _retrive_map(self, pcd_min: np.ndarray, pcd_max: np.ndarray, cs: float, map_path: Path) -> Tuple:
+            """
+            retrive the saved map route
+            """
 
+            # check if there is already saved map
+            if os.path.exists(map_path):
+                (mapped_iter_list, grid_feat, grid_pos, weight, occupied_ids, grid_rgb, pcd_min, pcd_max, cs) = (
+                    self.load_3d_map(self.map_save_path)
+                )
+                mapped_iter_set = set(mapped_iter_list)
+                max_id = grid_feat.shape[0]
+                self.pcd_min = pcd_min
+            else:
+                grid_size = np.ceil((pcd_max - pcd_min) / cs + 1).astype(int)  # col, height, row
+                self.grid_size = grid_size
+                occupied_ids = -1 * np.ones(grid_size[[0, 1, 2]], dtype=np.int32)
+                grid_feat = np.zeros((grid_size[0] * grid_size[2], self.clip_feat_dim), dtype=np.float32)
+                grid_pos = np.zeros((grid_size[0] * grid_size[2], 3), dtype=np.int32)
+                weight = np.zeros((grid_size[0] * grid_size[2]), dtype=np.float32)
+                grid_rgb = np.zeros((grid_size[0] * grid_size[2], 3), dtype=np.uint8)
+                # init the map related variables
+                mapped_iter_set = set()
+                mapped_iter_list = list(mapped_iter_set)
+                max_id = 0
+
+            return grid_feat, grid_pos, weight, occupied_ids, grid_rgb, mapped_iter_set, max_id
+        
         
     def plot_segmentation_result(self, rgb, semantic_segmentation, save_path):
         '''
@@ -480,112 +293,183 @@ class BEVSemMap:
         '''
         # Create a figure and axis
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-        
-        # Plot RGB image
-        ax[0].imshow(rgb)
-        ax[0].set_title("RGB Image")
-        ax[0].axis('off')  # Hide axes for RGB image
-        
-        # Define a colormap with 40 colors
-        num_colors = 40
-        colormap = plt.get_cmap('tab20c', num_colors)  # or any other colormap suitable for your number of classes
+
+    def plot_segmentation_result(self, rgb, semantic_segmentation, save_path):
+        '''
+        Visualize and save the RGB image and semantic segmentation map side by side.
+        Args:
+            rgb: The RGB image array of shape [H, W, 3].
+            semantic_segmentation: The semantic segmentation map array of shape [H, W].
+            save_path: Path to save the resulting figure.
+        '''
+        # Create a figure and axis
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+
+    def _reserve_map_space(
+    self, grid_feat: np.ndarray, grid_pos: np.ndarray, weight: np.ndarray, grid_rgb: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        grid_feat = np.concatenate(
+            [
+                grid_feat,
+                np.zeros((grid_feat.shape[0], grid_feat.shape[1]), dtype=np.float32),
+            ],
+            axis=0,
+        )
+        grid_pos = np.concatenate(
+            [
+                grid_pos,
+                np.zeros((grid_pos.shape[0], grid_pos.shape[1]), dtype=np.int32),
+            ],
+            axis=0,
+        )
+        weight = np.concatenate([weight, np.zeros((weight.shape[0]), dtype=np.int32)], axis=0)
+        grid_rgb = np.concatenate(
+            [
+                grid_rgb,
+                np.zeros((grid_rgb.shape[0], grid_rgb.shape[1]), dtype=np.float32),
+            ],
+            axis=0,
+        )
+        return grid_feat, grid_pos, weight, grid_rgb
+
+
 
         # Ensure semantic_segmentation is integer type
         if semantic_segmentation.dtype != np.uint8:
             semantic_segmentation = semantic_segmentation.astype(np.uint8)
-
-        # Plot semantic segmentation with color map
-        ax[1].imshow(semantic_segmentation, cmap=colormap, interpolation='nearest')
-        ax[1].set_title("Semantic Segmentation")
-        ax[1].axis('off')  # Hide axes for segmentation map
+        
+        # Ensure semantic_segmentation is integer type
+        if semantic_segmentation.dtype != np.uint8:
+            semantic_segmentation = semantic_segmentation.astype(np.uint8)
         
         # Add a legend to the semantic segmentation plot
         # Only add legend entries for non-empty classes
         num_classes = np.max(semantic_segmentation) + 1
         valid_classes = np.unique(semantic_segmentation)
-        
-        legend_elements = []
-        for i in valid_classes:
-            color = colormap(i % num_colors)
-            color_rgba = list(color)
-            color_rgba[3] = 0.7  # Adjust alpha for legend visibility
-            legend_elements.append(Line2D([0], [0], color=color_rgba, lw=4, label=f'Class {i}'))
-        
-        if legend_elements:
-            ax[1].legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.1, 1))
-        
-        # Save the figure
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.close()
 
-        import matplotlib.pyplot as plt
+        # Add a legend to the semantic segmentation plot
+        # Only add legend entries for non-empty classes
+        num_classes = np.max(semantic_segmentation) + 1
+        valid_classes = np.unique(semantic_segmentation)
 
-
-    
-    def plot_rgb_segmentation_semantic_pc(self, depth, rgb, semantic_segmentation, semantic_map, pc, robot_coords, save_path):
+    # TODO: check the hard-coded size and path
+    def _init_lseg(self):
         '''
-        Visualize and save the RGB image, depth image, semantic segmentation map, semantic map, and point cloud side by side.
+        copied from vlmap: vlmap_builder_cam.py
+        '''
+        crop_size = 480  # 480
+        base_size = 256  # 520
+        if torch.cuda.is_available():
+            self.device = "cuda"
+        elif torch.backends.mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
+        lseg_model = LSegEncNet("", arch_option=0, block_depth=0, activation="lrelu", crop_size=crop_size)
+        model_state_dict = lseg_model.state_dict()
+        checkpoint_dir = Path(__file__).resolve().parents[1] / "lseg" / "checkpoints"
+        checkpoint_path = checkpoint_dir / "demo_e200.ckpt"
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        if not checkpoint_path.exists():
+            print("Downloading LSeg checkpoint...")
+            # the checkpoint is from official LSeg github repo
+            # https://github.com/isl-org/lang-seg
+            checkpoint_url = "https://drive.google.com/u/0/uc?id=1ayk6NXURI_vIPlym16f_RG3ffxBWHxvb"
+            gdown.download(checkpoint_url, output=str(checkpoint_path))
+
+        pretrained_state_dict = torch.load(checkpoint_path, map_location=self.device)
+        pretrained_state_dict = {k.lstrip("net."): v for k, v in pretrained_state_dict["state_dict"].items()}
+        model_state_dict.update(pretrained_state_dict)
+        lseg_model.load_state_dict(pretrained_state_dict)
+
+        lseg_model.eval()
+        lseg_model = lseg_model.to(self.device)
+
+        norm_mean = [0.5, 0.5, 0.5]
+        norm_std = [0.5, 0.5, 0.5]
+        lseg_transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+            ]
+        )
+        self.clip_feat_dim = lseg_model.out_c
+        return lseg_model, lseg_transform, crop_size, base_size, norm_mean, norm_std
+
         
+    @staticmethod
+    def load_3d_map(map_path: Union[Path, str]):
+        with h5py.File(map_path, "r") as f:
+            mapped_iter_list = f["mapped_iter_list"][:].tolist()
+            grid_feat = f["grid_feat"][:]
+            grid_pos = f["grid_pos"][:]
+            weight = f["weight"][:]
+            occupied_ids = f["occupied_ids"][:]
+            grid_rgb = f["grid_rgb"][:]
+            pcd_min = f["pcd_min"][:]
+            pcd_max = f["pcd_max"][:]
+            cs = f["cs"][()]
+            return mapped_iter_list, grid_feat, grid_pos, weight, occupied_ids, grid_rgb, pcd_min, pcd_max, cs
+        
+    # copied from vlmap.map
+    def generate_obstacle_map(self, h_min: float = 0, h_max: float = 1.5) -> np.ndarray:
+        """Generate topdown obstacle map from loaded 3D map
+
         Args:
-            depth: The depth image array of shape [H, W].
-            rgb: The RGB image array of shape [H, W, 3].
-            semantic_segmentation: The semantic segmentation map array of shape [H, W].
-            semantic_map: The semantic map array of shape [H, W, Channel] with binary values.
-            pc: The point cloud data as a numpy array of shape [N, 3].
-            save_path: Path to save the resulting figure.
-        '''
-        # 创建一个5个子图的图形和坐标轴 
-        fig, ax = plt.subplots(1, 5, figsize=(30, 6))
-        
-        # 绘制RGB图像
-        ax[0].imshow(rgb)
-        ax[0].set_title("RGB Image")
-        ax[0].axis('off')
-        
-        # 绘制深度图像
-        ax[1].imshow(depth, cmap='gray')
-        ax[1].set_title("Depth Image")
-        ax[1].axis('off')
-        
-        # 定义一个具有40种颜色的colormap，以涵盖最多160类
-        num_colors = 40
-        colormap = plt.get_cmap('tab20c', num_colors)
-        
-        # 使用colormap绘制语义分割图像
-        ax[2].imshow(semantic_segmentation, cmap=colormap, interpolation='nearest')
-        ax[2].set_title("Semantic Segmentation")
-        ax[2].axis('off')
-        
-        # 绘制语义图
-        white_background = np.ones_like(semantic_map[:, :, 0])  # 创建一个白色图像
-        ax[3].imshow(white_background, cmap='gray', vmin=0, vmax=1)
-        ax[3].set_title("Semantic Map")
-        ax[3].axis('off')
-        
-        valid_labels = []
-        # 叠加每个channel的语义图
-        for i in range(semantic_map.shape[2]):
-            channel = semantic_map[:, :, i]
-            if np.any(channel == 1):  # 检查该channel是否存在
-                color = colormap(i % num_colors)
-                color_rgba = list(color)
-                color_rgba[3] = 1.0  # 设置alpha为1.0，完全不透明
-                ax[3].imshow(np.ma.masked_where(channel == 0, channel), cmap=ListedColormap([color_rgba]), interpolation='nearest')
-                valid_labels.append(i)
-        
-        # 绘制点云图像
-        ax[4] = fig.add_subplot(1, 5, 5, projection='3d')
-        ax[4].scatter(pc[:, 0], pc[:, 1], pc[:, 2], c=pc[:, 2], cmap='viridis', s=1)
-        ax[4].set_title("Point Cloud")
-        ax[4].set_xlabel('X')
-        ax[4].set_ylabel('Y')
-        ax[4].set_zlabel('Z')
-        convert_robot_coords = ((robot_coords[:2]- self.init_world_pos[:2])/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2])
-        ax[4].scatter(convert_robot_coords[0], convert_robot_coords[1], color='blue', marker='o', label="current position: (%.2f, %.2f)"%(convert_robot_coords[0], convert_robot_coords[1]))
-        ax[4].axis('off')
+            h_min (float, optional): The minimum height (m) of voxels considered
+                as obstacles. Defaults to 0.
+            h_max (float, optional): The maximum height (m) of voxels considered
+                as obstacles. Defaults to 1.5.
+        Return:
+            obstacles_map (np.ndarray): (gs, gs) 1 is free, 0 is occupied
+        """
+        assert self.occupied_ids is not None, "map not loaded"
+        heights = np.arange(0, self.occupied_ids.shape[-1]) * self.cs
+        height_mask = np.logical_and(heights > h_min, heights < h_max)
+        self.obstacles_map = np.sum(self.occupied_ids[..., height_mask] > 0, axis=2) == 0
+        self.generate_cropped_obstacle_map(self.obstacles_map)
+        return self.obstacles_map
 
-        # 保存最终的图形
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.close()
+    def generate_cropped_obstacle_map(self, obstacle_map: np.ndarray) -> np.ndarray:
+        x_indices, y_indices = np.where(obstacle_map == 0)
+        self.rmin = np.min(x_indices)
+        self.rmax = np.max(x_indices)
+        self.cmin = np.min(y_indices)
+        self.cmax = np.max(y_indices)
+        self.obstacles_cropped = obstacle_map[self.rmin : self.rmax + 1, self.cmin : self.cmax + 1]
+        return self.obstacles_cropped
+    
+
+    def init_categories(self, categories: List[str]) -> np.ndarray:
+        self.categories = categories
+        self.scores_mat = get_lseg_score(
+            self.clip_model,
+            self.categories,
+            self.grid_feat,
+            self.clip_feat_dim,
+            use_multiple_templates=True,
+            add_other=True,
+        )  # score for name and other
+        return self.scores_mat
+
+    def index_map(self, language_desc: str, with_init_cat: bool = True):
+        if with_init_cat and self.scores_mat is not None and self.categories is not None:
+            cat_id = find_similar_category_id(language_desc, self.categories)
+            scores_mat = self.scores_mat
+        else:
+            if with_init_cat:
+                raise Exception(
+                    "Categories are not preloaded. Call init_categories(categories: List[str]) to initialize categories."
+                )
+            scores_mat = get_lseg_score(
+                self.clip_model,
+                [language_desc],
+                self.grid_feat,
+                self.clip_feat_dim,
+                use_multiple_templates=True,
+                add_other=True,
+            )  # score for name and other
+            cat_id = 0
+
+        max_ids = np.argmax(scores_mat, axis=1)
+        mask = max_ids == cat_id
+        return mask

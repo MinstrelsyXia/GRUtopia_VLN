@@ -1,5 +1,5 @@
 defaults:
-  - data_paths: isaacsim_test
+  - data_paths: object_goal_navigation
   - map_config: issacsim_test
   - params: issacsim_test
   - _self_

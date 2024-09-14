@@ -10,9 +10,9 @@ from omegaconf import DictConfig, OmegaConf
 from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter, median_filter
 from shapely.geometry import Point, Polygon
 
-from vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
+from vlmaps.vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
 
-# from vlmaps.utils.mapping_utils import load_map
+# from vlmaps.vlmaps.utils.mapping_utils import load_map
 
 
 class Map:
@@ -76,7 +76,7 @@ class Map:
     def index_map(self, language_desc: str, with_init_cat: bool = True):
         return NotImplementedError
 
-    def generate_obstacle_map(self, h_min: float = 0, h_max: float = 1.5) -> np.ndarray:
+    def generate_obstacle_map(self, h_min: float = 0, h_max: float = 1.7) -> np.ndarray:
         """Generate topdown obstacle map from loaded 3D map
 
         Args:
@@ -120,11 +120,14 @@ class Map:
 
     @staticmethod
     def create(map_config: DictConfig) -> Map:
-        from vlmaps.map import VLMap
+        from vlmaps.vlmaps.map import VLMap
 
         if map_config.map_type == "vlmap":
             return VLMap(map_config)
 
+        if map_config.map_type == 'IsaacSimMap':
+            from application_my.build_dynamic_map import TMP
+            return TMP(map_config)
         # if map_type == "lseg":
         #     return VLMap(map_dir, map_config)
         # elif map_type == "gt":
@@ -178,6 +181,9 @@ class Map:
         return binary_map
 
     def get_nearest_pos(self, curr_pos: List[float], name: str) -> List[float]:
+        #! if what it faces is not explored(0 in explore map), return false
+        # self.occupancy_map = self.load_occupancy_map()
+        # 
         contours, centers, bbox_list = self.get_pos(name)
         ids_list = self.filter_small_objects(bbox_list, area_thres=10)
         contours = [contours[i] for i in ids_list]

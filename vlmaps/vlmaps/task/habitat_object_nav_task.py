@@ -7,10 +7,10 @@ import numpy as np
 import habitat_sim
 import cv2
 
-from vlmaps.task.habitat_task import HabitatTask
-from vlmaps.utils.habitat_utils import agent_state2tf, get_position_floor_objects
-from vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
-from vlmaps.utils.habitat_utils import display_sample
+from vlmaps.vlmaps.task.habitat_task import HabitatTask
+from vlmaps.vlmaps.utils.habitat_utils import agent_state2tf, get_position_floor_objects
+from vlmaps.vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
+from vlmaps.vlmaps.utils.habitat_utils import display_sample
 
 
 class HabitatObjectNavigationTask(HabitatTask):
@@ -18,8 +18,7 @@ class HabitatObjectNavigationTask(HabitatTask):
         assert hasattr(self, "vlmaps_dataloader"), "Please call setup_scene() first"
 
         task_path = Path(self.vlmaps_dataloader.data_dir) / "object_navigation_tasks.json"
-        with open(task_path, "r") as f:
-            self.task_dict = json.load(f)
+
 
     def setup_task(self, task_id: int):
         json_task_id = self.task_dict[task_id]["task_id"]

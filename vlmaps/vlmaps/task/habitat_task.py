@@ -4,8 +4,8 @@ import habitat_sim
 import numpy as np
 from omegaconf import DictConfig
 
-from vlmaps.dataloader.habitat_dataloader import VLMapsDataloaderHabitat
-from vlmaps.utils.habitat_utils import agent_state2tf
+from vlmaps.vlmaps.dataloader.habitat_dataloader import VLMapsDataloaderHabitat
+from vlmaps.vlmaps.utils.habitat_utils import agent_state2tf
 
 
 class HabitatTask:

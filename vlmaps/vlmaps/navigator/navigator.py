@@ -1,6 +1,6 @@
 import numpy as np
 import pyvisgraph as vg
-from vlmaps.utils.navigation_utils import build_visgraph_with_obs_map, plan_to_pos_v2
+from vlmaps.vlmaps.utils.navigation_utils import build_visgraph_with_obs_map, plan_to_pos_v2
 from typing import Tuple, List, Dict
 
 

@@ -104,6 +104,7 @@ def build_visgraph_with_obs_map(obs_map, use_internal_contour=False, internal_po
             contour_cv2 = contour[:, [1, 0]]
             cv2.drawContours(obs_map_vis, [contour_cv2], 0, (0, 255, 0), 3)
             cv2.imshow("obs", obs_map_vis)
+            cv2.imwrite("obs.jpg", obs_map_vis)
         contour_pos = []
         for [row, col] in contour:
             contour_pos.append(vg.Point(row, col))

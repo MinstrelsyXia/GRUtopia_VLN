@@ -4,7 +4,7 @@ import hydra
 import numpy as np
 from omegaconf import DictConfig
 import habitat_sim
-from vlmaps.utils.habitat_utils import *
+from vlmaps.vlmaps.utils.habitat_utils import *
 
 
 @hydra.main(

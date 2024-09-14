@@ -143,7 +143,7 @@ def create_lseg_map_batch(img_save_dir, camera_height, cs=0.05, gs=1000, depth_s
         semantic = load_semantic(semantic_path)
         semantic = cvt_obj_id_2_cls_id(semantic, obj2cls)
 
-        pix_feats = get_lseg_feat(model, rgb, labels, transform, crop_size, base_size, norm_mean, norm_std)
+        pix_feats,_ = get_lseg_feat(model, rgb, labels, transform, crop_size, base_size, norm_mean, norm_std)
         
         # transform all points to the global frame
         pc, mask = depth2pc(depth)

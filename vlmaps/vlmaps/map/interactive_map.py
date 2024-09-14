@@ -23,10 +23,10 @@ import magnum as mn
 import habitat_sim
 from habitat_sim import AgentState
 
-from vlmaps.utils.habitat_utils import tf2agent_state
+from vlmaps.vlmaps.utils.habitat_utils import tf2agent_state
 
 
-from vlmaps.map.vlmap import VLMap
+from vlmaps.vlmaps.map.vlmap import VLMap
 
 # from habitat.utils.visualizations import maps
 
@@ -48,8 +48,8 @@ from vlmaps.map.vlmap import VLMap
 #     pos2grid_id,
 # )
 # from utils.controller.discrete_nav_controller import DiscreteNavController
-from vlmaps.utils.matterport3d_categories import mp3dcat
-from vlmaps.dataloader.habitat_dataloader import VLMapsDataloaderHabitat
+from vlmaps.vlmaps.utils.matterport3d_categories import mp3dcat
+from vlmaps.vlmaps.dataloader.habitat_dataloader import VLMapsDataloaderHabitat
 from typing import Tuple, List
 
 

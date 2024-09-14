@@ -1,0 +1,17 @@
+# vln_config.yaml
+env: val_seen
+path_id: 37
+headless: true
+test_verbose: false
+wait: false
+mode: vis_one_path
+sim_cfg_file: "vln/configs/sim_cfg.yaml"
+vln_cfg_file: "vln/configs/vln_cfg.yaml"
+save_obs: false
+windows_head: false
+windows_head_type: show
+
+settings:
+  mode: vis_one_path
+  force_sample: true
+  sample_camera_list: ["camera1", "camera2"]

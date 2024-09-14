@@ -24,6 +24,7 @@ settings:
     - camera_params
   max_step: 300
   force_sample: true
+  interact_mode: "static" # static/ dynamic; for static mode, read in all data at the beginning; 
 
 sample_episodes:
   step_interval: 3

@@ -1,4 +1,4 @@
-map_type: "vlmap" # "vlmap", "gt", "clip", "clip_gradcam", "vlmaps_lseg_3d"
+map_type: "IsaacSimMap" # "vlmap", "gt", "clip", "clip_gradcam", "vlmaps_lseg_3d"
 pose_info:
   pose_type: camera_base # mobile_base, camera_base
   rot_type: "quat" # "mat", or "quat" (x, y, z, w)
@@ -9,9 +9,11 @@ pose_info:
   base_left_axis: [-1, 0, 0]
   base_up_axis: [0, 1, 0]
 skip_frame: 1
-cam_calib_mat : [194,0,112,0,194,112,0,0,1] # from camera_parrams
+cam_calib_mat : [221,0,128,0,221,128,0,0,1] # from camera_parrams
+# cam_calib_mat : [1.7320506250651373, 0.0, 0.0, 0.0, 0.0, 1.7320506250651373, 0.0, 0.0, 0.0, 0.0, 9.999999786482582e-10, -1.0, 0.0, 0.0, 0.009999999786482581, 0.0]
 grid_size: ${params.gs}
 cell_size: ${params.cs}
+robot_z: ${params.robot_z}
 depth_sample_rate: 50
 dilate_iter: 3
 gaussian_sigma: 1.0

@@ -4,7 +4,7 @@ import numpy as np
 import h5py
 from omegaconf import DictConfig, OmegaConf
 
-from vlmaps.map.map import Map
+from vlmaps.vlmaps.map.map import Map
 
 from typing import List, Tuple, Dict, Any
 
@@ -24,7 +24,7 @@ class LangRobot:
         return self.vlmaps_data_save_dirs
 
     def load_scene_map(self, data_dir: str, map_config: DictConfig):
-        self.map = Map.create(map_config)
+        self.map = Map.create(map_config) #! should include isaacmap!!!
         self.map.load_map(data_dir)
         self.map.generate_obstacle_map()
 

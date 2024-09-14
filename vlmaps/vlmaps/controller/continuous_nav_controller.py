@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 from controller import NavController
 import numpy as np
 from omegaconf import DictConfig
-from vlmaps.utils.mapping_utils import grid_id2pos, pos2grid_id
+from vlmaps.vlmaps.utils.mapping_utils import grid_id2pos, pos2grid_id
 
 
 class ContinuousNavController(NavController):
