@@ -41,7 +41,7 @@ def images_to_video(image_folder, output_video_name, camera_name=None, images=No
     print(f"Video saved as {output_video_name}")
 
 # 使用示例
-image_folder = '/ssd/wangliuyi/code/w61_grutopia_new/logs/sample_episodes/train/7y3sRwLe3Va/id_991'
+image_folder = '/ssd/wangliuyi/code/w61_grutopia_new/logs/sample_episodes/envdrop/SN83YJsR3w2/id_16'
 path_id = image_folder.split('/')[-1]
 output_video = f'logs/images/output_video_{path_id}.mp4'
 fps = 2  # 你可以根据需要调整帧率

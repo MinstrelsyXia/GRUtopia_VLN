@@ -646,6 +646,162 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
     
     # env.simulation_app.close()
         
+def generate_pc(args, vln_envs_all, pose, depth_map_list, split=None, scan=None, assigned_path_id=None, is_app_up=False):
+    # Init the variables
+    action_name = vln_config.settings.action
+    topdown_maps = {}
+    is_app_up = is_app_up
+    scan = args.scan if scan is None else scan
+    split = args.split if split is None else split
+    vln_envs = vln_envs_all[split] 
+    scan_data = vln_envs.data[scan] 
+
+    process_path_id = []
+    # scan_has_init = False
+    scan_first_init = True
+    # if scan_has_init:
+    #     vln_envs.reload_scene(scan)
+    find_path_id = False
+    for idx in range(len(scan_data)):
+        data_item = scan_data[idx]        
+        paths = data_item['reference_path']
+        path_id = data_item['trajectory_id']
+        if assigned_path_id is not None:
+            # find the target path_id
+            if path_id != assigned_path_id:
+                continue
+            else:
+                find_path_id = True
+                print(f'find target path_id {assigned_path_id}')
+
+        if hasattr(args.settings, 'filter_stairs') and args.settings.filter_stairs:
+            if 'stair' in data_item['instruction']['instruction_text']:
+                continue
+
+            different_height = False
+            for path_idx in range(len(paths)-1):
+                if abs(paths[path_idx+1][2] - paths[path_idx][2]) > 0.3:
+                    different_height = True
+                    break
+
+            if different_height:
+                continue
+
+        if path_id in process_path_id:
+            continue
+        else:
+            process_path_id.append(path_id)
+
+        # 1. init Omni Env or Reset robot episode
+        if args.test_verbose:
+            args.log_image_dir = os.path.join(args.log_dir, "images", split, scan, str(data_item['trajectory_id'])) # Note that this will inflence the global arg value
+            if not os.path.exists(args.log_image_dir):
+                os.makedirs(args.log_image_dir)
+
+        episode_path = os.path.join(args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
+        args.episode_path = episode_path
+        if os.path.exists(episode_path):
+            if args.settings.force_sample:
+                log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Force to sample again.")
+                # remove the previous sampled data
+                shutil.rmtree(episode_path)
+                os.makedirs(episode_path)
+            else:
+                log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled.")
+                continue
+        else:
+            os.makedirs(episode_path)
+
+        if scan_first_init:
+            # !!!
+            # scan = "sT4fr6TAbpF"
+            # idx = 9
+            # path_id = 116
+            # !!!
+            # path_id = -1
+            data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=True, reset_scene=is_app_up, save_log=True, path_id=path_id) #TODO: change to global init
+            is_app_up = True
+
+        else:
+            data_item = vln_envs.init_one_scan(scan, idx, init_omni_env=False, save_log=True, path_id=path_id)
+
+        env = vln_envs.env
+        current_point = 0
+        total_points = []
+        total_points.append([np.array(vln_envs.agent_init_pose), np.array(vln_envs.agent_init_rotation)])
+        is_image_stacked = False
+    
+        if vln_config.windows_head:
+            vln_envs.cam_occupancy_map_local.open_windows_head(text_info=data_item['instruction']['instruction_text'])
+    
+        '''start simulation'''
+        i = 0
+        step_interval = 50
+        pc_interval = 20
+        depth_length = 3
+        current_depth = 0
+        set_step = step_interval
+        # 生成像素坐标的网格
+        width, height = depth_map1.shape
+        x = np.arange(width)
+        y = np.arange(height)
+        xx, yy = np.meshgrid(x, y)
+        xx_flat = xx.flatten()
+        yy_flat = yy.flatten()
+        points_2d = np.vstack((xx_flat, yy_flat)).T  # (N, 2)
+
+        actions = {'h1': {'move_with_keyboard': []}}
+        global_pcd = o3d.geometry.PointCloud()
+        
+        camera = vln_envs.robots.sensors['pano_camera_0']._camera
+        if scan_first_init:
+            warm_step = 240 if args.headless else 2000
+            # warm_step = 5 # !!! debug
+            scan_first_init = False
+        else:
+            warm_step = 5
+        move_step = warm_step
+        # Note that warm_step should be the times of the oracle sample interval (now is set to 20)
+        
+        init_actions = {'h1': {action_name: [[paths[0]]]}}
+
+        start_time = time.time()
+        while env.simulation_app.is_running():
+            i += 1
+            if i%step_interval == 0:
+                camera.set_world_pose(pose[current_depth, :3], pose[current_depth, 3:])
+                set_step = i
+            if i%(set_step+pc_interval) == 0:
+                depth_map = depth_map_list[current_depth]
+                depth_map = depth_map.flatten()
+                # try:
+                points_3d = camera.get_world_points_from_image_coords(points_2d, depth_map)
+                points_3d_downsampled = downsample_pc(points_3d, 100)
+                pcd_global = o3d.geometry.PointCloud()
+                pcd_global.points = o3d.utility.Vector3dVector(points_3d_downsampled)
+                global_pcd += pcd_global
+                visualize_pc(pcd_global, False, save_path=f"logs/pc/{current_depth}.jpg")
+                current_depth += 1
+                if current_depth == depth_length:
+                    current_depth = 0
+                # except Exception:
+                #     print("Error!")
+                #     continue
+
+        end_time = time.time()
+        total_time = (end_time - start_time)/60
+        log.info(f"Total time for the [scan: {scan}] and [path_id: {path_id}] episode: {total_time:.2f} minutes")
+
+    print('finish')
+
+    return env
+
+    # if vln_config.windows_head:
+        # close the topdown camera
+        # vln_envs.cam_occupancy_map_local.close_windows_head()
+    
+    # env.simulation_app.close()
+        
 
 if __name__ == "__main__":
     vln_envs, vln_config, sim_config, data_camera_list = build_dataset()
@@ -661,3 +817,45 @@ if __name__ == "__main__":
         sample_episodes(vln_config, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_scripts":
         sample_episodes_single_scan(vln_config, vln_envs, data_camera_list)
+    elif vln_config.settings.mode == "sample_episodes_generate_pc":
+        import open3d as o3d
+        pose = np.loadtxt("/ssd/wangliuyi/code/w61_grutopia_new/logs/sample_episodes_R2R_20240908/train/1LXtFkjw3qL/id_67/poses.txt")
+        depth_map1 = np.load("/ssd/wangliuyi/code/w61_grutopia_new/logs/sample_episodes_R2R_20240908/train/1LXtFkjw3qL/id_67/pano_camera_0_depth_step_279.npy")
+        depth_map2 = np.load("/ssd/wangliuyi/code/w61_grutopia_new/logs/sample_episodes_R2R_20240908/train/1LXtFkjw3qL/id_67/pano_camera_0_depth_step_318.npy")
+        depth_map3 = np.load("/ssd/wangliuyi/code/w61_grutopia_new/logs/sample_episodes_R2R_20240908/train/1LXtFkjw3qL/id_67/pano_camera_0_depth_step_357.npy")
+
+        # 点云下采样函数
+        def downsample_pc(pc, depth_sample_rate):
+            shuffle_mask = np.arange(pc.shape[0])
+            np.random.shuffle(shuffle_mask)
+            shuffle_mask = shuffle_mask[::depth_sample_rate]
+            pc = pc[shuffle_mask, :]
+            return pc
+
+        # 保存点云图像函数
+        def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
+            vis = o3d.visualization.Visualizer()
+            vis.create_window()
+            ctr = vis.get_view_control()
+            ctr.set_front([0, 0, -1])
+            ctr.set_lookat([0, 0, 0])
+            ctr.set_up([0, 0, 1])
+            vis.add_geometry(pcd)
+            vis.update_geometry(pcd)
+            vis.poll_events()
+            vis.update_renderer()
+            vis.capture_screen_image(save_path)
+            vis.destroy_window()
+
+        # 点云可视化函数
+        def visualize_pc(pcd, headless, save_path='pc.jpg'):
+            if headless:
+                save_point_cloud_image(pcd, save_path=save_path)
+            else:
+                coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
+                o3d.visualization.draw_geometries([pcd, coordinate_frame])
+                o3d.io.write_point_cloud("logs/pc/point_cloud.pcd", pcd)
+                o3d.io.write_triangle_mesh("logs/pc/coordinate_frame.ply", coordinate_frame)
+                
+        depth_map_list = [depth_map1, depth_map2, depth_map3]
+        generate_pc(vln_config, vln_envs, pose, depth_map_list, split='train', scan='1LXtFkjw3qL', assigned_path_id=67)
