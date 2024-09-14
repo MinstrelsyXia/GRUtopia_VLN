@@ -51,11 +51,6 @@ class dataCollector:
 
         obs = env.get_observations(add_rgb_subframes=add_rgb_subframes)
 
-        # episode_data = {
-        #     'camera_data': {},
-        #     'robot_info': {},
-        #     'finish_flag': finish_flag
-        # }
         episode_datas = []
 
         for env_idx, (task_name, task) in enumerate(obs.items()):

@@ -1,0 +1,81 @@
+simulator:
+  physics_dt: 1/240
+  rendering_dt: 1/240
+  rendering_interval: 2
+
+tasks:
+- type: "VLNTask"
+  name: "vln"
+  scene_asset_path: ""
+  scene_scale: [1, 1, 1]
+  env_num: 1
+  offset_size: 100.0
+  light_on: true
+  robots:
+  - name: h1
+    prim_path: "/World/h1"
+    type: "HumanoidRobot"
+    position: [0, 0, 0]
+    scale: [1, 1, 1]
+    orientation: [0,0,0,0]
+    ankle_height: 0.0758
+    controller_params:
+    - name: "move_by_speed"
+    - name: "joint_controller"
+    - name: "move_to_point"
+    - name: "move_along_path"
+    - name: "rotate"
+    - name: "move_with_keyboard"
+    # - name: "web_chat"
+    - name: "stand_still"
+    - name: "oracle_move_to_point"
+    - name: "oracle_move_along_path"
+    sensor_params:
+    - name: "pano_camera_0"
+      enable: true
+      size: [640, 480]
+    - name: "topdown_camera_50"
+      enable: false
+      size: [500, 500]
+    - name: "topdown_camera_500"
+      enable: true
+      size: [500, 500]
+    - name: "h1_pano_camera_debug"
+      enable: false
+      size: [640, 480]
+    # - name: "pano_camera_45"
+    #   enable: true
+    #   size: [256, 256]
+    # - name: "pano_camera_90"
+    #   enable: true
+    #   size: [256, 256]
+    # - name: "pano_camera_135"
+    #   enable: true
+    #   size: [256, 256]
+    # - name: "pano_camera_180"
+    #   enable: true
+    #   size: [256, 256]
+    # - name: "pano_camera_225"
+    #   enable: true
+    #   size: [256, 256]
+    # - name: "pano_camera_270"
+    #   enable: true
+    #   size: [256, 256]
+    # - name: "pano_camera_315"
+    #   enable: true
+    #   size: [256, 256]
+    # - name: "camera_lookdown"
+    #   enable: true
+    #   size: [224, 224]
+    # - name: "camera_front"
+    #   enable: true
+    #   size: [640, 480]
+    # - name: "camera_behind"
+    #   enable: true
+    #   size: [640, 480]
+    # - name: "camera_left"
+    #   enable: true
+    #   size: [640, 480]
+    # - name: "camera_right"
+    #   enable: true
+    #   size: [640, 480]
