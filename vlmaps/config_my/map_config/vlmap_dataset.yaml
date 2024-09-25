@@ -1,4 +1,5 @@
-create_map: False
+create_map: True # if True: remove the existed map .hfd5
+pure_dynamic_map: True # if true, doesn't need to load rgb files
 map_type: "IsaacSimMap" # "vlmap", "gt", "clip", "clip_gradcam", "vlmaps_lseg_3d"
 pose_info:
   pose_type: camera_base # mobile_base, camera_base
@@ -16,9 +17,14 @@ grid_size: ${params.gs}
 cell_size: ${params.cs}
 robot_z: ${params.robot_z}
 depth_sample_rate: 50
+agent_radius: 0.25 #! identical to vln/configs/vln_cfg.yaml
 dilate_iter: 3
+area_thresh: 10000 #! not in use if vlmaps.vlfm.fill_small_holes is not used in obsatcle map update
+hole_area_thresh: 10000
+map_size: 1000
+
 gaussian_sigma: 1.0
-customize_obstacle_map: False
+customize_obstacle_map: False # if false: use height-limited map, else index map
 potential_obstacle_names:
   # - "chair"
   # - "wall"

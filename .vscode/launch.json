@@ -128,6 +128,65 @@
                 // "--path_id", "2234"
                 // "--save_obs"
             ]
-        }
+        },
+        {
+            "name": "test sem",
+            "type": "python",
+            "request": "launch",
+            // "module": "vln.test_vlmap_dataset",
+            "program": "${workspaceFolder}/vln/main.py",
+            // "program": "${workspaceFolder}/vln/test_vlmap_dataset.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "/home/xiaxinyuan/.conda/envs/isaacsim/bin/python",
+            "args":[
+                "--test_verbose",
+                "--wait",
+                "--headless",
+                "--path_id", "5",
+                "--env", "train"
+            ]
+        },
+        {
+            "name": "collect data",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/vln/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "/home/xiaxinyuan/.conda/envs/isaacsim/bin/python",
+            "args":[
+                "--vln_cfg_file","vln/configs/vln_extract_data.yaml",
+                "--sim_cfg_file", "vln/configs/sample_episodes_sim_cfg.yaml",
+                "--headless",
+            ]
+        },
+        {
+            "name": "Python: Dive into isaacsim",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            // "console": "externalTerminal",
+            "env": {
+                "RESOURCE_NAME": "IsaacSim"
+            },
+            "python": "/home/xiaxinyuan/.conda/envs/isaacsim/bin/python",
+            "justMyCode": false
+        },
+        {
+            "name": "test vlmap dataset load in",
+            "type": "python",
+            "request": "launch",
+            // "module": "vln.test_vlmap_dataset",
+            // "program": "${workspaceFolder}/vln/main.py",
+            "program": "${workspaceFolder}/vln/test_vlmap_dataset.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "/home/xiaxinyuan/.conda/envs/isaacsim/bin/python",
+        },
+
+
+
     ]
 }

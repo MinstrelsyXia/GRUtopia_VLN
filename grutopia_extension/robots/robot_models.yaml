@@ -2,7 +2,8 @@
 robots:
 - type: "HumanoidRobot"
   # usd_path: "GRUtopia/assets/robots/h1/h1_vln_pano_cameras.usd"
-  usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_cameras_925.usd"
   gains: [0.0, 0.0]
   joint_names:
   - left_hip_yaw_joint

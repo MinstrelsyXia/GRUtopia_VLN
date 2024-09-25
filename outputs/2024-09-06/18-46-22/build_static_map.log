@@ -1,0 +1,2 @@
+[2024-09-06 18:46:32,749][timm.models._builder][INFO] - Loading pretrained weights from Hugging Face hub (timm/vit_large_patch16_384.augreg_in21k_ft_in1k)
+[2024-09-06 18:46:33,635][timm.models._hub][INFO] - [timm/vit_large_patch16_384.augreg_in21k_ft_in1k] Safe alternative available for 'pytorch_model.bin' (as 'model.safetensors'). Loading weights using safetensors.

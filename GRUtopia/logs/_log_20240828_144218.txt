@@ -1,0 +1,4 @@
+[2024-08-28 14:43:03,984][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 5
+[2024-08-28 14:43:03,985][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: /ssd/xiaxinyuan/code/Matterport3D/data/v1/scans/s8pcmisQ38h/matterport_mesh/b2f1bf0a0de54856b1d9c8816633c0bb/isaacsim_b2f1bf0a0de54856b1d9c8816633c0bb.usd
+[2024-08-28 14:43:24,873][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x1512ea7a4190>}
+[2024-08-28 14:43:24,874][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}

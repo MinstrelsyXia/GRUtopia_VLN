@@ -110,7 +110,9 @@ class VLMapsDataloaderHabitat:
     def from_full_map_pose(self, row: int, col: int, theta_deg: float):
         self.full_map_pose = [row, col, theta_deg]
 
-    def from_habitat_tf(self, tf_hab: np.ndarray):
+
+
+    def from_habitat_tf(self, tf_hab):
         current_position, current_quaternion = tf_hab[0],tf_hab[1]
         _, _, theta_deg = self.quat_to_euler_angles(current_quaternion,degrees=True)
         row,col, _ = base_pos2grid_id_3d(self.gs,self.cs, current_position[0],current_position[1], current_position[2])

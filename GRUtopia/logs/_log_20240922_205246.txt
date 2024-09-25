@@ -1,0 +1,9 @@
+[2024-09-22 20:52:49,946][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:144] -: Loaded data with a total of 10819 items from train
+[2024-09-22 20:58:31,265][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 5
+[2024-09-22 20:58:31,267][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: ../Matterport3D/data/v1/scans/5LpN3gDmAk7/matterport_mesh/9c6b166997ae486f96d011c1de0b3427/isaacsim_9c6b166997ae486f96d011c1de0b3427.usd
+[2024-09-22 20:58:59,939][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x150c9b3573d0>}
+[2024-09-22 20:58:59,940][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}
+[2024-09-22 20:59:51,177][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:279] -: Initialized path id 5
+[2024-09-22 20:59:51,180][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:280] -: Scan: 5LpN3gDmAk7
+[2024-09-22 20:59:51,181][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:281] -: Instruction: Enter the bedroom and go around the bed. Go to the closet on the far wall on the left. Stop in the doorway. 
+[2024-09-22 20:59:51,182][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:282] -: Start Position: [ 6.03660011 -3.18623996  4.16564994], Start Rotation: [-0.7071067811865476, -0.0, 0.0, -0.7071067811865475]

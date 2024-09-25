@@ -17,7 +17,7 @@ import open3d as o3d
 import h5py
 import json
 from scipy.ndimage import binary_closing, binary_dilation, gaussian_filter
-
+import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "vlmaps"))
 print(sys.path)
@@ -64,7 +64,7 @@ from omni.isaac.lab.app import AppLauncher
 import clip
 
 from grutopia.core.util.log import log
-
+from vlmaps.application_my.utils import downsample_pc, visualize_pc, get_dummy_2d_grid, visualize_naive_occupancy_map
 class my_Camera(Camera):
     def __init__(self, prim_path, resolution):
         super().__init__(prim_path=prim_path, resolution=resolution)
@@ -99,87 +99,28 @@ def load_depth_npy(depth_filepath: Union[Path, str]):
     return depth
 
 def load_3d_map(map_path: Union[Path, str]):
-    with h5py.File(map_path, "r") as f:
-        mapped_iter_list = f["mapped_iter_list"][:].tolist()
-        grid_feat = f["grid_feat"][:]
-        grid_pos = f["grid_pos"][:]
-        weight = f["weight"][:]
-        occupied_ids = f["occupied_ids"][:]
-        grid_rgb = f["grid_rgb"][:]
-        pcd_min = f["pcd_min"][:]
-        pcd_max = f["pcd_max"][:]
-        cs = f["cs"][()]
-        return (mapped_iter_list, grid_feat, grid_pos, weight, occupied_ids, grid_rgb, pcd_min, pcd_max, cs)
+    try:
+        with h5py.File(map_path, "r") as f:
+            mapped_iter_list = f["mapped_iter_list"][:].tolist()
+            grid_feat = f["grid_feat"][:]
+            grid_pos = f["grid_pos"][:]
+            weight = f["weight"][:]
+            occupied_ids = f["occupied_ids"][:]
+            grid_rgb = f["grid_rgb"][:]
+            pcd_min = f["pcd_min"][:]
+            pcd_max = f["pcd_max"][:]
+            cs = f["cs"][()]
+            return (mapped_iter_list, grid_feat, grid_pos, weight, occupied_ids, grid_rgb, pcd_min, pcd_max, cs)
+    except:
+        print("A previous version lacking components exists. Error loading 3d map.")
+        return None
 
-def get_dummy_2d_grid(width,height):
-    # Generate a meshgrid of pixel coordinates
-    x = np.arange(width)
-    y = np.arange(height)
-    xx, yy = np.meshgrid(x, y)
-
-    # Flatten the meshgrid arrays to correspond to the flattened depth map
-    xx_flat = xx.flatten()
-    yy_flat = yy.flatten()
-
-    # Combine the flattened x and y coordinates into a 2D array of points
-    points_2d = np.vstack((xx_flat, yy_flat)).T  # Shape will be (N, 2), where N = height * width
-    return points_2d
-
-def downsample_pc(pc, depth_sample_rate):
-    '''
-    INput: points:(N,3); rate:downsample rate:int
-    Output: downsampled_points:(N/rate,3)
-    '''
-    # np.random.seed(42)
-    shuffle_mask = np.arange(pc.shape[0])
-    np.random.shuffle(shuffle_mask)
-    shuffle_mask = shuffle_mask[::depth_sample_rate]
-    pc = pc[shuffle_mask,:]
-    return pc
-
-
-def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
-    # 设置无头渲染
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()  # 创建一个不可见的窗口
-    ctr = vis.get_view_control()
-
-    # 设定特定的视角
-    ctr.set_front([0, 0, -1])  # 设置相机朝向正面
-    ctr.set_lookat([0, 0, 0])  # 设置相机目标点为原点
-    ctr.set_up([0, 0, 1])   
-    # 创建点云对象
-    # pcd = o3d.geometry.PointCloud()
-    # pcd.points = o3d.utility.Vector3dVector(pc)
-    vis.add_geometry(pcd)
-    vis.update_geometry(pcd)
-    vis.poll_events()
-    vis.update_renderer()
-
-    # 捕获当前视图并保存为图像
-    vis.capture_screen_image(save_path)
-    vis.destroy_window()
-              
-def visualize_pc(pcd,headless,save_path = 'pc.jpg'):
-    '''
-    pcd:     after:    pcd_global = o3d.geometry.PointCloud()
-    pcd_global.points = o3d.utility.Vector3dVector(points_3d)
-    '''
-    if headless==True:
-        save_point_cloud_image(pcd,save_path=save_path)
-        return
-    else:
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-    size=1.0, origin=[0, 0, 0]) 
-        o3d.io.write_point_cloud("point_cloud.pcd", pcd)
-        o3d.io.write_triangle_mesh("coordinate_frame.ply", coordinate_frame)
-        return
 
 from vlmaps.application_my.utils import NotFound
 from vlmaps.vlmaps.map import VLMap
 class TMP(VLMap):
-    def __init__(self, map_config, data_dir="",robot_init_pose = (0,0,0)):
-        super().__init__(map_config,data_dir)
+    def __init__(self, map_config, data_dir="",test_file_save_dir="", robot_init_pose = (0,0,0)):
+        
         self.robot_z = map_config.robot_z
         self.init_world_pos = np.array(robot_init_pose)
         self.cs = map_config.cell_size
@@ -187,22 +128,34 @@ class TMP(VLMap):
         self.lseg_model = None
         self.min_max = np.zeros([3,2])
         self.map_config = map_config
+        self.test_file_save_dir = test_file_save_dir
         if hasattr(map_config.model, 'threshold'):
             self.threshold = map_config.model.threshold
         else:
             self.threshold = 0.5
-    def _setup_paths(self, data_dir: Union[Path, str],test_file_save_dir) -> None:
+        if hasattr(map_config, 'pure_dynamic_map'):
+            self.pure_dynamic_map = map_config.pure_dynamic_map
+        else:
+            self.pure_dynamic_map = False
+
+        super().__init__(map_config,data_dir)
+
+    def _setup_paths(self, data_dir: Union[Path, str]) -> None:
         #! modified Map's function
         self.data_dir = Path(data_dir)
         self.rgb_dir = self.data_dir / "rgb"
         self.depth_dir = self.data_dir / "depth"
-        self.segmentation_dir = test_file_save_dir + "/segmentation"
-        if not os.path.exists(self.segmentation_dir):
-            os.makedirs(self.segmentation_dir)
         # self.rgb_dir = self.data_dir 
         # self.depth_dir = self.data_dir
         # self.semantic_dir = self.data_dir / "semantic"
         self.pose_path = self.data_dir / "poses.txt"
+
+        self.segmentation_dir = self.test_file_save_dir + "/segmentation"
+        if not os.path.exists(self.segmentation_dir):
+            os.makedirs(self.segmentation_dir)
+        if self.pure_dynamic_map:
+            print("not loading rgb paths")
+            return
         try:
             # self.rgb_paths = sorted(self.rgb_dir.glob("*.png"))
             # self.depth_paths = sorted(self.depth_dir.glob("*.npy"))
@@ -211,6 +164,7 @@ class TMP(VLMap):
             self.depth_paths = sorted(self.depth_dir.glob("*.npy"),key=lambda path: int(path.stem.split('_')[-1]))
         except FileNotFoundError as e:
             print(e)
+
     def _init_clip(self, clip_version="ViT-B/32"):
         if hasattr(self, "clip_model"):
             print("clip model is already initialized")
@@ -240,7 +194,7 @@ class TMP(VLMap):
         crop_size = 480  # 480
         base_size = 640  # 520: 无论多大的照片，长边都会变成640
         if torch.cuda.is_available():
-            self.device = "cuda"
+            self.device = "cuda:5"
         elif torch.backends.mps.is_available():
             self.device = "mps"
         else:
@@ -343,17 +297,12 @@ class TMP(VLMap):
         self.pcd_max = pcd_max
         self.cs = cs
 
-    def update_pos_map(self,old_map,new_map_coord,delta_map_coord):
+    def init_map(self,data_dir:str,test_file_save_dir:str):
         '''
-        old_map: shape: [x,y,z]
-        new_map: shape: [new_map_coord]
+        data_dir: rgb, pose, depth
+        file_save_dir: vlmaps.h5df
         '''
-        new_map = -np.ones(np.array(new_map_coord),dtype=np.int32)
-        new_map[delta_map_coord[0]:(old_map.shape[0]+delta_map_coord[0]),delta_map_coord[1]:(old_map.shape[1]+delta_map_coord[1]),delta_map_coord[2]:(old_map.shape[2]+delta_map_coord[2])] = old_map
-        return new_map
-
-    def load_map(self,data_dir,test_file_save_dir):
-        self._setup_paths(data_dir,test_file_save_dir)
+        # self._setup_paths(data_dir,test_file_save_dir)
         self._init_clip()
         if self.map_config.create_map == False:
             self.map_save_dir = Path(data_dir) /"vlmap"
@@ -368,15 +317,47 @@ class TMP(VLMap):
                 self.weight,
                 self.occupied_ids,
                 self.grid_rgb,
+                self.min_max[:,0],
+                self.min_max[:,1],
+                self.cs,
             ) = load_3d_map(self.map_save_path)
+            
         else:
-            self.map_save_dir = Path(data_dir) / "vlmap_cam"
-            os.makedirs(self.map_save_dir, exist_ok=True)
+            # used for building vlmap from scratch
+            self.map_save_dir = Path(self.test_file_save_dir) / "vlmap_cam"
+            if not os.path.exists(self.map_save_dir):
+                os.makedirs(self.map_save_dir, exist_ok=True)
             self.map_save_path = self.map_save_dir / "vlmaps_cam.h5df"
             # if file of self.map_save_path exists, rewrite it
             if os.path.exists(self.map_save_path):
                 os.remove(self.map_save_path)
 
+    def save_3d_map(
+        self,
+        grid_feat: np.ndarray,
+        grid_pos: np.ndarray,
+        weight: np.ndarray,
+        grid_rgb: np.ndarray,
+        occupied_ids: Set,
+        mapped_iter_set: Set,
+        max_id: int,
+    ) -> None:
+        grid_feat = grid_feat[:max_id]
+        grid_pos = grid_pos[:max_id]
+        weight = weight[:max_id]
+        grid_rgb = grid_rgb[:max_id]
+        with h5py.File(self.map_save_path, "w") as f:
+            f.create_dataset("mapped_iter_list", data=np.array(list(mapped_iter_set), dtype=np.int32))
+            f.create_dataset("grid_feat", data=grid_feat)
+            f.create_dataset("grid_pos", data=grid_pos)
+            f.create_dataset("weight", data=weight)
+            f.create_dataset("occupied_ids", data=occupied_ids)
+            f.create_dataset("grid_rgb", data=grid_rgb)
+            f.create_dataset("pcd_min", data=self.min_max[:,0])
+            f.create_dataset("pcd_max", data=self.min_max[:,1])
+            f.create_dataset("cs", data=self.map_config.cell_size)
+        self.update_map(mapped_iter_list=np.array(list(mapped_iter_set), dtype=np.int32) ,grid_feat=grid_feat, grid_pos=grid_pos, weight=weight, occupied_ids=occupied_ids, grid_rgb=grid_rgb, pcd_min=self.min_max[:,0], pcd_max=self.min_max[:,1], cs=self.map_config.cell_size)
+        
     def convert_world_to_map(self, point_cloud):
         # Note that the pointclouds have the world corrdinates that some values are very negative
         # We need to convert it into the map coordinates
@@ -386,6 +367,7 @@ class TMP(VLMap):
         point_cloud[...,:2] = point_cloud[..., :2] - self.init_world_pos[:2]
 
         return point_cloud
+    
     
     def _retrive_map(self, map_path: Path) -> Tuple:
             """
@@ -418,6 +400,7 @@ class TMP(VLMap):
                 max_id = 0
 
             return grid_feat, grid_pos, weight, occupied_ids, grid_rgb, mapped_iter_set, max_id
+    
     def cvt_global_to_pixel_map(self,pc_global):
         '''
         pc_global: [N,3]
@@ -442,7 +425,14 @@ class TMP(VLMap):
         print(self.min_max)
         return [new_row,new_height,new_col],[delta_row,delta_height,delta_col]
     
-    
+    def update_pos_map(self,old_map,new_map_coord,delta_map_coord):
+        '''
+        old_map: shape: [x,y,z]
+        new_map: shape: [new_map_coord]
+        '''
+        new_map = -np.ones(np.array(new_map_coord),dtype=np.int32)
+        new_map[delta_map_coord[0]:(old_map.shape[0]+delta_map_coord[0]),delta_map_coord[1]:(old_map.shape[1]+delta_map_coord[1]),delta_map_coord[2]:(old_map.shape[2]+delta_map_coord[2])] = old_map
+        return new_map
     
     def _update_semantic_map(self,camera,rgb,depth,labels):
         '''
@@ -539,8 +529,17 @@ class TMP(VLMap):
                     weight[occupied_id] += alpha
 
         self.save_3d_map(grid_feat, grid_pos, weight, grid_rgb, occupied_ids, mapped_iter_set, max_id)
-
         
+        # max depth among the indexes in pc_image
+        mask = np.zeros_like(depth)
+        mask[pc_image[:, 1], pc_image[:, 0]] = 1
+        max_depth = np.max(depth[mask==1])
+        visualize_naive_occupancy_map(occupied_ids, save_path = "occupancy.jpg")
+        return pc,max_depth
+
+
+    def test_visualze(self):
+        visualize_naive_occupancy_map(self.occupied_ids, save_path = "occupancy.jpg")
 
     def build_semantic_map(self,camera, world, labels):
         camera_poses= np.loadtxt(self.pose_path)
@@ -663,31 +662,20 @@ class TMP(VLMap):
         )
         return grid_feat, grid_pos, weight, grid_rgb
     
+    def get_min_pcd(self):
+        return self.min_max[:,0]
+    
+    def from_map_to_xyz(self, row, column):
+        x = row * self.cs + self.pcd_min[0]
+        y = column * self.cs + self.pcd_min[1]
+        return x, y
 
-    def save_3d_map(
-        self,
-        grid_feat: np.ndarray,
-        grid_pos: np.ndarray,
-        weight: np.ndarray,
-        grid_rgb: np.ndarray,
-        occupied_ids: Set,
-        mapped_iter_set: Set,
-        max_id: int,
-    ) -> None:
-        grid_feat = grid_feat[:max_id]
-        grid_pos = grid_pos[:max_id]
-        weight = weight[:max_id]
-        grid_rgb = grid_rgb[:max_id]
-        with h5py.File(self.map_save_path, "w") as f:
-            f.create_dataset("mapped_iter_list", data=np.array(list(mapped_iter_set), dtype=np.int32))
-            f.create_dataset("grid_feat", data=grid_feat)
-            f.create_dataset("grid_pos", data=grid_pos)
-            f.create_dataset("weight", data=weight)
-            f.create_dataset("occupied_ids", data=occupied_ids)
-            f.create_dataset("grid_rgb", data=grid_rgb)
-            f.create_dataset("pcd_min", data=self.min_max[:,0])
-            f.create_dataset("pcd_max", data=self.min_max[:,1])
-            f.create_dataset("cs", data=self.map_config.cell_size)
+    def from_xyz_to_map(self, x, y):
+        row = int((x - self.pcd_min[0]) / self.cs)
+        column = int((y - self.pcd_min[1]) / self.cs)
+        return row, column
+    
+
 
     def init_categories(self, categories: List[str]) -> np.ndarray:
             self.categories = categories
@@ -731,6 +719,7 @@ class TMP(VLMap):
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
         return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+
     
     ############################## from VLMap(Map) ########################################
     

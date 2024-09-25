@@ -1,0 +1,7 @@
+[2024-09-12 17:17:22,375][GRUtopia/logs/_log_20240912_171620.txt][INFO] - Loaded data with a total of 10819 items from train
+[2024-09-12 17:18:24,373][ogn_registration][INFO] - Looking for Python nodes to deregister in omni.isaac.sim.python-4.0.0
+[2024-09-12 17:18:24,376][ogn_registration][INFO] - Deregistered Python nodes in omni.isaac.sim.python-4.0.0
+[2024-09-12 17:18:24,376][ogn_registration][INFO] - OGN deregister omni.isaac.sim.python-4.0.0 took 540.14us
+[2024-09-12 17:18:24,377][ogn_registration][INFO] - Looking for Python nodes to deregister in omni.isaac.occupancy_map-1.0.1
+[2024-09-12 17:18:24,377][ogn_registration][INFO] - Deregistered Python nodes in omni.isaac.occupancy_map-1.0.1
+[2024-09-12 17:18:24,378][ogn_registration][INFO] - OGN deregister omni.isaac.occupancy_map-1.0.1 took 296.37us

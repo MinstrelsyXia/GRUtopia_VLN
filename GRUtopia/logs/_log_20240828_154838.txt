@@ -1,0 +1,156 @@
+[2024-08-28 15:49:28,907][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 5
+[2024-08-28 15:49:28,907][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: /ssd/xiaxinyuan/code/Matterport3D/data/v1/scans/s8pcmisQ38h/matterport_mesh/b2f1bf0a0de54856b1d9c8816633c0bb/isaacsim_b2f1bf0a0de54856b1d9c8816633c0bb.usd
+[2024-08-28 15:49:49,555][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x1458d2b6f790>}
+[2024-08-28 15:49:49,556][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}
+[2024-08-28 15:50:13,916][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:13,916][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:13,920][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:13,920][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:16,531][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:16,531][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:16,533][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:16,533][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:19,059][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:19,059][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:19,061][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:19,061][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:21,793][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:21,794][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:21,795][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:21,795][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:26,436][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:26,443][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:26,450][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:26,450][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:29,238][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:29,239][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:29,240][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:29,240][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:31,855][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:31,856][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:31,857][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:31,857][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:34,792][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:34,793][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:34,794][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:34,795][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:37,798][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:37,799][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:37,800][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:37,801][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:40,265][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:40,266][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:40,268][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:40,269][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:43,417][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:43,417][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:43,419][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:43,419][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:45,859][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:45,860][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:45,862][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:45,863][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:48,698][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:48,698][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:48,700][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:48,700][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:51,805][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:51,805][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:51,807][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:51,807][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:54,548][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:54,549][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:54,550][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:54,550][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:57,251][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:57,251][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:50:57,253][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:50:57,253][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:00,270][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:00,270][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:00,272][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:00,272][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:03,126][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:03,127][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:03,129][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:03,130][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:05,757][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:05,758][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:05,760][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:05,760][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:08,442][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:08,443][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:08,444][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:08,444][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:11,266][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:11,267][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:11,268][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:11,268][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:13,869][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:13,872][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:13,873][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:13,873][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:16,732][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:16,732][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:16,734][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:16,734][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:19,668][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:19,669][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:19,672][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:19,672][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:22,678][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:22,678][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:22,679][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:22,679][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:25,404][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:25,405][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:25,407][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:25,407][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:28,010][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:28,011][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:28,014][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:28,014][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:30,821][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:30,822][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:30,824][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:30,824][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:33,704][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:33,704][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:33,707][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:33,707][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:36,505][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:36,505][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:36,507][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:36,507][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:38,858][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:38,859][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:38,861][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:38,862][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:42,120][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:42,121][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:42,122][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:42,123][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:44,792][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:44,792][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:44,794][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:44,794][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:47,524][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:47,525][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:47,526][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:47,527][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:50,569][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:50,570][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:50,571][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:50,571][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:53,504][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:53,505][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:53,507][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:53,507][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:56,275][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:56,276][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:56,279][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:56,281][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:59,194][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:59,195][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)
+[2024-08-28 15:51:59,196][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:160] -: h1_house_0
+[2024-08-28 15:51:59,196][ERROR] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:161] -: Expecting value: line 1 column 1 (char 0)

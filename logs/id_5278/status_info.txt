@@ -1,0 +1,12 @@
+trajectory id 5278
+Initialized scan jh4fc5c5qoQ
+Instruction: Walk through the doorway and into the house. Continue forward past the sink and washing machine. Wait in the doorway to the bedroom. 
+Start Position: [11.70489979 -2.60810995  1.07616155], Start Rotation: [-0.9659258262890682, -0.0, 0.0, -0.2588190451025209]
+GT paths length: 7, points: [array([11.70489979, -2.60810995,  1.07616155]), array([11.7244997 , -1.94640994,  1.18057301]), array([11.89309978, -0.47420701,  1.1221836 ]), array([11.85589981,  0.85689598,  1.1068341 ]), array([11.73130035,  2.83599997,  0.980573  ]), array([11.82670021,  4.50634003,  0.980573  ]), array([11.55500031,  6.07468987,  0.980573  ])]
+Current point number: 0
+Current point number: 1
+Current point number: 2
+Current point number: 3
+Current point number: 4
+Current point number: 5
+Episode finished: True

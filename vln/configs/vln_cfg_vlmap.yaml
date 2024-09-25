@@ -42,6 +42,7 @@ maps:
     height: 1024
     aperture: 500
     camera_transform_height: 0.8
+    voxel_size: 0.1
 
 segmentation:
     num_categories: 160 # Number of semantic categories, no open volcabulary 

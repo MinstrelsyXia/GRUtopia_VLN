@@ -1,0 +1,168 @@
+data_paths:
+  habitat_scene_dir: ''
+  vlmaps_data_dir: /ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes/s8pcmisQ38h
+map_config:
+  map_type: vlmap
+  pose_info:
+    pose_type: camera_base
+    rot_type: quat
+    camera_height: 1.5
+    base2cam_rot:
+    - 1
+    - 0
+    - 0
+    - 0
+    - -1
+    - 0
+    - 0
+    - 0
+    - -1
+    base_forward_axis:
+    - 0
+    - 0
+    - -1
+    base_left_axis:
+    - -1
+    - 0
+    - 0
+    base_up_axis:
+    - 0
+    - 1
+    - 0
+  skip_frame: 1
+  cam_calib_mat:
+  - 221
+  - 0
+  - 128
+  - 0
+  - 221
+  - 128
+  - 0
+  - 0
+  - 1
+  grid_size: ${params.gs}
+  cell_size: ${params.cs}
+  depth_sample_rate: 50
+  dilate_iter: 3
+  gaussian_sigma: 1.0
+  customize_obstacle_map: false
+  potential_obstacle_names:
+  - wall
+  - floor
+  - chair
+  - door
+  - table
+  - picture
+  - cabinet
+  - cushion
+  - window
+  - sofa
+  - bed
+  - curtain
+  - chest_of_drawers
+  - plant
+  - sink
+  - stairs
+  - ceiling
+  - toilet
+  - stool
+  - towel
+  - mirror
+  - tv_monitor
+  - shower
+  - column
+  - bathtub
+  - counter
+  - fireplace
+  - lighting
+  - beam
+  - railing
+  - shelving
+  - blinds
+  - gym_equipment
+  - seating
+  - board_panel
+  - furniture
+  - appliances
+  - clothes
+  - objects
+  obstacle_names:
+  - wall
+  - floor
+  - chair
+  - door
+  - table
+  - picture
+  - cabinet
+  - cushion
+  - window
+  - sofa
+  - bed
+  - curtain
+  - chest_of_drawers
+  - plant
+  - sink
+  - stairs
+  - ceiling
+  - toilet
+  - stool
+  - towel
+  - mirror
+  - tv_monitor
+  - shower
+  - column
+  - bathtub
+  - counter
+  - fireplace
+  - lighting
+  - beam
+  - railing
+  - shelving
+  - blinds
+  - gym_equipment
+  - seating
+  - board_panel
+  - furniture
+  - appliances
+  - clothes
+  - objects
+  categories: mp3d
+params:
+  gs: 512
+  cs: 0.1
+  camera_height: 1.7
+  map_type: vlmaps_lseg_3d
+  forward_dist: 0.1
+  turn_angle: 5
+  sim_setting:
+    default_agent: 0
+    sensor_height: ${params.camera_height}
+    color_sensor: true
+    depth_sensor: false
+    semantic_sensor: false
+    lidar_sensor: false
+    move_forward: ${params.forward_dist}
+    turn_left: ${params.turn_angle}
+    turn_right: ${params.turn_angle}
+    width: 1024
+    height: 1024
+    enable_physics: false
+    seed: 1
+    lidar_fov: 360
+    depth_img_for_lidar_n: 20
+    img_save_dir: /tmp
+  sound_map_config:
+    map_type: wav2clip
+    detect_mode: retrieval
+  controller_config:
+    gs: ${params.gs}
+    cs: ${params.cs}
+    forward_dist: ${params.forward_dist}
+    turn_angle: ${params.turn_angle}
+    goal_dist_thres: 0.1
+nav:
+  valid_range: 1
+  vis: false
+  tasks_per_scene: 20
+scene_id: 0
+sim_type: isaacsim

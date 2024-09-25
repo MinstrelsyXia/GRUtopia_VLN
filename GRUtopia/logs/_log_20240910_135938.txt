@@ -1,0 +1,58 @@
+[2024-09-10 14:00:39,613][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 2
+[2024-09-10 14:00:39,615][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: ../Matterport3D/data/v1/scans/s8pcmisQ38h/matterport_mesh/b2f1bf0a0de54856b1d9c8816633c0bb/isaacsim_b2f1bf0a0de54856b1d9c8816633c0bb.usd
+[2024-09-10 14:01:02,369][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x7f93223f87f0>}
+[2024-09-10 14:01:02,369][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}
+[2024-09-10 14:01:29,551][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:395] -: trajectory id 37
+[2024-09-10 14:01:29,552][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:396] -: Initialized scan s8pcmisQ38h
+[2024-09-10 14:01:29,552][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:397] -: Instruction: Walk down the stairs, turn right, and walk towards place with a rug. Wait near the bench and piano along the right side of the wall. 
+[2024-09-10 14:01:29,552][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:398] -: Start Position: [ 5.58284998 -2.81788993 -0.57655795], Start Rotation: [0.25881904510252063, -0.0, -0.0, -0.9659258262890683]
+[2024-09-10 14:01:29,552][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:02:21,430][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/local_nav/global_topdown_map.py[line:83] -: update global topdown map at height: -1
+[2024-09-10 14:02:21,431][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:471] -: ====The global freemap has been initialized for s8pcmisQ38h====
+[2024-09-10 14:02:21,431][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:483] -: ===The robot starts navigating===
+[2024-09-10 14:02:21,431][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 1-th target place.===
+[2024-09-10 14:02:21,447][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:03:07,361][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 4.82264996 -2.79359007 -1.16733284]
+[2024-09-10 14:03:12,909][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 2-th target place.===
+[2024-09-10 14:03:12,924][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/local_nav/global_topdown_map.py[line:83] -: update global topdown map at height: -2
+[2024-09-10 14:03:12,925][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:03:30,315][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 3.58424997 -2.70576    -1.71167393]
+[2024-09-10 14:03:36,162][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 3-th target place.===
+[2024-09-10 14:03:36,180][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:04:15,455][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 4.09131002 -1.22950006 -2.11167402]
+[2024-09-10 14:04:21,085][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 4-th target place.===
+[2024-09-10 14:04:21,105][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/local_nav/global_topdown_map.py[line:83] -: update global topdown map at height: -3
+[2024-09-10 14:04:21,105][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/local_nav/path_planner.py[line:647] -: Initialize the start position in path planner.
+[2024-09-10 14:04:21,112][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:04:48,335][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 7.09131002 -1.32950041 -2.11184382]
+[2024-09-10 14:05:10,472][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 7.29131002 -1.32950041 -2.11184382]
+[2024-09-10 14:05:32,017][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 7.39131002 -1.42950041 -2.11184382]
+[2024-09-10 14:05:43,395][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 7.35482979 -1.38892996 -2.11184382]
+[2024-09-10 14:05:48,946][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 5-th target place.===
+[2024-09-10 14:05:48,983][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:06:05,908][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [10.39131021 -1.52950046 -2.11252522]
+[2024-09-10 14:06:11,378][WARNING] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:445] -: Scan: s8pcmisQ38h, Path_id: 37. Exceed the maximum steps: 300
+[2024-09-10 14:06:13,855][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:574] -: Total time for the [scan: s8pcmisQ38h] and [path_id: 37] episode: 4.74 minutes
+[2024-09-10 14:06:13,858][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:395] -: trajectory id 2606
+[2024-09-10 14:06:13,859][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:396] -: Initialized scan s8pcmisQ38h
+[2024-09-10 14:06:13,859][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:397] -: Instruction: Walk forward and make your way up the steps, turn left and make your way past the chair before stopping at the beginning of the stairs. 
+[2024-09-10 14:06:13,860][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:398] -: Start Position: [ 6.70725012 -2.81195998 -0.41238828], Start Rotation: [0.5000000000000002, -0.0, -0.0, -0.8660254037844385]
+[2024-09-10 14:06:13,861][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:06:14,368][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:483] -: ===The robot starts navigating===
+[2024-09-10 14:06:14,368][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 1-th target place.===
+[2024-09-10 14:06:14,386][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:06:36,204][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 8.38129044 -2.82414007 -0.40608329]
+[2024-09-10 14:06:41,843][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 2-th target place.===
+[2024-09-10 14:06:41,865][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:07:10,745][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [ 9.75086975 -2.73579001  0.46823471]
+[2024-09-10 14:07:16,158][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 3-th target place.===
+[2024-09-10 14:07:16,177][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/local_nav/global_topdown_map.py[line:83] -: update global topdown map at height: 0
+[2024-09-10 14:07:16,178][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:07:32,063][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [11.11600018 -2.69221997  1.11797964]
+[2024-09-10 14:07:37,966][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 4-th target place.===
+[2024-09-10 14:07:37,985][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/local_nav/global_topdown_map.py[line:83] -: update global topdown map at height: 1
+[2024-09-10 14:07:37,986][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-10 14:08:06,649][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:56] -: switch to next path point: [11.25839996  2.58583999  2.08832603]
+[2024-09-10 14:08:17,908][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:541] -: ===The robot has achieved the final target.===
+[2024-09-10 14:08:17,908][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:542] -: ===Break this episode.===
+[2024-09-10 14:08:19,327][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:574] -: Total time for the [scan: s8pcmisQ38h] and [path_id: 2606] episode: 2.09 minutes

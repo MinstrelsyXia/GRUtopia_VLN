@@ -1,0 +1,1 @@
+[2024-09-11 11:00:37,341][timm.models._builder][INFO] - Loading pretrained weights from Hugging Face hub (timm/vit_large_patch16_384.augreg_in21k_ft_in1k)

@@ -1,0 +1,14 @@
+[2024-09-06 16:55:18,927][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 2
+[2024-09-06 16:55:18,927][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: ../Matterport3D/data/v1/scans/s8pcmisQ38h/matterport_mesh/b2f1bf0a0de54856b1d9c8816633c0bb/isaacsim_b2f1bf0a0de54856b1d9c8816633c0bb.usd
+[2024-09-06 16:55:42,650][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x15324ab3e530>}
+[2024-09-06 16:55:42,651][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}
+[2024-09-06 16:56:09,535][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:392] -: trajectory id 37
+[2024-09-06 16:56:09,536][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:393] -: Initialized scan s8pcmisQ38h
+[2024-09-06 16:56:09,536][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:394] -: Instruction: Walk down the stairs, turn right, and walk towards place with a rug. Wait near the bench and piano along the right side of the wall. 
+[2024-09-06 16:56:09,537][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:395] -: Start Position: [ 5.58284998 -2.81788993 -0.57655795], Start Rotation: [0.25881904510252063, -0.0, -0.0, -0.9659258262890683]
+[2024-09-06 16:56:22,054][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points
+[2024-09-06 16:57:28,660][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/local_nav/global_topdown_map.py[line:83] -: update global topdown map at height: -1
+[2024-09-06 16:57:28,661][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:471] -: ====The global freemap has been initialized for s8pcmisQ38h====
+[2024-09-06 16:57:28,661][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:483] -: ===The robot starts navigating===
+[2024-09-06 16:57:28,661][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/main.py[line:485] -: ===The robot is navigating to the 1-th target place.===
+[2024-09-06 16:57:28,679][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points

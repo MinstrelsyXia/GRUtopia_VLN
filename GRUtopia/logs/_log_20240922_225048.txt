@@ -1,0 +1,5 @@
+[2024-09-22 22:50:51,822][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:144] -: Loaded data with a total of 10819 items from train
+[2024-09-22 22:51:50,246][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 5
+[2024-09-22 22:51:50,246][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: ../Matterport3D/data/v1/scans/5LpN3gDmAk7/matterport_mesh/9c6b166997ae486f96d011c1de0b3427/isaacsim_9c6b166997ae486f96d011c1de0b3427.usd
+[2024-09-22 22:52:13,715][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x15426d3b7d00>}
+[2024-09-22 22:52:13,716][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}

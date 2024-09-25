@@ -1,0 +1,9 @@
+[2024-08-23 20:50:44,982][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 2
+[2024-08-23 20:50:44,982][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:56] -: scene_path: ../Matterport3D/data/v1/scans/vyrNrziPKCB/matterport_mesh/e9510fcbae554d6cb8136a7274521ff3/isaacsim_e9510fcbae554d6cb8136a7274521ff3.usd
+[2024-08-23 20:51:09,834][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:117] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x14c39e7905b0>}
+[2024-08-23 20:51:09,834][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:118] -: {}
+[2024-08-23 20:53:22,124][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:288] -: trajectory id 5593
+[2024-08-23 20:53:22,126][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:289] -: Initialized scan vyrNrziPKCB
+[2024-08-23 20:53:22,126][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:290] -: Instruction: Exit the bedroom, cross the room to the left and stop near the room divider on the left,. 
+[2024-08-23 20:53:22,127][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:291] -: Start Position: [  5.79060984 -28.2614994    0.84856902], Start Rotation: [-1.0, -0.0, 0.0, -0.0]
+[2024-08-23 20:53:22,210][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia_extension/controllers/oracle_move_along_path_points_controller.py[line:45] -: reset path points

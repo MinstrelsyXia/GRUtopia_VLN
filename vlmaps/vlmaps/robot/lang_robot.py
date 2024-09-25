@@ -25,7 +25,10 @@ class LangRobot:
 
     def load_scene_map(self, data_dir: str, map_config: DictConfig):
         self.map = Map.create(map_config) #! should include isaacmap!!!
-        self.map.load_map(data_dir)
+        if map_config['map_type']=='IsaacSimMap':
+            self.map.load_map(data_dir, map_config['map_type'])
+        else:
+            self.map.load_map(data_dir)
         self.map.generate_obstacle_map()
 
     def empty_recorded_actions(self):

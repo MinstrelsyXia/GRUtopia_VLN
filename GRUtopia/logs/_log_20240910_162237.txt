@@ -1,0 +1,8 @@
+[2024-09-10 16:23:42,352][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 2
+[2024-09-10 16:23:42,353][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: ../Matterport3D/data/v1/scans/s8pcmisQ38h/matterport_mesh/b2f1bf0a0de54856b1d9c8816633c0bb/isaacsim_b2f1bf0a0de54856b1d9c8816633c0bb.usd
+[2024-09-10 16:24:05,394][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x14ce0ff45d80>}
+[2024-09-10 16:24:05,395][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}
+[2024-09-10 16:24:31,282][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:395] -: trajectory id 37
+[2024-09-10 16:24:31,283][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:396] -: Initialized scan s8pcmisQ38h
+[2024-09-10 16:24:31,283][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:397] -: Instruction: Walk down the stairs, turn right, and walk towards place with a rug. Wait near the bench and piano along the right side of the wall. 
+[2024-09-10 16:24:31,284][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:398] -: Start Position: [ 5.58284998 -2.81788993 -0.57655795], Start Rotation: [0.25881904510252063, -0.0, -0.0, -0.9659258262890683]

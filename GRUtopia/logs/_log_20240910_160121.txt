@@ -1,0 +1,9 @@
+[2024-09-10 16:01:33,948][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:144] -: Loaded data with a total of 778 items from val_seen
+[2024-09-10 16:03:00,149][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 5
+[2024-09-10 16:03:00,149][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: ../Matterport3D/data/v1/scans/vyrNrziPKCB/matterport_mesh/e9510fcbae554d6cb8136a7274521ff3/isaacsim_e9510fcbae554d6cb8136a7274521ff3.usd
+[2024-09-10 16:03:28,300][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x14d538f19660>}
+[2024-09-10 16:03:28,300][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}
+[2024-09-10 16:04:21,221][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:357] -: Initialized path id 5593
+[2024-09-10 16:04:21,223][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:358] -: Scan: vyrNrziPKCB
+[2024-09-10 16:04:21,223][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:359] -: Instruction: Exit the bedroom, cross the room to the left and stop near the room divider on the left,. 
+[2024-09-10 16:06:23,014][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:360] -: Start Position: [  5.79060984 -28.2614994    0.84856902], Start Rotation: [-1.0, -0.0, 0.0, -0.0]

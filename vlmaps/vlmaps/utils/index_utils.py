@@ -86,19 +86,20 @@ def find_similar_category_id(class_name, classes_list):
 
     from openai import AzureOpenAI
     try:
-        with open('api_key/azure_api_key', 'r', encoding='utf-8') as file:
-            return file.read().strip()
+        with open('api_key/azure_api_key.txt', 'r', encoding='utf-8') as file:
+            api_key = file.read().strip()
     except FileNotFoundError as e:
         print(f"Error: {e}")
         raise
-    client =AzureOpenAI(
-                api_key=self.api_key,
+    client = AzureOpenAI(
+                api_key=api_key,
                 api_version='2024-02-15-preview',
                 azure_endpoint='https://gpt-4o-pjm.openai.azure.com/'
             )
     classes_list_str = ",".join(classes_list)
+    print(classes_list_str)
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=[
             {
                 "role": "user",
@@ -118,7 +119,7 @@ def find_similar_category_id(class_name, classes_list):
             },
             {
                 "role": "user",
-                "content": f"What is {class_name} most relevant to among {classes_list_str}"
+                "content": f"What is {class_name} most relevant to among {classes_list_str}. Only answer the object name"
             }
         ],
         max_tokens=300,
