@@ -1,4 +1,0 @@
-[2024-09-25 20:41:38,977][GRUtopia/logs/_log_20240925_204135.txt][INFO] - Loaded data with a total of 10819 items from train
-[2024-09-25 20:41:42,532][asyncio][DEBUG] - Using selector: EpollSelector
-[2024-09-25 20:42:19,195][omni.kit.telemetry.impl.sentry_extension][INFO] - sentry is disabled for external build
-[2024-09-25 20:42:19,196][omni.kit.telemetry.impl.sentry_extension][INFO] - sentry is disabled for external build

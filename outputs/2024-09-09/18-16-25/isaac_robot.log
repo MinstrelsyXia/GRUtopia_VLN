@@ -1,4 +1,0 @@
-[2024-09-09 18:16:26,166][GRUtopia/logs/_log_20240909_181623.txt][INFO] - Loaded data with a total of 778 items from val_seen
-[2024-09-09 18:16:30,466][asyncio][DEBUG] - Using selector: EpollSelector
-[2024-09-09 18:16:43,323][omni.kit.telemetry.impl.sentry_extension][INFO] - sentry is disabled for external build
-[2024-09-09 18:16:43,324][omni.kit.telemetry.impl.sentry_extension][INFO] - sentry is disabled for external build
