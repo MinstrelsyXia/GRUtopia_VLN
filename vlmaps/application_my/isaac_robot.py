@@ -317,7 +317,7 @@ class IsaacSimLanguageRobot(LangRobot):
         hole_area_thresh = self.map_config["hole_area_thresh"]
         size = self.map_config["map_size"]
         pixels_per_meter = 1.0/self.cs
-        self.ObstacleMap = ObstacleMap(min_height=min_height, max_height=max_height,agent_radius=agent_radius, area_thresh=area_thresh,hole_area_thresh= hole_area_thresh, size = size, pixels_per_meter = pixels_per_meter)
+        self.ObstacleMap = ObstacleMap(min_height=min_height, max_height=max_height,agent_radius=agent_radius, area_thresh=area_thresh,hole_area_thresh= hole_area_thresh, size = size, pixels_per_meter = pixels_per_meter,log_image_dir=self.test_file_save_dir)
 
 
 
@@ -329,7 +329,8 @@ class IsaacSimLanguageRobot(LangRobot):
         max_depth = 10
         depth_map[depth_map > max_depth] = 0
         # update semantic map
-        pc, max_depth= self.map._update_semantic_map(self.camera, rgb, depth_map, labels = mp3dcat[1:-1])
+        pc, max_depth= self.map._update_semantic_map(self.camera, rgb, depth_map, labels = mp3dcat[1:-1],step=self.step)
+
         return pc,max_depth
     
     def update_obstacle_map(self,pc,max_depth):
@@ -341,7 +342,7 @@ class IsaacSimLanguageRobot(LangRobot):
         camera_orientation = camera_pose[1]
         camera_orientation_angle = quat_to_euler_angles(camera_orientation)
         # update obstacle map
-        self.ObstacleMap.update_map_with_pc(pc,camera_position=camera_position,camera_orientation=camera_orientation_angle,max_depth=max_depth, topdown_fov=self.fov ,verbose=self.vln_config.test_verbose)
+        self.ObstacleMap.update_map_with_pc(pc,camera_position=camera_position,camera_orientation=camera_orientation_angle,max_depth=max_depth, topdown_fov=self.fov ,verbose=self.vln_config.test_verbose,step = self.step)
     
     def get_frontier(self):
         frontiers = self.ObstacleMap.frontiers # array of waypoints
@@ -359,6 +360,7 @@ class IsaacSimLanguageRobot(LangRobot):
         row = int(current_position[0] - pcd_min[0]) / self.cs
         col = int(current_position[1] - pcd_min[1]) / self.cs
         self.full_map_pose = [row, col, theta_deg]
+
     def to_full_map_pose(self):
         '''
         from self.vlmaps_dataloader.to_full_map_pose()
@@ -486,7 +488,6 @@ class IsaacSimLanguageRobot(LangRobot):
         paths_3d = np.array(paths_3d)
         actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
         
-        self.step = 0
         while np.linalg.norm(np.array(curr_pose_on_full_map[:2]) - np.array(pos)) > 0.1:
             self.step = self.step + 1
             env_actions = []
@@ -525,7 +526,6 @@ class IsaacSimLanguageRobot(LangRobot):
         Turn right a relative angle in degrees
         """
         current_orientation = self.agents.get_world_pose()[1]
-        step_time = 0
         current_orientation_in_degree = quat_to_euler_angles(current_orientation)
         current_yaw = current_orientation_in_degree[2]
         base_yaw = current_yaw 
@@ -544,7 +544,7 @@ class IsaacSimLanguageRobot(LangRobot):
             env_actions.append(actions)
             
             while abs(quat_to_euler_angles(current_orientation)[2] - rotation_goal) > 0.1:
-                step_time += 1
+                self.step += 1
 
                 # if step_time%100==0 or step_time <= 3:
                 #     agent.bev_map.step_time = step_time
@@ -557,10 +557,10 @@ class IsaacSimLanguageRobot(LangRobot):
                 #! need fall down check
                 # if (obs['h1']['position'][2] < task_config['fall_threshold']) or step_time>1000: # robot falls down
                 #     break
-                if (step_time % 10 == 0):
+                if (self.step % 10 == 0):
                     self.update_all_maps()
                     if (self.step % 50 == 0):
-                        reset_robot = self.check_and_reset_robot(cur_iter=step_time, update_freemap=False, verbose=self.vln_config.test_verbose)
+                        reset_robot = self.check_and_reset_robot(cur_iter=self.step, update_freemap=False, verbose=self.vln_config.test_verbose)
                         reset_flag = reset_robot
                         if reset_flag:
                             # self.map.update_occupancy_map(verbose = self.vln_config.test_verbose) #! find dilate->vlmap occupancy map

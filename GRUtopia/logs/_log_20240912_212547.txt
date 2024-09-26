@@ -1,2 +1,0 @@
-[2024-09-12 21:26:44,230][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:144] -: Loaded data with a total of 778 items from val_seen
-[2024-09-12 21:26:45,082][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:144] -: Loaded data with a total of 10819 items from train

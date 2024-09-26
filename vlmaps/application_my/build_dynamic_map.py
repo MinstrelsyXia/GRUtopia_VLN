@@ -434,7 +434,7 @@ class TMP(VLMap):
         new_map[delta_map_coord[0]:(old_map.shape[0]+delta_map_coord[0]),delta_map_coord[1]:(old_map.shape[1]+delta_map_coord[1]),delta_map_coord[2]:(old_map.shape[2]+delta_map_coord[2])] = old_map
         return new_map
     
-    def _update_semantic_map(self,camera,rgb,depth,labels):
+    def _update_semantic_map(self,camera,rgb,depth,labels,step= 0 ):
         '''
         build semantic map locally, given sync camera
         
@@ -473,7 +473,7 @@ class TMP(VLMap):
             self.min_max = np.array([[np.min(pc[:,0]),np.max(pc[:,0])],[np.min(pc[:,1]),np.max(pc[:,1])],[np.min(pc[:,2]),np.max(pc[:,2])]])
 
         pix_feats ,pix_mask= get_lseg_feat(
-                            self.lseg_model, rgb, labels, self.lseg_transform, self.device, self.crop_size, self.base_size, self.norm_mean, self.norm_std
+                            self.lseg_model, rgb, labels, self.lseg_transform, self.device, self.crop_size, self.base_size, self.norm_mean, self.norm_std, vis = True, save_path = self.segmentation_dir + f"/{step}.jpg"
                         ) # [B,D,H,W];[H,W]
         # pix_feats = np.zeros([1,512,480,640])
         # pix_mask = np.zeros([480,640])

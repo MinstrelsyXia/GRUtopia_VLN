@@ -1,1 +1,0 @@
-[2024-09-09 18:16:26,166][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:144] -: Loaded data with a total of 778 items from val_seen

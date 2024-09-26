@@ -1,2 +1,0 @@
-[2024-08-23 15:17:12,746][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 2
-[2024-08-23 15:17:12,747][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:56] -: scene_path: ../Matterport3D/data/v1/scans/vyrNrziPKCB/matterport_mesh/e9510fcbae554d6cb8136a7274521ff3/isaacsim_e9510fcbae554d6cb8136a7274521ff3.usd

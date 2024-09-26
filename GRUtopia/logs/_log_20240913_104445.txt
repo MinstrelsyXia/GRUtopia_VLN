@@ -1,9 +1,0 @@
-[2024-09-13 10:44:47,664][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:144] -: Loaded data with a total of 778 items from val_seen
-[2024-09-13 10:45:41,423][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 5
-[2024-09-13 10:45:41,424][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: ../Matterport3D/data/v1/scans/5LpN3gDmAk7/matterport_mesh/9c6b166997ae486f96d011c1de0b3427/isaacsim_9c6b166997ae486f96d011c1de0b3427.usd
-[2024-09-13 10:46:03,119][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x151d2e5b46d0>}
-[2024-09-13 10:46:03,120][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}
-[2024-09-13 10:46:25,606][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:239] -: Initialized path id 1802
-[2024-09-13 10:46:25,607][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:240] -: Scan: 5LpN3gDmAk7
-[2024-09-13 10:46:25,607][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:241] -: Instruction: Go to the bottom of the stairs. Go past the stairs and face the light switches. Go past the table and take a left. Go toward the man at the end of the hall. 
-[2024-09-13 10:46:25,608][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:242] -: Start Position: [  4.0890398  -12.59290028  -0.03434999], Start Rotation: [0.25881904510252063, -0.0, -0.0, -0.9659258262890683]

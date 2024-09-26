@@ -1,9 +1,0 @@
-[2024-09-12 14:12:13,987][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vln/src/dataset/data_utils.py[line:144] -: Loaded data with a total of 778 items from val_seen
-[2024-09-12 14:13:13,095][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/runner.py[line:49] -: rendering interval: 5
-[2024-09-12 14:13:13,095][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:71] -: scene_path: ../Matterport3D/data/v1/scans/s8pcmisQ38h/matterport_mesh/b2f1bf0a0de54856b1d9c8816633c0bb/isaacsim_b2f1bf0a0de54856b1d9c8816633c0bb.usd
-[2024-09-12 14:13:36,170][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:139] -: {'h1_0': <grutopia_extension.robots.humanoid.HumanoidRobot object at 0x152e3a36d510>}
-[2024-09-12 14:13:36,171][INFO] /ssd/xiaxinyuan/code/w61-grutopia/grutopia/core/task/task.py[line:140] -: {}
-[2024-09-12 14:14:07,427][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:215] -: Initialized path id 37
-[2024-09-12 14:14:07,428][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:216] -: Scan: s8pcmisQ38h
-[2024-09-12 14:14:07,429][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:217] -: Instruction: Walk down the stairs, turn right, and walk towards place with a rug. Wait near the bench and piano along the right side of the wall. 
-[2024-09-12 14:14:07,429][INFO] /ssd/xiaxinyuan/code/w61-grutopia/vlmaps/application_my/isaac_robot.py[line:218] -: Start Position: [ 5.58284998 -2.81788993 -0.57655795], Start Rotation: [0.25881904510252063, -0.0, -0.0, -0.9659258262890683]

@@ -11,7 +11,7 @@ from vlmaps.vlfm.frontier_detection import detect_frontier_waypoints
 from vlmaps.vlfm.fog_of_war import reveal_fog_of_war
 
 from vlmaps.vlfm.base_map import BaseMap
-
+import os
 # from depth_camera_filtering import filter_depth
 # from agent_utils.geometry_utils import extract_camera_pos_zyxrot, get_extrinsic_matrix, get_world_points_from_image_coords
 # from agent_utils.img_utils import fill_small_holes
@@ -36,6 +36,7 @@ class ObstacleMap(BaseMap):
         hole_area_thresh: int = 100000,  # square pixels
         size: int = 1000,
         pixels_per_meter: int = 20,
+        log_image_dir: str = None
     ):
         super().__init__(size, pixels_per_meter)
         self.explored_area = np.zeros((size, size), dtype=bool)
@@ -49,6 +50,10 @@ class ObstacleMap(BaseMap):
         # round kernel_size to nearest odd number
         kernel_size = int(kernel_size) + (int(kernel_size) % 2 == 0)
         self._navigable_kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        self.save_dir = log_image_dir + '/obstacle_map'
+        if os.path.exists(self.save_dir) == False:
+            os.makedirs(self.save_dir)
+
 
     def reset(self) -> None:
         super().reset()
@@ -66,7 +71,8 @@ class ObstacleMap(BaseMap):
         topdown_fov: float,
         explore: bool = True,
         update_obstacles: bool = True,
-        verbose: bool = False
+        verbose: bool = False,
+        step: int = 0
     ) -> None:
         """
         Adds all obstacles from the current view to the map. Also updates the area
@@ -117,8 +123,10 @@ class ObstacleMap(BaseMap):
             ).astype(bool)
         
         if verbose: 
-            plt.imsave('GRUtopia/grutopia_extension/agents/social_navigation_agent/images/obstacle_map.jpg', self._map)
-            plt.imsave('GRUtopia/grutopia_extension/agents/social_navigation_agent/images/navigatable_map.jpg', self._navigable_map)
+            obs_map_save_path = os.path.join(self.save_dir,f'obstacle_map_{step}.jpg')
+            plt.imsave(obs_map_save_path, self._map)
+            navigatable_map_save_path = os.path.join(self.save_dir,f'navigatable_map_{step}.jpg')
+            plt.imsave(navigatable_map_save_path, self._navigable_map)
         if not explore:
             return
 
@@ -167,8 +175,10 @@ class ObstacleMap(BaseMap):
             explored_area_uint8 = self.explored_area.astype(np.uint8)
             for frontier in self._frontiers_px:
                 cv2.circle(explored_area_uint8, tuple([int(i) for i in frontier]), 5, 1, -1)
-            plt.imsave('GRUtopia/grutopia_extension/agents/social_navigation_agent/images/explored_with_frontiers.jpg', explored_area_uint8)
-            plt.imsave('GRUtopia/grutopia_extension/agents/social_navigation_agent/images/explored_map.jpg', self.explored_area)
+            save_path = os.path.join(self.save_dir,f'explored_with_frontiers_{step}.jpg')
+            plt.imsave(save_path, explored_area_uint8)
+            save_path = os.path.join(self.save_dir,f'explored_map_{step}.jpg')
+            plt.imsave(save_path, self.explored_area)
         if len(self._frontiers_px) == 0:
             self.frontiers = np.array([])
         else:
