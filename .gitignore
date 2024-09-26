@@ -3,7 +3,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.ckpt
 
+api_key/
 evaluate_data/
 assets/
 local_model/
