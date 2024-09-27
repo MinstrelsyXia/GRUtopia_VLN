@@ -11,7 +11,7 @@ from vlmaps.vlfm.utils import closest_line_segment
 # VISUALIZE = os.environ.get("MAP_VISUALIZE", "False").lower() == "true"
 # DEBUG = os.environ.get("MAP_DEBUG", "False").lower() == "true"
 
-VISUALIZE = True
+VISUALIZE = False
 DEBUG = False
 def detect_frontier_waypoints(
     full_map: np.ndarray,

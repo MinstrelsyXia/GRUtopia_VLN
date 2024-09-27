@@ -8,7 +8,7 @@ class Navigator:
     def __init__(self):
         pass
 
-    def build_visgraph(self, obstacle_map: np.ndarray, rowmin: float, colmin: float, vis: bool = False):
+    def build_visgraph(self, obstacle_map: np.ndarray, rowmin: float = 0, colmin: float = 0, vis: bool = False):
         self.obs_map = obstacle_map
         self.visgraph = build_visgraph_with_obs_map(obstacle_map, vis=vis)
         self.rowmin = rowmin
