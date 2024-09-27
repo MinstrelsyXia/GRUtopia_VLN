@@ -65,6 +65,7 @@ def reveal_fog_of_war(
     curr_pt_cv2 = current_point[::-1].astype(int)
     angle_cv2 = np.rad2deg(wrap_heading(-current_angle + np.pi / 2))
 
+    print('in real fog of war', angle_cv2)
     cone_mask = cv2.ellipse(
         np.zeros_like(top_down_map),
         curr_pt_cv2,
@@ -85,27 +86,32 @@ def reveal_fog_of_war(
     )
 
     if enable_debug_visualization:
+        cv2.imwrite('tmp/cone_mask.jpg',cone_mask)
+        cv2.imwrite('tmp/top_down_map.jpg',1-top_down_map)
         vis_top_down_map = top_down_map * 255
         vis_top_down_map = cv2.cvtColor(vis_top_down_map, cv2.COLOR_GRAY2BGR)
         vis_top_down_map[top_down_map > 0] = (60, 60, 60)
         vis_top_down_map[top_down_map == 0] = (255, 255, 255)
         cv2.circle(vis_top_down_map, tuple(curr_pt_cv2), 3, (255, 192, 15), -1)
-        cv2.imshow("vis_top_down_map", vis_top_down_map)
-        cv2.waitKey(0)
-        cv2.destroyWindow("vis_top_down_map")
+        # cv2.imshow("vis_top_down_map", vis_top_down_map)
+        # cv2.waitKey(0)
+        cv2.imwrite('tmp/vis_top_down_map.jpg',vis_top_down_map)
+        # cv2.destroyWindow("vis_top_down_map")
 
         cone_minus_obstacles = cv2.bitwise_and(cone_mask, top_down_map)
         vis_cone_minus_obstacles = vis_top_down_map.copy()
         vis_cone_minus_obstacles[cone_minus_obstacles == 1] = (127, 127, 127)
-        cv2.imshow("vis_cone_minus_obstacles", vis_cone_minus_obstacles)
-        cv2.waitKey(0)
-        cv2.destroyWindow("vis_cone_minus_obstacles")
+        # cv2.imshow("vis_cone_minus_obstacles", vis_cone_minus_obstacles)
+        # cv2.waitKey(0)
+        # cv2.destroyWindow("vis_cone_minus_obstacles")
+        cv2.imwrite("tmp/vis_cone_minus_obstacles.jpg", vis_cone_minus_obstacles)
 
         vis_obstacles_mask = vis_cone_minus_obstacles.copy()
         cv2.drawContours(vis_obstacles_mask, obstacle_contours, -1, (0, 0, 255), 1)
-        cv2.imshow("vis_obstacles_mask", vis_obstacles_mask)
-        cv2.waitKey(0)
-        cv2.destroyWindow("vis_obstacles_mask")
+        # cv2.imshow("vis_obstacles_mask", vis_obstacles_mask)
+        # cv2.waitKey(0)
+        # cv2.destroyWindow("vis_obstacles_mask")
+        cv2.imwrite("tmp/vis_obstacles_mask.jpg", vis_obstacles_mask)
 
     if len(obstacle_contours) == 0:
         return current_fog_of_war_mask  # there were no obstacles in the cone
@@ -133,6 +139,7 @@ def reveal_fog_of_war(
     final_contours, _ = cv2.findContours(
         visible_cone_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
     )
+    
     visible_area = None
     min_dist = np.inf
     for cnt in final_contours:
@@ -142,37 +149,64 @@ def reveal_fog_of_war(
             min_dist = dist
             visible_area = cnt
 
+    if visible_area.any() == None:
+        print('error')
     if enable_debug_visualization:
-        vis_points_mask = vis_obstacles_mask.copy()
-        for point in points.reshape(-1, 2):
-            cv2.circle(vis_points_mask, tuple(point), 3, (0, 255, 0), -1)
-        cv2.imshow("vis_points_mask", vis_points_mask)
-        cv2.waitKey(0)
-        cv2.destroyWindow("vis_points_mask")
+        # vis_points_mask = vis_obstacles_mask.copy()
+        # for point in points.reshape(-1, 2):
+        #     cv2.circle(vis_points_mask, tuple(point), 3, (0, 255, 0), -1)
+        # cv2.imshow("vis_points_mask", vis_points_mask)
+        # cv2.waitKey(0)
+        # cv2.destroyWindow("vis_points_mask")
 
-        vis_lines_mask = vis_points_mask.copy()
-        cv2.polylines(
-            vis_lines_mask, line_points, isClosed=False, color=(0, 0, 255), thickness=2
-        )
-        cv2.imshow("vis_lines_mask", vis_lines_mask)
-        cv2.waitKey(0)
-        cv2.destroyWindow("vis_lines_mask")
+        # vis_lines_mask = vis_points_mask.copy()
+        # cv2.polylines(
+        #     vis_lines_mask, line_points, isClosed=False, color=(0, 0, 255), thickness=2
+        # )
+        # cv2.imshow("vis_lines_mask", vis_lines_mask)
+        # cv2.waitKey(0)
+        # cv2.destroyWindow("vis_lines_mask")
 
-        vis_final_contours = vis_top_down_map.copy()
-        # Draw each contour in a random color
-        for cnt in final_contours:
-            color = tuple([int(i) for i in np.random.randint(0, 255, 3)])
-            cv2.drawContours(vis_final_contours, [cnt], -1, color, -1)
-        cv2.imshow("vis_final_contours", vis_final_contours)
-        cv2.waitKey(0)
-        cv2.destroyWindow("vis_final_contours")
+        # vis_final_contours = vis_top_down_map.copy()
+        # # Draw each contour in a random color
+        # for cnt in final_contours:
+        #     color = tuple([int(i) for i in np.random.randint(0, 255, 3)])
+        #     cv2.drawContours(vis_final_contours, [cnt], -1, color, -1)
+        # cv2.imshow("vis_final_contours", vis_final_contours)
+        # cv2.waitKey(0)
+        # cv2.destroyWindow("vis_final_contours")
 
-        vis_final = vis_top_down_map.copy()
-        # Draw each contour in a random color
-        cv2.drawContours(vis_final, [visible_area], -1, (127, 127, 127), -1)
-        cv2.imshow("vis_final", vis_final)
-        cv2.waitKey(0)
-        cv2.destroyWindow("vis_final")
+        # vis_final = vis_top_down_map.copy()
+        # # Draw each contour in a random color
+        # cv2.drawContours(vis_final, [visible_area], -1, (127, 127, 127), -1)
+        # cv2.imshow("vis_final", vis_final)
+        # cv2.waitKey(0)
+        # cv2.destroyWindow("vis_final")
+
+        if enable_debug_visualization:
+            vis_points_mask = vis_obstacles_mask.copy()
+            for point in points.reshape(-1, 2):
+                cv2.circle(vis_points_mask, tuple(point), 3, (0, 255, 0), -1)
+            cv2.imwrite("tmp/vis_points_mask.jpg", vis_points_mask)
+        
+            vis_lines_mask = vis_points_mask.copy()
+            cv2.polylines(
+                vis_lines_mask, line_points, isClosed=False, color=(0, 0, 255), thickness=2
+            )
+            cv2.imwrite("tmp/vis_lines_mask.jpg", vis_lines_mask)
+        
+            vis_final_contours = vis_top_down_map.copy()
+            # Draw each contour in a random color
+            for cnt in final_contours:
+                color = tuple([int(i) for i in np.random.randint(0, 255, 3)])
+                cv2.drawContours(vis_final_contours, [cnt], -1, color, -1)
+            cv2.imwrite("tmp/vis_final_contours.jpg", vis_final_contours)
+        
+            vis_final = vis_top_down_map.copy()
+            # Draw each contour in a random color
+            visible_area = visible_area.astype(np.int32)
+            cv2.drawContours(vis_final, [visible_area], -1, (127, 127, 127), -1)
+            cv2.imwrite("tmp/vis_final.jpg", vis_final)
 
     if min_dist > 3:
         return current_fog_of_war_mask  # the closest contour was too far away

@@ -62,6 +62,13 @@ class ObstacleMap(BaseMap):
         self._frontiers_px = np.array([])
         self.frontiers = np.array([])
 
+    def get_random_free_point(self):
+        free_points = np.argwhere(self._navigable_map == 1)
+        if len(free_points) == 0:
+            return None
+        idx = np.random.randint(0, len(free_points))
+        return free_points[idx]
+    
     def update_map_with_pc(
         self,
         pc: np.ndarray,
@@ -135,15 +142,18 @@ class ObstacleMap(BaseMap):
         # camera_xy_location = camera_position[:2].reshape(1, 2)
         camera_xy_location = camera_position[:2]
         camera_rotation = camera_orientation 
-        agent_pixel_location = self._xy_to_px(camera_xy_location)[0]
-        
+        agent_pixel_location = self._xy_to_px(np.array([camera_xy_location]))[0]
+        #! fix max_depth to 2.5
+        max_depth_limit = np.min([max_depth, 10])
+        print('in update_map_with_pc',camera_rotation)
         new_explored_area = reveal_fog_of_war(
             top_down_map=self._navigable_map.astype(np.uint8),
             current_fog_of_war_mask=np.zeros_like(self._map, dtype=np.uint8),
             current_point=agent_pixel_location[::-1],
-            current_angle= -np.pi/2 - camera_rotation[2], 
+            current_angle= - camera_rotation[2], # modified!
             fov=np.rad2deg(topdown_fov),
-            max_line_len=max_depth * self.pixels_per_meter,
+            max_line_len= max_depth_limit * self.pixels_per_meter,
+            enable_debug_visualization=True
         )
         new_explored_area = cv2.dilate(new_explored_area, np.ones((3, 3), np.uint8), iterations=1)
         self.explored_area[new_explored_area > 0] = 1
@@ -174,7 +184,7 @@ class ObstacleMap(BaseMap):
         if verbose:
             explored_area_uint8 = self.explored_area.astype(np.uint8)
             for frontier in self._frontiers_px:
-                cv2.circle(explored_area_uint8, tuple([int(i) for i in frontier]), 5, 1, -1)
+                cv2.circle(explored_area_uint8, tuple([int(i) for i in frontier]), 5, (255,0,0), -1)
             save_path = os.path.join(self.save_dir,f'explored_with_frontiers_{step}.jpg')
             plt.imsave(save_path, explored_area_uint8)
             save_path = os.path.join(self.save_dir,f'explored_map_{step}.jpg')

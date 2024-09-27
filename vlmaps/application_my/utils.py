@@ -29,31 +29,6 @@ def visualize_naive_occupancy_map(occupied_ids,save_path):
 
     plt.imsave(save_path,occupancy_map,cmap='gray')
 
-def get_dummy_2d_grid(width,height):
-    # Generate a meshgrid of pixel coordinates
-    x = np.arange(width)
-    y = np.arange(height)
-    xx, yy = np.meshgrid(x, y)
-
-    # Flatten the meshgrid arrays to correspond to the flattened depth map
-    xx_flat = xx.flatten()
-    yy_flat = yy.flatten()
-
-    # Combine the flattened x and y coordinates into a 2D array of points
-    points_2d = np.vstack((xx_flat, yy_flat)).T  # Shape will be (N, 2), where N = height * width
-    return points_2d
-
-def downsample_pc(pc, depth_sample_rate):
-    '''
-    INput: points:(N,3); rate:downsample rate:int
-    Output: downsampled_points:(N/rate,3)
-    '''
-    # np.random.seed(42)
-    shuffle_mask = np.arange(pc.shape[0])
-    np.random.shuffle(shuffle_mask)
-    shuffle_mask = shuffle_mask[::depth_sample_rate]
-    pc = pc[shuffle_mask,:]
-    return pc
 
 
 def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
@@ -156,3 +131,6 @@ def visualize_pc(pcd,headless,save_path = 'pc.jpg'):
         o3d.io.write_point_cloud("point_cloud.pcd", pcd)
         o3d.io.write_triangle_mesh("coordinate_frame.ply", coordinate_frame)
         return
+
+
+

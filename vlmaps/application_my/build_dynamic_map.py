@@ -454,7 +454,8 @@ class TMP(VLMap):
         depth_ds = depth[grid_2d_ds[:, 1], grid_2d_ds[:, 0]]
         downsampled_cloud = camera.get_world_points_from_image_coords(grid_2d_ds, depth_ds)
         downsampled_cloud = downsampled_cloud[np.isfinite(downsampled_cloud).all(axis=1)]
-        point_to_consider = downsampled_cloud = self.convert_world_to_map(downsampled_cloud)
+        # point_to_consider = downsampled_cloud = self.convert_world_to_map(downsampled_cloud)
+        point_to_consider = downsampled_cloud
         # adjusted_coords = (downsampled_cloud[:, :2]/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2]).astype(int) 
         # adjusted_coords_with_z = np.hstack((adjusted_coords, downsampled_cloud[:,2].reshape(-1,1)))
         # point_to_consider = adjusted_coords_with_z[(adjusted_coords_with_z[:, 0] < self.quadtree_width) & (adjusted_coords_with_z[:, 1] < self.quadtree_height)] 
@@ -666,6 +667,10 @@ class TMP(VLMap):
         return self.min_max[:,0]
     
     def from_map_to_xyz(self, row, column):
+        '''
+        input: row, column
+        output: x, y
+        '''
         x = row * self.cs + self.pcd_min[0]
         y = column * self.cs + self.pcd_min[1]
         return x, y

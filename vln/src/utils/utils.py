@@ -57,6 +57,7 @@ def compute_rel_orientations(prev_position, current_position, return_quat=False)
 def get_diff_beween_two_quat(w1,w2):
     a1 = quat_to_euler_angles(w1)
     a2 = quat_to_euler_angles(w2)
+    diff = (a1-a2)/180.0*np.pi
     diff = (diff + np.pi) % (2 * np.pi) - np.pi  # 将差值归一化到 -π 到 π
     return np.linalg.norm(diff)
 
