@@ -114,13 +114,19 @@ class ObstacleMap(BaseMap):
             # obstacle_cloud = filter_points_by_height(point_cloud_episodic_frame, self._min_height, self._max_height)
 
             obstacle_cloud = pc
+            camera_xy_location = camera_position[:2]
+            camera_rotation = camera_orientation 
+            agent_pixel_location = self._xy_to_px(np.array([camera_xy_location]))[0]
+            #! fix max_depth to 2.5
+            max_depth_limit = np.min([max_depth, 10])
 
+            
             # Populate topdown map with obstacle locations
             xy_points = obstacle_cloud[:, :2]
             pixel_points = self._xy_to_px(xy_points) #! didn't align with semantic map
             
             self._map[pixel_points[:, 1], pixel_points[:, 0]] = 1
-
+            self._map[agent_pixel_location[1], agent_pixel_location[0]] = 0
             # Update the navigable area, which is an inverse of the obstacle map after a
             # dilation operation to accommodate the robot's radius.
             self._navigable_map = 1 - cv2.dilate(
@@ -140,17 +146,12 @@ class ObstacleMap(BaseMap):
         # Update the explored area
         # camera_position, camera_rotation = extract_camera_pos_zyxrot(camera_transform)
         # camera_xy_location = camera_position[:2].reshape(1, 2)
-        camera_xy_location = camera_position[:2]
-        camera_rotation = camera_orientation 
-        agent_pixel_location = self._xy_to_px(np.array([camera_xy_location]))[0]
-        #! fix max_depth to 2.5
-        max_depth_limit = np.min([max_depth, 10])
-        print('in update_map_with_pc',camera_rotation)
+
         new_explored_area = reveal_fog_of_war(
             top_down_map=self._navigable_map.astype(np.uint8),
             current_fog_of_war_mask=np.zeros_like(self._map, dtype=np.uint8),
             current_point=agent_pixel_location[::-1],
-            current_angle= - camera_rotation[2], # modified!
+            current_angle= camera_rotation[2], # modified!
             fov=np.rad2deg(topdown_fov),
             max_line_len= max_depth_limit * self.pixels_per_meter,
             enable_debug_visualization=True
@@ -181,14 +182,41 @@ class ObstacleMap(BaseMap):
         
         # Compute frontier locations
         self._frontiers_px = self._get_frontiers()
+        # if verbose:
+        #     explored_area_uint8 = self.explored_area.astype(np.uint8)
+        #     for frontier in self._frontiers_px:
+        #         cv2.circle(explored_area_uint8, tuple([int(i) for i in frontier]), 5, (255,0,0), -1)
+        #     save_path = os.path.join(self.save_dir,f'explored_with_frontiers_{step}.jpg')
+        #     plt.imsave(save_path, explored_area_uint8)
+        #     save_path = os.path.join(self.save_dir,f'explored_map_{step}.jpg')
+        #     plt.imsave(save_path, self.explored_area)
+
         if verbose:
-            explored_area_uint8 = self.explored_area.astype(np.uint8)
+            # 创建可视化用的 navigable_map 副本
+            navigable_map_visual = self._navigable_map.astype(np.uint8) * 255  # 将 navigable_map 转为黑白图像 (0-255)
+
+            # 将 navigable_map 扩展为三通道 (灰度图变为RGB图像)
+            navigable_map_visual = cv2.cvtColor(navigable_map_visual, cv2.COLOR_GRAY2BGR)
+
+            navigable_map_visual[self._navigable_map>0] = (60,60,60) 
+            navigable_map_visual[self._navigable_map == 0] = (255 ,255, 255) 
+            # 创建 explored_area 的三通道灰色图像 (灰色为 [128,128,128])
+            navigable_map_visual[self.explored_area > 0] = (128, 128, 128)  # 灰色 (BGR) 表示 explored_area
+            # 在 visual_map 上圈出 frontiers，用红色标记
             for frontier in self._frontiers_px:
-                cv2.circle(explored_area_uint8, tuple([int(i) for i in frontier]), 5, (255,0,0), -1)
-            save_path = os.path.join(self.save_dir,f'explored_with_frontiers_{step}.jpg')
-            plt.imsave(save_path, explored_area_uint8)
-            save_path = os.path.join(self.save_dir,f'explored_map_{step}.jpg')
-            plt.imsave(save_path, self.explored_area)
+                cv2.circle(navigable_map_visual, tuple([int(i) for i in frontier]), 1, (0, 0, 255), -1)  # 红色 (BGR) 表示 frontiers
+
+            # 创建自己此时位置：
+            cv2.circle(navigable_map_visual, tuple(agent_pixel_location), 2, (255, 192, 15), -1)  # 红色 (BGR) 表示 frontiers
+            # 保存最终结果
+            save_path = os.path.join(self.save_dir, f'explored_with_frontiers_{step}.jpg')
+            cv2.imwrite(save_path, navigable_map_visual)
+
+            # 另存 explored_area，仅为灰度图，探索区域为灰色，未探索区域为黑色
+            explored_area_gray = self.explored_area.astype(np.uint8) * 255  # 将 explored_area 转为黑白图像
+            save_path = os.path.join(self.save_dir, f'explored_map_{step}.jpg')
+            cv2.imwrite(save_path, explored_area_gray)
+
         if len(self._frontiers_px) == 0:
             self.frontiers = np.array([])
         else:

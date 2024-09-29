@@ -115,4 +115,4 @@ obstacle_names:
   - "objects"
 categories: "mp3d" # "mp3d" "ai2thor"
 model:
-  threshold: 0.5
+  threshold: 0.3

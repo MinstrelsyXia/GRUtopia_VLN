@@ -26,7 +26,7 @@ def visualize_naive_occupancy_map(occupied_ids,save_path):
                     occupancy_map[i,j] = 1
 
     # visualize occupancy_map:
-
+    
     plt.imsave(save_path,occupancy_map,cmap='gray')
 
 

@@ -249,26 +249,26 @@ for k in range(len(pcd_files)):
     camera_position = pose[k,:3]
     camera_rotation = pose[k,3:]
     camera_yaw = quat_to_euler_angles(camera_rotation)
-    pcd_filtered = pcd[(-0.9 < (camera_position[2]-pcd[:,2])) & ((camera_position[2]-pcd[:,2]) < 1.7)]
+    pcd_filtered = pcd[(-0.9 < (camera_position[2]-pcd[:,2])) & ((camera_position[2]-pcd[:,2]) < 1.0)]
     print(np.min((camera_position[2]-pcd[:,2])),np.max((camera_position[2]-pcd[:,2])))
     # camera_pos<pcd: lose constraint; camera_pos >pcd: 
     my_map.update_map_with_pc(
         pc= pcd_filtered,
         camera_position = camera_position,
-        camera_orientation= camera_yaw,
+        camera_orientation= camera_yaw+np.pi/2,
         max_depth = 11,
         topdown_fov= 60.0/180.0*np.pi,
         step = k,
-        verbose=False
+        verbose=True
     )
-    rows, cols = np.where(my_map._navigable_map == 0)
-    min_row = np.max(np.min(rows)-1,0)
-    min_col = np.max(np.min(cols)-1,0)
-    my_nav.build_visgraph(my_map._navigable_map,
-                          rowmin = 0,
-                          colmin = 0,
-                          vis = True)
-    start = my_map._xy_to_px(np.array([[camera_position[0],camera_position[1]]]))[0]
+    # rows, cols = np.where(my_map._navigable_map == 0)
+    # min_row = np.max(np.min(rows)-1,0)
+    # min_col = np.max(np.min(cols)-1,0)
+    # my_nav.build_visgraph(my_map._navigable_map,
+    #                       rowmin = 0,
+    #                       colmin = 0,
+    #                       vis = True)
+    # start = my_map._xy_to_px(np.array([[camera_position[0],camera_position[1]]]))[0]
     
-    goal_xy = my_map._xy_to_px(np.array([goal]))[0]
-    path = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True)
+    # goal_xy = my_map._xy_to_px(np.array([goal]))[0]
+    # path = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True)

@@ -348,8 +348,13 @@ class IsaacSimLanguageRobot(LangRobot):
         # update obstacle map
         # pc_filtered = pc[np.abs(pc[:,2] - self.agent_init_pose) < 0.6]
         # TODO: find a better way to filter small points
-        pc_filtered = pc[(-0.9 < (camera_position[2]-pc[:,2])) & ((camera_position[2]-pc[:,2]) < 1.7)]
-        print("check floor and ceiling", np.min(pc_filtered[2,:]),np.max(pc_filtered[2,:]))
+        # sorted_pc = np.sort(pc[:,2])
+        # tenth_largest_value = sorted_pc[-10]
+        # tenth_smallest_value = sorted_pc[10]
+        # low_bound = - tenth_largest_value+ camera_position[2]
+        # upper_bound = - tenth_smallest_value + camera_position[2]
+        pc_filtered = pc[(-0.9 < (camera_position[2]-pc[:,2])) & ((camera_position[2]-pc[:,2]) < 1.0)]
+        print("check floor and ceiling", np.min(camera_position[2]-pc_filtered[2,:]),np.max(camera_position[2]-pc_filtered[2,:]))
         self.ObstacleMap.update_map_with_pc(
             pc_filtered,
             camera_position=camera_position,
@@ -364,8 +369,9 @@ class IsaacSimLanguageRobot(LangRobot):
         frontiers = self.ObstacleMap.frontiers # array of waypoints
         if len(frontiers) == 0:
             log.info("Frontier not found. Moving to point at random")
-            frontiers.append(self.ObstacleMap.get_random_free_point())
-            raise NotFound("Frontier not found")
+            frontiers = np.array([self.ObstacleMap.get_random_free_point()])
+            # frontiers.append(self.ObstacleMap.get_random_free_point())
+            # raise NotFound("Frontier not found")
         else:
             # randomly pick a frontier:
             num = frontiers.shape[0]
@@ -395,8 +401,8 @@ class IsaacSimLanguageRobot(LangRobot):
         """
         Explore the environment by moving the robot around
         """
-        self.turn(10)
-        self.turn(-10)
+        self.turn(180)
+        self.turn(180)
         self.update_all_maps()
         frontier_point = self.get_frontier()
         self.move_to(frontier_point,type = 'obs')
@@ -544,7 +550,7 @@ class IsaacSimLanguageRobot(LangRobot):
             env_actions = []
             env_actions.append(actions)
             self.env.step(actions=env_actions)
-        
+            log.info(f'action now {actions}')
 
             # check and reset roboet every 10 steps:
             if (self.step % 50 == 0):
@@ -601,6 +607,7 @@ class IsaacSimLanguageRobot(LangRobot):
                     },
                 }
             env_actions.append(actions)
+            log.info(f'action now {actions}')
             while abs(self.quat_to_euler_angles(current_orientation)[2] - rotation_goal) > 0.1:
                 self.step += 1
 
@@ -1341,7 +1348,8 @@ def main(config: DictConfig) -> None:
 
         while robot.env.simulation_app.is_running():
             robot.warm_up(100)
-            robot.turn(90)
+            # robot.turn(360)
+            
             for cat_i, cat in enumerate(object_categories):
                 print(f"Navigating to category {cat}")
                 # robot.move_to_object(cat)

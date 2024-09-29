@@ -1,7 +1,11 @@
 import cv2
 import numpy as np
 
-from vlmaps.vlfm.utils import wrap_heading
+# from vlmaps.vlfm.utils import wrap_heading
+
+def wrap_heading(heading):
+    """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
+    return (heading + np.pi) % (2 * np.pi) - np.pi
 
 
 def get_two_farthest_points(source, cnt, agent_yaw):
@@ -60,10 +64,10 @@ def reveal_fog_of_war(
     current_angle: float,
     fov: float = 90,
     max_line_len: float = 100,
-    enable_debug_visualization: bool = False,
+    enable_debug_visualization: bool = True,
 ) -> np.ndarray:
     curr_pt_cv2 = current_point[::-1].astype(int)
-    angle_cv2 = np.rad2deg(wrap_heading(-current_angle + np.pi / 2))
+    angle_cv2 = np.rad2deg(wrap_heading(current_angle))
 
     print('in real fog of war', angle_cv2)
     cone_mask = cv2.ellipse(
@@ -149,8 +153,9 @@ def reveal_fog_of_war(
             min_dist = dist
             visible_area = cnt
 
-    if visible_area.any() == None:
+    if visible_area is None:
         print('error')
+        return current_fog_of_war_mask
     if enable_debug_visualization:
         # vis_points_mask = vis_obstacles_mask.copy()
         # for point in points.reshape(-1, 2):
