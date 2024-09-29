@@ -52,6 +52,9 @@ from vlmaps.vlmaps.map.map import Map
 
 from vlmaps.application_my.utils import NotFound
 
+import logging
+logging.getLogger('PIL').setLevel(logging.WARNING) # used to delete the log file from PIL
+
 def is_equal(a, b, threshold=0.1):
     # 确保输入是 numpy 数组
     a = np.array(a)
@@ -148,6 +151,7 @@ class IsaacSimLanguageRobot(LangRobot):
         ## occupancy map to get the top-down oracle map:
         # in self._setup_sim
     
+    ############################### init env ############################################
 
     #! not in use !!!
     def scene_id2scene_name(self,scene_id):
@@ -207,7 +211,6 @@ class IsaacSimLanguageRobot(LangRobot):
         self.map = Map.create(map_config) #! should include isaacmap!!!
         self.map.init_map(data_dir,self.test_file_save_dir)
         # self.map.generate_obstacle_map()
-
 
     def setup_map(self, vlmaps_data_dir: str):
         if self.vlmap_dataset == False:

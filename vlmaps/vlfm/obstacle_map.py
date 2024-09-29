@@ -63,7 +63,7 @@ class ObstacleMap(BaseMap):
         self.frontiers = np.array([])
 
     def get_random_free_point(self):
-        free_points = np.argwhere(self._navigable_map == 1)
+        free_points = np.argwhere(self.explored_area == 1)
         if len(free_points) == 0:
             return None
         idx = np.random.randint(0, len(free_points))
@@ -204,10 +204,10 @@ class ObstacleMap(BaseMap):
             navigable_map_visual[self.explored_area > 0] = (128, 128, 128)  # 灰色 (BGR) 表示 explored_area
             # 在 visual_map 上圈出 frontiers，用红色标记
             for frontier in self._frontiers_px:
-                cv2.circle(navigable_map_visual, tuple([int(i) for i in frontier]), 1, (0, 0, 255), -1)  # 红色 (BGR) 表示 frontiers
+                cv2.circle(navigable_map_visual, tuple([int(i) for i in frontier]), 3, (0, 0, 255), -1)  # 红色 (BGR) 表示 frontiers
 
             # 创建自己此时位置：
-            cv2.circle(navigable_map_visual, tuple(agent_pixel_location), 2, (255, 192, 15), -1)  # 红色 (BGR) 表示 frontiers
+            cv2.circle(navigable_map_visual, tuple(agent_pixel_location), 3, (255, 192, 15), -1)  # 蓝色 (BGR) 表示 frontiers
             # 保存最终结果
             save_path = os.path.join(self.save_dir, f'explored_with_frontiers_{step}.jpg')
             cv2.imwrite(save_path, navigable_map_visual)
