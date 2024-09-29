@@ -113,6 +113,7 @@ def  get_lseg_feat(
         axes[1].axis("off")
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches='tight')
+        plt.close(fig)
 
-
+    print(f'rgb image saved to {save_path}')
     return outputs, pred

@@ -137,7 +137,7 @@ class TMP(VLMap):
             self.pure_dynamic_map = map_config.pure_dynamic_map
         else:
             self.pure_dynamic_map = False
-
+        self.known_dict = {}
         super().__init__(map_config,data_dir)
 
     def _setup_paths(self, data_dir: Union[Path, str]) -> None:
@@ -443,7 +443,7 @@ class TMP(VLMap):
         downsample_rate = 150
         grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
         # depth
-        depth[depth > max_depth] = 0
+        # depth[depth > max_depth] = 0
         # rgb
         rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
         # pose
@@ -697,8 +697,12 @@ class TMP(VLMap):
 
     def index_map(self, language_desc: str, with_init_cat: bool = True) -> np.ndarray:
         if with_init_cat and self.scores_mat is not None and self.categories is not None:
-            cat_id = find_similar_category_id(language_desc, self.categories)
-            scores_mat = self.scores_mat
+            if language_desc in self.known_dict.keys():
+                cat_id = self.known_dict[language_desc]
+            else:
+                cat_id = find_similar_category_id(language_desc, self.categories)
+                self.known_dict[language_desc] = cat_id
+                scores_mat = self.scores_mat
         else:
             if with_init_cat:
                 raise Exception(
