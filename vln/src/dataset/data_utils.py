@@ -86,6 +86,10 @@ def load_scene_usd(args, scan):
     find_flag = False
     for root, dirs, files in os.walk(os.path.join(args.datasets.mp3d_data_dir, scan)):
         for file in files:
+            if 'fix_holes_ver2' in file:
+                scene_usd_path = os.path.join(root,file)
+                find_flag = True
+                break
             if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
                 scene_usd_path = os.path.join(root, file)
                 find_flag = True

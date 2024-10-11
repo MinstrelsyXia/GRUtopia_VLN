@@ -7,6 +7,13 @@ flags="
     --windows_head
 "
 
+flags_gui="
+    --test_verbose
+    --windows_head
+    --path_id 1726
+    --split val_seen
+"
+
 flags_sample_episodes="
     --headless
     --vln_cfg_file vln/configs/vln_extract_data.yaml
@@ -24,4 +31,4 @@ flags_sample_episodes_script_single_scan="
     --windows_head_type save
 "
 
-python vln/main.py $flags_sample_episodes_script_single_scan
+python vln/main.py $flags_gui
