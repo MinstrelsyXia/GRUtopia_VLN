@@ -124,7 +124,8 @@ class Camera(BaseSensor):
             # frame = self._camera.get_current_frame()
             # camera_params = self._camera.get_camera_params()
             # return {'rgba': rgba, 'depth': depth, 'frame': frame}
-            return {'rgba': rgba, 'depth': depth}
+            pointcloud = self._camera.get_pointcloud()
+            return {'rgba': rgba, 'depth': depth, 'pointcloud':pointcloud}
         return {}
     
     # def get_camera_data(self, data_type: list) -> Dict:

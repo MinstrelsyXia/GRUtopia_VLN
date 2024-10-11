@@ -14,7 +14,7 @@ settings:
   batch_size: 1
   action: "move_along_path"
   check_and_reset_robot: true
-  use_llm: true
+  use_llm: false
 
 robots:
   - name: "CylinderRobot"
@@ -23,12 +23,12 @@ robots:
     z_offset: 1.05 # !!!
   
 maps:
-  robot_z: [0.1, 1.7]  # Robot's height range on the Z-axis
+  robot_z: [0.15, 1.7]  # Robot's height range on the Z-axis
   global_robot_z: [0, 1.7]
   agent_radius: 0.25 # Robot's radius (original: 0.25)
-  voxel_size: 0.1  # Size of a voxel (original: 0.05)
+  voxel_size: 0.05  # Size of a voxel (original: 0.05)
   add_dilation: true # Add dilation to the map
-  dilation_iterations: 3 # Number of dilation iterations
+  dilation_iterations: 1 # Number of dilation iterations
   quadtree_config:
     width: 30 # Quadtree map size
     height: 30
@@ -37,8 +37,8 @@ maps:
     max_depth: 8  # Maximum depth of the quadtree
     threshold: 1  # Threshold for node splitting  
   global_topdown_config:
-    width: 1024
-    height: 1024
+    width: 500
+    height: 500
     aperture: 500
     camera_transform_height: 0.8
     voxel_size: 0.1

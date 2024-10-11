@@ -9,16 +9,15 @@ import json
 import copy
 import numpy as np
 import time
-from collections import defaultdict
-from copy import deepcopy
 
+import cv2
 import torch
 from torch.utils.data import Dataset
 # from torchvision import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 import importlib
-# from scipy.ndimage import convolve, gaussian_filter
+from scipy.ndimage import convolve, gaussian_filter
 
 try:
     from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
@@ -32,12 +31,33 @@ from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_re
 
 from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
 from ..local_nav.BEVmap import BEVMap
+from ..local_nav.sementic_map import BEVSemMap
+
+import open3d as o3d
+
+from vlmaps.application_my.utils import visualize_pc,get_dummy_2d_grid,downsample_pc
+
+PCD_GLOBAL = o3d.geometry.PointCloud()
+
+    
+def test_pc(camera,depth):
+    global PCD_GLOBAL
+    grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
+    wp = camera.get_world_pose()
+    camera.set_world_pose(wp[0],wp[1])
+    pc = camera.get_world_points_from_image_coords(grid_2d, depth.flatten())
+    pc_downsampled = downsample_pc(pc, 150)
+    pcd_global = o3d.geometry.PointCloud()
+    pcd_global.points = o3d.utility.Vector3dVector(pc_downsampled)
+    PCD_GLOBAL+=pcd_global
+    # visualize_pc(PCD_GLOBAL,headless=False, save_path = "1.jpg")
+
 
 
 def load_data(args, split):
     ''' Load data based on VLN-CE
     '''
-    dataset_root_dir = args.datasets.base_data_dir
+    dataset_root_dir = args.datasets.base_data_dir # '../VLN/VLNCE/R2R_VLNCE_v1-3'
     total_scans = []
     load_data = []
     with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
@@ -60,24 +80,12 @@ def load_data(args, split):
     log.info(f"Loaded data with a total of {len(load_data)} items from {split}")
     return load_data, list(set(total_scans))
 
-def load_gather_data(args, split, gather_scan=False, filter_same_trajectory=False):
+def load_gather_data(args, split):
     dataset_root_dir = args.datasets.base_data_dir
     with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
         data = json.load(f)
     with open(os.path.join(dataset_root_dir, "gather_data", "env_scan.json"), 'r') as f:
         scan = json.load(f)
-    if gather_scan:
-        new_data = defaultdict(list)
-        if filter_same_trajectory:
-            trajectory_list = []
-        for item in data:
-            if item['trajectory_id'] in trajectory_list:
-                continue
-            else:
-                trajectory_list.append(item['trajectory_id'])
-            scan = item['scene_id'].split('/')[1]
-            new_data[scan].append(item)
-        data = new_data
     return data, scan
 
 def load_scene_usd(args, scan):
@@ -86,13 +94,8 @@ def load_scene_usd(args, scan):
     find_flag = False
     for root, dirs, files in os.walk(os.path.join(args.datasets.mp3d_data_dir, scan)):
         for file in files:
-            if 'fix_holes_ver2' in file:
-                scene_usd_path = os.path.join(root,file)
-                find_flag = True
-                break
             if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
-                # scene_usd_path = os.path.join(root, file)
-                scene_usd_path = '/ssd/wangliuyi/code/Matterport3D/data/v1/scans/V2XKFyX4ASd/matterport_mesh/04d3f2105168491db767ad1fe7bc39df/fix_holes_ver2.usd'
+                scene_usd_path = os.path.join(root, file)
                 find_flag = True
                 break
         if find_flag:
@@ -175,12 +178,13 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
                 log.error(f"Error in saving camera image: {e}")
 
 class VLNDataLoader(Dataset):
-    def __init__(self, args, sim_config, split, filter_same_trajectory=False):
+    def __init__(self, args, sim_config, split):
+        print(split)
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size
-        if "sample_episodes" in args.settings.mode:
-            self.data, self._scans = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory)
+        if args.settings.mode == "sample_episodes":
+            self.data, self._scans = load_gather_data(args, split)
         else:
             self.data, self._scans = load_data(args, split)
         self.robot_type = sim_config.config.tasks[0].robots[0].type
@@ -193,7 +197,7 @@ class VLNDataLoader(Dataset):
             raise ValueError("Robot offset not found for robot type")
         
         # process paths offset
-        if "sample_episodes" in args.settings.mode:
+        if args.settings.mode == "sample_episodes":
             for scan, data in self.data.items():
                 for item in data:
                     item["start_position"] += self.robot_offset
@@ -205,7 +209,7 @@ class VLNDataLoader(Dataset):
                 for i, path in enumerate(item["reference_path"]):
                     item["reference_path"][i] += self.robot_offset
 
-        # self.env_num = sim_config.tasks.env_num
+        
         self.task_name = sim_config.config.tasks[0].name # only one task
         self.robot_name = sim_config.config.tasks[0].robots[0].name # only one robot type
         
@@ -225,15 +229,11 @@ class VLNDataLoader(Dataset):
     def init_agents(self):
         '''call after self.init_env'''
         self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
-        self.robots = self.env._runner.current_tasks[self.task_name].robots[self.robot_name]
-
+        self.agent_last_pose = None
         self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
         self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
 
-        # self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
-        self.reset_robot(self.agent_init_pose, self.agent_init_rotation)
-        self.agent_last_pose = None
-
+        self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
         # if 'oracle' in self.args.settings.action:
         #     from pxr import Usd, UsdPhysics
         #     robot_prim = self.agents.prim
@@ -247,6 +247,9 @@ class VLNDataLoader(Dataset):
     def init_BEVMap(self, robot_init_pose=(0,0,0)):
         '''init BEV map'''
         self.bev = BEVMap(self.args, robot_init_pose=robot_init_pose)
+        # TODO：可能在其他位置调用
+        self.robot_init_pose = robot_init_pose
+        self.init_BEVSemMap(robot_init_pose=robot_init_pose)
     
     def init_isaac_occupancy_map(self):
         '''init Isaac Occupancy map'''
@@ -258,18 +261,12 @@ class VLNDataLoader(Dataset):
         from ..local_nav.camera_occupancy_map import CamOccupancyMap
         from ..local_nav.global_topdown_map import GlobalTopdownMap
         self.GlobalTopdownMap = GlobalTopdownMap
-        self.cam_occupancy_map_local = CamOccupancyMap(self.args, self.robots.sensors['topdown_camera_50'])
-        self.cam_occupancy_map_global = CamOccupancyMap(self.args, self.robots.sensors['topdown_camera_500'])
-    
-    def update_cam_occupancy_map_pose(self):
-        '''update camera pose'''
-        robot_pose = self.agents.get_world_pose()[0]
-        self.cam_occupancy_map_local.set_world_pose(robot_pose)
-        self.cam_occupancy_map_global.set_world_pose(robot_pose)
+        self.cam_occupancy_map_local = CamOccupancyMap(self.args, robot_prim, start_point, local=True)
+        self.cam_occupancy_map_global = CamOccupancyMap(self.args, robot_prim, start_point, local=False)
     
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
-        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_height()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
     
     @property
     def current_task_stage(self):
@@ -308,13 +305,8 @@ class VLNDataLoader(Dataset):
         self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
         # self.env._runner._world._current_tasks[0].reload_scene(scene_usd_path)
 
-    def init_one_scan(self, scan, idx=0, init_omni_env=False, reset_scene=False, save_log=False, path_id=-1):
+    def init_one_scan(self, scan, idx=0, init_omni_env=False, reset_scene=False):
         # for extract episodes within one scan (for dataset extraction)
-        if path_id != -1:
-            # debug mode
-            for idx, item in enumerate(self.data[scan]):
-                if item['trajectory_id'] == path_id:
-                    break
         item = self.data[scan][idx]
         scene_usd_path = load_scene_usd(self.args, scan)
         self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
@@ -336,24 +328,10 @@ class VLNDataLoader(Dataset):
         self.init_agents()
         if init_omni_env:
             self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
-        
-        status_info = []
-
-        status_info.append(f"trajectory id {item['trajectory_id']}")
-        status_info.append(f"Initialized scan {scan}")
-        status_info.append(f"Instruction: {item['instruction']['instruction_text']}")
-        status_info.append(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
-        status_info.append(f"GT paths length: {len(item['reference_path'])}, points: {item['reference_path']}")
-
-        for info in status_info:
-            log.info(info)
-
-        if save_log:
-            self.args.episode_status_info_file = os.path.join(self.args.episode_path, 'status_info.txt')
-            with open(self.args.episode_status_info_file, 'w') as f:
-                for info in status_info:
-                    f.write(info + '\n')         
-
+        log.info("trajectory id %d", item['trajectory_id'])
+        log.info("Initialized scan %s", scan)
+        log.info("Instruction: %s", item['instruction']['instruction_text'])
+        log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
         return item
     
     def get_agent_pose(self):
@@ -374,10 +352,12 @@ class VLNDataLoader(Dataset):
         log.info(f"Target Position: {next_position}, Orientation: {next_orientation}")
         # self.agents.set_world_pose(current_position, rel_orientation)
     
-    def get_observations(self, add_rgb_subframes=True):
+    def get_observations(self, data_types):
         ''' GEt observations from the sensors
         '''
-        return self.env.get_observations(add_rgb_subframes=add_rgb_subframes)
+        return self.env.get_observations(data_type=data_types)
+
+
 
     def get_camera_pose(self):
         '''
@@ -390,10 +370,17 @@ class VLNDataLoader(Dataset):
             camera_pose[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
         return camera_pose
     
-    def save_observations(self, camera_list:list, data_types=[], save_image_list=None, save_imgs=True, add_rgb_subframes=False, step_time=0):
+    def get_isaacsim_camera(self):
+        camera_dict = self.args.camera_list
+        camera_all = {}
+        for camera in camera_dict:
+            camera_all[camera] = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera]._camera
+        return camera_all
+            
+    def save_observations(self, camera_list:list, data_types:list, save_image_list=None, save_imgs=True, step_time=0):
         ''' Save observations from the agent
         '''
-        obs = self.env.get_observations(add_rgb_subframes=add_rgb_subframes)
+        obs = self.env.get_observations(data_type=data_types)
             
         for camera in camera_list:
             cur_obs = obs[self.task_name][self.robot_name][camera]
@@ -404,7 +391,7 @@ class VLNDataLoader(Dataset):
                 elif data == "depth":
                     data_info = cur_obs[data]
                     max_depth = 10
-                    data_info[data_info > max_depth] = 0
+                    data_info[data_info > max_depth] = 0 # automatically discard unsatisfied values
                     save_img_flag = True
                 elif data == 'pointcloud':
                     save_img_flag = False
@@ -420,64 +407,61 @@ class VLNDataLoader(Dataset):
                         log.error(f"Error in saving camera image: {e}")
         return obs
 
-    def save_episode_data(self, split, scan, path_id, total_images, camera_list:list, add_rgb_subframes=True, step_time=0, init_param_data=False):
+    def save_episode_data(self, scan, path_id, total_images, camera_list:list, data_types:list, step_time=0):
         ''' Save episode data
         '''
         # make dir
-        save_dir = os.path.join(self.args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
+        save_dir = os.path.join(self.args.sample_episode_dir, scan, f"id_{str(path_id)}")
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-        obs = self.env.get_observations(add_rgb_subframes=add_rgb_subframes)
+        obs = self.env.get_observations(data_type=data_types)
         camera_pose_dict = self.get_camera_pose()
 
         # save camera information
         for camera in camera_list:
             cur_obs = obs[self.task_name][self.robot_name][camera]
+
             # save pose
             camera_pose = camera_pose_dict[camera]
-            pos, quat = camera_pose[0], camera_pose[1]
+            pos, quat = camera_pose[0], camera_pose[1] # quat: w,x,y,z
             pose_save_path = os.path.join(save_dir, 'poses.txt')
-            if init_param_data:
-                # remove the previous sampling data before saving
-                if os.path.exists(pose_save_path):
-                    os.remove(pose_save_path)
-
             with open(pose_save_path,'a') as f:
                 sep =""
-                f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}")
+                f.write(f"{sep}{pos[0]}\t{pos[1]}\t{pos[2]}\t{quat[0]}\t{quat[1]}\t{quat[2]}\t{quat[3]}\n") # prrrocessed in vlmaps/vlmap_builder_map.py
                 sep = "\n"
         
             # stack RGB into memory
             rgb_info = cur_obs['rgba'][...,:3]
+            cv2.imwrite("rgb_info.jpg", rgb_info)
             depth_info = cur_obs['depth']
             max_depth = 10
             depth_info[depth_info > max_depth] = 0 
 
+            ca = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera]._camera
+            test_pc(ca, depth_info)
             total_images[camera].append({
                 'step_time': step_time,
                 'rgb': rgb_info,
                 'depth': depth_info})
 
             # save camera_intrinsic
-            # camera_params = cur_obs['camera_params']
+            camera_params = cur_obs['camera_params']
             # 构造要保存的字典
             camera_info = {
                 "camera": camera,
                 "step_time": step_time,
-                "position": camera_pose[0].tolist(),
-                'orientation': camera_pose[1].tolist()}
-            #     "intrinsic_matrix": camera_params['cameraProjection'].tolist(),
-            #     "extrinsic_matrix": camera_params['cameraViewTransform'].tolist(),
-            #     "cameraAperture": camera_params['cameraAperture'].tolist(),
-            #     "cameraApertureOffset": camera_params['cameraApertureOffset'].tolist(),
-            #     "cameraFocalLength": camera_params['cameraFocalLength'],
-            #     "robot_init_pose": self.agent_init_pose.tolist()
-            # }
-            # # print(self.agent_init_pose)
+                "intrinsic_matrix": camera_params['cameraProjection'].tolist(),
+                "extrinsic_matrix": camera_params['cameraViewTransform'].tolist(),
+                "cameraAperture": camera_params['cameraAperture'].tolist(),
+                "cameraApertureOffset": camera_params['cameraApertureOffset'].tolist(),
+                "cameraFocalLength": camera_params['cameraFocalLength'],
+                "robot_init_pose": self.agent_init_pose.tolist(),
+            }
+            # print(self.agent_init_pose)
             cam_save_path = os.path.join(save_dir, 'camera_param.jsonl')
 
-            # # 将信息追加保存到 jsonl 文件
+            # 将信息追加保存到 jsonl 文件
             with open(cam_save_path, 'a') as f:
                 json.dump(camera_info, f)
                 f.write('\n')
@@ -490,55 +474,17 @@ class VLNDataLoader(Dataset):
         }
         robot_save_path = os.path.join(save_dir, 'robot_param.jsonl')
 
-        if init_param_data:
-            if os.path.exists(robot_save_path):
-                os.remove(robot_save_path)
-
         # 将信息追加保存到 jsonl 文件
         with open(robot_save_path, 'a') as f:
             json.dump(robot_info, f)
             f.write('\n')
 
         return total_images
-    
-    def save_episode_images(self, total_images, sample_episode_dir, split, scan, path_id, lock, verbose=False, FLAG_FINISH=False, is_saving=False):
-        while True:
-            time.sleep(2)  # 每x秒保存一次数据，避免过于频繁
-            with lock:
-                camera_keys = list(total_images.keys())
-            for camera in camera_keys:
-                with lock:
-                    if camera in total_images:
-                        for idx, image_info in enumerate(total_images[camera]):
-
-                            step_time = image_info['step_time']
-                            rgb_image = Image.fromarray(image_info['rgb'], "RGB")
-                            depth_image = image_info['depth']
-
-                            # 定义文件名
-                            save_dir = os.path.join(sample_episode_dir, split, scan, f"id_{str(path_id)}")
-                            if not os.path.exists(save_dir):
-                                os.makedirs(save_dir)
-
-                            rgb_filename = os.path.join(save_dir, f"{camera}_image_step_{step_time}.png")
-                            rgb_image.save(rgb_filename)
-
-                            depth_filename = os.path.join(save_dir, f"{camera}_depth_step_{step_time}.npy")
-                            np.save(depth_filename, depth_image)
-
-                            if verbose:
-                                print(f"Saved {rgb_filename} and {depth_filename}")
-
-                # 清空已保存的数据，避免重复保存
-                total_images.clear()
-                is_saving = False
-            if FLAG_FINISH:
-                break
 
     def process_pointcloud(self, camera_list: list, draw=False, convert_to_local=False):
         ''' Process pointcloud for combining multiple cameras
         '''
-        obs = self.env.get_observations(True)
+        obs = self.env.get_observations(data_type=['pointcloud', 'camera_params'])
         camera_positions = []
         camera_orientations = []
         camera_pc_data = []
@@ -554,10 +500,10 @@ class VLNDataLoader(Dataset):
                 pc_local = pc_to_local_pose(cur_obs)
                 camera_pc_data.append(pc_local)
             else:
-                camera_pc_data.append(cur_obs['pointcloud'])
+                camera_pc_data.append(cur_obs['pointcloud']['data'])
         
         if draw:
-            combined_pcd = generate_pano_pointcloud_local(camera_positions, camera_orientations, camera_pc_data, draw=draw, log_dir=self.args.log_image_dir)
+            combined_pcd = generate_pano_pointcloud_local(camera_positions, camera_orientations, camera_pc_data, draw=draw, log_dir=self.args.log_image_dir) # TODO：wrong code
         return camera_pc_data, camera_positions, camera_orientations
     
     def get_surrounding_free_map(self, verbose=False):
@@ -566,9 +512,8 @@ class VLNDataLoader(Dataset):
         '''
         # agent_current_pose = self.get_agent_pose()[0]
         # agent_bottom_z = self.get_robot_bottom_z()
-        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map_local.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.65, update_camera_pose=False, verbose=verbose)
+        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map_local.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.65, verbose=verbose)
         self.surrounding_freemap_camera_pose = self.cam_occupancy_map_local.topdown_camera.get_world_pose()[0]
-        return self.surrounding_freemap, self.surrounding_freemap_camera_pose
 
     def get_global_free_map(self, verbose=False):
         ''' Use top-down orthogonal camera to get the ground-truth surrounding free map
@@ -581,10 +526,27 @@ class VLNDataLoader(Dataset):
     def update_occupancy_map(self, verbose=False):
         '''Use BEVMap to update the occupancy map based on pointcloud
         '''
-        camera_list = [x for x in self.args.camera_list if 'debug' not in x]
-        pointclouds, _, _ = self.process_pointcloud(camera_list)
+        pointclouds, _, _ = self.process_pointcloud(self.args.camera_list) # ! 直接拿到的pointcloud個數比depth小
         robot_ankle_z = self.get_robot_bottom_z()
         self.bev.update_occupancy_map(pointclouds, robot_ankle_z, add_dilation=self.args.maps.add_dilation, verbose=verbose, robot_coords=self.get_agent_pose()[0])
+        # TODO: 可能在main里调用
+        # self.update_semantic_map(verbose=verbose)
+
+    
+    def update_semantic_map(self,verbose=False):
+        # single robot
+        obs = self.get_observations(data_types=['rgba', 'depth'])
+        cur_obs = obs[self.task_name][self.robot_name]
+        # camera_pose = self.get_camera_pose()
+        isaacsim_cameras = self.get_isaacsim_camera()
+        self.bev_sem.update_semantic_map(obs_tr=cur_obs,camera_dict=self.args.camera_list,cameras = isaacsim_cameras,verbose=verbose,robot_coords=self.get_agent_pose()[0])
+        
+    
+
+    def init_BEVSemMap(self, robot_init_pose=(0,0,0)):
+        '''init BEVSem map'''
+        self.bev_sem = BEVSemMap(self.args, robot_init_pose=robot_init_pose)
+        self.robot_init_pose=robot_init_pose
 
     def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, height_threshold=0.5, adjust=False, initial_pose=None, initial_rotation=None):
         '''
@@ -697,7 +659,7 @@ class VLNDataLoader(Dataset):
     
     def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False):
         is_fall = self.check_robot_fall(self.agents, adjust=False)
-        is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=2000, threshold=0.2)
+        is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=300, threshold=0.2)
         if (not is_fall) and (not is_stuck):
             if update_freemap:
                 self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
@@ -712,3 +674,5 @@ class VLNDataLoader(Dataset):
             self.reset_robot(random_position, self.agent_init_rotation)
             log.info(f"Reset robot pose to {random_position}.")
             return True
+    
+    

@@ -60,10 +60,7 @@ def build_dataset():
         data_camera_list = vln_config.settings.sample_camera_list
     else:
         data_camera_list = None
-    if vln_config.debug:
-        vln_config.save_camera_list = ["pano_camera_0", "h1_pano_camera_debug"] # !!! for debugging
-    else:
-        vln_config.save_camera_list = camera_list
+    # camera_list = ["pano_camera_0"] # !!! for debugging
     vln_config.camera_list = camera_list
     
     return vln_datasets, vln_config, sim_config, data_camera_list
@@ -116,9 +113,9 @@ def vis_one_path(args, vln_envs):
         if i % 10 == 0:
             print(i)
             if vln_config.settings.check_and_reset_robot:
-                topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) 
-                freemap, camera_pose = vln_envs.get_surrounding_free_map(verbose=False)
-                topdown_map.update_map(freemap, camera_pose, verbose=False) 
+                topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) # !!!
+                freemap, camera_pose = vln_envs.get_surrounding_free_map(verbose=vln_config.test_verbose) # !!!
+                topdown_map.update_map(freemap, camera_pose, verbose=vln_config.test_verbose) # !!!
 
                 reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=vln_config.test_verbose)
                 reset_flag = reset_robot
@@ -129,15 +126,15 @@ def vis_one_path(args, vln_envs):
                     exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point], verbose=vln_config.test_verbose)
 
                     
-            if vln_config.windows_head:
-                # show the topdown camera
-                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
+            # if vln_config.windows_head:
+            #     # show the topdown camera
+            #     vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
 
         if i % 100 == 0:
             print(i)
             if not reset_flag:
-                if args.save_obs:
-                    vln_envs.save_observations(camera_list=vln_config.save_camera_list, data_types=["rgba", "depth"], step_time=i)
+                # if args.save_obs:
+                vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
 
                 # move to next waypoint
                 if current_point == 0:
@@ -148,7 +145,7 @@ def vis_one_path(args, vln_envs):
                     vln_envs.init_BEVMap(robot_init_pose=agent_current_pose)
                     
                     if args.save_obs:
-                        vln_envs.save_observations(camera_list=vln_config.save_camera_list, data_types=["rgba", "depth"], step_time=i)
+                        vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
                     vln_envs.bev.step_time = i
                     vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
                     exe_path, node_type = vln_envs.bev.navigate_p2p(paths[current_point], paths[current_point+1], verbose=vln_config.test_verbose)
@@ -161,8 +158,7 @@ def vis_one_path(args, vln_envs):
                         log.info("***The robot has finished the action.***")
                         if current_point < len(paths)-1:
                             if args.save_obs:
-                                vln_envs.save_observations(camera_list=vln_config.save_camera_list, data_types=["rgba", "depth"], step_time=i)
-                            vln_envs.bev.step_time = i
+                                vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
                             vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
                             robot_current_pos = vln_envs.agents.get_world_pose()[0]
                             exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point+1], verbose=vln_config.test_verbose)
@@ -179,20 +175,20 @@ def vis_one_path(args, vln_envs):
         
         if i % 500 == 0 and not agent_action_state['finished']:
             if args.save_obs:
-                vln_envs.save_observations(camera_list=vln_config.save_camera_list, data_types=["rgba", "depth"], step_time=i)
+                vln_envs.save_observations(camera_list=vln_config.camera_list, data_types=["rgba", "depth"], step_time=i)
         
             # update BEVMap every specific intervals
             vln_envs.bev.step_time = i
             vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
             
             # after BEVMap's update, determine whether the robot's path is blocked
-            # if current_point > 0:
-            #     agent_current_pose = vln_envs.agents.get_world_pose()[0]
-            #     next_action_pose = exe_path[agent_action_state['current_index']+1] if len(exe_path)>agent_action_state['current_index']+1 else agent_action_state['current_point']
-            #     if vln_envs.bev.is_collision(agent_current_pose, next_action_pose):
-            #         log.info("===The robot's path is blocked. Replanning now.===")
-            #         exe_path, _ = vln_envs.bev.navigate_p2p(agent_current_pose, paths[current_point], verbose=vln_config.test_verbose)
-            #         actions = {'h1': {'move_along_path': [exe_path]}}
+            if current_point > 0:
+                agent_current_pose = vln_envs.agents.get_world_pose()[0]
+                next_action_pose = exe_path[agent_action_state['current_index']+1] if len(exe_path)>agent_action_state['current_index']+1 else agent_action_state['current_point']
+                if vln_envs.bev.is_collision(agent_current_pose, next_action_pose):
+                    log.info("===The robot's path is blocked. Replanning now.===")
+                    exe_path, _ = vln_envs.bev.navigate_p2p(agent_current_pose, paths[current_point], verbose=vln_config.test_verbose)
+                    actions = {'h1': {'move_along_path': [exe_path]}}
                             
         env_actions.append(actions)
         obs = env.step(actions=env_actions)
@@ -520,7 +516,7 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
             elif i == warm_step:
                 # first warm up finished
                 if scan not in topdown_maps:
-                    topdown_map = vln_envs.TopdownMapGlobal(args, scan)
+                    topdown_map = vln_envs.GlobalTopdownMap(args, scan)
                     topdown_maps[scan] = topdown_map
                     freemap, camera_pose = vln_envs.get_global_free_map(verbose=args.test_verbose)
                     topdown_map.update_map(freemap, camera_pose, verbose=args.test_verbose)
