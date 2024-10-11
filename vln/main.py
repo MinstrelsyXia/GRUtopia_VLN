@@ -73,7 +73,7 @@ def vis_one_path(args, vln_envs):
     # get the specific path
     vln_envs = vln_envs[args.split]
     data_item = vln_envs.init_one_path(args.path_id)
-    env = vln_envs.split
+    env = vln_envs.env
     
     paths = data_item['reference_path']
     current_point = 0
@@ -81,7 +81,7 @@ def vis_one_path(args, vln_envs):
     reset_robot = False
     
     if vln_config.windows_head:
-        vln_envs.cam_occupancy_map.open_windows_head(text_info=data_item['instruction']['instruction_text'])
+        vln_envs.cam_occupancy_map_local.open_windows_head(text_info=data_item['instruction']['instruction_text'])
     
     '''start simulation'''
     i = 0
@@ -128,7 +128,7 @@ def vis_one_path(args, vln_envs):
                     
             if vln_config.windows_head:
                 # show the topdown camera
-                vln_envs.cam_occupancy_map.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
+                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
 
         if i % 100 == 0:
             print(i)
@@ -202,7 +202,7 @@ def vis_one_path(args, vln_envs):
     env.simulation_app.close()
     if vln_config.windows_head:
         # close the topdown camera
-        vln_envs.cam_occupancy_map.close_windows_head()
+        vln_envs.cam_occupancy_map_local.close_windows_head()
 
 def keyboard_control(args, vln_envs):
     if args.path_id == -1:
