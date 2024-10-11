@@ -23,7 +23,8 @@ class CamOccupancyMap:
         self.args = args
         self.topdown_camera = camera # grutopia sensor
         self.issac_camera = camera._camera 
-        self.width, self.height = self.issac_camera._resolution
+        # self.width, self.height = self.issac_camera._resolution
+        self.height, self.width = self.issac_camera._resolution
 
         self.center_x, self.center_y = self.width // 2, self.height// 2
         self.aperture = self.issac_camera.get_horizontal_aperture() * 10
@@ -192,7 +193,7 @@ class CamOccupancyMap:
     def close_windows_head(self):
         plt.close('all')  # Close all figures
 
-    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, verbose=False):
+    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, update_camera_pose=True, verbose=False):
         # Define height range for free map
         # free_map: 1 for free space, 0 for occupied space
 
@@ -243,8 +244,9 @@ class CamOccupancyMap:
         # extract connectd free area
         connected_free_area = self.extract_connected_free_area(free_map, verbose=verbose)
 
-        # update the pose of the camera based on robot's pose
-        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+        if update_camera_pose:
+            # update the pose of the camera based on robot's pose
+            self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
 
         return free_map, connected_free_area
     

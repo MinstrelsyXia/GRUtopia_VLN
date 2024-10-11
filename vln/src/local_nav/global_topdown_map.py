@@ -91,9 +91,9 @@ class GlobalTopdownMap:
                 'camera_pose': camera_pose,
                 'freemap': freemap,
                 'occupancy_map': self.freemap_to_accupancy_map(freemap, add_dilation=self.args.maps.add_dilation)
-            } 
-            log.info("update global topdown map at height: {}".format(height))
-            if verbose:
+            }
+            if verbose: 
+                log.info("update global topdown map at height: {}".format(height))
                 self.save_map(robot_pos=camera_pose, is_camera_base=True, env_idx=env_idx)
         else:
             if update_map:

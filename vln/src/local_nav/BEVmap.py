@@ -12,7 +12,7 @@ import json
 from grutopia.core.util.log import log
 
 from .path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
-
+import open3d as o3d
 class BEVMap:
     def __init__(self, args, robot_init_pose=(0, 0, 0)):
         self.args = args
@@ -285,6 +285,7 @@ class BEVMap:
         paths, find_flag = self.path_planner.planning(current.y, current.x, target.y, target.x, # x and y are reversed in AStarPlanner
                                       obs_map=quadtree_map,
                                       min_final_meter=self.planner_config.last_scope,
+                                      path_legend=True,
                                       img_save_path=os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg"))
         
         transfer_paths = []
