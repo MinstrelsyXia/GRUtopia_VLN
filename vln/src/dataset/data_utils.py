@@ -538,7 +538,7 @@ class VLNDataLoader(Dataset):
     def process_pointcloud(self, camera_list: list, draw=False, convert_to_local=False):
         ''' Process pointcloud for combining multiple cameras
         '''
-        obs = self.env.get_observations(True)
+        obs = self.env.get_observations(add_rgb_subframes=False)
         camera_positions = []
         camera_orientations = []
         camera_pc_data = []
@@ -581,7 +581,10 @@ class VLNDataLoader(Dataset):
     def update_occupancy_map(self, verbose=False):
         '''Use BEVMap to update the occupancy map based on pointcloud
         '''
-        camera_list = [x for x in self.args.camera_list if 'debug' not in x]
+        camera_list = []
+        for camera in self.args.camera_list:
+            if 'debug' not in camera and 'topdown' not in camera:
+                camera_list.append(camera)
         pointclouds, _, _ = self.process_pointcloud(camera_list)
         robot_ankle_z = self.get_robot_bottom_z()
         self.bev.update_occupancy_map(pointclouds, robot_ankle_z, add_dilation=self.args.maps.add_dilation, verbose=verbose, robot_coords=self.get_agent_pose()[0])
