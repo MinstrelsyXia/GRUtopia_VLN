@@ -186,13 +186,13 @@ def vis_one_path(args, vln_envs):
             vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
             
             # after BEVMap's update, determine whether the robot's path is blocked
-            # if current_point > 0:
-            #     agent_current_pose = vln_envs.agents.get_world_pose()[0]
-            #     next_action_pose = exe_path[agent_action_state['current_index']+1] if len(exe_path)>agent_action_state['current_index']+1 else agent_action_state['current_point']
-            #     if vln_envs.bev.is_collision(agent_current_pose, next_action_pose):
-            #         log.info("===The robot's path is blocked. Replanning now.===")
-            #         exe_path, _ = vln_envs.bev.navigate_p2p(agent_current_pose, paths[current_point], verbose=vln_config.test_verbose)
-            #         actions = {'h1': {'move_along_path': [exe_path]}}
+            if current_point > 0:
+                agent_current_pose = vln_envs.agents.get_world_pose()[0]
+                next_action_pose = exe_path[agent_action_state['current_index']+1] if len(exe_path)>agent_action_state['current_index']+1 else agent_action_state['current_point']
+                if vln_envs.bev.is_collision(agent_current_pose, next_action_pose):
+                    log.info("===The robot's path is blocked. Replanning now.===")
+                    exe_path, _ = vln_envs.bev.navigate_p2p(agent_current_pose, paths[current_point], verbose=vln_config.test_verbose)
+                    actions = {'h1': {'move_along_path': [exe_path]}}
                             
         env_actions.append(actions)
         obs = env.step(actions=env_actions)
