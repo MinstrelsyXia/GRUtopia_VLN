@@ -86,8 +86,10 @@ camera.initialize()
 # 载入姿态和深度图数据
 main_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes_safe/s8pcmisQ38h/id_37"
 pose = np.loadtxt(main_dir + "/poses.txt")
-save_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes/s8pcmisQ38h/id_37"
+save_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes_safe_2/s8pcmisQ38h/id_37"
 pcd_save_dir = save_dir + '/pcd'
+if not os.path.exists(pcd_save_dir):
+    os.makedirs(pcd_save_dir)
 
 i = 0
 depth_dir = os.path.join(main_dir, "depth")
@@ -140,17 +142,17 @@ while simulation_app.is_running():
         
         k+=1
         pcd = get_pc(camera,depth_map) # [N,3]
-        # np.save(os.path.join(pcd_save_dir, f'pc_{k}.npy'), pcd)
-        pcd_filtered = pcd[np.abs(pcd[:,2] - camera_position[2]) < 0.6]
-        my_map.update_map_with_pc(
-            pc= pcd_filtered,
-            camera_position = camera_position,
-            camera_orientation= camera_yaw,
-            max_depth = 11,
-            topdown_fov= 60.0/180.0*np.pi,
-            step = k,
-            verbose=True
-        )
+        np.save(os.path.join(pcd_save_dir, f'pc_{k}.npy'), pcd)
+        # pcd_filtered = pcd[np.abs(pcd[:,2] - camera_position[2]) < 0.6]
+        # my_map.update_map_with_pc(
+        #     pc= pcd_filtered,
+        #     camera_position = camera_position,
+        #     camera_orientation= camera_yaw,
+        #     max_depth = 11,
+        #     topdown_fov= 60.0/180.0*np.pi,
+        #     step = k,
+        #     verbose=True
+        # )
 
 simulation_app.close()
 

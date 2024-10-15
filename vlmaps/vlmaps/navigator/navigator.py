@@ -2,7 +2,7 @@ import numpy as np
 import pyvisgraph as vg
 from vlmaps.vlmaps.utils.navigation_utils import build_visgraph_with_obs_map, plan_to_pos_v2
 from typing import Tuple, List, Dict
-
+import cv2
 
 class Navigator:
     def __init__(self):
@@ -15,7 +15,7 @@ class Navigator:
         self.colmin = colmin
 
     def plan_to(
-        self, start_full_map: Tuple[float, float], goal_full_map: Tuple[float, float], vis: bool = False
+        self, start_full_map: Tuple[float, float], goal_full_map: Tuple[float, float], vis: bool = False, navigable_map_visual = None
     ) -> List[List[float]]:
         """
         Take full map start (row, col) and full map goal (row, col) as input
@@ -25,9 +25,33 @@ class Navigator:
         goal = self._convert_full_map_pos_to_cropped_map_pos(goal_full_map)
         if self._check_if_start_in_graph_obstacle(start):
             self._rebuild_visgraph(start, vis)
-        paths = plan_to_pos_v2(start, goal, self.obs_map, self.visgraph, vis)
-        paths = self.shift_path(paths, self.rowmin, self.colmin)
+        paths = plan_to_pos_v2(start_full_map, goal_full_map, self.obs_map, self.visgraph, vis,navigable_map_visual)
+        # paths = self.shift_path(paths, self.rowmin, self.colmin)
+        if vis == True:
+            self.visualize_path(start = start_full_map, goal = goal_full_map, obstacles = navigable_map_visual, path = paths)
         return paths
+    
+    def visualize_path(self,start,goal,obstacles,path):
+        # obs_map_vis = (obstacles[:, :, None] * 255).astype(np.uint8)
+        # obs_map_vis = np.tile(obs_map_vis, [1, 1, 3])
+
+        # obs_map_vis = (obstacles[:, :, None] * 255).astype(np.uint8)
+        # obs_map_vis = np.tile(obs_map_vis, [1, 1, 3])
+        obs_map_vis = obstacles
+
+        for i, point in enumerate(path):
+            subgoal = (int(point[1]), int(point[0]))
+            print(i, subgoal)
+            obs_map_vis = cv2.circle(obs_map_vis, subgoal, 1, (255, 0, 0), -1)
+            if i > 0:
+                cv2.line(obs_map_vis, last_subgoal, subgoal, (255, 0, 0), 1)
+            last_subgoal = subgoal
+        obs_map_vis = cv2.circle(obs_map_vis, (int(start[1]), int(start[0])), 2, (0, 255, 0), -1)
+        obs_map_vis = cv2.circle(obs_map_vis, (int(goal[1]), int(goal[0])), 2, (0, 0, 255), -1)
+        # cv2.imshow("planned path", obs_map_vis)
+        # cv2.waitKey(1)
+        cv2.imwrite('tmp2/tmp/planned_path.jpg', obs_map_vis)
+
 
     def shift_path(self, paths: List[List[float]], row_shift: int, col_shift: int) -> List[List[float]]:
         shifted_paths = []

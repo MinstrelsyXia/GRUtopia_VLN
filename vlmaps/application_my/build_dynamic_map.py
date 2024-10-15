@@ -462,7 +462,17 @@ class TMP(VLMap):
 
         # pc =  point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z+self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))]# points that are within the robot's height range (occupancy),#! still decimal, not int!!!
 
-        pc = point_to_consider #! self.robot_z; robot_bottom_z should be considered
+        # pc = point_to_consider #! self.robot_z; robot_bottom_z should be considered
+
+        distances = np.linalg.norm(point_to_consider - camera_position, axis=1)
+        
+        # 找出所有距离大于阈值的点
+        threshold = 0.001
+        mask = distances >= threshold
+        
+        # 使用布尔索引选择满足条件的点
+        pc = point_to_consider[mask]
+
         pc_pcd = o3d.geometry.PointCloud()
         pc_pcd.points = o3d.utility.Vector3dVector(pc)
         visualize_pc(pc_pcd,headless=False)
@@ -696,19 +706,30 @@ class TMP(VLMap):
             return self.scores_mat
 
     def index_map(self, language_desc: str, with_init_cat: bool = True) -> np.ndarray:
-        if with_init_cat and self.scores_mat is not None and self.categories is not None:
-            if language_desc in self.known_dict.keys():
-                cat_id = self.known_dict[language_desc]
-            else:
-                cat_id = find_similar_category_id(language_desc, self.categories)
-                self.known_dict[language_desc] = cat_id
-                scores_mat = self.scores_mat
-        else:
-            if with_init_cat:
-                raise Exception(
-                    "Categories are not preloaded. Call init_categories(categories: List[str]) to initialize categories."
-                )
-            scores_mat = get_lseg_score(
+        # init map
+        # if with_init_cat and self.scores_mat is not None and self.categories is not None:
+        #     if language_desc in self.known_dict.keys():
+        #         cat_id = self.known_dict[language_desc]
+        #         scores_mat = self.scores_mat
+        #     else:
+        #         cat_id = find_similar_category_id(language_desc, self.categories)
+        #         self.known_dict[language_desc] = cat_id
+        #         scores_mat = self.scores_mat
+        # else:
+        #     if with_init_cat:
+        #         raise Exception(
+        #             "Categories are not preloaded. Call init_categories(categories: List[str]) to initialize categories."
+        #         )
+            
+        #     scores_mat = get_lseg_score(
+        #         self.clip_model,
+        #         [language_desc],
+        #         self.grid_feat,
+        #         self.clip_feat_dim,
+        #         use_multiple_templates=True,
+        #         add_other=True,
+        #     )  # score for name and other
+        scores_mat = get_lseg_score(
                 self.clip_model,
                 [language_desc],
                 self.grid_feat,
@@ -716,9 +737,17 @@ class TMP(VLMap):
                 use_multiple_templates=True,
                 add_other=True,
             )  # score for name and other
+        if language_desc in self.known_dict.keys():
+            cat_id = self.known_dict[language_desc]
+        else:
+            cat_id = find_similar_category_id(language_desc, self.categories)
+            self.known_dict[language_desc] = cat_id
         # score_mat: [h*w,c]
         max_ids = np.argmax(scores_mat, axis=1)
-        mask = max_ids == cat_id
+        
+        # mask = max_ids == cat_id
+        mask = max_ids == 0 #['landmark', 'others']
+        print(np.sum(mask))
         for i in range(len(max_ids)):
             if scores_mat[i, max_ids[i]] <= self.threshold:
                 mask[i]  = 0  # 将不符合条件的值设为 -1
@@ -748,7 +777,7 @@ class TMP(VLMap):
             raise NotFound(f"pc_mask for object '{name}' is either empty or too small.")
 
         mask_2d = pool_3d_label_to_2d(pc_mask, self.grid_pos, self.gs)
-        mask_2d = mask_2d[self.rmin : self.rmax + 1, self.cmin : self.cmax + 1]
+        # mask_2d = mask_2d[self.rmin : self.rmax + 1, self.cmin : self.cmax + 1]
         
         # print(f"showing mask for object cat {name}")
         # cv2.imshow(f"mask_{name}", (mask_2d.astype(np.float32) * 255).astype(np.uint8))
@@ -766,16 +795,16 @@ class TMP(VLMap):
         # print("centers", centers)
 
         # whole map position
-        for i in range(len(contours)):
-            centers[i][0] += self.rmin
-            centers[i][1] += self.cmin
-            bbox_list[i][0] += self.rmin
-            bbox_list[i][1] += self.rmin
-            bbox_list[i][2] += self.cmin
-            bbox_list[i][3] += self.cmin
-            for j in range(len(contours[i])):
-                contours[i][j, 0] += self.rmin
-                contours[i][j, 1] += self.cmin
+        # for i in range(len(contours)):
+        #     centers[i][0] += self.rmin
+        #     centers[i][1] += self.cmin
+        #     bbox_list[i][0] += self.rmin
+        #     bbox_list[i][1] += self.rmin
+        #     bbox_list[i][2] += self.cmin
+        #     bbox_list[i][3] += self.cmin
+        #     for j in range(len(contours[i])):
+        #         contours[i][j, 0] += self.rmin
+        #         contours[i][j, 1] += self.cmin
 
         return contours, centers, bbox_list
 

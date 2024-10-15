@@ -32,7 +32,7 @@ def main(config: DictConfig) -> None:
     vlmap.load_map(data_dirs[config.scene_id])
     visualize_rgb_map_3d(vlmap.grid_pos, vlmap.grid_rgb)
     # cat = input("What is your interested category in this scene?")
-    cat = "chair"
+    cat = "bed"
 
     vlmap._init_clip()
     print("considering categories: ")

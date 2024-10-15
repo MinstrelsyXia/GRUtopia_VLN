@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 
 from vlmaps.vlfm.frontier_detection import detect_frontier_waypoints
-from vlmaps.vlfm.fog_of_war import reveal_fog_of_war
+from vlmaps.vlfm.fog_of_war import reveal_fog_of_war, get_current_angle
 
 from vlmaps.vlfm.base_map import BaseMap
 import os
@@ -36,7 +36,8 @@ class ObstacleMap(BaseMap):
         hole_area_thresh: int = 100000,  # square pixels
         size: int = 1000,
         pixels_per_meter: int = 20,
-        log_image_dir: str = None
+        log_image_dir: str = None,
+        dilate_iters: int = 1
     ):
         super().__init__(size, pixels_per_meter)
         self.explored_area = np.zeros((size, size), dtype=bool)
@@ -47,12 +48,14 @@ class ObstacleMap(BaseMap):
         self._area_thresh_in_pixels = area_thresh * (self.pixels_per_meter**2)
         self._hole_area_thresh = hole_area_thresh
         kernel_size = self.pixels_per_meter * agent_radius * 2
+        self.robot_radius = agent_radius
         # round kernel_size to nearest odd number
         kernel_size = int(kernel_size) + (int(kernel_size) % 2 == 0)
         self._navigable_kernel = np.ones((kernel_size, kernel_size), np.uint8)
         self.save_dir = log_image_dir + '/obstacle_map'
         if os.path.exists(self.save_dir) == False:
             os.makedirs(self.save_dir)
+        self._dilate_iters = dilate_iters
 
 
     def reset(self) -> None:
@@ -69,6 +72,39 @@ class ObstacleMap(BaseMap):
         idx = np.random.randint(0, len(free_points))
         return free_points[idx]
     
+
+    def clear_robot_surrounding(self, robot_pos, robot_radius, num_points=36):
+        '''
+        input: 
+        - robot_pos: tuple (x, y) representing the robot's position
+        - robot_radius: float, radius around the robot to clear
+        - num_points: int, number of points to generate around the robot (default is 36)
+        
+        output: 
+        - List of surrounding points (x, y) within the specified radius
+        '''
+        x, y = robot_pos  # 机器人当前位置
+        surrounding_points = []
+
+        # 生成num_points个在半径为robot_radius的圆周上的点
+        angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
+        
+        for angle in angles:
+            # 计算圆周上点的坐标
+            point_x = x + robot_radius * np.cos(angle)
+            point_y = y + robot_radius * np.sin(angle)
+            surrounding_points.append((point_x, point_y))
+
+        return np.array(surrounding_points)
+
+
+    def _get_current_angle_on_map(self,camera_orientation):
+        '''
+        camera_orientation: in row, pitch, yaw format, 1-dim
+        '''
+        return get_current_angle(camera_orientation)
+
+
     def update_map_with_pc(
         self,
         pc: np.ndarray,
@@ -117,7 +153,7 @@ class ObstacleMap(BaseMap):
             camera_xy_location = camera_position[:2]
             camera_rotation = camera_orientation 
             agent_pixel_location = self._xy_to_px(np.array([camera_xy_location]))[0]
-            #! fix max_depth to 2.5
+
             max_depth_limit = np.min([max_depth, 10])
 
             
@@ -126,13 +162,19 @@ class ObstacleMap(BaseMap):
             pixel_points = self._xy_to_px(xy_points) #! didn't align with semantic map
             
             self._map[pixel_points[:, 1], pixel_points[:, 0]] = 1
-            self._map[agent_pixel_location[1], agent_pixel_location[0]] = 0
+
+            
+            # agent_surrounding = self.clear_robot_surrounding(camera_position[:2], self.robot_radius*2)
+            # agent_surrounding_on_map = self._xy_to_px(agent_surrounding)
+            # # self._map[agent_pixel_location[1], agent_pixel_location[0]] = 0
+            # self._map[agent_surrounding_on_map[:, 1], agent_surrounding_on_map[:, 0]] = 0
+
             # Update the navigable area, which is an inverse of the obstacle map after a
             # dilation operation to accommodate the robot's radius.
             self._navigable_map = 1 - cv2.dilate(
                 self._map.astype(np.uint8),
                 self._navigable_kernel,
-                iterations=1,
+                iterations=self._dilate_iters,
             ).astype(bool)
         
         if verbose: 
@@ -221,6 +263,7 @@ class ObstacleMap(BaseMap):
             self.frontiers = np.array([])
         else:
             self.frontiers = self._px_to_xy(self._frontiers_px)
+        self.nav_map_visual = navigable_map_visual
 
 
     def update_map(
@@ -352,6 +395,15 @@ class ObstacleMap(BaseMap):
             self._area_thresh_in_pixels,
         )
         return frontiers
+
+    def _path_is_blocked(self, path):
+        '''
+        already updated obstacle map:
+
+        '''
+        # draw a straight line between start and end:
+
+        # determine whether points intersect with obstacle map
 
     def visualize(self) -> np.ndarray:
         """Visualizes the map."""

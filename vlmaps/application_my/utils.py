@@ -29,7 +29,56 @@ def visualize_naive_occupancy_map(occupied_ids,save_path):
     
     plt.imsave(save_path,occupancy_map,cmap='gray')
 
+import cv2
+def visualize_matrix(matrix, save_path):
+    """
+    使用 OpenCV 可视化一个 0/1 的 2D 矩阵
+    :param matrix: 要可视化的矩阵: bool shape=(n,n)
+    :param window_name: 窗口名称
+    """
+    # 将矩阵转换为图像格式
+    img = (matrix.astype(np.float32) * 255).astype(np.uint8)
+    
+    # 显示图像
+    cv2.imwrite(save_path,img)
 
+def visualize_visgraph_and_path(G, path_vg, save_path='visgraph_with_path.png'):
+    """
+    可视化已构建好的可见图及路径。
+    
+    参数:
+    - G: 已经构建好的可见图对象 (VisGraph)
+    - path_vg: 由 shortest_path 生成的路径
+    - save_path: 保存路径的文件名
+    """
+    # 创建一个图形
+    fig, ax = plt.subplots()
+
+    # 绘制可见图的边
+    for edge in G.visgraph.edges:
+        start = edge.p1
+        end = edge.p2
+        ax.plot([start.x, end.x], [start.y, end.y], 'g--')  # 绿色虚线代表可见边
+
+    # 绘制路径
+    if path_vg:
+        path_xs = [p.x for p in path_vg]
+        path_ys = [p.y for p in path_vg]
+        ax.plot(path_xs, path_ys, 'r-', linewidth=2, marker='o')  # 红色线条，带圆点
+        ax.plot(path_xs[0], path_ys[0], 'bo', label='Start')      # 蓝色起点标记
+        ax.plot(path_xs[-1], path_ys[-1], 'ro', label='Goal')     # 红色终点标记
+
+    # 设置坐标系比例，保持x和y尺度相同
+    ax.set_aspect('equal')
+
+    # 添加图例
+    ax.legend()
+
+    # 保存图像到文件
+    plt.savefig(save_path)
+    print(f"Graph with path saved as {save_path}")
+    plt.show()
+    # visualize_visgraph_and_path(G, path_vg, save_path='tmp/visgraph_with_path_output.png')
 
 def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
     # 设置无头渲染
@@ -117,20 +166,6 @@ def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
     vis.capture_screen_image(save_path)
     vis.destroy_window()
               
-def visualize_pc(pcd,headless,save_path = 'pc.jpg'):
-    '''
-    pcd:     after:    pcd_global = o3d.geometry.PointCloud()
-    pcd_global.points = o3d.utility.Vector3dVector(points_3d)
-    '''
-    if headless==True:
-        save_point_cloud_image(pcd,save_path=save_path)
-        return
-    else:
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-    size=1.0, origin=[0, 0, 0]) 
-        o3d.io.write_point_cloud("point_cloud.pcd", pcd)
-        o3d.io.write_triangle_mesh("coordinate_frame.ply", coordinate_frame)
-        return
 
 
 

@@ -63,7 +63,7 @@ class GlobalTopdownMap:
         
         img_save_path = os.path.join(self.args.log_image_dir, f"global_topdown_map_{self.scan_name}_{height}.jpg")
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
-
+        plt.close()
         log.info(f"Saved global topdown map at height {height} to {img_save_path}")
     
     def get_height(self, pos, is_camera_base=False):

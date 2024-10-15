@@ -117,7 +117,7 @@ def build_visgraph_with_obs_map(obs_map, use_internal_contour=False, internal_po
 
             # cv2.waitKey(1)
     g = vg.VisGraph()
-    g.build(poly_list, workers=4)
+    g.build(poly_list, workers=1)
     return g
 
 
@@ -129,7 +129,7 @@ def get_nearby_position(goal: Tuple[float, float], G: vg.VisGraph) -> Tuple[floa
             return (goal[0] + dr, goal[1] + dc)
 
 
-def plan_to_pos_v2(start, goal, obstacles, G: vg.VisGraph = None, vis=False):
+def plan_to_pos_v2(start, goal, obstacles, G: vg.VisGraph = None, vis=False, vis_map=None):
     """
     plan a path on a cropped obstacles map represented by a graph.
     Start and goal are tuples of (row, col) in the map.
@@ -137,17 +137,20 @@ def plan_to_pos_v2(start, goal, obstacles, G: vg.VisGraph = None, vis=False):
 
     print("start: ", start)
     print("goal: ", goal)
-    if vis:
-        obs_map_vis = (obstacles[:, :, None] * 255).astype(np.uint8)
-        obs_map_vis = np.tile(obs_map_vis, [1, 1, 3])
-        obs_map_vis = cv2.circle(obs_map_vis, (int(start[1]), int(start[0])), 3, (255, 0, 0), -1)
-        obs_map_vis = cv2.circle(obs_map_vis, (int(goal[1]), int(goal[0])), 3, (0, 0, 255), -1)
-        # cv2.imshow("planned path", obs_map_vis)
-        # cv2.waitKey(1)
-        cv2.imwrite('tmp/planned_path.jpg', obs_map_vis)
+    # if vis:
+    #     if vis_map is None:
+    #         obs_map_vis = (obstacles[:, :, None] * 255).astype(np.uint8)
+    #         obs_map_vis = np.tile(obs_map_vis, [1, 1, 3])
+    #     else:
+    #         obs_map_vis = vis_map.copy()
+    #     obs_map_vis = cv2.circle(obs_map_vis, (int(start[1]), int(start[0])), 3, (255, 0, 0), -1)
+    #     obs_map_vis = cv2.circle(obs_map_vis, (int(goal[1]), int(goal[0])), 3, (0, 0, 255), -1)
+    #     # cv2.imshow("planned path", obs_map_vis)
+    #     # cv2.waitKey(1)
+    #     cv2.imwrite('tmp/planned_path.jpg', obs_map_vis)
 
     path = []
-    startvg = vg.Point(start[0], start[1])
+    startvg = vg.Point(start[0], start[1]) 
     if obstacles[int(start[0]), int(start[1])] == 0:
         print("start in obstacles")
         rows, cols = np.where(obstacles == 1)
@@ -175,29 +178,16 @@ def plan_to_pos_v2(start, goal, obstacles, G: vg.VisGraph = None, vis=False):
         path.append(subgoal)
     print(path)
 
+    # startvg = vg.Point(start[1], start[0])
+    # goalvg = vg.Point(goal[1], goal[0])
+    # path_vg = G.shortest_path(startvg, goalvg)
+
+    
     # check the final goal is not in obstacles
     # if obstacles[int(goal[0]), int(goal[1])] == 0:
     #     path = path[:-1]
 
-    if vis:
-        obs_map_vis = (obstacles[:, :, None] * 255).astype(np.uint8)
-        obs_map_vis = np.tile(obs_map_vis, [1, 1, 3])
-
-        for i, point in enumerate(path):
-            subgoal = (int(point[1]), int(point[0]))
-            print(i, subgoal)
-            obs_map_vis = cv2.circle(obs_map_vis, subgoal, 5, (255, 0, 0), -1)
-            if i > 0:
-                cv2.line(obs_map_vis, last_subgoal, subgoal, (255, 0, 0), 2)
-            last_subgoal = subgoal
-        obs_map_vis = cv2.circle(obs_map_vis, (int(start[1]), int(start[0])), 5, (0, 255, 0), -1)
-        obs_map_vis = cv2.circle(obs_map_vis, (int(goal[1]), int(goal[0])), 5, (0, 0, 255), -1)
-
-        seg = Image.fromarray(obs_map_vis)
-        # cv2.imshow("planned path", obs_map_vis)
-        # cv2.waitKey(1)
-        cv2.imwrite('tmp/planned_path.jpg', obs_map_vis)
-
+    
     return path
 
 

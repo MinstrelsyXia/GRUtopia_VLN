@@ -225,7 +225,7 @@ from vlmaps.vlfm.obstacle_map import ObstacleMap
 
 main_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes_safe/s8pcmisQ38h/id_37"
 pose = np.loadtxt(main_dir + "/poses.txt")
-save_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes/s8pcmisQ38h/id_37"
+save_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes_safe_2/s8pcmisQ38h/id_37"
 pcd_save_dir = save_dir + '/pcd'
 pcd_files = [f for f in os.listdir(pcd_save_dir) if f.endswith(".npy")]
 
@@ -235,40 +235,188 @@ my_map = ObstacleMap(
     max_height= 1.7,
     agent_radius=0.25,
     pixels_per_meter=10,
-    log_image_dir=save_dir
+    log_image_dir=save_dir,
+    dilate_iters= 3
 )
 
 k = 0 
 
-from vlmaps.vlmaps.navigator.navigator import Navigator
+def wrap_heading(heading):
+    """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
+    return (heading + np.pi) % (2 * np.pi) - np.pi
 
-my_nav = Navigator()
-goal = (pose[-1,0],pose[-1,1])
-for k in range(len(pcd_files)):
-    pcd = np.load(pcd_save_dir + '/'+pcd_files[k])
-    camera_position = pose[k,:3]
-    camera_rotation = pose[k,3:]
-    camera_yaw = quat_to_euler_angles(camera_rotation)
-    pcd_filtered = pcd[(-0.9 < (camera_position[2]-pcd[:,2])) & ((camera_position[2]-pcd[:,2]) < 1.0)]
-    print(np.min((camera_position[2]-pcd[:,2])),np.max((camera_position[2]-pcd[:,2])))
-    # camera_pos<pcd: lose constraint; camera_pos >pcd: 
-    my_map.update_map_with_pc(
-        pc= pcd_filtered,
-        camera_position = camera_position,
-        camera_orientation= camera_yaw+np.pi/2,
-        max_depth = 11,
-        topdown_fov= 60.0/180.0*np.pi,
-        step = k,
-        verbose=True
-    )
-    # rows, cols = np.where(my_map._navigable_map == 0)
-    # min_row = np.max(np.min(rows)-1,0)
-    # min_col = np.max(np.min(cols)-1,0)
-    # my_nav.build_visgraph(my_map._navigable_map,
-    #                       rowmin = 0,
-    #                       colmin = 0,
-    #                       vis = True)
-    # start = my_map._xy_to_px(np.array([[camera_position[0],camera_position[1]]]))[0]
-    
-    # goal_xy = my_map._xy_to_px(np.array([goal]))[0]
-    # path = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True)
+from vlmaps.vlmaps.navigator.navigator import Navigator
+from vln.src.local_nav.path_planner import AStarPlanner
+import yaml
+import time
+navigator_type = 'astar'
+# navigator_type = 'visgraph'
+
+
+if navigator_type == 'astar':
+
+    class Args:
+        class LLMS:
+            def __init__(self, map_grid_num):
+                self.map_grid_num = map_grid_num
+
+        def __init__(self, map_grid_num):
+            self.llms = self.LLMS(map_grid_num)
+    args = Args(map_grid_num=30)
+    my_nav = AStarPlanner(args= args, map_width = 1000, map_height = 1000,show_animation=True, verbose = True,max_step=1000)
+    goal = (pose[-1,0],pose[-1,1])
+    for k in range(len(pcd_files)):
+        start_time = time.time()
+        # from update obstacle map
+        pcd = np.load(pcd_save_dir + '/'+pcd_files[k])
+        camera_position = pose[k,:3]
+        camera_rotation = pose[k,3:]
+        camera_yaw = quat_to_euler_angles(camera_rotation)
+        pcd_filtered = pcd[(-0.9 < (camera_position[2]-pcd[:,2])) & ((camera_position[2]-pcd[:,2]) < 1.0)]
+
+        distances = np.linalg.norm(pcd_filtered - camera_position, axis=1)
+        
+        # 找出所有距离大于阈值的点
+        threshold = 0.001
+        mask = distances >= threshold
+        
+        # 使用布尔索引选择满足条件的点
+        pcd_new = pcd_filtered[mask]
+
+        # 打印警告信息（可选，取代逐点判断）
+        if np.any(distances < threshold):
+            print('origin exists')
+
+        print(np.min((camera_position[2]-pcd[:,2])),np.max((camera_position[2]-pcd[:,2])))
+        # camera_pos<pcd: lose constraint; camera_pos >pcd: 
+        navigable_map_visual = my_map.update_map_with_pc(
+            pc= pcd_new,
+            camera_position = camera_position,
+            camera_orientation= camera_yaw+np.pi/2,
+            max_depth = 11,
+            topdown_fov= 60.0/180.0*np.pi,
+            step = k,
+            verbose=True
+        )
+        #! camera_yaw+np.pi/2
+        rows, cols = np.where(my_map._navigable_map == 0)
+        min_row = np.max(np.min(rows)-1,0)
+        min_col = np.max(np.min(cols)-1,0)
+
+        start = my_map._xy_to_px(np.array([[camera_position[0],camera_position[1]]]))[0]
+        
+        # from get_frontier:
+        frontiers = my_map.frontiers # array of waypoints
+        if len(frontiers) == 0:
+            frontiers = np.array([my_map.get_random_free_point()])[0]
+            print("error")
+        else:
+            # randomly pick a frontier:
+            # frontier in world coord
+            num = frontiers.shape[0]
+            idx = np.random.randint(0,num)
+            pos = frontiers[idx]
+            
+            # goal = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+            goal_xy = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+
+
+        # goal_xy = my_map._xy_to_px(np.array([goal]))[0]
+        # path = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True,navigable_map_visual=my_map.nav_map_visual)
+        path, find_flag = my_nav.planning(start[0], start[1], goal_xy[0], goal_xy[1], img_save_path = 'tmp/astar_planning.jpg',obs_map = (1-my_map._navigable_map.T==0))
+
+        if find_flag == False:
+            continue
+        
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Iteration {k} took {elapsed_time:.2f} seconds")
+
+        # path = np.array(path)
+        # path = [path[:,1], path[:,0]]
+
+
+else:
+    my_nav = Navigator()
+
+    goal = (pose[-1,0],pose[-1,1])
+    for k in range(len(pcd_files)):
+        start_time = time.time()
+        # from update obstacle map
+        pcd = np.load(pcd_save_dir + '/'+pcd_files[k])
+        camera_position = pose[k,:3]
+        camera_rotation = pose[k,3:]
+        camera_yaw = quat_to_euler_angles(camera_rotation)
+        pcd_filtered = pcd[(-0.9 < (camera_position[2]-pcd[:,2])) & ((camera_position[2]-pcd[:,2]) < 1.0)]
+
+        distances = np.linalg.norm(pcd_filtered - camera_position, axis=1)
+        
+        # 找出所有距离大于阈值的点
+        threshold = 0.001
+        mask = distances >= threshold
+        
+        # 使用布尔索引选择满足条件的点
+        pcd_new = pcd_filtered[mask]
+
+        # # 打印警告信息（可选，取代逐点判断）
+        # if np.any(distances < threshold):
+        #     print('origin exists')
+
+        print(np.min((camera_position[2]-pcd[:,2])),np.max((camera_position[2]-pcd[:,2])))
+        # camera_pos<pcd: lose constraint; camera_pos >pcd: 
+        navigable_map_visual = my_map.update_map_with_pc(
+            pc= pcd_new,
+            camera_position = camera_position,
+            camera_orientation= camera_yaw+np.pi/2,
+            max_depth = 11,
+            topdown_fov= 60.0/180.0*np.pi,
+            step = k,
+            verbose=True
+        )
+        #! camera_yaw+np.pi/2
+        rows, cols = np.where(my_map._navigable_map == 0)
+        min_row = np.max(np.min(rows)-1,0)
+        min_col = np.max(np.min(cols)-1,0)
+        my_nav.build_visgraph(my_map._navigable_map,
+                            rowmin = 0,
+                            colmin = 0,
+                            vis = True)
+        start = my_map._xy_to_px(np.array([[camera_position[0],camera_position[1]]]))[0]
+        
+        # from get_frontier:
+        frontiers = my_map.frontiers # array of waypoints
+        if len(frontiers) == 0:
+            frontiers = np.array([my_map.get_random_free_point()])[0]
+            print("error")
+        else:
+            # randomly pick a frontier:
+            # frontier in world coord
+            num = frontiers.shape[0]
+            idx = np.random.randint(0,num)
+            pos = frontiers[idx]
+            
+            # goal = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+            goal_xy = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+
+
+        # goal_xy = my_map._xy_to_px(np.array([goal]))[0]
+        path = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True,navigable_map_visual=my_map.nav_map_visual)
+
+        path = np.array(path)
+        path = [path[:,1], path[:,0]]
+
+        # # test angle:
+        # target_rotation = np.arctan2(goal_xy[1] - start[1], goal_xy[0] - start[0]) / np.pi * 180
+        
+        # yaw = my_map._get_current_angle_on_map(camera_yaw[2] + np.pi / 2) #! camera_yaw[2] + np.pi / 2
+
+        # print("camera yaw, target rotation", yaw,target_rotation)
+        # print(((yaw -target_rotation+180) % 360-180))
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Iteration {k} took {elapsed_time:.2f} seconds")
+
+
+
+        # visualize the angle 
