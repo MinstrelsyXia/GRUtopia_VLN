@@ -853,7 +853,7 @@ if __name__ == "__main__":
     occupancy_map = np.load('map.npy')
     quad_tree_root = QuadTreeNode(0, 0, map_data = 1-(occupancy_map==0),**config['map_config']['quadtree_config'])
     quad_tree_root.plot_quad_tree(occupancy_map,fig_size=(14,8),if_save=True)
-    path_planner = PathPlanning(quad_tree_root, 1-(occupancy_map==0), **config['planner_config']) # Navigation method
+    path_planner = AStarPlanner(quad_tree_root, 1-(occupancy_map==0), **config['planner_config']) # Navigation method
     start, goal = Node(90,195), Node(190,210)
     node, node_type= path_planner.rrt_star(start, goal)
     path_planner.plot_path(node, start, goal)

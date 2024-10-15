@@ -56,6 +56,8 @@ def get_line_points(current_point, points, maxlen):
     line_points = np.array(line_points, dtype=np.int32)
     return line_points
 
+def get_current_angle(current_angle):
+    return np.rad2deg(wrap_heading(current_angle))
 
 def reveal_fog_of_war(
     top_down_map: np.ndarray,
@@ -69,7 +71,7 @@ def reveal_fog_of_war(
     curr_pt_cv2 = current_point[::-1].astype(int)
     angle_cv2 = np.rad2deg(wrap_heading(current_angle))
 
-    print('in real fog of war', angle_cv2)
+    # print('in real fog of war', angle_cv2)
     cone_mask = cv2.ellipse(
         np.zeros_like(top_down_map),
         curr_pt_cv2,

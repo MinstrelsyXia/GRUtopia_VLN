@@ -210,7 +210,7 @@ def get_lseg_score(
     Return:
         scores_list: (h, w, class_num) storing the score for each location for each class
     """
-    if lseg_map == None:
+    if lseg_map is None:
         print("lseg_map is empty")
         return np.zeros((2,clip_feat_dim)) # (map_size.flatten(),clip_feat_dim)
     landmarks_other = landmarks
