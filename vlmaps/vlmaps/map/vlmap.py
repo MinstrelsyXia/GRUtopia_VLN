@@ -145,10 +145,14 @@ class VLMap(Map):
         )  # score for name and other
         return self.scores_mat
 
-    def index_map(self, language_desc: str, with_init_cat: bool = True):
+    def index_map(self, language_desc: str, with_init_cat: bool = True, threshold = 0.85):
         if with_init_cat and self.scores_mat is not None and self.categories is not None:
             cat_id = find_similar_category_id(language_desc, self.categories)
             scores_mat = self.scores_mat
+            max_ids = np.argmax(scores_mat, axis=1)
+            max_values = np.max(scores_mat, axis=1)
+            mask = ((max_ids == cat_id) & (max_values > threshold))
+            return mask
         else:
             if with_init_cat:
                 raise Exception(
@@ -162,10 +166,14 @@ class VLMap(Map):
                 use_multiple_templates=True,
                 add_other=True,
             )  # score for name and other
+            print(scores_mat,scores_mat.shape)
+            max_ids = np.argmax(scores_mat, axis=1)
+            max_values = np.max(scores_mat, axis=1)
+            mask = ((max_ids == 0) & (max_values > threshold))
+            # mask = max_ids == 0
+            return mask
 
-        max_ids = np.argmax(scores_mat, axis=1)
-        mask = max_ids == cat_id
-        return mask
+
 
     def customize_obstacle_map(
         self,

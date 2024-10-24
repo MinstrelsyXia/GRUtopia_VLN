@@ -129,6 +129,7 @@ class TMP(VLMap):
         self.min_max = np.zeros([3,2])
         self.map_config = map_config
         self.test_file_save_dir = test_file_save_dir
+        
         if hasattr(map_config.model, 'threshold'):
             self.threshold = map_config.model.threshold
         else:
@@ -142,13 +143,11 @@ class TMP(VLMap):
 
     def _setup_paths(self, data_dir: Union[Path, str]) -> None:
         #! modified Map's function
-        self.data_dir = Path(data_dir)
-        self.rgb_dir = self.data_dir / "rgb"
-        self.depth_dir = self.data_dir / "depth"
-        # self.rgb_dir = self.data_dir 
-        # self.depth_dir = self.data_dir
-        # self.semantic_dir = self.data_dir / "semantic"
-        self.pose_path = self.data_dir / "poses.txt"
+        if self.pure_dynamic_map == False:
+            self.data_dir = Path(data_dir)
+            self.rgb_dir = self.data_dir / "rgb"
+            self.depth_dir = self.data_dir / "depth"
+            self.pose_path = self.data_dir / "poses.txt"
 
         self.segmentation_dir = self.test_file_save_dir + "/segmentation"
         if not os.path.exists(self.segmentation_dir):

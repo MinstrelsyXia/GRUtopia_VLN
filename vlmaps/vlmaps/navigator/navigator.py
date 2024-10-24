@@ -13,9 +13,10 @@ class Navigator:
         self.visgraph = build_visgraph_with_obs_map(obstacle_map, vis=vis)
         self.rowmin = rowmin
         self.colmin = colmin
+        
 
     def plan_to(
-        self, start_full_map: Tuple[float, float], goal_full_map: Tuple[float, float], vis: bool = False, navigable_map_visual = None
+        self, start_full_map: Tuple[float, float], goal_full_map: Tuple[float, float], vis: bool = False, navigable_map_visual = None,save_path ='tmp2/tmp/planned_path.jpg'
     ) -> List[List[float]]:
         """
         Take full map start (row, col) and full map goal (row, col) as input
@@ -28,10 +29,10 @@ class Navigator:
         paths = plan_to_pos_v2(start_full_map, goal_full_map, self.obs_map, self.visgraph, vis,navigable_map_visual)
         # paths = self.shift_path(paths, self.rowmin, self.colmin)
         if vis == True:
-            self.visualize_path(start = start_full_map, goal = goal_full_map, obstacles = navigable_map_visual, path = paths)
+            self.visualize_path(start = start_full_map, goal = goal_full_map, obstacles = navigable_map_visual, path = paths,save_path=save_path)
         return paths
     
-    def visualize_path(self,start,goal,obstacles,path):
+    def visualize_path(self,start,goal,obstacles,path,save_path):
         # obs_map_vis = (obstacles[:, :, None] * 255).astype(np.uint8)
         # obs_map_vis = np.tile(obs_map_vis, [1, 1, 3])
 
@@ -50,7 +51,8 @@ class Navigator:
         obs_map_vis = cv2.circle(obs_map_vis, (int(goal[1]), int(goal[0])), 2, (0, 0, 255), -1)
         # cv2.imshow("planned path", obs_map_vis)
         # cv2.waitKey(1)
-        cv2.imwrite('tmp2/tmp/planned_path.jpg', obs_map_vis)
+        
+        cv2.imwrite(save_path, obs_map_vis)
 
 
     def shift_path(self, paths: List[List[float]], row_shift: int, col_shift: int) -> List[List[float]]:

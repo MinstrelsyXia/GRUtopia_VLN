@@ -181,8 +181,10 @@ class TMP(VLMap):
         super().__init__(map_config,data_dir)
         self.robot_z = map_config.robot_z
         self.cs = map_config.cs
+        
     def _setup_paths(self, data_dir: Union[Path, str]) -> None:
         #! modified Map's function
+
         self.data_dir = Path(data_dir)
         self.rgb_dir = self.data_dir / "rgb"
         self.depth_dir = self.data_dir / "depth"

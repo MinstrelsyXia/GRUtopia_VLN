@@ -18,7 +18,7 @@ from grutopia.core.util.rsl_rl import pickle
 class RLPolicy:
     """RL policy for h1 locomotion."""
 
-    def __init__(self, path='./examples/h1/model_20000.pt') -> None:
+    def __init__(self, path: str) -> None:
         self.policy_cfg = {
             'class_name': 'ActorCritic',
             'init_noise_std': 1.0,
@@ -34,7 +34,7 @@ class RLPolicy:
         self.actor_critic = ActorCritic(num_obs, num_critic_obs, self.env_actions, **self.policy_cfg)
         self.load(path=path)
 
-    def load(self, path, load_optimizer=False):
+    def load(self, path: str, load_optimizer=False):
         loaded_dict = torch.load(path, pickle_module=pickle)
         self.actor_critic.load_state_dict(loaded_dict['model_state_dict'])
         if self.empirical_normalization:
@@ -101,7 +101,7 @@ class HumanoidMoveBySpeedController(BaseController):
         rotation_speed: float = 0,
         lateral_speed: float = 0,
     ) -> ArticulationAction:
-        if self._apply_times_left > 0:
+        if self._apply_times_left > 0: # !!!
             self._apply_times_left -= 1
             if self.joint_subset is None:
                 return ArticulationAction(joint_positions=self.applied_joint_positions)
@@ -110,7 +110,7 @@ class HumanoidMoveBySpeedController(BaseController):
 
         # Get obs for policy.
         robot_base = self.robot.get_robot_base()
-        base_pose_w = robot_base.get_world_pose() # [position, orientation]
+        base_pose_w = robot_base.get_world_pose()
         base_quat_w = torch.tensor(base_pose_w[1]).reshape(1, -1)
         base_lin_vel_w = torch.tensor(robot_base.get_linear_velocity()).reshape(1, -1)
         base_ang_vel_w = torch.tensor(robot_base.get_angular_velocity()[:]).reshape(1, -1)
@@ -129,12 +129,10 @@ class HumanoidMoveBySpeedController(BaseController):
 
         joint_pos -= default_dof_pos
 
-        ankle_height = self.robot.get_ankle_base_z()
-        base_height = base_pose_w[0][2] - ankle_height + 0.0758 # 0.0758 is the height of the right ankle from the ground. # !!!
-        # base_height = 1.05
-        
-        # base_height = base_pose_w[0][2] # This value should be replaced by a relative height (from pelves to ground).
-        heights = np.clip(base_height - 0.5 - np.zeros(121), -1., 1.) * 5.0
+        base_height = base_pose_w[0][2]
+        ankle_height = self.robot.get_ankle_height()
+        relative_base_height = base_height - ankle_height + 0.0758 # 0.0758 is the height of the right ankle from the ground. # !!!
+        heights = np.clip(relative_base_height - 0.5 - np.zeros(121), -1., 1.) * 5.0
 
         # Set action command.
         tracking_command = np.array([forward_speed, lateral_speed, rotation_speed, 0.0], dtype=np.float32)

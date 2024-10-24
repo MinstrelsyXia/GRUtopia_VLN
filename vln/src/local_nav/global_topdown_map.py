@@ -40,8 +40,13 @@ class GlobalTopdownMap:
                             windows_head=self.args.windows_head,
                             for_llm=self.args.settings.use_llm,
                             verbose=True)
+
+        # init vis settings
+        self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
+        self.bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
+        self.norm = mcolors.BoundaryNorm(self.bounds, self.cmap.N)
     
-    def save_map(self, robot_pos=None, is_camera_base=False):
+    def save_map(self, robot_pos=None, is_camera_base=False, env_idx=None):
         height = self.get_height(robot_pos, is_camera_base=is_camera_base)
         occupancy_map = self.get_map(robot_pos, is_camera_base=is_camera_base)
         if occupancy_map is None:
@@ -61,17 +66,24 @@ class GlobalTopdownMap:
             plt.scatter(robot_pixel[0], robot_pixel[1], color='blue', marker='o', label="current position (%.2f, %.2f, %.2f)" % (robot_pos[0], robot_pos[1], robot_pos[2]))
         plt.legend()
         
-        img_save_path = os.path.join(self.args.log_image_dir, f"global_topdown_map_{self.scan_name}_{height}.jpg")
+        if env_idx is not None and hasattr(self.args, 'episode_path_list'):
+            img_save_path = os.path.join(self.args.episode_path_list[env_idx], f"global_topdown_map_{height}.jpg")
+        else:
+            img_save_path = os.path.join(self.args.log_image_dir, f"global_topdown_map_{self.scan_name}_{height}.jpg")
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
-        plt.close()
+
         log.info(f"Saved global topdown map at height {height} to {img_save_path}")
+        plt.close()
     
     def get_height(self, pos, is_camera_base=False):
+        # if is_camera_base:
+        #     return math.floor(pos[2] - self.camera_height)
+        # return math.floor(pos[2])
         if is_camera_base:
-            return math.floor(pos[2] - self.camera_height)
-        return math.floor(pos[2])
+            return round(pos[2] - self.camera_height)
+        return round(pos[2])
     
-    def update_map(self, freemap, camera_pose, update_map=False, verbose=False):
+    def update_map(self, freemap, camera_pose, update_map=False, verbose=False, env_idx=None):
         height = self.get_height(camera_pose, is_camera_base=True)
         if height not in self.floor_maps:
             self.floor_heights.append(height)
@@ -79,10 +91,10 @@ class GlobalTopdownMap:
                 'camera_pose': camera_pose,
                 'freemap': freemap,
                 'occupancy_map': self.freemap_to_accupancy_map(freemap, add_dilation=self.args.maps.add_dilation)
-            } 
-            log.info("update global topdown map at height: {}".format(height))
-            if verbose:
-                self.save_map(robot_pos=camera_pose, is_camera_base=True)
+            }
+            if verbose: 
+                log.info("update global topdown map at height: {}".format(height))
+                self.save_map(robot_pos=camera_pose, is_camera_base=True, env_idx=env_idx)
         else:
             if update_map:
                 self.floor_maps[height] = {
@@ -203,9 +215,11 @@ class GlobalTopdownMap:
 
         return sampled_points
 
-    def navigate_p2p(self, start, goal, step_time=0, verbose=False, all_paths=[]):
+    def navigate_p2p(self, start, goal, step_time=0, verbose=False, all_paths=[], save_dir=None):
         # start_height = int(start[2])
         # goal_height = int(goal[2])
+        if save_dir is None:
+            save_dir = self.args.log_image_dir
 
         if abs(start[2] - goal[2]) >= 0.3:
             # different floor! we directly sample the nodes
@@ -214,10 +228,11 @@ class GlobalTopdownMap:
             if verbose:
                 occupancy_map = self.get_map(start)
                 map_nodes = [self.world_to_pixel(x, specific_height=self.get_height(start)) for x in transfer_paths]
-                self.path_planner.vis_path(occupancy_map, map_nodes[0][0], map_nodes[0][1], map_nodes[-1][0], map_nodes[-1][1], map_nodes, os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"), legend=True)
+                self.path_planner.vis_path(occupancy_map, map_nodes[0][0], map_nodes[0][1], map_nodes[-1][0], map_nodes[-1][1], map_nodes, os.path.join(save_dir, "global_path_"+str(step_time)+".jpg"), legend=True)
         
         else:
             occupancy_map, camera_pose = self.get_map(start, return_camera_pose=True)
+            goal[-1] = start[-1] # depend on start height 
             
             start_pixel = self.world_to_pixel(start)
             goal_pixel = self.world_to_pixel(goal)
@@ -225,13 +240,15 @@ class GlobalTopdownMap:
             # test
             if verbose and len(all_paths) > 0:
                 plt.clf()
-                plt.imshow(occupancy_map, cmap='binary', origin='upper')
+                plt.imshow(occupancy_map, cmap=self.cmap, norm=self.norm, origin='upper')
                 path_pixel_list = []
                 for path in all_paths:
                     path_pixel = self.world_to_pixel(path)
                     path_pixel_list.append(path_pixel)
                     plt.scatter(path_pixel[1], path_pixel[0])
-                plt.savefig('test.jpg')
+                all_paths_save_path = os.path.join(save_dir, "all_paths.jpg")
+                plt.savefig(all_paths_save_path)
+                log.info(f"Saved all paths visualization to {all_paths_save_path}")
                 plt.clf()
 
             # self.path_planner.update_obs_map(occupancy_map)
@@ -240,11 +257,10 @@ class GlobalTopdownMap:
                                             goal_pixel[0], goal_pixel[1],
                                             obs_map=occupancy_map,
                                             min_final_meter=self.planner_config.last_scope,
-                                            img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"),
                                             vis_path=False)
             if verbose:
                 if len(paths) > 0:
-                    self.vis_nav_path(start_pixel, goal_pixel, paths, occupancy_map, img_save_path=os.path.join(self.args.log_image_dir, "global_path_"+str(step_time)+".jpg"))
+                    self.vis_nav_path(start_pixel, goal_pixel, paths, occupancy_map, img_save_path=os.path.join(save_dir, "global_path_"+str(step_time)+".jpg"))
 
             if find_flag:
                 transfer_paths = []
@@ -261,13 +277,9 @@ class GlobalTopdownMap:
         return transfer_paths
 
     def vis_nav_path(self, start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
-        cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
-        bounds = [0, 1, 3, 254, 256]  # Boundaries for the colors
-        norm = mcolors.BoundaryNorm(bounds, cmap.N)
-    
         plt.figure(figsize=(10, 10))
         # plt.imshow(occupancy_map, cmap='binary', origin='lower')
-        plt.imshow(occupancy_map, cmap=cmap, norm=norm, origin='upper')
+        plt.imshow(occupancy_map, cmap=self.cmap, norm=self.norm, origin='upper')
 
         # Plot start and goal points
         plt.plot(start_pixel[1], start_pixel[0], 'ro', markersize=6, label='Start')
@@ -288,3 +300,4 @@ class GlobalTopdownMap:
         # Save the plot
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
         log.info(f"Saved path planning visualization to {img_save_path}")
+        plt.close()

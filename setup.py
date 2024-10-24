@@ -19,6 +19,10 @@ setuptools.setup(
         'Programming Language :: Python :: 3',
         'Operating System :: OS Independent',
     ],
+<<<<<<< HEAD
     # install_requires=[i.strip() for i in requirements],
+=======
+    install_requires=[i.strip() for i in requirements],
+>>>>>>> grutopia_new/fix_holes
     python_requires='>=3.10',
 )

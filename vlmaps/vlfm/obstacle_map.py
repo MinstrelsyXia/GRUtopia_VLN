@@ -177,11 +177,11 @@ class ObstacleMap(BaseMap):
                 iterations=self._dilate_iters,
             ).astype(bool)
         
-        if verbose: 
-            obs_map_save_path = os.path.join(self.save_dir,f'obstacle_map_{step}.jpg')
-            plt.imsave(obs_map_save_path, self._map)
-            navigatable_map_save_path = os.path.join(self.save_dir,f'navigatable_map_{step}.jpg')
-            plt.imsave(navigatable_map_save_path, self._navigable_map)
+        # if verbose: 
+        #     obs_map_save_path = os.path.join(self.save_dir,f'obstacle_map_{step}.jpg')
+        #     plt.imsave(obs_map_save_path, self._map)
+        #     navigatable_map_save_path = os.path.join(self.save_dir,f'navigatable_map_{step}.jpg')
+        #     plt.imsave(navigatable_map_save_path, self._navigable_map)
         if not explore:
             return
 
@@ -255,9 +255,9 @@ class ObstacleMap(BaseMap):
             cv2.imwrite(save_path, navigable_map_visual)
 
             # 另存 explored_area，仅为灰度图，探索区域为灰色，未探索区域为黑色
-            explored_area_gray = self.explored_area.astype(np.uint8) * 255  # 将 explored_area 转为黑白图像
-            save_path = os.path.join(self.save_dir, f'explored_map_{step}.jpg')
-            cv2.imwrite(save_path, explored_area_gray)
+            # explored_area_gray = self.explored_area.astype(np.uint8) * 255  # 将 explored_area 转为黑白图像
+            # save_path = os.path.join(self.save_dir, f'explored_map_{step}.jpg')
+            # cv2.imwrite(save_path, explored_area_gray)
 
         if len(self._frontiers_px) == 0:
             self.frontiers = np.array([])

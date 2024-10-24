@@ -7,7 +7,7 @@ from typing import Any, Dict
 from omni.isaac.core.scenes.scene import Scene
 from omni.isaac.core.tasks import BaseTask as OmniBaseTask
 from omni.isaac.core.utils.prims import create_prim
-from omni.isaac.lab.assets import ArticulationCfg, AssetBaseCfg
+# from omni.isaac.lab.assets import ArticulationCfg, AssetBaseCfg
 
 from grutopia.core.config import TaskUserConfig
 from grutopia.core.robot import init_robots
@@ -16,10 +16,10 @@ from grutopia.core.task.metric import BaseMetric, create_metric
 from grutopia.core.util import log
 
 import omni.usd
-from omni.isaac.lab.sim.spawners.materials import RigidBodyMaterialCfg
+# from omni.isaac.lab.sim.spawners.materials import RigidBodyMaterialCfg
 import omni.isaac.core.utils.stage as stage_utils
 import omni.isaac.core.utils.prims as prim_utils
-import omni.isaac.lab.sim as sim_utils
+# import omni.isaac.lab.sim as sim_utils
 import omni.kit.actions.core
 
 from pxr import PhysxSchema
@@ -49,21 +49,6 @@ class BaseTask(OmniBaseTask, ABC):
 
         for metric_config in config.metrics:
             self.metrics[metric_config.name] = create_metric(metric_config)
-    
-    def reload_scene(self, scene_asset_path):
-        log.info(f"Reload scene_path: {self.config.scene_asset_path}")
-        source, prim_path = create_scene(self.config.scene_asset_path,
-                                    prim_path_root=f'World/env_{self.config.env_id}/scene')
-        physics_scene_prim = create_prim(prim_path,
-                    usd_path=source,
-                    scale=self.config.scene_scale,
-                    translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)])
-        self.config.scene_prim_path = prim_path
-
-        from pxr import UsdPhysics
-        meshCollisionAPI = UsdPhysics.MeshCollisionAPI.Apply(physics_scene_prim)
-        meshCollisionAPI.CreateApproximationAttr(defaultValue='convexHull', writeSparsely=False)
-
 
     def load(self):
         # load scenes
@@ -81,47 +66,15 @@ class BaseTask(OmniBaseTask, ABC):
             # convert the collider type to convexHull !!!
             from pxr import UsdPhysics
             meshCollisionAPI = UsdPhysics.MeshCollisionAPI.Apply(physics_scene_prim)
-            meshCollisionAPI.CreateApproximationAttr(defaultValue='convexHull', writeSparsely=False)
+            meshCollisionAPI.CreateApproximationAttr(defaultValue='convexHull', writeSparsely=False) # debug!!!
             
             # increase the GPU capacity according to https://forums.developer.nvidia.com/t/is-there-a-solution-to-the-buffer-overflow/299449/4
             physxSceneAPI = PhysxSchema.PhysxSceneAPI.Apply(physics_scene_prim)
             physxSceneAPI.CreateGpuTempBufferCapacityAttr(16 * 1024 * 1024 * 2)        
-            physxSceneAPI.CreateGpuHeapCapacityAttr(64 * 1024 * 1024 * 2)
-            # prim_path = f"/World/env_{self.config.env_id}/scene"
-            # _xform_prim = prim_utils.create_prim(
-            #     prim_path= f"/World/env_{self.config.env_id}/scene", 
-            #     translation=[self.config.offset[idx] + i for idx, i in enumerate(self.config.scene_position)], 
-            #     usd_path=self.config.scene_asset_path
-            # )
-
-            # # add colliders and physics material
-            # # apply collider properties
-            # collider_cfg = sim_utils.CollisionPropertiesCfg(collision_enabled=True)
-            # sim_utils.define_collision_properties(_xform_prim.GetPrimPath(), collider_cfg)
-
-            # # create physics material
-            # physics_material = RigidBodyMaterialCfg(
-            #     static_friction=0.5, 
-            #     dynamic_friction=0.5, 
-            #     restitution=0.0,
-            #     improve_patch_friction=True,
-            #     friction_combine_mode='average',
-            #     restitution_combine_mode='average',
-            #     compliant_contact_stiffness=0.0,
-            #     compliant_contact_damping=0.0
-            # )
-
-            # physics_material_cfg: sim_utils.RigidBodyMaterialCfg = physics_material
-            # # spawn the material
-            # physics_material_cfg.func(f"{prim_path}/physicsMaterial", physics_material)
-            # sim_utils.bind_physics_material(_xform_prim.GetPrimPath(), f"{prim_path}/physicsMaterial")
-            
-            # ground_plane_cfg = sim_utils.GroundPlaneCfg(physics_material=physics_material)
-            # ground_plane = ground_plane_cfg.func(f"{prim_path}/GroundPlane", ground_plane_cfg)
-            # ground_plane.visible = True
+            physxSceneAPI.CreateGpuHeapCapacityAttr(64 * 1024 * 1024 * 2) # debug !!!
 
             # Turn on the lights
-            if self.config.light_on:
+            if hasattr(self.config, 'light_on') and self.config.light_on:
                 action_registry = omni.kit.actions.core.get_action_registry()
                 # switches to camera lighting
                 action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
@@ -143,7 +96,7 @@ class BaseTask(OmniBaseTask, ABC):
         self._scene = scene
         self.load()
 
-    def get_observations(self, data_type=None) -> Dict[str, Any]:
+    def get_observations(self,add_rgb_subframes=False) -> Dict[str, Any]:
         """
         Returns current observations from the objects needed for the behavioral layer.
 
@@ -155,7 +108,7 @@ class BaseTask(OmniBaseTask, ABC):
         obs = {}
         for robot_name, robot in self.robots.items():
             try:
-                obs[robot_name] = robot.get_obs(data_type=data_type)
+                obs[robot_name] = robot.get_obs(add_rgb_subframes=add_rgb_subframes)
             except Exception as e:
                 log.error(self.name)
                 log.error(e)

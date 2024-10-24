@@ -81,27 +81,6 @@ class BEVMap:
         return dilation_structure
         
     ######################## update_occupancy_map ########################
-
-    # def save_point_cloud_image(self, pc, temp_path="temp_pc_image.png"):
-    #         """
-    #         生成并保存点云图像。
-    #         """
-    #         os.environ['DISPLAY'] = ':0.0'
-    #         # 创建点云对象
-    #         pcd = o3d.geometry.PointCloud()
-    #         pcd.points = o3d.utility.Vector3dVector(pc)
-    #         # 设置无头渲染
-    #         vis = o3d.visualization.Visualizer()
-    #         vis.create_window() 
-            
-    #         vis.add_geometry(pcd)
-    #         vis.poll_events()
-    #         vis.update_renderer()
-            
-    #         # 捕获当前视图并保存为图像
-    #         vis.capture_screen_image(temp_path)
-    #         vis.destroy_window()
-
     def update_occupancy_map(self, point_cloud, robot_bottom_z, add_dilation=False, verbose = False, global_bev=False, robot_coords=None):
         """
         Updates the occupancy map based on the new point cloud data.
@@ -310,6 +289,7 @@ class BEVMap:
         paths, find_flag = self.path_planner.planning(current.y, current.x, target.y, target.x, # x and y are reversed in AStarPlanner
                                       obs_map=quadtree_map,
                                       min_final_meter=self.planner_config.last_scope,
+                                      path_legend=True,
                                       img_save_path=os.path.join(self.args.log_image_dir, "path_"+str(self.step_time)+".jpg"))
         
         transfer_paths = []

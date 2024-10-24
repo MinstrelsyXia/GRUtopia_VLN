@@ -277,12 +277,13 @@ if navigator_type == 'astar':
         distances = np.linalg.norm(pcd_filtered - camera_position, axis=1)
         
         # 找出所有距离大于阈值的点
-        threshold = 0.001
+        threshold = 0.3
         mask = distances >= threshold
         
         # 使用布尔索引选择满足条件的点
         pcd_new = pcd_filtered[mask]
 
+        np.save('tmp/dist.npy',distances)
         # 打印警告信息（可选，取代逐点判断）
         if np.any(distances < threshold):
             print('origin exists')

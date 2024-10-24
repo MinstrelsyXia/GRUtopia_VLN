@@ -32,7 +32,7 @@ with open(config_path, 'r') as f:
 
 # Generate a unique log filename
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-log_dir = os.path.join("GRUtopia", "logs")
+log_dir = os.path.join("logs")
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 unique_log_filename = os.path.join(log_dir, f'_log_{timestamp}.txt')

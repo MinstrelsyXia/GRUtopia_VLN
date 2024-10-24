@@ -13,7 +13,7 @@ class BaseEnv:
     ----------------------------------------------------------------------
     """
 
-    def __init__(self, config: SimulatorConfig, headless: bool = True, webrtc: bool = False) -> None:
+    def __init__(self, config: SimulatorConfig, headless: bool = True, webrtc: bool = False, native: bool = False) -> None:
         self._simulation_config = None
         self._render = None
         # Setup Multitask Env Parameters
@@ -28,9 +28,8 @@ class BaseEnv:
         import isaacsim
         from omni.isaac.kit import SimulationApp
         self.headless = headless
-        # self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0, 'renderer': 'RayTracing'}) # !!!
-        # self._simulation_app = SimulationApp({'headless': self.headless, 'renderer': 'RayTracing'})
-        self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0, 'renderer': 'Rasterization'})
+        # self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0, 'renderer': 'RayTracing'})
+        self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0}) # !!!
 
         if webrtc:
             from omni.isaac.core.utils.extensions import enable_extension  # noqa
@@ -40,6 +39,15 @@ class BaseEnv:
             self._simulation_app.set_setting('/app/livestream/websocket/framerate_limit', 60)
             self._simulation_app.set_setting('/ngx/enabled', False)
             enable_extension('omni.services.streamclient.webrtc')
+
+        elif native:
+            from omni.isaac.core.utils.extensions import enable_extension  # noqa
+
+            self._simulation_app.set_setting("/app/window/drawMouse", True)
+            self._simulation_app.set_setting("/app/livestream/proto", "ws")
+            self._simulation_app.set_setting("/app/livestream/websocket/framerate_limit", 120)
+            self._simulation_app.set_setting("/ngx/enabled", False)
+            enable_extension("omni.kit.livestream.native")
 
         from grutopia.core import datahub  # noqa E402.
         from grutopia.core.runner import SimulatorRunner  # noqa E402.
@@ -63,7 +71,7 @@ class BaseEnv:
     def get_dt(self):
         return self._runner.dt
 
-    def step(self, actions: List[Dict[str, Any]], data_type=None) -> List[Dict[str, Any]]:
+    def step(self, actions: List[Dict[str, Any]], add_rgb_subframes=False, render=False) -> List[Dict[str, Any]]:
         """
         run step with given action(with isaac step)
 
@@ -87,20 +95,9 @@ class BaseEnv:
         }
 
         # log.debug(action_after_reshape)
-        self._runner.step(action_after_reshape, data_type=data_type)
+        self._runner.step(action_after_reshape, add_rgb_subframes=add_rgb_subframes, render=render)
         observations = self.get_observations()
         return observations
-    
-    def wait(self, render=True, get_obs=False):
-        self._runner.render_trigger += 1
-        render = render and self._runner.render_trigger > self._runner.render_interval
-        if self._runner.render_trigger > self._runner.render_interval:
-            self._runner.render_trigger = 0
-        self._runner._world.step(render=render)
-        if get_obs:
-            observations = self.get_observations()
-            return observations
-        return render
 
     def reset(self, envs: List[int] = None):
         """
@@ -119,13 +116,13 @@ class BaseEnv:
         self._runner.reset()
         return self.get_observations(), {}
 
-    def get_observations(self, data_type:list=None) -> List[Dict[str, Any]]:
+    def get_observations(self, add_rgb_subframes=False) -> List[Dict[str, Any]]:
         """
         Get observations from Isaac environment
         Returns:
             List[Dict[str, Any]]: observations
         """
-        _obs = self._runner.get_obs(data_type=data_type)
+        _obs = self._runner.get_obs(add_rgb_subframes=add_rgb_subframes)
         return _obs
 
     def render(self, mode='human'):
@@ -145,3 +142,8 @@ class BaseEnv:
     def simulation_app(self):
         """simulation app instance"""
         return self._simulation_app
+    
+    def reset_env(self):
+        # tasks = self.runner._world._current_tasks
+        # self.runner._world._current_tasks['h1_locomotion_0'].robots['h1_0'].sensors['camera'].__del__() # !!!!
+        self.runner._world.clear()

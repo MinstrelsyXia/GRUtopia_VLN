@@ -44,42 +44,54 @@ class Camera(BaseSensor):
         camera.add_distance_to_image_plane_to_frame()
         
         # obtain data from rep
-        self.rp = rep.create.render_product(self.prim_path, size)
+        # self._render_product_paths: list[str] = list()
+        # self.rp = rep.create.render_product(self.prim_path, size)
+        # if not isinstance(self.rp, str):
+        #     render_prod_path = self.rp.path
+        # self._render_product_paths.append(render_prod_path)
         
-        # bbox
-        self.bbox_receiver = rep.AnnotatorRegistry.get_annotator("bounding_box_2d_tight")
-        self.bbox_receiver.attach(self.rp)
+        # data_type = [
+        #     "bbox",
+        #     "rgba",
+        #     "depth",
+        #     "pointcloud",
+        #     "normals",
+        #     "camera_params"
+        # ]
+        # self._rep_registry: dict[str, list[rep.annotators.Annotator]] = {name: list() for name in data_type}
+        
+        # # bbox
+        # self.bbox_receiver = rep.AnnotatorRegistry.get_annotator("bounding_box_2d_tight")
+        # self.bbox_receiver.attach(self.rp)
+        # self._rep_registry["bbox"].append(self.bbox_receiver)
         
         # rgba
-        self.rgba_receiver = rep.AnnotatorRegistry.get_annotator("LdrColor")
-        self.rgba_receiver.attach(self.rp)
+        # self.rgba_receiver = rep.AnnotatorRegistry.get_annotator("LdrColor")
+        # self.rgba_receiver.attach(self.rp)
+        # self._rep_registry["rgba"].append(self.rgba_receiver)
         
-        # depth
-        self.depth_reveiver = rep.AnnotatorRegistry.get_annotator("distance_to_image_plane")
-        self.depth_reveiver.attach(self.rp)
+        # # depth
+        # self.depth_reveiver = rep.AnnotatorRegistry.get_annotator("distance_to_image_plane")
+        # self.depth_reveiver.attach(self.rp)
+        # self._rep_registry["depth"].append(self.depth_reveiver)
         
-        # pointcloud
-        self.pointcloud_receiver = rep.AnnotatorRegistry.get_annotator("pointcloud", init_params={"includeUnlabelled": True})
-        self.pointcloud_receiver.attach(self.rp)
+        # # pointcloud
+        # self.pointcloud_receiver = rep.AnnotatorRegistry.get_annotator("pointcloud", init_params={"includeUnlabelled": True})
+        # self.pointcloud_receiver.attach(self.rp)
+        # self._rep_registry["pointcloud"].append(self.pointcloud_receiver)
         
-        # camera_params
-        self.camera_params_receiver = rep.AnnotatorRegistry.get_annotator("CameraParams")
-        self.camera_params_receiver.attach(self.rp)
+        # # camera_params
+        # self.camera_params_receiver = rep.AnnotatorRegistry.get_annotator("CameraParams")
+        # self.camera_params_receiver.attach(self.rp)
+        # self._rep_registry["camera_params"].append(self.camera_params_receiver)
         
-        # normals
-        self.normals_receiver = rep.AnnotatorRegistry.get_annotator("normals")
-        self.normals_receiver.attach(self.rp)
+        # # normals
+        # self.normals_receiver = rep.AnnotatorRegistry.get_annotator("normals")
+        # self.normals_receiver.attach(self.rp)
+        # self._rep_registry["normals"].append(self.normals_receiver)
 
         # Setting capture on play to False will prevent the replicator from capturing data each frame
         carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False) # !!!
-
-        # writer
-        # if init_writer in self.config and self.config.init_writer:
-        #     self.writer = rep.WriterRegistry.get("BasicWriter")
-        #     self.writer.initialize(
-        #         output_dir=f"{self.config.}/writer", rgb=True, depth=True
-        #     )
-        #     self.writer.attach(self.rp)
         
         log.debug('camera_prim_path: ' + prim_path)
         log.debug('name            : ' + self.config.name)
@@ -90,42 +102,79 @@ class Camera(BaseSensor):
         if self.config.enable:
             self._camera.initialize()
             self._camera.add_distance_to_image_plane_to_frame()
-            self._camera.add_semantic_segmentation_to_frame()
-            self._camera.add_instance_segmentation_to_frame()
-            self._camera.add_instance_id_segmentation_to_frame()
-            self._camera.add_bounding_box_2d_tight_to_frame()
+            # self._camera.add_semantic_segmentation_to_frame()
+            # self._camera.add_instance_segmentation_to_frame()
+            # self._camera.add_instance_id_segmentation_to_frame()
+            # self._camera.add_bounding_box_2d_tight_to_frame()
+            # self._camera.add_normals_to_frame()
+    
+    def camera_get_rgba(self, add_subframes=True):
+        # if add_subframes:
+        #     rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
+        return self.rgba_receiver.get_data()
 
-    def get_data(self, data_type:list=None) -> Dict:
-        if data_type is not None:
-            return self.get_camera_data(data_type)
-        else:
-            if self.config.enable:
-                rgba = self._camera.get_rgba()
-                depth = self._camera.get_depth()
-                # frame = self._camera.get_current_frame()
-                # camera_params = self._camera.get_camera_params()
-                return {'rgba': rgba, 'depth': depth}
-            return {}
+    def get_data(self, add_rgb_subframes=False) -> Dict:
+        if self.config.enable:
+            # if add_rgb_subframes:
+            #     rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False)
+            rgba = self._camera.get_rgba()
+            # if add_rgb_subframes:
+                # rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
+            depth = self._camera.get_depth()
+            # frame = self._camera.get_current_frame()
+            # camera_params = self._camera.get_camera_params()
+            # return {'rgba': rgba, 'depth': depth, 'frame': frame}
+            pointcloud = self._camera.get_pointcloud()
+            return {'rgba': rgba, 'depth': depth, 'pointcloud':pointcloud}
+        return {}
+    
+    # def get_rep_camera_data(self, data_type: list) -> Dict:
+    #     # Use the self-built rep to get the data
+    #     output_data = {}
+    #     if "bbox" in data_type:
+    #         output_data["bbox"] = self.bbox_receiver.get_data()
+    #     if "rgba" in data_type:
+    #         rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
+    #         output_data["rgba"] = self.rgba_receiver.get_data()
+    #     if "depth" in data_type:
+    #         output_data["depth"] = self.depth_reveiver.get_data()
+    #     if "pointcloud" in data_type: 
+    #         output_data["pointcloud"] = self.pointcloud_receiver.get_data()
+    #     if "normals" in data_type:
+    #         output_data["normals"] = self.normals_receiver.get_data()
+    #     if "camera_params" in data_type:
+    #         output_data["camera_params"] = self.camera_params_receiver.get_data()
+    #     return output_data
     
     def get_camera_data(self, data_type: list) -> Dict:
         output_data = {}
-        if "bbox" in data_type:
-            output_data["bbox"] = self.bbox_receiver.get_data()
+        # if "bbox" in data_type:
+        #     output_data["bbox"] = self._camera.get_bbox()
         if "rgba" in data_type:
             rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
-            output_data["rgba"] = self.rgba_receiver.get_data()
+            output_data["rgba"] = self._camera.get_rgba()
+            rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
         if "depth" in data_type:
-            output_data["depth"] = self.depth_reveiver.get_data()
+            output_data["depth"] = self._camera.get_depth()
         if "pointcloud" in data_type: 
-            output_data["pointcloud"] = self.pointcloud_receiver.get_data()
-        if "normals" in data_type:
-            output_data["normals"] = self.normals_receiver.get_data()
-        if "camera_params" in data_type:
-            output_data["camera_params"] = self.camera_params_receiver.get_data()
+            output_data["pointcloud"] = self._camera.get_pointcloud()
+        # if "normals" in data_type: 
+        #     output_data["normals"] = self._camera.get_normals()
+        # if "camera_params" in data_type:
+        #     output_data["camera_params"] = self._camera.get_camera_params()
         return output_data
+    
+    def reset(self):
+        del self._camera
+        # del self.rp
+        # del self._rep_registry
+        self._camera = self.create_camera()
     
     def get_world_pose(self):
         return self._camera.get_world_pose()
+
+    def get_world_w_cam_u_T(self):
+        return self._camera.world_w_cam_u_T
     
     def write_rgb_data(self, rgb_data, file_path):
         rgb_img = Image.fromarray(rgb_data[:,:,:3], "RGB")
