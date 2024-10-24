@@ -65,7 +65,7 @@ class Camera(BaseSensor):
         # self.bbox_receiver.attach(self.rp)
         # self._rep_registry["bbox"].append(self.bbox_receiver)
         
-        # # rgba
+        # rgba
         # self.rgba_receiver = rep.AnnotatorRegistry.get_annotator("LdrColor")
         # self.rgba_receiver.attach(self.rp)
         # self._rep_registry["rgba"].append(self.rgba_receiver)
@@ -128,7 +128,8 @@ class Camera(BaseSensor):
             return {'rgba': rgba, 'depth': depth, 'pointcloud':pointcloud}
         return {}
     
-    # def get_camera_data(self, data_type: list) -> Dict:
+    # def get_rep_camera_data(self, data_type: list) -> Dict:
+    #     # Use the self-built rep to get the data
     #     output_data = {}
     #     if "bbox" in data_type:
     #         output_data["bbox"] = self.bbox_receiver.get_data()
@@ -165,6 +166,8 @@ class Camera(BaseSensor):
     
     def reset(self):
         del self._camera
+        # del self.rp
+        # del self._rep_registry
         self._camera = self.create_camera()
     
     def get_world_pose(self):
