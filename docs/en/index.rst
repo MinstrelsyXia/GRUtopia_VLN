@@ -11,7 +11,11 @@ Welcome to GRUtopia's documentation!
    :caption: Introduction
 
 
+<<<<<<< HEAD
    introduction/introduction.md
+=======
+   introduction/overview.md
+>>>>>>> grutopia_new/fix_holes
 
 .. toctree::
    :maxdepth: 1

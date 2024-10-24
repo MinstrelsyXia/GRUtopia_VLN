@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Your name
-# @Date:   2024-07-08 20:28:33
-# @Last Modified by:   Your name
-# @Last Modified time: 2024-07-08 20:57:30
 system_message = """
 You are an expert in spatial reasoning and code generation.
 

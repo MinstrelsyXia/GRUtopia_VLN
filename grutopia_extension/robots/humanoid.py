@@ -10,6 +10,7 @@ from omni.isaac.core.scenes import Scene
 from omni.isaac.core.utils.nucleus import get_assets_root_path
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.types import ArticulationAction, ArticulationActions
+import omni.isaac.core.utils.numpy.rotations as rot_utils
 
 import grutopia.core.util.string as string_utils
 from grutopia.actuators import ActuatorBase, ActuatorBaseCfg, DCMotorCfg
@@ -126,6 +127,7 @@ class Humanoid(IsaacRobot):
 
         if 'oracle' in controller_name:
             return
+
         control_joint_pos = torch.tensor(control_action.joint_positions, dtype=torch.float32)
         control_actions = ArticulationActions(
             joint_positions=control_joint_pos,
@@ -207,14 +209,18 @@ class HumanoidRobot(BaseRobot):
         self._robot_ik_base = None
 
         self._robot_base = RigidPrim(prim_path=config.prim_path + '/pelvis', name=config.name + '_base')
-        self._robot_right_ankle_base = RigidPrim(prim_path=config.prim_path + '/right_ankle_link', name=config.name + '_right_ankle_base')
-        self._robot_left_ankle_base = RigidPrim(prim_path=config.prim_path + '/left_ankle_link', name=config.name + '_left_ankle_base')
+        self._robot_right_ankle = RigidPrim(prim_path=config.prim_path + '/right_ankle_link', name=config.name + 'right_ankle')
+        self._robot_left_ankle = RigidPrim(prim_path=config.prim_path + '/left_ankle_link', name=config.name + 'left_ankle')
 
     def post_reset(self):
         super().post_reset()
         self.isaac_robot._process_actuators_cfg()
         if self._gains is not None:
             self.isaac_robot.set_gains(self._gains)
+
+
+    def get_ankle_height(self):
+        return np.min([self._robot_right_ankle.get_world_pose()[0][2], self._robot_left_ankle.get_world_pose()[0][2]])
 
     def get_robot_scale(self):
         return self._robot_scale
@@ -227,11 +233,14 @@ class HumanoidRobot(BaseRobot):
 
     def get_world_pose(self):
         return self._robot_base.get_world_pose()
-    
-    def get_ankle_base_z(self):
-        left_ankle_base = self._robot_left_ankle_base.get_world_pose()[0][2]
-        right_ankle_base = self._robot_right_ankle_base.get_world_pose()[0][2]
-        return min(left_ankle_base, right_ankle_base)
+
+    def oracle_set_world_pose(self, position, orientation):
+        # Note that this is without offset
+        self.isaac_robot.set_world_pose(position, orientation)
+        self.isaac_robot.set_joint_velocities(np.zeros(len(self.isaac_robot.dof_names)))
+        self.isaac_robot.set_joint_positions(np.zeros(len(self.isaac_robot.dof_names)))
+        self.isaac_robot.set_linear_velocity(np.zeros(3))
+        self.isaac_robot.set_angular_velocity(np.zeros(3))
 
     def apply_action(self, action: dict):
         """
@@ -245,15 +254,19 @@ class HumanoidRobot(BaseRobot):
             controller = self.controllers[controller_name]
             control = controller.action_to_control(controller_action)
             self.isaac_robot.apply_actuator_model(control, controller_name, self.joint_subset)
-    
-    def oracle_set_world_pose(self, position, orientation):
-        self.isaac_robot.set_world_pose(position, orientation)
-        self.isaac_robot.set_joint_velocities(np.zeros(len(self.isaac_robot.dof_names)))
-        self.isaac_robot.set_joint_positions(np.zeros(len(self.isaac_robot.dof_names)))
-        self.isaac_robot.set_linear_velocity(np.zeros(3))
-        self.isaac_robot.set_angular_velocity(np.zeros(3))
+        
+        # top-down camera reset
+        if 'topdown_camera_500' in self.sensors:
+            orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+            robot_pos = self.isaac_robot.get_world_pose()[0]
+            self.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
+        
+        if 'topdown_camera_50' in self.sensors:
+            orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+            robot_pos = self.isaac_robot.get_world_pose()[0]
+            self.sensors['topdown_camera_50']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
 
-    def get_obs(self, data_type=None):
+    def get_obs(self, add_rgb_subframes=False):
         position, orientation = self._robot_base.get_world_pose()
 
         # custom
@@ -266,11 +279,5 @@ class HumanoidRobot(BaseRobot):
         for c_obs_name, controller_obs in self.controllers.items():
             obs[c_obs_name] = controller_obs.get_obs()
         for sensor_name, sensor_obs in self.sensors.items():
-            obs[sensor_name] = sensor_obs.get_data(data_type=data_type)
-        return obs
-    
-    def get_sensors(self, data_type=None):
-        obs = {}
-        for sensor_name, sensor_obs in self.sensors.items():
-            obs[sensor_name] = sensor_obs.get_data(data_type=data_type)
+            obs[sensor_name] = sensor_obs.get_data(add_rgb_subframes=add_rgb_subframes)
         return obs

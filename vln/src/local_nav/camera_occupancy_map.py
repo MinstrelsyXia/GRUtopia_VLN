@@ -19,107 +19,23 @@ from .BEVmap import BEVMap
 from grutopia.core.util.log import log
 
 class CamOccupancyMap:
-    def __init__(self, args, robot_prim, start_point, local=True):
+    def __init__(self, args, camera):
         self.args = args
-        self.width = 512
-        self.height = 512
+        self.topdown_camera = camera # grutopia sensor
+        self.issac_camera = camera._camera 
+        # self.width, self.height = self.issac_camera._resolution
+        self.height, self.width = self.issac_camera._resolution
 
         self.center_x, self.center_y = self.width // 2, self.height// 2
+        self.aperture = self.issac_camera.get_horizontal_aperture() * 10
 
-        # Create a camera object
-        # self.topdown_camera_prim_path = "/World/env_0/CamOccCamera"
-        # self.create_new_orthogonal_camera()
-        
-        # load from a pre-defined top-down camera
-        if local:
-            self.topdown_camera_prim_path = robot_prim + "/topdown_camera_50"
-            self.aperture = 50
-        else:
-            self.topdown_camera_prim_path = robot_prim + "/topdown_camera_500"
-            self.aperture = self.args.maps.global_topdown_config.aperture
-            self.width = self.args.maps.global_topdown_config.width
-            self.height = self.args.maps.global_topdown_config.height
-            self.center_x, self.center_y = self.width // 2, self.height// 2
-        self.topdown_camera = Camera(prim_path=self.topdown_camera_prim_path,resolution=(self.width, self.height))
-        # if not local:
-        #     self.edit_to_unparant(self.topdown_camera_prim_path)
-
-        self.topdown_camera.initialize()
-        self.topdown_camera.add_distance_to_image_plane_to_frame()
-        self.topdown_camera.add_normals_to_frame()
-        
-        self.rp = rep.create.render_product(self.topdown_camera_prim_path, (self.width, self.height))
-        # rgba
-        self.rgba_receiver = rep.AnnotatorRegistry.get_annotator("LdrColor")
-        self.rgba_receiver.attach(self.rp)
-        
-        # depth
-        self.depth_reveiver = rep.AnnotatorRegistry.get_annotator("distance_to_image_plane")
-        self.depth_reveiver.attach(self.rp)
-
-        # normals
-        self.normals_receiver = rep.AnnotatorRegistry.get_annotator("normals")
-        self.normals_receiver.attach(self.rp)
-
-        # camera_params
-        self.camera_params_receiver = rep.AnnotatorRegistry.get_annotator("CameraParams")
-        self.camera_params_receiver.attach(self.rp)
-
-        self.camera_occupancy_file = os.path.join(self.args.log_image_dir, "camera_occupancy_map.npy")
-
-        # get current scene bounding box
-        self.scene_min_bounds, self.scene_max_bounds = self.get_scene_bbox()
-        self.scene_center = (self.scene_min_bounds + self.scene_max_bounds) / 2
-
-        # set the topdown_camera's coordinate system to the scene's coordinate system
-        # self.topdown_camera.set_world_pose(start_point+[0,0,0.65])
-        # self.topdown_camera_init_robot_pose = False
-        print("Topdown camera pose init:", self.topdown_camera.get_world_pose())
+        # print("Topdown camera pose init:", self.topdown_camera.get_world_pose())
     
-    def edit_to_unparant(self, camera_prim_path):
-        # new_path = "/".join(camera_prim_path.split("/")[:-1])
-        camera_prim = self.topdown_camera.prim
-        # stage = self.topdown_camera.prim.GetStage()
-        stage = omni.usd.get_context().get_stage()
+    def get_world_pose(self):
+        return self.topdown_camera.get_world_pose()
 
-        # parent_path = Sdf.Path(camera_prim_path).GetParentPath()
-        # parent_parent_path = Sdf.Path(parent_path).GetParentPath()
-        # UsdGeom.Xform.Define(stage, parent_parent_path)
-
-        new_prim_path = "/".join(camera_prim_path.split("/")[:-2])+'/'+camera_prim_path.split("/")[-1]
-        if not stage.GetPrimAtPath(new_prim_path).IsValid():
-            UsdGeom.Xform.Define(stage, new_prim_path)
-        # new_prim = stage.DefinePrim(new_prim_path)
-
-        # 获取编辑目标
-        edit_target = stage.GetEditTarget()
-        edit_layer = edit_target.GetLayer()
-
-        with Sdf.ChangeBlock():
-            success = Sdf.JumpToEdit(edit_layer, camera_prim_path, new_prim_path)
-
-        # 设置新prim的属性
-        # new_camera = Camera(prim_path=new_prim_path, resolution=(self.width, self.height))
-        # for prop_name, value in prim_properties.items():
-        #     new_prim.GetAttribute(prop_name).Set(value)
-
-        # Usd.Prim.SetParent(camera_prim, stage.GetPrimAtPath(parent_parent_path))
-
-        self.topdown_camera.prim_path = new_prim_path
-        self.topdown_camera.prim = stage.GetPrimAtPath(new_prim_path)
-
-        log.info("Camera prim path changed to", new_prim_path)
-
-    def get_camera_data(self, data_type: list): 
-        output_data = {}
-        if "rgba" in data_type:
-            output_data["rgba"] = self.rgba_receiver.get_data()
-        if "depth" in data_type:
-            output_data["depth"] = self.depth_reveiver.get_data()
-        if "normals" in data_type:
-            output_data["normals"] = self.normals_receiver.get_data()
-        if "camera_params" in data_type:
-            output_data["camera_params"] = self.camera_params_receiver.get_data()
+    def get_camera_data(self): 
+        output_data = self.topdown_camera.get_data()
         return output_data
     
     def set_topdown_camera_pose(self, pose):
@@ -298,7 +214,7 @@ class CamOccupancyMap:
     def close_windows_head(self):
         plt.close('all')  # Close all figures
 
-    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, verbose=False):
+    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, update_camera_pose=True, verbose=False):
         # Define height range for free map
         # free_map: 1 for free space, 0 for occupied space
 
@@ -309,23 +225,9 @@ class CamOccupancyMap:
         # rgb_init, depth_init, mask, (row_min, row_max), (col_min, col_max), pointcloud = self._get_topdown_map(self.topdown_camera)
 
         # get info
-        data_info = self.get_camera_data(["rgba", "depth", "normals"])
+        data_info = self.get_camera_data()
         rgb = np.array(data_info["rgba"])
         depth = np.array(data_info["depth"])
-        normals = np.array(data_info["normals"])
-
-        # Generate free map using normal vectors and depth information
-
-        # Normalize the normal vectors (ignoring the last component if it exists)
-        norm_magnitudes = np.linalg.norm(normals[..., :3], axis=2)
-        try:
-            normalized_normals = normals[..., :3] / (norm_magnitudes[..., np.newaxis]+1e-8)
-            # Generate mask for flat surfaces based on normal vectors
-            flat_surface_mask = np.abs(normalized_normals[..., 2] - 1) < normal_threshold
-        except Exception:
-            # NOTE: Sometimes the normal vectors are not available? 
-            # the issue is: RuntimeWarning: invalid value encountered in divide
-            flat_surface_mask = np.zeros_like(depth, dtype=bool)
 
         # Generate mask for depth within the acceptable range
         depth_mask = (depth >= min_height) & (depth < max_height)
@@ -335,7 +237,7 @@ class CamOccupancyMap:
 
         # Combine masks to determine free space
         free_map = np.zeros_like(depth, dtype=int)
-        free_map[flat_surface_mask & depth_mask] = 1  # Free space is where conditions are met
+        free_map[depth_mask] = 1  # Free space is where conditions are met
         free_map[robot_mask == 1] = 1  # Robot's location is free space
 
         if verbose:
@@ -363,8 +265,9 @@ class CamOccupancyMap:
         # extract connectd free area
         connected_free_area = self.extract_connected_free_area(free_map, verbose=verbose)
 
-        # update the pose of the camera based on robot's pose
-        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+        if update_camera_pose:
+            # update the pose of the camera based on robot's pose
+            self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
 
         return free_map, connected_free_area
     
@@ -387,9 +290,9 @@ class CamOccupancyMap:
         # update the pose of the camera based on robot's pose
         # orientation_quat = euler_angles_to_quat([0,180,0])
         orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
-        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
+        self.issac_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8], orientation_quat)
 
-    def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, update_camera_pose=True, verbose=False):
+    def get_global_free_map(self, robot_pos, robot_height=1.05+0.8, norm_filter=False, connect_filter=False, update_camera_pose=True, verbose=False, env_idx=None):
         # Define height range for free map
         # free_map: 1 for free space, 0 for occupied space
 
@@ -401,15 +304,23 @@ class CamOccupancyMap:
         # rgb_init, depth_init, mask, (row_min, row_max), (col_min, col_max), pointcloud = self._get_topdown_map(self.topdown_camera)
 
         # get info
+<<<<<<< HEAD
         data_info = self.get_camera_data(["rgba", "depth", "normals"])
         rgb = np.array(data_info["rgba"])
         depth = np.array(data_info["depth"])
         normals = np.array(data_info["normals"])
+=======
+        data_info = self.get_camera_data()
+        rgb = np.array(data_info["rgba"])
+        depth = np.array(data_info["depth"])
+        # normals = np.array(data_info["normals"])
+>>>>>>> grutopia_new/fix_holes
 
         # Generate free map using normal vectors and depth information
 
         # Normalize the normal vectors (ignoring the last component if it exists)
         if norm_filter:
+            # after code clearning, not realize yet
             norm_magnitudes = np.linalg.norm(normals[..., :3], axis=2)
             try:
                 normalized_normals = normals[..., :3] / (norm_magnitudes[..., np.newaxis]+1e-8)
@@ -451,9 +362,12 @@ class CamOccupancyMap:
             # free_map_normalized = ((free_map - free_map.min()) * (1/(free_map.max() - free_map.min()) * 255)).astype('uint8')
             free_map_image = Image.fromarray(free_map_normalized)
             # Save the image
-            free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "topdown_global_freemap.png")
+            if env_idx is not None and hasattr(self.args, 'episode_path_list'):
+                free_map_path = os.path.join(self.args.episode_path_list[env_idx], f"global_topdown_freemap.jpg")
+            else:
+                free_map_path = os.path.join(self.args.log_image_dir, "cam_free", "topdown_global_freemap.png")
             free_map_image.save(free_map_path)
-            log.info(f"Global free map saved at {free_map_path}.")
+            # log.info(f"Global free map saved at {free_map_path}.")
         
         # extract connectd free area
         if connect_filter:

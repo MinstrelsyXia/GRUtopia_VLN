@@ -113,7 +113,7 @@ def create_sensors(config: RobotUserConfig, robot_model: RobotModel, robot: Base
 
             sensor_ins = sensor_cls(config=config_inject(param, sensor), robot=robot, name=sensor_name, scene=scene)
             sensor_map[sensor_name] = sensor_ins
-            sensor_ins.sensor_init()
+            # sensor_ins.sensor_init()
             log.debug(f'==================== {sensor_name} loaded==========================')
 
     return sensor_map

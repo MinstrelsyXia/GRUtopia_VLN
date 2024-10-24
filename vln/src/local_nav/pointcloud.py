@@ -4,7 +4,7 @@ import numpy as np
 import cv2
         
 from grutopia.core.util.log import log
-# from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
+from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
 
 
 # Function to transform a point cloud given a transformation matrix

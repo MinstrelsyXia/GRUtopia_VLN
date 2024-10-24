@@ -98,6 +98,7 @@ def visualize_rgb_map_2d(rgb: np.ndarray, save_path: str = None):
 
 
 
+
 def visualize_heatmap_2d(rgb: np.ndarray, heatmap: np.ndarray, transparency: float = 0.5,save_path = None):
     """visualize heatmap
 

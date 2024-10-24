@@ -1,3 +1,4 @@
+import time
 from typing import List
 
 # import numpy as np
@@ -6,6 +7,7 @@ from omni.isaac.core.prims.xform_prim import XFormPrim
 from omni.isaac.core.utils.stage import add_reference_to_stage  # noqa F401
 from omni.physx.scripts import utils
 from pxr import Usd  # noqa
+import omni.replicator.core as rep
 
 # Init
 from grutopia.core.config import SimulatorConfig, TaskUserConfig
@@ -61,24 +63,47 @@ class SimulatorRunner:
         for config in configs:
             task = create_task(config, self._scene)
             self._world.add_task(task)
-            
+
         self._world.reset()
-        # task.load()
+
+        # for task in self.current_tasks.values():
+        #     for robot in task.robots.values():
+        #         for sensor in robot.sensors.values():
+        #             sensor.sensor_init()
+
         self._warm_up()
 
-    def step(self, actions: dict, render: bool = True, data_type=None):
+    def step(self, actions: dict, render: bool = True, add_rgb_subframes=False):
+        # start_time = time.time() 
         for task_name, action_dict in actions.items():
             task = self.current_tasks.get(task_name)
             for name, action in action_dict.items():
                 if name in task.robots:
                     task.robots[name].apply_action(action)
+        
+        # apply_action_time = time.time() - start_time
+
         self.render_trigger += 1
-        render = render and self.render_trigger > self.render_interval
+        # render = render and self.render_trigger > self.render_interval
+        render = render or self.render_trigger > self.render_interval
         if self.render_trigger > self.render_interval:
             self.render_trigger = 0
-        self._world.step(render=render)
+        
+        if add_rgb_subframes:
+            rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
 
-        obs = self.get_obs(data_type=data_type)
+        # world_step_start_time = time.time()
+        self._world.step(render=render)
+        # world_step_time = time.time() - world_step_start_time 
+
+        if add_rgb_subframes:
+            rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False) # !!!
+
+        # log.info(f"apply_action time: {apply_action_time:.4f}s, world_step time: {world_step_time:.4f}s")
+
+        obs = self.get_obs(add_rgb_subframes=add_rgb_subframes)
+
+
         for npc in self.npc:
             try:
                 npc.feed(obs)
@@ -88,10 +113,10 @@ class SimulatorRunner:
         if render:
             return obs
 
-    def get_obs(self, data_type=None):
+    def get_obs(self, add_rgb_subframes=False):
         obs = {}
         for task_name, task in self.current_tasks.items():
-            obs[task_name] = task.get_observations(data_type=data_type)
+            obs[task_name] = task.get_observations(add_rgb_subframes=add_rgb_subframes)
         return obs
 
     def get_current_time_step_index(self) -> int:

@@ -2,8 +2,8 @@
 robots:
 - type: "HumanoidRobot"
   # usd_path: "GRUtopia/assets/robots/h1/h1_vln_pano_cameras.usd"
-  # usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
-  usd_path: "assets/robots/h1/h1_vln_pano_cameras_925.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
+  # usd_path: "assets/robots/h1/h1.usd"
   gains: [0.0, 0.0]
   joint_names:
   - left_hip_yaw_joint
@@ -115,6 +115,23 @@ robots:
   - name: "pano_camera_0"
     type: "Camera"
     prim_path: "torso_link/h1_pano_camera_0"
+  - name: "topdown_camera_50"
+    type: "Camera"
+    prim_path: "topdown_camera_50"
+  - name: "topdown_camera_500"
+    type: "Camera"
+    prim_path: "topdown_camera_500"
+  - name: "h1_pano_camera_debug"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_debug"
+
+  # - name: "camera"
+  #   type: "Camera"
+  #   prim_path: "logo_link/Camera"
+  # - name: "tp_camera"
+  #   type: "Camera"
+  #   prim_path: "torso_link/TPCamera"
+    
   - name: "pano_camera_45"
     type: "Camera"
     prim_path: "torso_link/h1_pano_camera_45"

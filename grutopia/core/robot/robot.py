@@ -31,21 +31,20 @@ class BaseRobot:
         """
         config = self.user_config
         robot_model = self.robot_model
-        if self.isaac_robot is not None:
-            scene.add(self.isaac_robot)
-            log.debug('self.isaac_robot: ' + str(self.isaac_robot))
+        scene.add(self.isaac_robot)
+        log.debug('self.isaac_robot: ' + str(self.isaac_robot))
         from grutopia.core.robot.controller import BaseController, create_controllers
         from grutopia.core.robot.sensor import BaseSensor, create_sensors
 
-        if robot_model.controllers is None:
-            self.controllers = {}
-        else:
-            self.controllers: Dict[str, BaseController] = create_controllers(config, robot_model, self, scene)
+        self.controllers: Dict[str, BaseController] = create_controllers(config, robot_model, self, scene)
         self.sensors: Dict[str, BaseSensor] = create_sensors(config, robot_model, self, scene)
 
     def post_reset(self):
         """Set up things that happen after the world resets."""
-        pass
+        for sensor in self.sensors.values():
+            sensor.reset()
+            sensor.sensor_init()
+        # pass
 
     def apply_action(self, action: dict):
         """Apply actions of controllers to robot.
@@ -57,7 +56,7 @@ class BaseRobot:
         """
         raise NotImplementedError()
 
-    def get_obs(self) -> dict:
+    def get_obs(self, add_rgb_subframes=False) -> dict:
         """Get observation of robot, including controllers, sensors, and world pose.
 
         Raises:

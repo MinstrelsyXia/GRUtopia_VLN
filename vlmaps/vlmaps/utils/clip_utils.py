@@ -228,7 +228,7 @@ def get_lseg_score(
             text_feats = np.mean(text_feats, axis=1)
 
         map_feats = lseg_map.reshape((-1, lseg_map.shape[-1]))
-
+        map_feats = map_feats / np.linalg.norm(map_feats, axis=1, keepdims=True)
         scores_list = map_feats @ text_feats.T
 
         # average the features
@@ -240,7 +240,9 @@ def get_lseg_score(
 
         map_feats = lseg_map.reshape((-1, lseg_map.shape[-1]))
 
-        scores_list = map_feats @ text_feats.T
+        map_feats = map_feats / np.linalg.norm(map_feats, axis=1, keepdims=True)
+        scores_list = map_feats @ text_feats.T            
+        
 
     return scores_list
 

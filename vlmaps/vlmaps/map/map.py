@@ -11,8 +11,22 @@ from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter, medi
 from shapely.geometry import Point, Polygon
 
 from vlmaps.vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
-
+import types
 # from vlmaps.vlmaps.utils.mapping_utils import load_map
+
+def get_attr(obj, attr):
+    """
+    获取对象的属性值，兼容字典和 SimpleNamespace 对象
+    :param obj: 字典或 SimpleNamespace 对象
+    :param attr: 属性名称
+    :return: 属性值
+    """
+   
+    if isinstance(obj, types.SimpleNamespace):
+        return getattr(obj, attr)
+    else:
+        return obj[attr]
+        # raise TypeError(f"Unsupported object type: {type(obj)}")
 
 
 class Map:
@@ -20,8 +34,10 @@ class Map:
         self.map_config = map_config
         # obstacles_path = os.path.join(map_dir, "obstacles.npy")
         # self.obstacles = load_map(obstacles_path)
-        self.gs = map_config["grid_size"]
-        self.cs = map_config["cell_size"]
+        # self.gs = map_config["grid_size"]
+        # self.cs = map_config["cell_size"]
+        self.gs = get_attr(map_config, "grid_size")
+        self.cs = get_attr(map_config, "cell_size")
 
         self.mapped_iter_list = None
         self.grid_feat = None
