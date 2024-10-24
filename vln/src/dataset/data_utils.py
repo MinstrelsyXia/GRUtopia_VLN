@@ -86,13 +86,14 @@ def load_scene_usd(args, scan):
     find_flag = False
     for root, dirs, files in os.walk(os.path.join(args.datasets.mp3d_data_dir, scan)):
         for file in files:
-            if 'fix_holes_ver2' in file:
-                scene_usd_path = os.path.join(root,file)
-                find_flag = True
-                break
-            if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
-                # scene_usd_path = os.path.join(root, file)
-                scene_usd_path = '/ssd/wangliuyi/code/Matterport3D/data/v1/scans/V2XKFyX4ASd/matterport_mesh/04d3f2105168491db767ad1fe7bc39df/fix_holes_ver2.usd'
+            # if 'fix_holes_ver2' in file:
+            #     scene_usd_path = os.path.join(root,file)
+            #     find_flag = True
+            #     break
+            # if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
+            if file == 'fixed.usd':
+                scene_usd_path = os.path.join(root, file)
+                # scene_usd_path = '/ssd/wangliuyi/code/Matterport3D/data/v1/scans/V2XKFyX4ASd/matterport_mesh/04d3f2105168491db767ad1fe7bc39df/fix_holes_ver2.usd'
                 find_flag = True
                 break
         if find_flag:
@@ -534,6 +535,12 @@ class VLNDataLoader(Dataset):
                 is_saving = False
             if FLAG_FINISH:
                 break
+    
+    def get_rep_camera_data(self, camera, data_type):
+        ''' Use the self-built rep camera to get data
+        '''
+        camera_data = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_rep_camera_data(data_type)
+        return camera_data
 
     def process_pointcloud(self, camera_list: list, draw=False, convert_to_local=False):
         ''' Process pointcloud for combining multiple cameras
@@ -545,6 +552,7 @@ class VLNDataLoader(Dataset):
         
         for camera in camera_list:
             cur_obs = obs[self.task_name][self.robot_name][camera]
+            # cur_obs = self.get_rep_camera_data(camera, ['pointcloud'])
             camera_pose = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].sensors[camera].get_world_pose()
             camera_position, camera_orientation = camera_pose[0], camera_pose[1]
             camera_positions.append(camera_position)
