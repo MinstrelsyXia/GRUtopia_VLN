@@ -39,7 +39,7 @@ class CamOccupancyMap:
         return output_data
     
     def set_topdown_camera_pose(self, pose):
-        self.topdown_camera.set_world_pose(pose)
+        self.issac_camera.set_world_pose(pose)
         self.topdown_camera_init_robot_pose = True
         print("Update the topdown camera pose:", pose)
     
@@ -196,9 +196,10 @@ class CamOccupancyMap:
             self.ax.text(4, 11, text_info, fontsize=10, ha='center', va='bottom', wrap=True)
         self.ax.set_title('Top-down RGB Image')
 
-    def update_windows_head(self, robot_pos, text_info=None, mode="show"):
+    #! un used
+    def update_windows_head(self, robot_pos, text_info=None, mode="save"):
         rgb_data = self.get_camera_data(["rgba"])["rgba"]
-        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
+        self.issac_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
         self.image_display.set_data(rgb_data)  # Update the image data
         if text_info is not None:
             self.ax.text(0.5, 0.01, text_info, fontsize=10, ha='left', va='bottom', wrap=True)
@@ -214,7 +215,7 @@ class CamOccupancyMap:
     def close_windows_head(self):
         plt.close('all')  # Close all figures
 
-    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, update_camera_pose=True, verbose=False):
+    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, update_camera_pose=False, verbose=False):
         # Define height range for free map
         # free_map: 1 for free space, 0 for occupied space
 
@@ -267,7 +268,7 @@ class CamOccupancyMap:
 
         if update_camera_pose:
             # update the pose of the camera based on robot's pose
-            self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+            self.issac_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
 
         return free_map, connected_free_area
     
@@ -304,17 +305,10 @@ class CamOccupancyMap:
         # rgb_init, depth_init, mask, (row_min, row_max), (col_min, col_max), pointcloud = self._get_topdown_map(self.topdown_camera)
 
         # get info
-<<<<<<< HEAD
-        data_info = self.get_camera_data(["rgba", "depth", "normals"])
-        rgb = np.array(data_info["rgba"])
-        depth = np.array(data_info["depth"])
-        normals = np.array(data_info["normals"])
-=======
         data_info = self.get_camera_data()
         rgb = np.array(data_info["rgba"])
         depth = np.array(data_info["depth"])
         # normals = np.array(data_info["normals"])
->>>>>>> grutopia_new/fix_holes
 
         # Generate free map using normal vectors and depth information
 
@@ -377,7 +371,7 @@ class CamOccupancyMap:
 
         # update the pose of the camera based on robot's pose
         if update_camera_pose:
-            self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
+            self.issac_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8])
 
         return free_map, connected_free_area
     

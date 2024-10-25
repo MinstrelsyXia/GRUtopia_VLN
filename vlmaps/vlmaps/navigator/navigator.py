@@ -89,3 +89,44 @@ class Navigator:
         Return (row, col) in full map
         """
         return [cropped_map_pos[0] + self.rowmin, cropped_map_pos[1] + self.colmin]
+
+
+    def check_path_blocked(self,start, goal):
+        '''
+        start, goal: (row, col) in full map
+        grid: 2D list or array representing the map, where 0 is free and 1 is blocked
+        '''
+        line_points = bresenham_line(start[0], start[1], goal[0], goal[1])
+        
+        for point in line_points:
+            row, col = point
+            if self.obs_map[row][col] == 1:  # 1 indicates a blocked cell
+                return False
+        
+        return True
+
+
+def bresenham_line(x0, y0, x1, y1):
+    """Bresenham's Line Algorithm to get points on a line between (x0, y0) and (x1, y1)."""
+    points = []
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx - dy
+
+    while True:
+        points.append((x0, y0))
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+    return points
+
+        

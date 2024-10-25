@@ -9,7 +9,7 @@ nav:
   vis: True
   tasks_per_scene: 20
 
-episode_id: 6 #! unique id for all trajectory
+episode_id: 1 #! unique id for all trajectory
 trajectory_id: 5
 
 
@@ -19,4 +19,4 @@ index_2d: True
 init_categories: True
 from_scratch: True # no need to load in vlmap
 online: True # needn't load from rgbs/depths
-find_frontier_type: default # or closest
+find_frontier_type: closest # or closest

@@ -310,7 +310,7 @@ class Map:
     ) -> Tuple[List[float], List[float]]:
         contours, centers, bbox_list = self.get_pos(name)
         print("centers: ", centers)
-        centers_cropped = [[x[0] - self.rmin, x[1] - self.cmin] for x in centers]
+        # centers_cropped = [[x[0] - self.rmin, x[1] - self.cmin] for x in centers]
         ids_list = self.select_front_objs(centers, curr_pos, curr_angle_deg)
         print("ids_list: ", ids_list)
         if not ids_list:
@@ -318,7 +318,7 @@ class Map:
 
         front_centers = [centers[i] for i in ids_list]
         front_bboxes = [bbox_list[i] for i in ids_list]
-        front_centers_cropped = [[x[0] - self.rmin, x[1] - self.cmin] for x in front_centers]
+        # front_centers_cropped = [[x[0] - self.rmin, x[1] - self.cmin] for x in front_centers]
         nearest_id = self.select_nearest_obj(front_centers, front_bboxes, curr_pos)
         nearest_center = front_centers[nearest_id]
         nearest_box = front_bboxes[nearest_id]
@@ -368,7 +368,7 @@ class Map:
         return ids_list
 
     def find_middle_bewteen_contours(self, cona: List[List[float]], conb: List[List[float]]):
-        min_pos = np.array([[self.rmin, self.cmin]])
+        # min_pos = np.array([[self.rmin, self.cmin]])
         cona_np = np.array(cona).reshape((-1, 1, 2))
         conb_np = np.array(conb).reshape((1, -1, 2))
         dist_mat = cona_np - conb_np
@@ -378,8 +378,8 @@ class Map:
         pa = cona[row]
         pb = conb[col]
         middle = (pa + pb) / 2
-        cona_cropped = cona - min_pos
-        conb_cropped = conb - min_pos
+        # cona_cropped = cona - min_pos
+        # conb_cropped = conb - min_pos
         return middle
 
     def get_pos_in_between(

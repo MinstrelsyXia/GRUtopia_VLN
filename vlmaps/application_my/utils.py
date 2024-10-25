@@ -4,10 +4,57 @@ class NotFound(Exception):
     def __init__(self, message="Object not found or insufficient data in pc_mask."):
         self.message = message
         super().__init__(self.message)
+class EarlyFound(Exception):
+    '''
+    Exception raised when a subgoal is not reached but te ultimate goal is found
+    '''
+    def __init__(self, message="Subgoal not reached but ultimate goal is found."):
+        self.message = message
+        super().__init__(self.message)
+
 
 import numpy as np
 import matplotlib.pyplot as plt
 import open3d as o3d
+
+import re
+
+def extract_parameters(input_string):
+    """
+    提取字符串中括号内的参数
+    :param input_string: 输入字符串
+    :return: 参数列表
+    """
+    # 使用正则表达式匹配括号内的内容
+    match = re.search(r'\((.*?)\)', input_string)
+    
+    if match:
+        # 提取括号内的内容并分割成参数列表
+        parameters = match.group(1).split(',')
+        # 去除参数两端的空格
+        parameters = [param.strip() for param in parameters]
+        return parameters[0]
+    else:
+        return None
+
+def extract_self_methods(input_string):
+    """
+    从输入字符串中提取以 `self.` 开头的所有部分，并放到一个列表中
+    :param input_string: 输入字符串
+    :return: 提取的部分列表
+    """
+    # 使用正则表达式匹配以 `self.` 开头的部分
+    matches = re.findall(r'self\.\w+\(.*?\)', input_string)
+    return matches
+
+# # 示例输入
+# input_string = "python\nself.move_to_left('counter')\nself.face('counter')\nself.move_west('counter')\nself.with_object_on_right('counter')\nself.move_east('chair')\nself.move_to_object('sofa')\n"
+
+# # 提取以 `self.` 开头的部分
+# extracted_methods = extract_self_methods(input_string)
+
+# # 打印结果
+# print(extracted_methods)
 
 ################### angle utils ########################
 
@@ -16,6 +63,43 @@ import open3d as o3d
 
 
 ################### visualize utils ########################
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def visualize_occupancy_map_with_contours(occupied_ids, contours, curr_pos, curr_angle_deg, save_path):
+    # 创建占用地图
+    occupancy_map = np.zeros(occupied_ids.shape[:2])
+    for i in range(occupied_ids.shape[0]):
+        for j in range(occupied_ids.shape[1]):
+            for k in range(occupied_ids.shape[2]):
+                if occupied_ids[i, j, k] > 0:
+                    occupancy_map[i, j] = 1
+
+    # 创建可视化图
+    plt.imshow(occupancy_map, cmap='gray', alpha=0.5)
+
+    # 绘制contours
+    for contour in contours:
+        plt.plot(contour[:, 0], contour[:, 1], color='red', linewidth=2)
+
+    # 计算朝向的结束点
+    curr_x, curr_y = curr_pos
+    angle_rad = np.deg2rad(curr_angle_deg)
+    arrow_length = 10  # 可以根据需要调整箭头长度
+    end_x = curr_x + arrow_length * np.cos(angle_rad)
+    end_y = curr_y + arrow_length * np.sin(angle_rad)
+
+    # 绘制朝向箭头
+    plt.arrow(curr_x, curr_y, end_x - curr_x, end_y - curr_y, head_width=1, head_length=2, fc='red', ec='red')
+
+    # 保存可视化图
+    plt.axis('off')  # 关闭坐标轴
+    plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+
+
 def visualize_naive_occupancy_map(occupied_ids,save_path):
     # visualize semantic map:
     occupancy_map = np.zeros(occupied_ids.shape[:2])
@@ -102,7 +186,7 @@ def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
     vis.capture_screen_image(save_path)
     vis.destroy_window()
               
-def visualize_pc(pcd,headless,save_path = 'pc.jpg'):
+def visualize_pc(pcd,headless=False,save_path = 'pc.jpg'):
     '''
     pcd:     after:    pcd_global = o3d.geometry.PointCloud()
     pcd_global.points = o3d.utility.Vector3dVector(points_3d)
@@ -165,7 +249,7 @@ def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
     # 捕获当前视图并保存为图像
     vis.capture_screen_image(save_path)
     vis.destroy_window()
-              
+
 
 
 

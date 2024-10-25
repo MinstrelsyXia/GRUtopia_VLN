@@ -1,6 +1,6 @@
 # vln_config.yaml
-env: train
-path_id: 5
+# env: train
+# path_id: 5
 headless: True
 test_verbose: True
 wait: false
