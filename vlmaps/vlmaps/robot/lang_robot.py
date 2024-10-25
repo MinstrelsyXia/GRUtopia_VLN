@@ -134,16 +134,19 @@ class LangRobot:
 
     def move_to_left(self, name: str):
         self._set_nav_curr_pose()
+        self.move_to_object(name)
         pos = self.map.get_left_pos(self.curr_pos_on_map, self.curr_ang_deg_on_map, name)
         self.move_to(pos)
 
     def move_to_right(self, name: str):
         self._set_nav_curr_pose()
+        self.move_to_object(name)
         pos = self.map.get_right_pos(self.curr_pos_on_map, self.curr_ang_deg_on_map, name)
         self.move_to(pos)
 
     def move_in_between(self, name_a: str, name_b: str):
         self._set_nav_curr_pose()
+        self.move_to_object(name_a)
         pos = self.map.get_pos_in_between(self.curr_pos_on_map, self.curr_ang_deg_on_map, name_a, name_b)
         self.move_to(pos)
 

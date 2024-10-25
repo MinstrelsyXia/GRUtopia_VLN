@@ -61,9 +61,9 @@ tasks:
     - name: "topdown_camera_50"
       enable: true
       size: [500, 500]
-    # - name: "topdown_camera_500"
-    #   enable: true
-    #   size: [500, 500]
+    - name: "topdown_camera_500"
+      enable: true
+      size: [500, 500]
     # - name: "camera_lookdown"
     #   enable: true
     #   size: [224, 224]

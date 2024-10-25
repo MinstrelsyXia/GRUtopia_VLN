@@ -807,6 +807,15 @@ class TMP(VLMap):
 
         return contours, centers, bbox_list
 
+    def check_object(self, name: str) -> bool:
+        """
+        Check if an object exists in the map
+        """
+        pc_mask = self.index_map(name, with_init_cat=True)
+        if pc_mask is None or np.sum(pc_mask) < 10:
+            return False
+        return True
+
 
 @hydra.main(
     version_base=None,

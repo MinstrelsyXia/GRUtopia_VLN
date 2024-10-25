@@ -23,7 +23,7 @@ from vlmaps.vlmaps.robot.lang_robot import LangRobot
 from vlmaps.vlmaps.dataloader.isaacsim_dataloader import VLMapsDataloaderHabitat
 from vlmaps.vlmaps.navigator.navigator import Navigator
 from vlmaps.vlmaps.controller.discrete_nav_controller import DiscreteNavController
-
+from vlmaps.vlmaps.task.isaacsim_task import IsaacSimSpatialGoalNavigationTask
 from vlmaps.vlmaps.utils.mapping_utils import (
     grid_id2base_pos_3d,
     grid_id2base_pos_3d_batch,
@@ -50,9 +50,11 @@ from vln.src.local_nav.BEVmap import BEVMap
 
 from vlmaps.vlmaps.map.map import Map
 
-from vlmaps.application_my.utils import NotFound
+from vlmaps.application_my.utils import NotFound, EarlyFound, extract_parameters, extract_self_methods
 
 import logging
+
+
 logging.getLogger('PIL').setLevel(logging.WARNING) # used to delete the log file from PIL
 logging.getLogger('numba').setLevel(logging.WARNING)
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
@@ -155,6 +157,7 @@ class IsaacSimLanguageRobot(LangRobot):
         self.min_height = 100 #! arbitray
         ## occupancy map to get the top-down oracle map:
         # in self._setup_sim
+        self.eval_helper = IsaacSimSpatialGoalNavigationTask(config) 
     
     ############################### init env ############################################
 
@@ -202,7 +205,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 vis=self.config.nav.vis,
             )
             cropped_obst_map = self.map.get_customized_obstacle_cropped()
-
+        self.eval_helper.setup_task(item)
         # self.nav.build_visgraph(
         #     cropped_obst_map,
         #     0,
@@ -316,6 +319,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
                 self.vlmaps_data_dir = self.vlmaps_data_dir + f"/{item['scan']}/id_{item['episode_id']}"
                 self.test_file_save_dir = self.test_file_save_dir + f"/{item['scan']}/id_{item['episode_id']}"
+                self.vln_config.log_image_dir = self.test_file_save_dir
                 if not os.path.exists(self.test_file_save_dir):
                     os.makedirs(self.test_file_save_dir, exist_ok=True)
                 self.nav_save_dir = self.test_file_save_dir + "/nav"
@@ -331,6 +335,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 log.info("Instruction: %s", item['instruction']['instruction_text'])
                 self.instruction = item['instruction']['instruction_text']
                 log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
+                self.reference_path = item["reference_path"]
                 return item
         log.error("Path id %d not found in the dataset", episode_id)
         return None
@@ -346,8 +351,11 @@ class IsaacSimLanguageRobot(LangRobot):
         from vln.src.local_nav.global_topdown_map import GlobalTopdownMap
 
         self.GlobalTopdownMap = GlobalTopdownMap
-        self.cam_occupancy_map_local = CamOccupancyMap(self.vln_config, robot_prim, start_point, local=True)
-        self.cam_occupancy_map_global = CamOccupancyMap(self.vln_config, robot_prim, start_point, local=False)
+        # self.cam_occupancy_map_local = CamOccupancyMap(self.vln_config, robot_prim, start_point, local=True)
+        # self.cam_occupancy_map_global = CamOccupancyMap(self.vln_config, robot_prim, start_point, local=False)
+        self.robots = self.env._runner.current_tasks[self.task_name].robots[self.robot_name]
+        self.cam_occupancy_map_local = CamOccupancyMap(self.vln_config, self.robots.sensors['topdown_camera_50'])
+        self.cam_occupancy_map_global = CamOccupancyMap(self.vln_config, self.robots.sensors['topdown_camera_500'])
 
 
 
@@ -393,7 +401,7 @@ class IsaacSimLanguageRobot(LangRobot):
         # low_bound = - tenth_largest_value+ camera_position[2]
         # upper_bound = - tenth_smallest_value + camera_position[2]
         # pc_filtered = pc[(-0.9 < (camera_position[2]-pc[:,2])) & ((camera_position[2]-pc[:,2]) < 0.8)]
-        pc_filtered = pc[(0 < (camera_position[2]-pc[:,2])) & ((camera_position[2]-pc[:,2]) < 0.8)]
+        pc_filtered = pc[(0 < (camera_position[2]-pc[:,2])) & ((camera_position[2]-pc[:,2]) < 0.6)]
         # print("check floor and ceiling", np.min(camera_position[2]-pc_filtered[2,:]),np.max(camera_position[2]-pc_filtered[2,:]))
         self.ObstacleMap.update_map_with_pc(
             pc_filtered,
@@ -526,6 +534,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 # 如果位置发生变化，说明动作成功，退出循环
                 if not (is_equal(self.curr_pos_on_map, prev_pos) and is_equal(self.curr_ang_deg_on_map, prev_ang)):
                     log.info(f"Successfully executed {action_name}")
+
                     break
                 else:
                     # 如果位置没有发生变化，记录日志并进行探索
@@ -538,6 +547,10 @@ class IsaacSimLanguageRobot(LangRobot):
                 found = self.explore(action_name) # update occupancy map, semantic map
                 if found == True:
                     break
+            except NameError as e:
+                print(f"Instruction GPT parsed {action_name} doesn't exist: {e}, following next instruction")
+                break
+
 
             # except Exception as e:
             #     # 捕获其他异常并记录日志（如评估 action_name 失败）
@@ -567,6 +580,7 @@ class IsaacSimLanguageRobot(LangRobot):
 
         pc, max_depth = self.update_semantic_map()
         self.update_obstacle_map(pc,max_depth)
+        self.eval_helper.add_pos(self.agents.get_world_pose()[0])
     
     def get_pos_on_obstacle_map(self):
         pos = self.agents.get_world_pose()[0]
@@ -578,6 +592,8 @@ class IsaacSimLanguageRobot(LangRobot):
         while self.step < warm_step:
             self.env.step(actions=env_actions)
             self.step += 1
+            if (self.step % 50 == 0):
+                self.check_and_reset_robot(self.step, update_freemap=True, verbose=False)
         self.update_all_maps()
         log.info("Warm up finished, updated all maps")
 
@@ -601,6 +617,17 @@ class IsaacSimLanguageRobot(LangRobot):
         pos_new = self.ObstacleMap._xy_to_px(np.array([[xy[0],xy[1]]]))[0]
         return pos_new
 
+
+    def check_environment(self, name: str) -> bool:
+        """
+        Check if an object exists in the existing map with one rotation
+        """
+        for i in range(0,360,60):
+            exist_flag = self.map.check_object(name)
+            if exist_flag:
+                return True
+            self.turn(60)
+            
 
     def move_to(self, pos: Tuple[float, float], type = 'sem') -> List[str]:
         """Move the robot to the position on the obstacle map
@@ -647,9 +674,12 @@ class IsaacSimLanguageRobot(LangRobot):
             log.warning("no need to move, already very close")
             return False
 
-        actions = self.planning_path(start_modified,goal_modified)
-
-
+        paths, paths_3d = self.planning_path(start_modified,goal_modified)
+        init_step = self.step
+        actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
+        log.info(f"moving from {start} to {goal} on {paths}")
+        log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
+        self.eval_helper.add_action(actions)
 
         while np.linalg.norm(goal_xy - self.agents.get_world_pose()[0][:2]) > 1.0:
             # np.linalg.norm(self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2]) - np.array(goal_modified) )
@@ -679,6 +709,7 @@ class IsaacSimLanguageRobot(LangRobot):
                     actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
                     log.info(f"moving from {start} to {goal} on {paths}")
                     log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
+                    self.eval_helper.add_action(actions)
                     self._retrive_robot_stuck_check()
 
 
@@ -696,12 +727,13 @@ class IsaacSimLanguageRobot(LangRobot):
 
             if (self.step % 1000 == 0):
                 # check whether path is blocked
-                current_pos = self.agents.get_world_pose()[0][:2]
-                start = self.ObstacleMap._xy_to_px(np.array([[current_pos[0],current_pos[1]]]))[0]
-                start_modified = [start[0],start[1]]
-                goal = env_actions[0]['h1']['move_along_path'][0][-1]
-                goal_xy = self.ObstacleMap._px_to_xy(np.array([[goal[0],goal[1]]]))[0]
+
                 if self.nav.check_path_blocked(start_modified, goal_modified):
+                    current_pos = self.agents.get_world_pose()[0][:2]
+                    start = self.ObstacleMap._xy_to_px(np.array([[current_pos[0],current_pos[1]]]))[0]
+                    start_modified = [start[0],start[1]]
+                    goal_xy = env_actions[0]['h1']['move_along_path'][0][-1]
+                    goal_modified = self.ObstacleMap._xy_to_px(np.array([[goal_xy[0],goal_xy[1]]]))[0]
                     log.warning("Path is blocked, replanning")
                     paths, paths_3d = self.planning_path(start_modified,goal_modified)
                     actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
@@ -709,7 +741,14 @@ class IsaacSimLanguageRobot(LangRobot):
                     log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
                     env_actions = []
                     env_actions.append(actions)
+                    self.eval_helper.add_action(actions)
                     continue
+            if ((self.step-init_step) % 10000 == 0):
+                # end this loop
+                log.warning("Failed to reach the subgoal after 10000 steps")
+                goal = self.ultimate_goal
+                if(self.map.check_object(goal)):
+                    raise EarlyFound
 
 
         return True
@@ -723,9 +762,9 @@ class IsaacSimLanguageRobot(LangRobot):
             rowmin = min_row,
             colmin = min_col,
             vis = True)
-        
+
         path_save_path = self.nav_save_dir + f"/path_{self.step}.png"
-        paths = self.nav.plan_to( start_modified, goal_modified , vis=self.config["nav"]["vis"],navigable_map_visual = self.ObstacleMap.nav_map_visual,save_dir=path_save_path)
+        paths = self.nav.plan_to( [start_modified[1],start_modified[0]],[goal_modified[1],goal_modified[0]] , vis=self.config["nav"]["vis"],navigable_map_visual = self.ObstacleMap.nav_map_visual,save_path=path_save_path)
         paths = np.array(paths)
         paths = np.array([paths[:,1], paths[:,0]]).T
         paths_3d = []
@@ -889,7 +928,7 @@ class IsaacSimLanguageRobot(LangRobot):
     def get_observations(self, data_types):
         ''' GEt observations from the sensors
         '''
-        return self.env.get_observations(data_type=data_types)
+        return self.env.get_observations()
 
 
 
@@ -1265,7 +1304,8 @@ class IsaacSimLanguageRobot(LangRobot):
     
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
-        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+        return  self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_height() - self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+        # return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
     
 
     def check_robot_fall(self, agent, pitch_threshold=35, roll_threshold=15, height_threshold=0.5, adjust=False, initial_pose=None, initial_rotation=None):
@@ -1412,6 +1452,13 @@ class IsaacSimLanguageRobot(LangRobot):
         # agent_bottom_z = self.get_robot_bottom_z()
         self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map_local.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.65, verbose=verbose)
         self.surrounding_freemap_camera_pose = self.cam_occupancy_map_local.topdown_camera.get_world_pose()[0]
+    
+    def set_ultimate_goal(self, goal:str):
+        self.ultimate_goal = goal
+    
+    def save_metric(self):
+        self.eval_helper.calculate_metric()
+        self.eval_helper.save_single_task_metric(save_path = self.test_file_save_dir)
 
 
 
@@ -1443,10 +1490,10 @@ def process_args(vln_total_config):
     for key, value in vln_total_config.items():
         setattr(vln_config, key, value)
     vln_config.root_dir = ROOT_DIR
-    vln_config.log_dir = os.path.join(ROOT_DIR, "logs")
-    vln_config.log_image_dir = os.path.join(vln_config.log_dir, "images", str(vln_config.env), str(vln_config.path_id))
-    if not os.path.exists(vln_config.log_image_dir):
-        os.makedirs(vln_config.log_image_dir)
+    # vln_config.log_dir = os.path.join(ROOT_DIR, "logs")
+    # vln_config.log_image_dir = os.path.join(vln_config.log_dir, "images", str(vln_config.env), str(vln_config.path_id))
+    # if not os.path.exists(vln_config.log_image_dir):
+    #     os.makedirs(vln_config.log_image_dir)
     
     if vln_config.settings.mode == "sample_episodes":
         vln_config.sample_episode_dir = os.path.join(ROOT_DIR, "logs", "sample_episodes")
@@ -1474,7 +1521,7 @@ def build_dataset(cfg):
     return vln_datasets, vln_config, sim_config, data_camera_list
 
 
-from vlmaps.vlmaps.utils.llm_utils import parse_object_goal_instruction
+from vlmaps.vlmaps.utils.llm_utils import parse_object_goal_instruction, parse_spatial_instruction
 import pickle
 
 
@@ -1494,51 +1541,70 @@ def main(config: DictConfig) -> None:
     #     api_key = f.read().strip()
     # os.environ["OPENAI_KEY"] = api_key
 
+    # for split in vln_config.datasets.splits:
+    #     # data_dir = Path(config.data_paths.vlmaps_data_dir) / "vlmaps_dataset"
+    #     robot = IsaacSimLanguageRobot(config,sim_config,vln_config = vln_config, split= split)
+    #     robot.setup_scene(config.episode_id,config.trajectory_id)
+    #     robot.map.init_categories(mp3dcat.copy())
+    #     object_categories = parse_object_goal_instruction(robot.instruction)
+        
+    #     # "Enter the bedroom and go around the bed. Go to the closet on the far wall on the left. Stop in the doorway"
+    #     # object_categories = ["bedroom", "bed", "closet", "doorway"]
+    #     # object_categories = ["bed", "closet", "doorway"]
+    #     print("object categories", object_categories)
+    #     print(f"instruction: {robot.instruction}")
+
+    #     while robot.env.simulation_app.is_running():
+    #         robot.warm_up(200)
+    #         # robot.turn(-90)
+            
+    #         for cat_i, cat in enumerate(object_categories):
+    #             print(f"Navigating to category {cat}")
+    #             # robot.move_to_object(cat)
+    #             robot.test_movement(f'self.move_to_object("{cat}")')
+    #             #! already moved, missing goal achieved parameter
+    #         break
+    #     robot.env.simulation_app.close()
+
     for split in vln_config.datasets.splits:
         # data_dir = Path(config.data_paths.vlmaps_data_dir) / "vlmaps_dataset"
         robot = IsaacSimLanguageRobot(config,sim_config,vln_config = vln_config, split= split)
         robot.setup_scene(config.episode_id,config.trajectory_id)
         robot.map.init_categories(mp3dcat.copy())
-        object_categories = parse_object_goal_instruction(robot.instruction)
-        # "Enter the bedroom and go around the bed. Go to the closet on the far wall on the left. Stop in the doorway"
-        # object_categories = ["bedroom", "bed", "closet", "doorway"]
-        # object_categories = ["bed", "closet", "doorway"]
-        print("object categories", object_categories)
-        print(f"instruction: {robot.instruction}")
-
+        gpt_ans = parse_spatial_instruction(robot.instruction)
+        parsed_instructions = extract_self_methods(gpt_ans)
+        log.info(f"instruction: {robot.instruction}")
+        log.info(f"parsed instructions: {parsed_instructions}")
+        
+        for idx in range(len(parsed_instructions)-1,-1, -1):
+            subgoal = parsed_instructions[idx]
+            if not('move_forward' or 'turn' in subgoal):
+                fin_obj = extract_parameters(subgoal)
+                robot.set_ultimate_goal(subgoal)
+                skipped_i = idx
+                break
+        skip_flag = 0
         while robot.env.simulation_app.is_running():
             robot.warm_up(200)
+            
             # robot.turn(-90)
             
-            for cat_i, cat in enumerate(object_categories):
-                print(f"Navigating to category {cat}")
-                # robot.move_to_object(cat)
-                robot.test_movement(f'self.move_to_object("{cat}")')
+            for cat_i, subgoal in enumerate(parsed_instructions):
+                if (cat_i >= skip_flag):
+                    print(f"Executing {subgoal}")
+                    # robot.move_to_object(cat)
+                    try:
+                        robot.test_movement(subgoal)
+                    except EarlyFound as e:
+                        log.info(f"{e}. Found object early, stopping exploration.")
+                        skip_flag = skipped_i
+                    break
+
                 #! already moved, missing goal achieved parameter
             break
+        
+        robot.save_metric()
         robot.env.simulation_app.close()
-        # hab_tf = cvt_pose_vec2tf(robot.vlmaps_dataloader.base_poses[0])
-        # robot.set_agent_state(hab_tf)
-        # obs = robot.get_observations(data_types=["rgba","depth"])
-        # rgb = obs["color_sensor"]
-        # bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        # cv2.imshow("scr rgb", bgr)
-        # cv2.waitKey(1)
-
-        # tar_hab_tf = cvt_pose_vec2tf(robot.vlmaps_dataloader.base_poses[800])
-        # robot.set_agent_state(tar_hab_tf)
-        # obs = robot.sim.get_sensor_observations(0)
-        # rgb = obs["color_sensor"]
-        # bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        # cv2.imshow("tar rgb", bgr)
-        # cv2.waitKey(1)
-
-        # robot.set_agent_state(hab_tf)
-        # robot.vlmaps_dataloader.from_habitat_tf(tar_hab_tf)
-        # tar_row, tar_col, tar_angle_deg = robot.vlmaps_dataloader.to_full_map_pose()
-        # robot.empty_recorded_actions()
-        # robot.pass_goal_tf([tar_hab_tf])
-        # robot.move_to((tar_row, tar_col))
 
 
 if __name__ == "__main__":

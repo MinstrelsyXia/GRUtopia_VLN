@@ -11,7 +11,7 @@ import json
 
 from grutopia.core.util.log import log
 
-from .path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
+from vln.src.local_nav.path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
 import copy
 class BEVMap:
     def __init__(self, args, robot_init_pose=(0, 0, 0)):

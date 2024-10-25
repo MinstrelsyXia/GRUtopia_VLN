@@ -236,7 +236,7 @@ my_map = ObstacleMap(
     agent_radius=0.25,
     pixels_per_meter=10,
     log_image_dir=save_dir,
-    dilate_iters= 3
+    dilate_iters= 1
 )
 
 k = 0 
@@ -249,8 +249,8 @@ from vlmaps.vlmaps.navigator.navigator import Navigator
 from vln.src.local_nav.path_planner import AStarPlanner
 import yaml
 import time
-navigator_type = 'astar'
-# navigator_type = 'visgraph'
+# navigator_type = 'astar'
+navigator_type = 'visgraph'
 
 
 if navigator_type == 'astar':
@@ -401,11 +401,18 @@ else:
 
 
         # goal_xy = my_map._xy_to_px(np.array([goal]))[0]
-        path = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True,navigable_map_visual=my_map.nav_map_visual)
+        paths = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True,navigable_map_visual=my_map.nav_map_visual)
 
-        path = np.array(path)
-        path = [path[:,1], path[:,0]]
+        paths = np.array(paths)
+        paths = np.array([paths[:,1], paths[:,0]]).T
 
+        paths_3d = []
+        for path in paths:
+            xy = my_map._px_to_xy(np.array([[path[0], path[1]]]))[0]
+            paths_3d.append([xy[0],xy[1],1]) # fix height
+        paths_3d = np.array(paths_3d)
+        print(f"moving from {start} to {goal_xy} on {paths}")
+        print(f'moving from {camera_position} to {pos} on {paths_3d}')
         # # test angle:
         # target_rotation = np.arctan2(goal_xy[1] - start[1], goal_xy[0] - start[0]) / np.pi * 180
         

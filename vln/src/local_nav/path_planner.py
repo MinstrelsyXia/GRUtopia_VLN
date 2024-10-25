@@ -547,22 +547,6 @@ class AStarPlanner:
         self.major_ticks_y = np.linspace(0, self.max_y, self.args.llms.map_grid_num)
         # self.minor_ticks_y = np.linspace(0, self.max_y, 40)
     
-<<<<<<< HEAD
-    def vis_path(self, obs_map, sx, sy, gx, gy, points, img_save_path, legend=False):
-        obs_map_draw = obs_map.transpose(1,0) # transpose the map to match the plot
-        # self.image_display.set_data(obs_map_draw)
-        self.ax.clear()
-        self.ax.imshow(obs_map_draw, cmap=self.cmap, norm=self.norm, aspect='auto')
-        self.ax.plot(sx, sy, "or", label="start")
-        self.ax.plot(gx, gy, "xr", label="end")
-        self.ax.plot([x[0] for x in points], [x[1] for x in points], "-r")
-        
-        if legend:
-            self.ax.legend()
-            self.ax.grid()
-        
-        self.ax.figure.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
-=======
     #### This function has some bugs after the first time saving...
     # def vis_path(self, obs_map, sx, sy, gx, gy, points, img_save_path, legend=True):
     #     obs_map_draw = obs_map.transpose(1,0) # transpose the map to match the plot
@@ -596,17 +580,13 @@ class AStarPlanner:
             plt.grid()
         
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
->>>>>>> grutopia_new/fix_holes
         log.info("Path has been saved to {}".format(img_save_path))
         if self.windows_head:
             plt.show(block=False)
             plt.pause(0.001)
-<<<<<<< HEAD
-=======
         
         plt.clf()
         plt.close()
->>>>>>> grutopia_new/fix_holes
     
     def figure_clear(self, for_llm=False):
         self.ax.clear()
@@ -695,14 +675,6 @@ class AStarPlanner:
         goal_node = self.Node(self.calc_xy_index(gx, self.min_x),
                               self.calc_xy_index(gy, self.min_y), 0.0, -1)
 
-<<<<<<< HEAD
-=======
-        if self.obstacle_map[goal_node.x, goal_node.y] == 255:
-            # goal is in the obstacle
-            log.warning("Goal is in the obstacle.")
-            return [], False
-
->>>>>>> grutopia_new/fix_holes
         open_set, closed_set = dict(), dict()
         open_set[self.calc_grid_index(start_node)] = start_node
 
@@ -903,11 +875,7 @@ if __name__ == "__main__":
     occupancy_map = np.load('map.npy')
     quad_tree_root = QuadTreeNode(0, 0, map_data = 1-(occupancy_map==0),**config['map_config']['quadtree_config'])
     quad_tree_root.plot_quad_tree(occupancy_map,fig_size=(14,8),if_save=True)
-<<<<<<< HEAD
     path_planner = AStarPlanner(quad_tree_root, 1-(occupancy_map==0), **config['planner_config']) # Navigation method
-=======
-    path_planner = PathPlanning(quad_tree_root, 1-(occupancy_map==0), **config['planner_config']) # Navigation method
->>>>>>> grutopia_new/fix_holes
     start, goal = Node(90,195), Node(190,210)
     node, node_type= path_planner.rrt_star(start, goal)
     path_planner.plot_path(node, start, goal)
