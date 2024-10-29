@@ -122,6 +122,8 @@ class Humanoid(IsaacRobot):
 
     def apply_actuator_model(self, control_action: ArticulationAction, controller_name: str,
                              joint_set: ArticulationSubset):
+        if joint_set is None or control_action is None:
+            return
         name = 'base_legs'
         actuator = self.actuators[name]
 
@@ -198,9 +200,6 @@ class HumanoidRobot(BaseRobot):
             usd_path=usd_path,
         )
 
-        if robot_model.joint_names is not None:
-            self.joint_subset = ArticulationSubset(self.isaac_robot, robot_model.joint_names)
-
         self._robot_scale = np.array([1.0, 1.0, 1.0])
         if config.scale is not None:
             self._robot_scale = np.array(config.scale)
@@ -209,15 +208,18 @@ class HumanoidRobot(BaseRobot):
         self._robot_ik_base = None
 
         self._robot_base = RigidPrim(prim_path=config.prim_path + '/pelvis', name=config.name + '_base')
-        self._robot_right_ankle = RigidPrim(prim_path=config.prim_path + '/right_ankle_link', name=config.name + 'right_ankle')
-        self._robot_left_ankle = RigidPrim(prim_path=config.prim_path + '/left_ankle_link', name=config.name + 'left_ankle')
+        self._robot_right_ankle = RigidPrim(prim_path=config.prim_path + '/right_ankle_link',
+                                            name=config.name + 'right_ankle')
+        self._robot_left_ankle = RigidPrim(prim_path=config.prim_path + '/left_ankle_link',
+                                           name=config.name + 'left_ankle')
+        self._imu_link = RigidPrim(prim_path=config.prim_path + '/imu_link', name=config.name + '_imu')
+        self._torso_link = RigidPrim(prim_path=config.prim_path + '/torso_link', name=config.name + '_torso')
 
     def post_reset(self):
         super().post_reset()
         self.isaac_robot._process_actuators_cfg()
         if self._gains is not None:
             self.isaac_robot.set_gains(self._gains)
-
 
     def get_ankle_height(self):
         return np.min([self._robot_right_ankle.get_world_pose()[0][2], self._robot_left_ankle.get_world_pose()[0][2]])
@@ -253,7 +255,7 @@ class HumanoidRobot(BaseRobot):
                 continue
             controller = self.controllers[controller_name]
             control = controller.action_to_control(controller_action)
-            self.isaac_robot.apply_actuator_model(control, controller_name, self.joint_subset)
+            self.isaac_robot.apply_actuator_model(control, controller_name, controller.get_joint_subset())
         
         # top-down camera reset
         if 'topdown_camera_500' in self.sensors:
