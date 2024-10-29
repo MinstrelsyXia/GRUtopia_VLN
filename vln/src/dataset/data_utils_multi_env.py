@@ -841,6 +841,7 @@ class VLNDataLoader(Dataset):
         for idx, (task_name, task) in enumerate(self.tasks.items()):
             task.set_robot_poses_without_offset(position_list[idx], orientation_list[idx])
             isaac_robot = self.isaac_robots[idx]
+            isaac_robot.set_world_velocity(np.zeros(6))
             isaac_robot.set_joint_velocities(np.zeros(len(isaac_robot.dof_names)))
             isaac_robot.set_joint_positions(np.zeros(len(isaac_robot.dof_names)))
             self.robot_last_poses[idx] = position_list[idx]
@@ -849,6 +850,7 @@ class VLNDataLoader(Dataset):
         ''' Reset a single robot's pose
         '''
         self.tasks[self.task_names[idx]].set_single_robot_poses_without_offset(position, orientation)
+        self.tasks[self.task_names[idx]].set_world_velocity(np.zeros(6))
         self.isaac_robots[idx].set_joint_velocities(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.isaac_robots[idx].set_joint_positions(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.isaac_robots[idx].set_joint_efforts(np.zeros(len(self.isaac_robots[idx].dof_names)))
