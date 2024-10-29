@@ -1,34 +1,13 @@
 # Developer only. User read-only.
 robots:
 - type: "HumanoidRobot"
-  # usd_path: "GRUtopia/assets/robots/h1/h1_vln_pano_cameras.usd"
-  usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
-  # usd_path: "assets/robots/h1/h1.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
+  usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
   gains: [0.0, 0.0]
-  joint_names:
-  - left_hip_yaw_joint
-  - right_hip_yaw_joint
-  - torso_joint
-  - left_hip_roll_joint
-  - right_hip_roll_joint
-  - left_shoulder_pitch_joint
-  - right_shoulder_pitch_joint
-  - left_hip_pitch_joint
-  - right_hip_pitch_joint
-  - left_shoulder_roll_joint
-  - right_shoulder_roll_joint
-  - left_knee_joint
-  - right_knee_joint
-  - left_shoulder_yaw_joint
-  - right_shoulder_yaw_joint
-  - left_ankle_joint
-  - right_ankle_joint
-  - left_elbow_joint
-  - right_elbow_joint
   controllers:
   - name: "move_by_speed"
     type: HumanoidMoveBySpeedController
-    policy_weights_path: assets/policy/weights/h1_loco_model_20000.pt
+    policy_weights_path: assets/policy/weights/h1_loco_jit_policy.pt
     joint_names:
     - left_hip_yaw_joint
     - right_hip_yaw_joint
@@ -74,14 +53,14 @@ robots:
   - name: "move_to_point"
     type: "MoveToPointBySpeedController"
     forward_speed: 1.0
-    rotation_speed: 4.0
+    rotation_speed: 1.0
     threshold: 0.05
     sub_controllers:
     - name: move_by_speed
   - name: "move_along_path"
     type: MoveAlongPathPointsController
     forward_speed: 1.0
-    rotation_speed: 4.0
+    rotation_speed: 1.0
     threshold: 0.1
     sub_controllers:
     - name: move_to_point
@@ -94,7 +73,7 @@ robots:
   - name: "move_with_keyboard"
     type: MoveWithKeyboardController
     forward_speed: 1.0
-    rotation_speed: 4.0
+    rotation_speed: 1.0
     lateral_speed: 1.0
     sub_controllers:
     - name: move_by_speed
@@ -104,77 +83,18 @@ robots:
     type: StandStillController
     sub_controllers:
     - name: move_by_speed
-  - name: oracle_move_to_point
-    type: OracleMoveToPointController
-  - name: oracle_move_along_path
-    type: OracleMoveAlongPathPointsController
-    threshold: 0.1
+  - name: recover
+    type: RecoverController
+    recover_height: 1.0
     sub_controllers:
-    - name: oracle_move_to_point
+    - name: joint_controller
   sensors:
-  - name: "pano_camera_0"
+  - name: "camera"
     type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_0"
-  - name: "topdown_camera_50"
+    prim_path: "logo_link/Camera"
+  - name: "tp_camera"
     type: "Camera"
-    prim_path: "topdown_camera_50"
-  - name: "topdown_camera_500"
+    prim_path: "torso_link/Camera"
+  - name: "tp_pointcloud"
     type: "Camera"
-    prim_path: "topdown_camera_500"
-  - name: "h1_pano_camera_debug"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_debug"
-
-  # - name: "camera"
-  #   type: "Camera"
-  #   prim_path: "logo_link/Camera"
-  # - name: "tp_camera"
-  #   type: "Camera"
-  #   prim_path: "torso_link/TPCamera"
-    
-  - name: "pano_camera_45"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_45"
-  - name: "pano_camera_90"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_90"
-  - name: "pano_camera_135"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_135"
-  - name: "pano_camera_180"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_180"
-  - name: "pano_camera_225"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_225"
-  - name: "pano_camera_270"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_270"
-  - name: "pano_camera_315"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_315"
-  # - name: "camera_lookdown"
-  #   type: "Camera"
-  #   prim_path: "torso_link/h1_camera_lookdown"
-- type: "CylinderRobot"
-  usd_path: "GRUtopia/assets/robots/Cylinder/cy_4_cameras_simple.usd"
-  gains: [0, 0]
-  sensors:
-  - name: "camera_front"
-    type: "Camera"
-    prim_path: "cy_robot/body0/camera_front"
-  - name: "camera_behind"
-    type: "Camera"
-    prim_path: "cy_robot/body0/camera_behind"
-  - name: "camera_left"
-    type: "Camera"
-    prim_path: "cy_robot/body0/camera_left"
-  - name: "camera_right"
-    type: "Camera"
-    prim_path: "cy_robot/body0/camera_right"
-  - name: "camera_tp"
-    type: "Camera"
-    prim_path: "cy_robot/body0/camera_tp" 
-- type: "Go1Robot"
-  usd_path: "GRUtopia/assets/robots/g1/g1.usd"
-  gains: [0, 0]
+    prim_path: "logo_link/Camera_pointcloud"

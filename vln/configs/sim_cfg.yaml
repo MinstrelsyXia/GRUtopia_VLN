@@ -30,6 +30,7 @@ tasks:
     - name: "stand_still"
     - name: "oracle_move_to_point"
     - name: "oracle_move_along_path"
+    # - name: "recover"
     sensor_params:
     - name: "pano_camera_0"
       enable: true
@@ -61,6 +62,12 @@ tasks:
     - name: "topdown_camera_50"
       enable: true
       size: [500, 500]
+    - name: "tp_pointcloud"
+      enable: True
+      size: [64, 64]
+      camera_config:
+        - no_rgb
+        - point_cloud
     # - name: "topdown_camera_500"
     #   enable: true
     #   size: [500, 500]
