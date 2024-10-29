@@ -702,6 +702,7 @@ class VLNDataLoader(Dataset):
         ''' Reset the robot's pose
         '''
         self.agents.set_world_pose(position, rotation)
+        self.agents.set_world_velocity(np.zeros(6))
         self.agent_last_pose = position
         self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
         self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))

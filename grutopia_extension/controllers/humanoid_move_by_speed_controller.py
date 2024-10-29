@@ -71,7 +71,7 @@ class DynamicHeightSamples:
         if self.x_min is None:
             self.x_min, self.x_max = x_min, x_max
             self.y_min, self.y_max = y_min, y_max
-            self.height_map = torch.zeros(x_max - x_min + 1, y_max - y_min + 1)
+            self.height_map = torch.full((x_max - x_min + 1, y_max - y_min + 1), fill_value=padding)
             return
 
         # Check if x range needs to be expanded.
@@ -235,19 +235,26 @@ class HumanoidMoveBySpeedController(BaseController):
 
         torso_link: RigidPrim = self.robot._torso_link
         torso_pos_w, torso_quat_w = torso_link.get_world_pose()
+        ankle_height = self.robot.get_ankle_height()
+        # base_height = torso_pos_w[2]
+        # relative_base_height = base_height - ankle_height + 0.0758
+        # rel_torso_pos = torso_pos_w
+        # rel_torso_pos[-1] -= ankle_height
 
         robot_pos_for_height_samples = base_pose_w[0].copy()
         robot_pos_for_height_samples[2] = self.robot.get_ankle_height() - 0.05  # floor height
 
-        if self.update_height_samples_trigger == 0:
-            # Update height samples.
-            if self.point_cloud_sensor is None:
-                self.point_cloud_sensor: BaseSensor = self.robot.sensors['tp_pointcloud']
+        if self.point_cloud_sensor is None:
+            self.point_cloud_sensor: BaseSensor = self.robot.sensors['tp_pointcloud']
 
+        # Update height samples.
+        if self.update_height_samples_trigger == 0:
             sensor_data = self.point_cloud_sensor.get_data()
             if 'pointcloud' in sensor_data and sensor_data['pointcloud'] is not None:
                 point_cloud_data = torch.Tensor(sensor_data['pointcloud'])
                 self.dynamic_height_samples.set_heights(point_cloud_data, robot_pos_for_height_samples)
+            else:
+                self.update_height_samples_trigger -= 1
 
         self.update_height_samples_trigger += 1
         if self.update_height_samples_trigger == 5:
@@ -255,6 +262,7 @@ class HumanoidMoveBySpeedController(BaseController):
 
         # Calculate the height points (in shape of [num_height_points, 3]) in world frame.
         height_points_w = quat_apply_yaw(torch.Tensor(torso_quat_w), self.height_points) + torch.Tensor(torso_pos_w)
+        # height_points_w = quat_apply_yaw(torch.Tensor(torso_quat_w), self.height_points) + torch.Tensor(rel_torso_pos)
 
         heights = self.dynamic_height_samples.get_heights(height_points_w)
 
@@ -277,6 +285,7 @@ class HumanoidMoveBySpeedController(BaseController):
         joint_pos -= default_dof_pos
 
         heights = np.clip(torso_pos_w[2] - 1.0 - heights, -1., 1.) * 5.0
+        # heights = np.clip(relative_base_height- 1.0 - heights, -1., 1.) * 5.0
 
         # Set action command.
         tracking_command = np.array([forward_speed, lateral_speed, rotation_speed], dtype=np.float32)
