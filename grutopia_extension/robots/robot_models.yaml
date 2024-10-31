@@ -88,6 +88,13 @@ robots:
     recover_height: 1.0
     sub_controllers:
     - name: joint_controller
+  - name: oracle_move_to_point
+    type: OracleMoveToPointController
+  - name: oracle_move_along_path
+    type: OracleMoveAlongPathPointsController
+    threshold: 0.1
+    sub_controllers:
+    - name: oracle_move_to_point
   sensors:
   - name: "camera"
     type: "Camera"
@@ -98,3 +105,37 @@ robots:
   - name: "tp_pointcloud"
     type: "Camera"
     prim_path: "logo_link/Camera_pointcloud"
+  - name: "pano_camera_0"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_0"
+  - name: "topdown_camera_50"
+    type: "Camera"
+    prim_path: "topdown_camera_50"
+  - name: "topdown_camera_500"
+    type: "Camera"
+    prim_path: "topdown_camera_500"
+  - name: "h1_pano_camera_debug"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_debug"
+
+  - name: "pano_camera_45"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_45"
+  - name: "pano_camera_90"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_90"
+  - name: "pano_camera_135"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_135"
+  - name: "pano_camera_180"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_180"
+  - name: "pano_camera_225"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_225"
+  - name: "pano_camera_270"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_270"
+  - name: "pano_camera_315"
+    type: "Camera"
+    prim_path: "torso_link/h1_pano_camera_315"

@@ -28,6 +28,7 @@ except:
 
 from grutopia.core.util.log import log
 from grutopia.core.env import BaseEnv
+from grutopia.core.util.container import is_in_container
 
 from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
 
@@ -103,8 +104,10 @@ def load_scene_usd(args, scan):
     '''
     find_flag = False
     for root, dirs, files in os.walk(os.path.join(args.datasets.mp3d_data_dir, scan)):
+        target_file_name = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
         for file in files:
-            if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
+            # if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
+            if file == target_file_name:
                 scene_usd_path = os.path.join(root, file)
                 find_flag = True
                 break
@@ -850,7 +853,7 @@ class VLNDataLoader(Dataset):
         ''' Reset a single robot's pose
         '''
         self.tasks[self.task_names[idx]].set_single_robot_poses_without_offset(position, orientation)
-        self.tasks[self.task_names[idx]].set_world_velocity(np.zeros(6))
+        self.isaac_robots[idx].set_world_velocity(np.zeros(6))
         self.isaac_robots[idx].set_joint_velocities(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.isaac_robots[idx].set_joint_positions(np.zeros(len(self.isaac_robots[idx].dof_names)))
         self.isaac_robots[idx].set_joint_efforts(np.zeros(len(self.isaac_robots[idx].dof_names)))

@@ -205,9 +205,16 @@ def get_occupancy_map(env):
     # Get dimensions for 2d buffer
     dims = generator.get_dimensions()
     print(1)
-    
-base_data_dir = '/ssd/wangliuyi/code/VLN/VLNCE/R2R_VLNCE_v1-3'
-mp3d_data_dir = '/ssd/wangliuyi/code/Matterport3D/data/v1/scans'
+
+# if is_in_container():
+#     headless = True
+#     base_data_dir = '/root/code/VLN/VLNCE/R2R_VLNCE_v1-3'
+#     mp3d_data_dir = '/root/code/Matterport3D/data/v1/scans'
+# else:
+#     base_data_dir = '/ssd/wangliuyi/code/VLN/VLNCE/R2R_VLNCE_v1-3'
+#     mp3d_data_dir = '/ssd/wangliuyi/code/Matterport3D/data/v1/scans'
+base_data_dir = '../VLN/VLNCE/R2R_VLNCE_v1-3'
+mp3d_data_dir = '../Matterport3D/data/v1/scans'
 data_item, data_scan, start_position, start_rotation = load_data(base_data_dir+f"/{args.env}/{args.env}.json.gz", 
                                                                 args.path_id, verbose=args.test_verbose)
 
@@ -215,7 +222,8 @@ find_flag = False
 for root, dirs, files in os.walk(mp3d_data_dir+f"/{data_scan}"):
     for file in files:
         # if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
-        if file == 'fixed.usd':
+        target_file = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
+        if file == target_file:
             scene_usd_path = os.path.join(root, file)
             find_flag = True
             break

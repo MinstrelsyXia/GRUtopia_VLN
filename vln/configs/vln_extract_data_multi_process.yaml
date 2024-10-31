@@ -4,8 +4,8 @@ datasets:
   mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
   mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
   splits:
-    - envdrop
-    # - train
+    # - envdrop
+    - train
     # - val_seen
     # - val_unseen
     # - test
@@ -26,11 +26,11 @@ settings:
     - depth
     - camera_params
   max_step: 20000
-  force_sample: false
+  force_sample: true
   force_sample_scan: false
   filter_stairs: true
   sample_env_flow: true # allow the env flow
-  num_workers: 3
+  num_workers: 2
   max_episodes_per_scan: 100
 
 sample_episodes:

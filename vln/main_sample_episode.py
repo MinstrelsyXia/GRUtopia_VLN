@@ -19,6 +19,7 @@ from multiprocessing import Pipe, Process, Pool
 from threading import Thread
 import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor
+import torch.multiprocessing as mp
 
 from grutopia.core.config import SimulatorConfig
 from grutopia.core.env import BaseEnv
@@ -73,7 +74,7 @@ def update_env_actions(action_name, paths_list, path_idx=-1):
         env_actions.append(init_actions)
     return env_actions
 
-def sample_episode_worker(args, vln_envs, data_camera_list, data_list):
+def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_list):
     """
     Worker function to be executed in parallel.
     """
@@ -84,7 +85,7 @@ def sample_episode_worker(args, vln_envs, data_camera_list, data_list):
         if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
             log.info(f'Scan {scan} has been sampled. Pass.')
             continue
-        env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
         is_app_up = True
             # Assuming `sample_episodes_single_scan` handles its own exceptions and cleanup
         # except Exception as e:
@@ -95,7 +96,7 @@ def sample_episode_worker(args, vln_envs, data_camera_list, data_list):
         #     return
     env.simulation_app.close()
 
-def sample_episodes_multiprocess(args, num_workers, vln_envs, data_camera_list):
+def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_camera_list):
     '''Use multiprocess to handle different scans'''
     tasks = [[] for _ in range(num_workers)]
     scans = [[] for _ in range(num_workers)]
@@ -108,22 +109,27 @@ def sample_episodes_multiprocess(args, num_workers, vln_envs, data_camera_list):
             i += 1
 
     for task_idx in range(num_workers):
-        tasks[task_idx] = (args, vln_envs, data_camera_list, scans[task_idx])
+        tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
 
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        # Using the executor to submit all tasks and immediately creating a list of futures
-        futures = [executor.submit(sample_episode_worker, *task) for task in tasks]
+    # with ProcessPoolExecutor(max_workers=num_workers) as executor:
+    #     # Using the executor to submit all tasks and immediately creating a list of futures
+    #     futures = [executor.submit(sample_episode_worker, *task) for task in tasks]
 
-        # Optionally, you can wait for all futures to complete and handle their results or exceptions
-        for future in futures:
-            try:
-                result = future.result()  # This will block until the future is complete
-                # Handle the result (if any) here
-            except Exception as exc:
-                # Handle exceptions
-                print(f'Generated an exception: {exc}')
+    #     # Optionally, you can wait for all futures to complete and handle their results or exceptions
+    #     for future in futures:
+    #         try:
+    #             result = future.result()  # This will block until the future is complete
+    #             # Handle the result (if any) here
+    #         except Exception as exc:
+    #             # Handle exceptions
+    #             print(f'Generated an exception: {exc}')
+    
+    mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
+    with mp.Pool(num_workers) as pool:
+        pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
+    
 
-def sample_episodes_reset_scans(args, vln_envs, data_camera_list, assigned_split=None, assigned_scan=None):
+def sample_episodes_reset_scans(args, sim_config, vln_envs, data_camera_list, assigned_split=None, assigned_scan=None):
     '''Use one app to handle different scans'''
     is_app_up = False
     if assigned_split is not None and assigned_scan is not None:
@@ -135,12 +141,12 @@ def sample_episodes_reset_scans(args, vln_envs, data_camera_list, assigned_split
                 if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
                     log.info(f'Scan {scan} has been sampled. Pass.')
                     continue
-                env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+                env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
                 is_app_up = True
 
     env.simulation_app.close()
 
-def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, scan=None, is_app_up=False):
+def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=None, scan=None, is_app_up=False):
     '''1. Init the variables'''
     action_name = args.settings.action
     is_app_up = is_app_up
@@ -203,10 +209,11 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
 
         i += 1
 
-        if i % sim_config.config.simulator.rendering_interval == 0:
-            render = True
-        else:
-            render = False
+        # if i % sim_config.config.simulator.rendering_interval == 0:
+        #     render = True
+        # else:
+        #     render = False
+        render = True
 
         # update warm up list
         for warm_up_idx in range(vln_envs.env_num):
@@ -408,9 +415,10 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
 
 if __name__ == "__main__":
     vln_envs, vln_config, sim_config, data_camera_list = build_dataset()
+    log.info(f'Is in container: {is_in_container()}')
     
     if vln_config.settings.mode == "sample_episodes_multiprocess":
-        sample_episodes_multiprocess(vln_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
+        sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
         # sample_episodes_reset_scans(vln_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='VzqfbhrpDEA')
-        sample_episodes_reset_scans(vln_config, vln_envs, data_camera_list)
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
