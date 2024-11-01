@@ -7,7 +7,6 @@ import multiprocessing as mp
 
 class dataCollector:
     def __init__(self, args, parent_pipe, child_pipe, split, scan, path_id_list):
-        # TODO: this has not supported multiple robots
         self.args = args
         self.data_collection_interval = 1
         self.parent_pipe = parent_pipe
