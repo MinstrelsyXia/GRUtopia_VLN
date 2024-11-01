@@ -31,7 +31,7 @@ class SimulatorRunner:
         rendering_dt = eval(rendering_dt) if isinstance(rendering_dt, str) else rendering_dt
         self.dt = physics_dt
         log.debug(f'Simulator physics dt: {self.dt}')
-        self._world = World(physics_dt=self.dt, rendering_dt=rendering_dt, stage_units_in_meters=1.0,sim_params={"use_fabric": True})
+        self._world = World(physics_dt=self.dt, rendering_dt=rendering_dt, stage_units_in_meters=1.0)
         self._scene = self._world.scene
         self._stage = self._world.stage
 
