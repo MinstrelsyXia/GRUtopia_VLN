@@ -11,6 +11,7 @@ import argparse
 import yaml
 import time
 import shutil
+import lmdb
 from collections import defaultdict
 from PIL import Image
 from copy import deepcopy
@@ -80,20 +81,12 @@ def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_lis
     """
     is_app_up = False
     for split, scan in data_list:
-        # try:
         scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
         if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
             log.info(f'Scan {scan} has been sampled. Pass.')
             continue
         env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
         is_app_up = True
-            # Assuming `sample_episodes_single_scan` handles its own exceptions and cleanup
-        # except Exception as e:
-        #     log.error(f"Error processing {scan} in {split}: {e}")
-        # finally:
-        #     # if hasattr(env, 'simulation_app'):
-        #     env.simulation_app.close()
-        #     return
     env.simulation_app.close()
 
 def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_camera_list):
@@ -110,23 +103,12 @@ def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_c
 
     for task_idx in range(num_workers):
         tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
-
-    # with ProcessPoolExecutor(max_workers=num_workers) as executor:
-    #     # Using the executor to submit all tasks and immediately creating a list of futures
-    #     futures = [executor.submit(sample_episode_worker, *task) for task in tasks]
-
-    #     # Optionally, you can wait for all futures to complete and handle their results or exceptions
-    #     for future in futures:
-    #         try:
-    #             result = future.result()  # This will block until the future is complete
-    #             # Handle the result (if any) here
-    #         except Exception as exc:
-    #             # Handle exceptions
-    #             print(f'Generated an exception: {exc}')
     
     mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
     with mp.Pool(num_workers) as pool:
         pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
+    
+    log.info('Finished.')
     
 
 def sample_episodes_reset_scans(args, sim_config, vln_envs, data_camera_list, assigned_split=None, assigned_scan=None):
@@ -209,10 +191,10 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
 
         i += 1
 
-        # if i % sim_config.config.simulator.rendering_interval == 0:
-        #     render = True
-        # else:
-        #     render = False
+        if i % sim_config.config.simulator.rendering_interval == 0:
+            render = True
+        else:
+            render = False
         render = True
 
         # update warm up list

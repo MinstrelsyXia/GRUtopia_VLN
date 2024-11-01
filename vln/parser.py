@@ -49,12 +49,18 @@ def process_args():
         os.makedirs(vln_config.log_image_dir)
     
     if "sample_episodes" in vln_config.settings.mode:
-        vln_config.sample_episode_dir = os.path.join(ROOT_DIR, "logs", "sample_episodes")
+        vln_config.sample_episode_dir = os.path.join(ROOT_DIR, "data", "sample_episodes")
         # if os.path.exists(vln_config.sample_episode_dir) and vln_config.settings.force_sample:
         if os.path.exists(vln_config.sample_episode_dir) and args.clear_sample_dir:
             shutil.rmtree(vln_config.sample_episode_dir)
         if not os.path.exists(vln_config.sample_episode_dir):
             os.makedirs(vln_config.sample_episode_dir)
+        
+        if vln_config.sample_episodes.save_form == 'lmdb':
+            lmdb_name_dir = os.path.join(vln_config.sample_episode_dir, vln_config.nam)
+            vln_config.lmdb_path = os.path.join(lmdb_name_dir, "sample_data.lmdb")
+            if not os.path.exists(lmdb_name_dir):
+                os.makedirs(lmdb_name_dir)
 
     return vln_config, sim_config
 
