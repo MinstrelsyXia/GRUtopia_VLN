@@ -4,7 +4,14 @@ import time
 import numpy as np
 from PIL import Image
 import multiprocessing as mp
+import lmdb
+import torch
+from multiprocessing import Lock
+import pickle
 
+from grutopia.core.util.math import yaw_quat
+
+# This uses multi-thread to save raw data in sub-dictionaries
 class dataCollector:
     def __init__(self, args, parent_pipe, child_pipe, split, scan, path_id_list):
         self.args = args
@@ -157,3 +164,90 @@ class dataCollector:
         if flag is not None and 'save_flag' in flag:
             return True
         return False
+
+class LmdbDataCollector:
+    def __init__(self, args, split, scan, path_id_list, lmdb_path, env_num):
+        self.args = args
+        self.data_collection_interval = 1
+        self.split = split
+        self.scan = scan
+        self.path_id_list = path_id_list
+        self.lmdb_path = lmdb_path  # LMDB database file path
+        
+        self.episode_total_data = [[] for _ in range(env_num)]
+
+    def collect_data(self, step_time, env, camera_list, camera_pose_dict, 
+                     robot_pose_dict, end_list, path_id_list, start_step_list, 
+                     lock,
+                     add_rgb_subframes=True, success_list=0, fail_reasons=None):
+        """Collect data from environment observations for each step."""
+        obs = env.get_observations(add_rgb_subframes=add_rgb_subframes)
+
+        for env_idx, (task_name, task) in enumerate(obs.items()):
+            episode_data = None
+            if not end_list[env_idx]:
+                for robot_name, robot in task.items():
+                    episode_data = {
+                        robot_name: {
+                            'camera_info': {},
+                            'robot_info': {},
+                            'path_id': path_id_list[env_idx],
+                            'step': step_time - start_step_list[env_idx]
+                        }
+                    }
+                    for camera in camera_list:
+                        cur_obs = obs[task_name][robot_name][camera]
+                        camera_pose = camera_pose_dict[task_name][camera]
+                        pos, quat = camera_pose[0], camera_pose[1]
+                        yaw = yaw_quat(torch.Tensor(quat)).item() #TODO: Check!
+
+                        rgb_info = cur_obs['rgba'][..., :3]
+                        depth_info = cur_obs['depth']
+                        max_depth = 10
+                        depth_info[depth_info > max_depth] = 0
+
+                        episode_data[robot_name]['camera_data'][camera] = {
+                            'rgb': rgb_info,
+                            'depth': depth_info,
+                            'position': pos.tolist(),
+                            'orientation': quat.tolist(),
+                            'yaw': yaw
+                        }
+
+                    pos, quat = robot_pose_dict[env_idx][0], robot_pose_dict[env_idx][1]
+                    yaw = yaw_quat(torch.Tensor(quat)).item()
+                    episode_data[robot_name]['robot_info'] = {
+                        "position": pos.tolist(),
+                        "orientation": quat.tolist(),
+                        "yaw": yaw
+                    }
+
+            self.episode_total_data[env_idx].append(episode_data)
+
+            if end_list[env_idx]:
+                finish_flag = "success" if success_list[env_idx] else "fail"
+                self.save_episode_data(self.episode_total_data[env_idx], lock, finish_flag, fail_reasons[env_idx])
+            
+            self.episode_total_data[env_idx] = []
+        
+    def save_episode_data(self, episode_datas, lock, finish_flag, fail_reason=None):
+        """Save finished episode into the LMDB database."""
+        with lock:
+            env = lmdb.open(self.lmdb_path, map_size=1024 * 1024 * 1024, max_dbs=0)  # Adjust map_size as needed
+            with env.begin(write=True) as txn:
+                # Use the path_id as the key and store all episode data under it
+                path_id = episode_datas[0].get('path_id', 'unknown_path')
+                key = "path_id".encode()
+
+                # Package episode data with metadata
+                data_to_store = {
+                    'episode_data': episode_datas,
+                    'finish_status': finish_flag,
+                    'fail_reason': fail_reason
+                }
+
+                # Serialize data using pickle and write to LMDB
+                txn.put(key, pickle.dumps(data_to_store))
+
+            env.close()
+            # print(f"Episode {path_id} saved with status {self.finish_status[finish_flag]}.")
