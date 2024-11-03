@@ -28,7 +28,7 @@ from grutopia.core.util.container import is_in_container
 from grutopia.core.util.log import log
 
 from vln.src.dataset.data_utils_multi_env import VLNDataLoader
-from vln.src.dataset.data_collector import dataCollector
+from vln.src.dataset.data_collector import dataCollector, LmdbDataCollector
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
@@ -75,7 +75,7 @@ def update_env_actions(action_name, paths_list, path_idx=-1):
         env_actions.append(init_actions)
     return env_actions
 
-def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_list):
+def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_list, lock=None):
     """
     Worker function to be executed in parallel.
     """
@@ -85,7 +85,7 @@ def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_lis
         if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
             log.info(f'Scan {scan} has been sampled. Pass.')
             continue
-        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up, mp_lock=lock)
         is_app_up = True
     env.simulation_app.close()
 
@@ -94,19 +94,29 @@ def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_c
     tasks = [[] for _ in range(num_workers)]
     scans = [[] for _ in range(num_workers)]
     
+    # Create lock for multiple processes
+    lock = mp.Lock()
+    
     i = 0
-    # for split, vln_envs in vln_envs_all.items():
     for split in vln_envs.data.keys():
         for scan in vln_envs.data[split].keys():
-            scans[i%num_workers].append((split, scan))
+            scans[i % num_workers].append((split, scan))
             i += 1
 
-    for task_idx in range(num_workers):
-        tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
-    
+    processes = []
     mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
-    with mp.Pool(num_workers) as pool:
-        pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
+    for task_idx in range(num_workers):
+        # Pack arguments for each worker
+        task_args = (args, sim_config, vln_envs, data_camera_list, scans[task_idx], lock)
+        
+        # Create and start each process
+        p = mp.Process(target=sample_episode_worker, args=task_args)
+        p.start()
+        processes.append(p)
+    
+    # Wait for all processes to complete
+    for p in processes:
+        p.join()
     
     log.info('Finished.')
     
@@ -128,7 +138,7 @@ def sample_episodes_reset_scans(args, sim_config, vln_envs, data_camera_list, as
 
     env.simulation_app.close()
 
-def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=None, scan=None, is_app_up=False):
+def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=None, scan=None, is_app_up=False, mp_lock=None):
     '''1. Init the variables'''
     action_name = args.settings.action
     is_app_up = is_app_up
@@ -152,12 +162,17 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
         vln_envs.cam_occupancy_map_local_list[0].open_windows_head(text_info=data_item['instruction']['instruction_text'])
     
     '''4. init pipe for saving images'''
-    parent_conn, child_conn = Pipe()
-    data_collector = dataCollector(args, parent_conn, child_conn, split, scan, vln_envs.path_id_list)
-    # save_process = Process(target=data_collector.save_episode_data, args=())
-    save_process = Thread(target=data_collector.save_episode_data, args=())
-    save_process.start()
-    log.info(f"Save process starts.")
+    if args.sample_episodes.save_form == 'thread':
+        # V1: Use multiple threads to save raw images and information
+        parent_conn, child_conn = Pipe()
+        data_collector = dataCollector(args, parent_conn, child_conn, split, scan, vln_envs.path_id_list)
+        # save_process = Process(target=data_collector.save_episode_data, args=())
+        save_process = Thread(target=data_collector.save_episode_data, args=())
+        save_process.start()
+        log.info(f"Save process starts.")
+    elif args.sample_episodes.save_form == 'lmdb':
+        # V2: use lmdb to save all information
+        data_collector = LmdbDataCollector(args, split, scan, vln_envs.path_id_list, args.lmdb_path, sim_config.tasks[0].env_num)
 
     '''5. start simulation'''
     i = 0
@@ -350,15 +365,24 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
             # Since oracle_move_path_controller moves to the next point every 5 steps, the image is fetched every 5+3 steps
             camera_pose_dict = vln_envs.get_camera_pose()
             robot_pose_dict = vln_envs.get_robot_poses()
-            data_collector.collect_and_send_data(i, env, 
-                        camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
-                        robot_pose_dict=robot_pose_dict,
-                        end_list=vln_envs.end_list, 
-                        path_id_list=vln_envs.path_id_list,
-                        start_step_list=vln_envs.env_step_start_index,
-                        add_rgb_subframes=True, finish_flag=False)
-
-            is_image_stacked = True
+            if args.sample_episodes.save_form == 'thread':
+                data_collector.collect_and_send_data(i, env, 
+                            camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
+                            robot_pose_dict=robot_pose_dict,
+                            end_list=vln_envs.end_list, 
+                            path_id_list=vln_envs.path_id_list,
+                            start_step_list=vln_envs.env_step_start_index,
+                            add_rgb_subframes=True, finish_flag=False)
+            elif args.sample_episodes.save_form == 'lmdb':
+                data_collector.collect_data(i, env, 
+                            camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
+                            robot_pose_dict=robot_pose_dict,
+                            end_list=vln_envs.end_list, 
+                            path_id_list=vln_envs.path_id_list,
+                            start_step_list=vln_envs.env_step_start_index,
+                            add_rgb_subframes=True, 
+                            success_list=vln_envs.success_list,
+                            fail_reasons=vln_envs.fail_reason)
 
         if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%(args.sample_episodes.step_interval-1) == 0:
             # TODO

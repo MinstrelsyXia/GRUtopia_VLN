@@ -131,3 +131,6 @@ docs/en/_build
 
 # Log
 logs/
+
+# vln data
+data/

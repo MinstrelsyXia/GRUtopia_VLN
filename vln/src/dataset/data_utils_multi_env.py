@@ -300,6 +300,7 @@ class VLNDataLoader(Dataset):
         self.end_list = [False] * self.env_num
         self.just_end_list = [True] * self.env_num
         self.success_list = [False] * self.env_num
+        self.fail_reason = [None] * self.env_num
         self.env_data_list = [None] * self.env_num
         self.env_step_start_index = [0] * self.env_num
         self.warm_up_list = [10] * self.env_num # This is for warm-up after resetting
@@ -937,6 +938,7 @@ class VLNDataLoader(Dataset):
             self.end_list[env_idx] = True
             self.success_list[env_idx] = False
             self.env_action_finish_states[env_idx] = True
+            self.fail_reasons[env_idx] = reason
             log.error(f"[Fail: {reason}] Scan: {scan}, Path_id: {self.path_id_list[env_idx]}.")
             if self.just_end_list[env_idx]:
                 with open(self.args.episode_status_info_file_list[env_idx], 'a') as f:

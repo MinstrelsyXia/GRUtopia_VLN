@@ -57,7 +57,7 @@ def process_args():
             os.makedirs(vln_config.sample_episode_dir)
         
         if vln_config.sample_episodes.save_form == 'lmdb':
-            lmdb_name_dir = os.path.join(vln_config.sample_episode_dir, vln_config.nam)
+            lmdb_name_dir = os.path.join(vln_config.sample_episode_dir, vln_config.name)
             vln_config.lmdb_path = os.path.join(lmdb_name_dir, "sample_data.lmdb")
             if not os.path.exists(lmdb_name_dir):
                 os.makedirs(lmdb_name_dir)
