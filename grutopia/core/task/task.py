@@ -78,6 +78,7 @@ class BaseTask(OmniBaseTask, ABC):
                 action_registry = omni.kit.actions.core.get_action_registry()
                 # switches to camera lighting
                 action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
+                # set_lighting_mode_stage is not helpful
                 action.execute()
 
         # load robots

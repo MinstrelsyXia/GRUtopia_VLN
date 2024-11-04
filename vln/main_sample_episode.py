@@ -75,7 +75,7 @@ def update_env_actions(action_name, paths_list, path_idx=-1):
         env_actions.append(init_actions)
     return env_actions
 
-def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_list, lock=None):
+def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_list):
     """
     Worker function to be executed in parallel.
     """
@@ -85,7 +85,7 @@ def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_lis
         if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
             log.info(f'Scan {scan} has been sampled. Pass.')
             continue
-        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up, mp_lock=lock)
+        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
         is_app_up = True
     env.simulation_app.close()
 
@@ -94,29 +94,19 @@ def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_c
     tasks = [[] for _ in range(num_workers)]
     scans = [[] for _ in range(num_workers)]
     
-    # Create lock for multiple processes
-    lock = mp.Lock()
-    
     i = 0
+    # for split, vln_envs in vln_envs_all.items():
     for split in vln_envs.data.keys():
         for scan in vln_envs.data[split].keys():
-            scans[i % num_workers].append((split, scan))
+            scans[i%num_workers].append((split, scan))
             i += 1
 
-    processes = []
-    mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
     for task_idx in range(num_workers):
-        # Pack arguments for each worker
-        task_args = (args, sim_config, vln_envs, data_camera_list, scans[task_idx], lock)
-        
-        # Create and start each process
-        p = mp.Process(target=sample_episode_worker, args=task_args)
-        p.start()
-        processes.append(p)
+        tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
     
-    # Wait for all processes to complete
-    for p in processes:
-        p.join()
+    mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
+    with mp.Pool(num_workers) as pool:
+        pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
     
     log.info('Finished.')
     
@@ -138,7 +128,7 @@ def sample_episodes_reset_scans(args, sim_config, vln_envs, data_camera_list, as
 
     env.simulation_app.close()
 
-def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=None, scan=None, is_app_up=False, mp_lock=None):
+def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=None, scan=None, is_app_up=False):
     '''1. Init the variables'''
     action_name = args.settings.action
     is_app_up = is_app_up
@@ -172,7 +162,7 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
         log.info(f"Save process starts.")
     elif args.sample_episodes.save_form == 'lmdb':
         # V2: use lmdb to save all information
-        data_collector = LmdbDataCollector(args, split, scan, vln_envs.path_id_list, args.lmdb_path, sim_config.tasks[0].env_num)
+        data_collector = LmdbDataCollector(args, split, scan, vln_envs.path_id_list, args.lmdb_path, sim_config.config.tasks[0].env_num)
 
     '''5. start simulation'''
     i = 0
@@ -332,6 +322,7 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
                 if args.settings.sample_env_flow:
                     # assign new path to the finished env
                     if vln_envs.end_list[env_idx]:
+                        data_collector.save_data(env_idx,vln_envs.path_id_list[env_idx], vln_envs.success_list[env_idx], vln_envs.fail_reasons[env_idx])
                         update_flag = vln_envs.update_next_single_data(env_idx, split, scan, current_step=i)
                         if update_flag:
                             log.error(f"{env_idx}-th Env: Assign new path_id: {vln_envs.path_id_list[env_idx]}. Reset this env!")
@@ -382,7 +373,7 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
                             start_step_list=vln_envs.env_step_start_index,
                             add_rgb_subframes=True, 
                             success_list=vln_envs.success_list,
-                            fail_reasons=vln_envs.fail_reason)
+                            fail_reasons=vln_envs.fail_reasons)
 
         if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%(args.sample_episodes.step_interval-1) == 0:
             # TODO

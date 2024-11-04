@@ -27,16 +27,16 @@ settings:
     - rgba
     - depth
     - camera_params
-  max_step: 20000
+  max_step: 25000
   force_sample: true
-  force_sample_scan: false
+  force_sample_scan: true
   filter_stairs: true
   sample_env_flow: true # allow the env flow
-  num_workers: 2
+  num_workers: 4
   max_episodes_per_scan: 100
 
 sample_episodes:
-  step_interval: 40
+  step_interval: 80
   save_form: "lmdb" # thread / lmdb
 
 robots:
