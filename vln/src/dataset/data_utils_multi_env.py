@@ -9,6 +9,7 @@ import json
 import copy
 import numpy as np
 import time
+import lmdb
 from collections import defaultdict
 from copy import deepcopy
 import shutil
@@ -83,7 +84,20 @@ def load_gather_data(args, split, filter_same_trajectory=False, filter_stairs=Fa
 
                 if filter_stairs:
                     if 'stair' in item['instruction']['instruction_text']:
-                        continue
+                        # use the differences between the z-dim among reference paths to filter stairs
+                        height_th = 0.3
+                        latest_height = item['reference_path'][0][-1]
+                        has_stairs = False
+                        for path_id in range(1, len(item['reference_path'])):
+                            path = item['reference_path'][path_id]
+                            if abs(path[-1] - latest_height) >= height_th:
+                                # stairs
+                                has_stairs = True
+                                break
+                            else:
+                                latest_height = path[-1]
+                        if has_stairs:
+                            continue
 
                     different_height = False
                     paths = item['reference_path']
@@ -300,7 +314,7 @@ class VLNDataLoader(Dataset):
         self.end_list = [False] * self.env_num
         self.just_end_list = [True] * self.env_num
         self.success_list = [False] * self.env_num
-        self.fail_reason = [None] * self.env_num
+        self.fail_reasons = [None] * self.env_num
         self.env_data_list = [None] * self.env_num
         self.env_step_start_index = [0] * self.env_num
         self.warm_up_list = [10] * self.env_num # This is for warm-up after resetting
@@ -335,6 +349,28 @@ class VLNDataLoader(Dataset):
             return item
         self.all_episode_finish = True
         return None
+    
+    def check_pathId_exist_in_lmdb(self, path_id):
+        '''Check if the data exists in the LMDB database'''
+        exist_flag = False
+        if os.path.exists(self.args.lmdb_path):
+            env = lmdb.open(self.args.lmdb_path, readonly=True)  # Open LMDB in readonly mode
+            
+            with env.begin() as txn:
+                key = f"{path_id}".encode()  # Create the key used to store the data
+                
+                # Retrieve the data using the key
+                value = txn.get(key)
+
+                if value is not None:
+                    print(f"Data exists for path_id: {path_id}")
+                    exist_flag = True  # Data exists
+
+                print(f"No data found for path_id: {path_id}")
+                exist_flag = False  # Data does not exist
+            
+            env.close()
+        return exist_flag
 
     def update_next_single_data(self, env_idx, split, scan, current_step=0, reset_robot=True):
         '''Get the next single data and init all settings'''
@@ -357,9 +393,20 @@ class VLNDataLoader(Dataset):
                     os.makedirs(episode_path)
                     is_data_valid = True
                 else:
-                    log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Pass.")
-                    is_data_valid = False
-                    continue
+                    if self.args.sample_episodes.save_form =='lmdb':
+                        if not self.check_pathId_exist_in_lmdb(path_id):
+                            # the log dir exists but this path data is not in lmdb. So remove the dir and sample again.
+                            shutil.rmtree(episode_path)
+                            os.makedirs(episode_path)
+                            is_data_valid = True
+                        else:
+                            log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Pass.")
+                            is_data_valid = False
+                            continue
+                    else:
+                        log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Pass.")
+                        is_data_valid = False
+                        continue
             else:
                 is_data_valid = True
                 os.makedirs(episode_path)
@@ -877,7 +924,7 @@ class VLNDataLoader(Dataset):
                 continue
             is_fall = self.check_robot_fall(isaac_robot, robots_bottom_z)
             is_fall_list[idx] = is_fall
-            is_stuck = self.check_robot_stuck(idx, isaac_robot, cur_iter=cur_iter, max_iter=1000, threshold=0.2)
+            is_stuck = self.check_robot_stuck(idx, isaac_robot, cur_iter=cur_iter, max_iter=2500, threshold=0.2)
             is_stuck_list[idx] = is_stuck
 
             if (not is_fall) and (not is_stuck):
