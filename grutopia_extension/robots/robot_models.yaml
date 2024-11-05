@@ -53,14 +53,14 @@ robots:
     - right_elbow_joint
   - name: "move_to_point"
     type: "MoveToPointBySpeedController"
-    forward_speed: 1.0
+    forward_speed: 1.5
     rotation_speed: 2.0
-    threshold: 0.1
+    threshold: 0.15
     sub_controllers:
     - name: move_by_speed
   - name: "move_along_path"
     type: MoveAlongPathPointsController
-    forward_speed: 1.0
+    forward_speed: 1.5
     rotation_speed: 2.0
     threshold: 0.15
     sub_controllers:

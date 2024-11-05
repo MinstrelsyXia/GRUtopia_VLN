@@ -105,13 +105,31 @@ class GlobalTopdownMap:
 
     def get_map(self, world_pose, is_camera_base=False, return_camera_pose=False):
         height = self.get_height(world_pose, is_camera_base=is_camera_base)
+        
         if height in self.floor_maps.keys():
             if return_camera_pose:
                 return self.floor_maps[height]['occupancy_map'], self.floor_maps[height]['camera_pose']
             return self.floor_maps[height]['occupancy_map']
         else:
             log.error("Floor height not found in global topdown map")
-            return None
+            cur_height = world_pose[2]
+            if is_camera_base:
+                cur_height = cur_height - self.camera_height
+            
+            # Find a nearest height key from self.floor_maps
+            total_heights = list(self.floor_maps.keys())
+            
+            # Calculate the closest height
+            closest_height = min(total_heights, key=lambda h: abs(h - cur_height))
+            
+            if closest_height in self.floor_maps:
+                log.info(f"Using nearest height: {closest_height} for current height: {cur_height}")
+                if return_camera_pose:
+                    return self.floor_maps[closest_height]['occupancy_map'], self.floor_maps[closest_height]['camera_pose']
+                return self.floor_maps[closest_height]['occupancy_map']
+            else:
+                log.error("No valid height found in global topdown map")
+                return None  # or raise an exception if preferred
 
     def world_to_pixel_old(self, world_pose, specific_height=None, is_camera_base=False):
         if specific_height is None:

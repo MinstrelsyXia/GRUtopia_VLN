@@ -192,7 +192,8 @@ class LmdbDataCollector:
         return depth_info
 
     def collect_data(self, step_time, env, camera_list, camera_pose_dict,
-                     robot_pose_dict, end_list, path_id_list, start_step_list,  
+                     robot_pose_dict, end_list, path_id_list, start_step_list,
+                     progress_list,  
                      add_rgb_subframes=True, success_list=0, fail_reasons=None):
         """Collect data from environment observations for each step."""
         obs = env.get_observations(add_rgb_subframes=add_rgb_subframes)
@@ -206,7 +207,8 @@ class LmdbDataCollector:
                         'camera_info': {},
                         'robot_info': {},
                         # 'path_id': path_id_list[env_idx],
-                        'step': step_time - start_step_list[env_idx]
+                        'step': step_time - start_step_list[env_idx],
+                        'progress': progress_list[env_idx]
                     }
                     for camera in camera_list:
                         cur_obs = obs[task_name][robot_name][camera]
@@ -239,15 +241,69 @@ class LmdbDataCollector:
         finish_flag = "success" if success_flag else "fail"
         self.save_episode_data(self.episode_total_data[env_idx], path_id, finish_flag, fail_reason)
         self.episode_total_data[env_idx] = []
+    
+    def collate_data(self, episode_datas):
+        camera_info_dict = {}
+        robot_info_list = {
+            "position": [],
+            "orientation": [],
+            "yaw": [],
+        }
+        progress_list = []
+        step_list = []
+
+        for episode_data in episode_datas:
+            for camera, info in episode_data['camera_info'].items():
+                if camera not in camera_info_dict:
+                    camera_info_dict[camera] = {
+                        "rgb": [],
+                        "depth": [],
+                        "position": [],
+                        "orientation": [],
+                        "yaw": [],
+                    }
+                
+                camera_info_dict[camera]["rgb"].append(info["rgb"])
+                camera_info_dict[camera]["depth"].append(info["depth"])
+                camera_info_dict[camera]["position"].append(info["position"])
+                camera_info_dict[camera]["orientation"].append(info["orientation"])
+                camera_info_dict[camera]["yaw"].append(info["yaw"])
+
+            robot_info_list["position"].append(episode_data["robot_info"]["position"])
+            robot_info_list["orientation"].append(episode_data["robot_info"]["orientation"])
+            robot_info_list["yaw"].append(episode_data["robot_info"]["yaw"])
+            
+            step_list.append(episode_data["step"])
+            progress_list.append(episode_data["progress"])
+
+        for camera, info in camera_info_dict.items():
+            for key, values in info.items():
+                camera_info_dict[camera][key] = np.array(values)
+
+        for key, values in robot_info_list.items():
+            robot_info_list[key] = np.array(values)
+        
+        collate_data = {
+            'camera_info': camera_info_dict,
+            'robot_info': robot_info_list,
+            'progress': np.array(progress_list),
+            'step': np.array(step_list)
+        }
+        
+        return collate_data
         
     def save_episode_data(self, episode_datas, path_id, finish_flag, fail_reason=None):
-        """Save finished episode into the LMDB database."""
+        """Save finished episode into the LMDB database.
+        :finish_flag: ['success', 'fail']
+        :fail_reason:
+        """
         env = lmdb.open(self.lmdb_path, map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)  # Adjust map_size as needed
         with env.begin(write=True) as txn:
             # Use the path_id as the key and store all episode data under it
             # path_id = episode_datas[0].get('path_id', 'unknown_path')
             key = f"{path_id}".encode()
 
+            episode_datas = self.collate_data(episode_datas)
             # Package episode data with metadata
             data_to_store = {
                 'episode_data': episode_datas,
