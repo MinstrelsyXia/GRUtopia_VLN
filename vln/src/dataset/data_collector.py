@@ -241,7 +241,7 @@ class LmdbDataCollector:
         
     def save_episode_data(self, episode_datas, path_id, finish_flag, fail_reason=None):
         """Save finished episode into the LMDB database."""
-        env = lmdb.open(self.lmdb_path, map_size=1024 * 1024 * 1024, max_dbs=0)  # Adjust map_size as needed
+        env = lmdb.open(self.lmdb_path, map_size=1e12, max_dbs=0)  # Adjust map_size as needed
         with env.begin(write=True) as txn:
             # Use the path_id as the key and store all episode data under it
             # path_id = episode_datas[0].get('path_id', 'unknown_path')

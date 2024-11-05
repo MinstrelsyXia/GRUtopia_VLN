@@ -81,7 +81,7 @@ if __name__ == '__main__':
     # data_collector.read_all_episode_data()
     
     '''2. Load the target path_id'''
-    path_id = '991'
+    path_id = '66'
     episode_data = data_collector.read_episode_data(path_id)
     ## save to the video
     data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos')

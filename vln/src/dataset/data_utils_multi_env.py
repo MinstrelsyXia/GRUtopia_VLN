@@ -354,7 +354,7 @@ class VLNDataLoader(Dataset):
         '''Check if the data exists in the LMDB database'''
         exist_flag = False
         if os.path.exists(self.args.lmdb_path):
-            env = lmdb.open(self.args.lmdb_path, readonly=True)  # Open LMDB in readonly mode
+            env = lmdb.open(self.args.lmdb_path, readonly=True, lock=False)  # Open LMDB in readonly mode
             
             with env.begin() as txn:
                 key = f"{path_id}".encode()  # Create the key used to store the data
@@ -393,7 +393,7 @@ class VLNDataLoader(Dataset):
                     os.makedirs(episode_path)
                     is_data_valid = True
                 else:
-                    if self.args.sample_episodes.save_form =='lmdb':
+                    if self.args.sample_episodes.save_form == 'lmdb':
                         if not self.check_pathId_exist_in_lmdb(path_id):
                             # the log dir exists but this path data is not in lmdb. So remove the dir and sample again.
                             shutil.rmtree(episode_path)

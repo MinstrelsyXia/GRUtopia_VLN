@@ -398,8 +398,9 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
     log.info(f"Total time for scan {scan}: {total_time:.2f} minutes")
 
     print('finish')
-    parent_conn.send({'finish_flag': True})
-    save_process.join() 
+    if args.sample_episodes.save_form == 'thread':
+        parent_conn.send({'finish_flag': True})
+        save_process.join() 
 
     return env
 
