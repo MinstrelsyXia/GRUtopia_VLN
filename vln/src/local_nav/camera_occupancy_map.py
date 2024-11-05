@@ -286,6 +286,7 @@ class CamOccupancyMap:
         data_info = self.get_camera_data()
         rgb = np.array(data_info["rgba"])
         depth = np.array(data_info["depth"])
+        
         # normals = np.array(data_info["normals"])
 
         # Generate free map using normal vectors and depth information
@@ -306,7 +307,8 @@ class CamOccupancyMap:
             flat_surface_mask = np.ones_like(depth, dtype=bool)
 
         # Generate mask for depth within the acceptable range
-        depth_mask = (depth >= min_height) & (depth < max_height)
+        depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
+        # add constraints to allow the door to be free
 
         # robot_mask
         robot_mask = self.create_robot_mask()

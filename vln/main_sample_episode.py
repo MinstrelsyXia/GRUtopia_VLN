@@ -115,7 +115,7 @@ def sample_episodes_reset_scans(args, sim_config, vln_envs, data_camera_list, as
     '''Use one app to handle different scans'''
     is_app_up = False
     if assigned_split is not None and assigned_scan is not None:
-        env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=assigned_split, scan=assigned_scan, is_app_up=is_app_up)
+        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=assigned_split, scan=assigned_scan, is_app_up=is_app_up)
     else:
         for split in vln_envs.data.keys():
             for scan in vln_envs.data[split].keys():
@@ -418,5 +418,5 @@ if __name__ == "__main__":
     if vln_config.settings.mode == "sample_episodes_multiprocess":
         sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
-        # sample_episodes_reset_scans(vln_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='VzqfbhrpDEA')
-        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='cV4RVeZvu5T')
+        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
