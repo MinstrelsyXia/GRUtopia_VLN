@@ -188,7 +188,7 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
     '''6. Enter the env flow loop'''
     while (not all(vln_envs.end_list)) and (not vln_envs.all_episode_finish) and env.simulation_app.is_running():
         ''' (0) check the maximum steps for each env'''
-        max_step = 500 if args.debug else args.settings.max_step
+        max_step = 400 if args.debug else args.settings.max_step
         for env_idx in range(vln_envs.env_num):
             if (i - vln_envs.env_step_start_index[env_idx]) >= max_step:
                 log.error(f"[Failed]. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Exceed the maximum steps: {max_step}")
@@ -365,12 +365,17 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
                             start_step_list=vln_envs.env_step_start_index,
                             add_rgb_subframes=True, finish_flag=False)
             elif args.sample_episodes.save_form == 'lmdb':
+                progress_list = []
+                for env_idx in range(vln_envs.env_num):
+                    progress = vln_envs.nav_point_list[env_idx] / len(vln_envs.paths_list[env_idx])
+                    progress_list.append(progress)
                 data_collector.collect_data(i, env, 
                             camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
                             robot_pose_dict=robot_pose_dict,
                             end_list=vln_envs.end_list, 
                             path_id_list=vln_envs.path_id_list,
                             start_step_list=vln_envs.env_step_start_index,
+                            progress_list=progress_list,
                             add_rgb_subframes=True, 
                             success_list=vln_envs.success_list,
                             fail_reasons=vln_envs.fail_reasons)
@@ -418,5 +423,5 @@ if __name__ == "__main__":
     if vln_config.settings.mode == "sample_episodes_multiprocess":
         sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
-        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='cV4RVeZvu5T')
-        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
+        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='VzqfbhrpDEA')
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)

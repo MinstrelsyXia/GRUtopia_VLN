@@ -1,0 +1,128 @@
+'''
+Author: w61
+Date: 2014/11/05
+Function: the main file to support training and evluation
+'''
+
+import argparse
+import os
+import random
+import yaml
+
+import numpy as np
+import torch
+
+from vln.src.utils.logging import MyLogger, logger
+from vln.src.trainers import dp_trainer
+from vln.src.utils.utils import dict_to_namespace
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--run-type",
+        choices=["train", "eval", "inference"],
+        required=True,
+        help="run type of the experiment (train, eval, inference, collect_dataset)",
+    )
+    parser.add_argument(
+        "--exp-config",
+        type=str,
+        required=True,
+        help="path to config yaml containing info about experiment",
+    )
+    parser.add_argument(
+        "opts",
+        default=None,
+        nargs=argparse.REMAINDER,
+        help="Modify config options from command line",
+    )
+    args = parser.parse_args()
+    run_exp(**vars(args))
+
+def get_config(exp_config, opts):
+    with open(exp_config, 'r') as f:
+        config = dict_to_namespace(yaml.load(f.read(), yaml.FullLoader))
+    if len(opts) > 0:
+        # update args into vln_config
+        for key, value in vars(opts).items():
+            setattr(config, key, value)
+    return config
+
+def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
+    """Runs experiment given mode and config
+
+    Args:
+        exp_config: path to config file.
+        run_type: "train" or "eval.
+        opts: list of strings of additional config options.
+    """
+    config = get_config(exp_config, opts)
+    logger.info(f"config: {config}")
+    
+    # Process the log dir
+    if hasattr(config, 'NAME'):
+        name = config.NAME
+        config.run_type = run_type
+        config.TENSORBOARD_DIR = config.TENSORBOARD_DIR.replace("*name", name)
+        config.CHECKPOINT_FOLDER = config.CHECKPOINT_FOLDER.replace("*name", name)
+        config.EVAL_CKPT_PATH_DIR = config.EVAL_CKPT_PATH_DIR.replace("*name", name)
+        config.RESULTS_DIR = config.RESULTS_DIR.replace("*name", name)
+        config.LOG_DIR = config.LOG_DIR.replace("*name", name)
+        config.IL.DAGGER.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir.replace("*name", name)
+        config.IL.DAGGER.lmdb_features_dagger_update_dir = config.IL.DAGGER.lmdb_features_dagger_update_dir.replace("*name", name)
+        if hasattr(config, 'VIDEO_OPTION'):
+            if len(config.VIDEO_OPTION) > 0:
+                config.VIDEO_DIR = config.VIDEO_DIR.replace("*name", name)
+        
+        config.local_rank = local_rank 
+        config.world_size = config.GPU_NUMBERS = len(config.TORCH_GPU_IDS)
+    
+    # DDP
+    # if hasattr(config, 'DDP') and config.DDP.use:
+    if hasattr(config, 'DDP'):
+        config.seed = config.DDP.seed
+        config.fp16 = config.DDP.fp16
+        config.n_workers = config.DDP.n_workers
+        config.local_rank = config.DDP.local_rank
+        config.node_rank = config.DDP.node_rank
+        config.world_size = config.DDP.world_size
+        config.cuda_first_device = config.DDP.cuda_first_device
+        
+        if config.local_rank == -1 and config.world_size > 1:
+            # Ensure the batch size must be divisible by the number of GPUs for DP
+            assert config.IL.batch_size % len(config.TORCH_GPU_IDS) == 0
+    
+    logdir = config.LOG_DIR
+    config.LOG_FILE = os.path.join(logdir, "log.txt")
+    if logdir:
+        os.makedirs(logdir, exist_ok=True)
+    logger.add_filehandler(config.LOG_FILE)
+
+    random.seed(config.SEED)
+    np.random.seed(config.SEED)
+    torch.manual_seed(config.SEED)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = False
+    # if torch.cuda.is_available():
+    #     torch.set_num_threads(1)
+
+    if run_type == "eval":
+        torch.backends.cudnn.deterministic = True
+
+    if config.MODEL.policy_name == 'CMA_DP_ImgMultiPatch_Policy':
+        trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
+    assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
+    trainer = trainer_init(config)
+
+    if run_type == "train":
+        trainer.train()
+    elif run_type == "eval":
+        trainer.eval()
+    # elif run_type == "inference":
+    #     trainer.inference()
+    # elif run_type == 'collect_dataset':
+    #     trainer.collect_dataset() # for dagger_diffusion_policy_trainer only 
+
+
+if __name__ == "__main__":
+    main()

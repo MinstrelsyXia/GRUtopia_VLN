@@ -13,6 +13,8 @@ import lmdb
 from collections import defaultdict
 from copy import deepcopy
 import shutil
+import zlib
+import pickle
 
 import torch
 from torch.utils.data import Dataset
@@ -350,8 +352,10 @@ class VLNDataLoader(Dataset):
         self.all_episode_finish = True
         return None
     
-    def check_pathId_exist_in_lmdb(self, path_id):
-        '''Check if the data exists in the LMDB database'''
+    def check_pathId_exist_in_lmdb(self, path_id, recollect_failure=False):
+        '''Check if the data exists in the LMDB database
+        :param recollect_failure: whether re-collect the failure samples
+        '''
         exist_flag = False
         if os.path.exists(self.args.lmdb_path):
             env = lmdb.open(self.args.lmdb_path, readonly=True, lock=False)  # Open LMDB in readonly mode
@@ -363,11 +367,21 @@ class VLNDataLoader(Dataset):
                 value = txn.get(key)
 
                 if value is not None:
-                    print(f"Data exists for path_id: {path_id}")
-                    exist_flag = True  # Data exists
-
-                print(f"No data found for path_id: {path_id}")
-                exist_flag = False  # Data does not exist
+                    log.info(f"Data exists for path_id: {path_id}")
+                    if not recollect_failure:
+                        exist_flag = True  # Data exists
+                    else:
+                        value = zlib.decompress(value)
+                        value = pickle.loads(value)
+                        if value['finish_status'] == 'fail':
+                            exist_flag = False
+                            log.info(f"path id {path_id} fails since {value['fail_reason']}. Recollect!")
+                        else:
+                            exist_flag = True
+                            log.info(f"path id {path_id} success. Pass.")
+                else:
+                    print(f"No data found for path_id: {path_id}")
+                    exist_flag = False  # Data does not exist
             
             env.close()
         return exist_flag
@@ -394,7 +408,7 @@ class VLNDataLoader(Dataset):
                     is_data_valid = True
                 else:
                     if self.args.sample_episodes.save_form == 'lmdb':
-                        if not self.check_pathId_exist_in_lmdb(path_id):
+                        if not self.check_pathId_exist_in_lmdb(path_id, recollect_failure=self.args.sample_episodes.recollect_failure):
                             # the log dir exists but this path data is not in lmdb. So remove the dir and sample again.
                             shutil.rmtree(episode_path)
                             os.makedirs(episode_path)
@@ -709,7 +723,7 @@ class VLNDataLoader(Dataset):
         robot_poses = self.get_robot_poses()
         for idx in range(self.env_num):
             global_freemap_camera_pose = self.cam_occupancy_map_global_list[idx].topdown_camera.get_world_pose()[0] - self.tasks[self.task_names[idx]]._offset
-            global_freemap, _ = self.cam_occupancy_map_global_list[idx].get_global_free_map(robot_pos=robot_poses[idx][0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
+            global_freemap, _ = self.cam_occupancy_map_global_list[idx].get_global_free_map(robot_pos=robot_poses[idx][0],robot_height=1.55, update_camera_pose=False, verbose=verbose)
             self.global_freemap_list.append(global_freemap)
             self.global_freemap_camera_pose_list.append(global_freemap_camera_pose)
 
@@ -738,7 +752,7 @@ class VLNDataLoader(Dataset):
 
         robot_pose = self.get_robot_poses()[env_idx]
         global_freemap_camera_pose = self.cam_occupancy_map_global_list[env_idx].topdown_camera.get_world_pose()[0] - self.tasks[self.task_names[env_idx]]._offset
-        global_freemap, _ = self.cam_occupancy_map_global_list[env_idx].get_global_free_map(robot_pos=robot_pose[0],robot_height=1.7, update_camera_pose=False, verbose=verbose)
+        global_freemap, _ = self.cam_occupancy_map_global_list[env_idx].get_global_free_map(robot_pos=robot_pose[0],robot_height=1.55, update_camera_pose=False, verbose=verbose)
         self.global_freemap_list[env_idx] = global_freemap
         self.global_freemap_camera_pose_list[env_idx] = global_freemap_camera_pose
 

@@ -311,7 +311,7 @@ class CamOccupancyMap:
         # add constraints to allow the door to be free
 
         # robot_mask
-        robot_mask = self.create_robot_mask()
+        robot_mask = self.create_robot_mask(mask_size=30)
 
         # Combine masks to determine free space
         free_map = np.zeros_like(depth, dtype=int)

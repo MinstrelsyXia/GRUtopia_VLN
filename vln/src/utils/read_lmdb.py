@@ -65,7 +65,7 @@ class DataCollector:
         if len(frames) > 0:
             height, width, layers = frames[0].shape
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video_writer = cv2.VideoWriter(output_file, fourcc, 24.0, (width, height))
+            video_writer = cv2.VideoWriter(output_file, fourcc, 6, (width, height))
 
             # Write frames to video
             for frame in frames:
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     # data_collector.read_all_episode_data()
     
     '''2. Load the target path_id'''
-    path_id = '66'
+    path_id = '107'
     episode_data = data_collector.read_episode_data(path_id)
     ## save to the video
     data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos')
