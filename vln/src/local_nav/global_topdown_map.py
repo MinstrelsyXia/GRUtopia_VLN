@@ -30,7 +30,7 @@ class GlobalTopdownMap:
 
         self.agent_radius = args.maps.agent_radius  # The radius(m) of robot
         self.voxel_size = args.maps.global_topdown_config.voxel_size # TODO
-        if self.args.maps.add_dilation: # TODO
+        if self.args.maps.add_dilation:
             self.dilation_structure = self.create_dilation_structure(self.agent_radius)
 
         # Attributes for path_planner

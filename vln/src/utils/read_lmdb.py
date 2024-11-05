@@ -4,6 +4,7 @@ import pickle
 from PIL import Image
 import numpy as np
 import cv2
+import zlib
 
 class DataCollector:
     def __init__(self, lmdb_path):
@@ -20,6 +21,7 @@ class DataCollector:
 
             if value is not None:
                 # Deserialize data using pickle
+                value = zlib.decompress(value)
                 data = pickle.loads(value)
                 return data
             else:
@@ -38,6 +40,7 @@ class DataCollector:
                 for key, value in cursor:
                     key_decoded = key.decode('utf-8')  # Decode the key from bytes to string
                     # Deserialize data using pickle
+                    value = zlib.decompress(value)
                     data = pickle.loads(value)
                     all_data[key_decoded] = data  # Store in the dictionary
 
