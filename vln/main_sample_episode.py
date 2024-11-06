@@ -86,7 +86,8 @@ def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_lis
             log.info(f'Scan {scan} has been sampled. Pass.')
             continue
         env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
-        is_app_up = True
+        if env is not None:
+            is_app_up = True
     env.simulation_app.close()
 
 def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_camera_list):
@@ -124,7 +125,9 @@ def sample_episodes_reset_scans(args, sim_config, vln_envs, data_camera_list, as
                     log.info(f'Scan {scan} has been sampled. Pass.')
                     continue
                 env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
-                is_app_up = True
+                if env is not None:
+                    # env has not up
+                    is_app_up = True
 
     env.simulation_app.close()
 
@@ -137,7 +140,10 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
     stand_still_action = {'h1': {'stand_still': []}}
 
     '''2. Init the data and env_num'''
-    vln_envs.allocate_data(split, scan)
+    allocate_flag = vln_envs.allocate_data(split, scan)
+    if not allocate_flag:
+        # This scan has been sampled.
+        return None
 
     '''3. Init the app or Reset the scene'''
     if not is_app_up:
