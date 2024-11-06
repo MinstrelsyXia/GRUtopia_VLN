@@ -1,7 +1,7 @@
 simulator:
   physics_dt: 1/200
   rendering_dt: 1/200
-  rendering_interval: 5
+  rendering_interval: 10
 
 tasks:
 - type: "VLNTask"

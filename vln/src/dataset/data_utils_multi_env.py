@@ -342,7 +342,9 @@ class VLNDataLoader(Dataset):
         self.init_env_manager() # update env_num according to the data length
 
         for idx in range(self.env_num):
-            self.update_next_single_data(idx, split, scan, current_step=0, reset_robot=False)
+            find_valid = self.update_next_single_data(idx, split, scan, current_step=0, reset_robot=False)
+        
+        return find_valid
 
     def get_next_single_data(self):
         if self.data_idx < len(self.scan_data):
