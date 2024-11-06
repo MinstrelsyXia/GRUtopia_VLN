@@ -52,8 +52,8 @@ class DataCollector:
         frames = []
         
         # Collect frames from episode data
-        for episode in episode_data['episode_data']:
-            frame = episode['camera_info']['pano_camera_0']['rgb']
+        rgb_data = episode_data['episode_data']['camera_info']['pano_camera_0']['rgb']
+        for frame in rgb_data:
             # Convert the frame to a PIL image and then to a NumPy array
             pil_image = Image.fromarray(frame)
             frames.append(np.array(pil_image))
@@ -78,13 +78,13 @@ class DataCollector:
             print("No frames to save to video.")
 
 if __name__ == '__main__':
-    lmdb_path = '/ssd/wangliuyi/code/GRUtopia/data/sample_episodes/20241101_sample_episodes/sample_data.lmdb'
+    lmdb_path = '/ssd/wangliuyi/code/GRUtopia/data/sample_episodes/20241105_sample_episodes/sample_data.lmdb'
     data_collector = DataCollector(lmdb_path)
     '''1. Load all data'''
     # data_collector.read_all_episode_data()
     
     '''2. Load the target path_id'''
-    path_id = '107'
+    path_id = '66'
     episode_data = data_collector.read_episode_data(path_id)
     ## save to the video
     data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos')

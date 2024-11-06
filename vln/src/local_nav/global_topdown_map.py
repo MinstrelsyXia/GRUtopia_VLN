@@ -75,16 +75,36 @@ class GlobalTopdownMap:
         log.info(f"Saved global topdown map at height {height} to {img_save_path}")
         plt.close()
     
-    def get_height(self, pos, is_camera_base=False):
+    def get_height(self, pos, is_camera_base=False, find_nearest=True):
         # if is_camera_base:
         #     return math.floor(pos[2] - self.camera_height)
         # return math.floor(pos[2])
         if is_camera_base:
-            return round(pos[2] - self.camera_height)
-        return round(pos[2])
+            height = round(pos[2] - self.camera_height)
+        else:
+            height = round(pos[2])
+        
+        if height not in self.floor_maps.keys() and find_nearest:
+            cur_height = pos[2]
+            if is_camera_base:
+                cur_height = cur_height - self.camera_height
+            
+            # Find a nearest height key from self.floor_maps
+            total_heights = list(self.floor_maps.keys())
+            
+            # Calculate the closest height
+            closest_height = min(total_heights, key=lambda h: abs(h - cur_height))
+            
+            if closest_height in self.floor_maps:
+                log.info(f"Using nearest height: {closest_height} for current height: {cur_height}")
+                return closest_height
+            else:
+                log.error("No valid height found in global topdown map")
+                return None  # or raise an exception if preferred
+        return height
     
     def update_map(self, freemap, camera_pose, update_map=False, verbose=False, env_idx=None):
-        height = self.get_height(camera_pose, is_camera_base=True)
+        height = self.get_height(camera_pose, is_camera_base=True, find_nearest=False)
         if height not in self.floor_maps:
             self.floor_heights.append(height)
             self.floor_maps[height] = {

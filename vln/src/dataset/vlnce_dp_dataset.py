@@ -19,6 +19,8 @@ import torch
 from torch.utils.data import Dataset, IterableDataset
 import torchvision.transforms.functional as TF
 
+from vln.src.models.utils.feature_extract import extract_image_features, extract_instruction_tokens
+
 from vln.src.utils.utils import (
     to_local_coords,
     normalize_data,get_delta,map_action_to_2d
@@ -65,8 +67,9 @@ class VLNCE_DP_Dataset(IterableDataset):
         Main VLNCE-DP dataset class
         """
         self.config = config
-        self.dp_config = config.Diffusion_Policy
+        self.dp_config = config.MODEL.Diffusion_Policy
         
+        self.camera_name = self.config.IL.camera_name
         self.lmdb_features_dir = lmdb_features_dir
         self.lmdb_map_size = lmdb_map_size
         self.preload_size = batch_size * 100
@@ -74,10 +77,10 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.batch_size = batch_size
         
         self.action_stats = {}
-        self.action_stats['min'] = np.array(self.config.Diffusion_Policy.action_stats.min)
-        self.action_stats['max'] = np.array(self.config.Diffusion_Policy.action_stats.max)
+        self.action_stats['min'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.min)
+        self.action_stats['max'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.max)
 
-        if self.config.use_iw:
+        if self.config.MODEL.use_iw:
             self.use_iw = True
             self.inflec_weights = torch.tensor([1.0, inflection_weight_coef])
         else:
@@ -87,7 +90,8 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.lmdb_save_episode_id = lmdb_save_episode_id
         self.use_stack = use_stack
         
-        self.img_mod = self.config.IMAGE_ENCODER.RGB.img_mod
+        self.img_mod = self.config.MODEL.IMAGE_ENCODER.RGB.img_mod
+        self.is_clip_long = (self.config.MODEL.TEXT_ENCODER.type == 'clip-long')
                     
         with lmdb.open(
             self.lmdb_features_dir,
@@ -131,7 +135,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         if self.negative_mining:
             self.distance_categories.append(-1)
         self.len_traj_pred = self.dp_config.len_traj_pred
-        self.learn_angle = self.config.learn_angle
+        self.learn_angle = self.config.MODEL.learn_angle
         self.metric_waypoint_spacing = self.dp_config.metric_waypoint_spacing
 
         self.min_action_distance = self.dp_config.action.min_dist_cat
@@ -153,7 +157,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         # self._load_index()
         # self._build_caches()
         
-        if self.config.learn_angle:
+        if self.config.MODEL.learn_angle:
             self.num_action_params = 3
         else:
             self.num_action_params = 2
@@ -185,19 +189,32 @@ class VLNCE_DP_Dataset(IterableDataset):
                     data = data_to_load['episode_data']
                     finish_status = data_to_load['finish_status']
                     fail_reason = data_to_load['fail_reason']
-                    new_preload.append(data)
+                    if self.config.IL.Filter_failure.use:
+                        if finish_status != 'success' and len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
+                            continue
+                        
+                    instr = self.dataset_data[key]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
+                    # TODO: encode instr
+                    new_data = {
+                        'instruction': instr,
+                        'progress': data['progress'],
+                        'globalgps': data['robot_info']['position'],
+                        'global_rotation': data['robot_info']['orientation'],
+                        'globalyaw': data['robot_info']['yaw'],
+                        'rgb': data['camera_info'][self.camera_name]['rgb'],
+                        'depth': data['camera_info'][self.camera_name]['depth']
+                    }
+                    new_preload.append(new_data)
                     finish_status_list.append(finish_status)
                     fail_reasons_list.append(fail_reason)
-
-                    lengths.append(len(new_preload[-1][0]))
+                    lengths.append(len(new_preload[-1]))
 
             # compute stack images, positions, yaw, and relative actions, time_distance for each observations
+            new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
             
             for item_idx in range(len(new_preload)):
-                instr = self.dataset_data # TODO
-                new_preload[item_idx][0]['instruction'] = new_preload[item_idx][0]['instruction'][:, :self.config.TEXT_ENCODER.max_length]
-                item_obs = new_preload[item_idx][0]
-                total_steps = len(item_obs["globalgps"])
+                item_obs = new_preload[item_idx]
+                total_steps = len(item_obs["progress"])
                 '''Type-2: Remove episodes having too long steps'''
                 # if total_steps > 200:
                 #     continue
@@ -206,19 +223,19 @@ class VLNCE_DP_Dataset(IterableDataset):
                 # total_steps = min(total_steps, 200)
                 
                 item_obs["globalyaw"] = np.zeros(total_steps)
-                for k,v in item_obs.items():
-                    item_obs[k] = item_obs[k][:total_steps]
+                # for k,v in item_obs.items():
+                #     item_obs[k] = item_obs[k][:total_steps]
 
-                if self.config.learn_angle:
+                if self.config.MODEL.learn_angle:
                     item_obs["actions"] = np.zeros((total_steps, self.len_traj_pred, 3))
-                    item_obs["prev_actions"] = np.zeros((total_steps, self.config.len_traj_act, 3))
+                    item_obs["prev_actions"] = np.zeros((total_steps, self.config.MODEL.len_traj_act, 3))
                 else:
                     item_obs["actions"] = item_obs["prev_actions"] = np.zeros((total_steps, self.len_traj_pred, 2))
-                    item_obs["prev_actions"] = np.zeros((total_steps, self.config.len_traj_act, 2))
+                    item_obs["prev_actions"] = np.zeros((total_steps, self.config.MODEL.len_traj_act, 2))
                 item_obs["step_distance"] = np.zeros(total_steps)
 
-                if self.config.STEP_ENCODER.use:
-                    item_obs["steps"] = np.arange(min(total_steps, self.config.STEP_ENCODER.max_steps))
+                if self.config.MODEL.STEP_ENCODER.use:
+                    item_obs["steps"] = np.arange(min(total_steps, self.config.MODEL.STEP_ENCODER.max_steps))
                 
                 if "rgb_features" in item_obs.keys():
                     self.extract_img_features = False
@@ -226,16 +243,16 @@ class VLNCE_DP_Dataset(IterableDataset):
                     self.extract_img_features = True
                 
                 # Stack images
-                img_stack_nums = 1 if not self.use_stack else self.config.IMAGE_ENCODER.img_stack_nums
+                img_stack_nums = 1 if not self.use_stack else self.config.MODEL.IMAGE_ENCODER.img_stack_nums
                 if self.extract_img_features:
                     # extract image features from raw images
                     img_shape = item_obs["rgb"][0].shape
                     depth_shape = item_obs["depth"][0].shape
                     
                     item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, 3, img_shape[0], img_shape[1]))
-                    if self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
+                    if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
                         item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, 1, depth_shape[0], depth_shape[1]))
-                    elif self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                    elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
                         item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, 3, img_shape[0], img_shape[1]))
                         item_obs["depth_process"] = np.zeros((total_steps, 3, img_shape[0], img_shape[1]))
                         
@@ -247,19 +264,19 @@ class VLNCE_DP_Dataset(IterableDataset):
                     elif self.img_mod == 'multi_patches_avg_pooling':
                         img_patch_num = item_obs["rgb_features"][0].shape[0]
                         item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, img_patch_num, img_shape[-1]))
-                    if self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                    if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
                         item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, img_shape[-1]))
-                    elif self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
+                    elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
                         depth_shape = item_obs["depth_features"][0].shape
                         item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
                     
-                if self.config.IMU_ENCODER.use:
+                if self.config.MODEL.IMU_ENCODER.use:
                     item_obs["imu"] = np.zeros((total_steps, 2))
                 
                 start_pos = item_obs["globalgps"][0][[0, 2]]
                 for step_idx in range(total_steps):
                     # compute imu
-                    if self.config.IMU_ENCODER.use:
+                    if self.config.MODEL.IMU_ENCODER.use:
                         current_pos = item_obs["globalgps"][step_idx][[0,2]]
                         item_obs["imu"][step_idx] = current_pos - start_pos
                     # compute yaw
@@ -277,28 +294,28 @@ class VLNCE_DP_Dataset(IterableDataset):
                     if self.extract_img_features and self.img_encoder is not None:
                         # TODO: adaptive to long-clip and multiple RGB patches
                         item_obs["rgb_process"][step_idx] = self.img_encoder.process_image(item_obs["rgb"][step_idx])
-                        if self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                        if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
                             item_obs["depth_process"][step_idx] = self.img_encoder.process_depth(item_obs["depth"][step_idx])
                         
                         if self.use_stack:
                             if step_idx == 0:
                                 item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_process"][0]
-                                if self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                                if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
                                     item_obs["stack_depth"][step_idx][0] = item_obs["depth_process"][0]
-                                elif self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
+                                elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
                                     item_obs["stack_depth"][step_idx][0] = item_obs["depth"][0]
                             else:
                                 prev_step_idx = min(img_stack_nums, step_idx+1)
                                 item_obs["stack_rgb"][step_idx][:prev_step_idx] = item_obs["rgb_process"][step_idx+1-prev_step_idx: step_idx+1]
-                                if self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                                if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
                                     item_obs["stack_depth"][step_idx][:prev_step_idx] = item_obs["depth_process"][step_idx+1-prev_step_idx: step_idx+1]
-                                elif self.config.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
+                                elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
                                     item_obs["stack_depth"][step_idx][:prev_step_idx] = item_obs["depth"][step_idx+1-prev_step_idx: step_idx+1]
                         else:
                             item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_process"][step_idx]
                     else:
                         if step_idx == 0:
-                            if self.config.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.IMAGE_ENCODER.RGB.multi_patches_num:
+                            if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.MODEL.IMAGE_ENCODER.RGB.multi_patches_num:
                                 # sample data use multi patches, but only use the first cls token
                                 item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_features"][0][0]
                             else:
@@ -308,7 +325,7 @@ class VLNCE_DP_Dataset(IterableDataset):
                             prev_step_idx = min(img_stack_nums, step_idx+1)
                             # use np.flip to make the latest image in the first token
                             flip_images = np.flip(item_obs["rgb_features"][step_idx+1-prev_step_idx: step_idx+1], axis=0)
-                            if self.config.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.IMAGE_ENCODER.RGB.multi_patches_num:
+                            if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.MODEL.IMAGE_ENCODER.RGB.multi_patches_num:
                                 flip_images = flip_images[:,0]
                             item_obs["stack_rgb"][step_idx][:prev_step_idx] = flip_images
                             item_obs["stack_depth"][step_idx][:prev_step_idx] = np.flip(item_obs["depth_features"][step_idx+1-prev_step_idx: step_idx+1], axis=0)
@@ -329,7 +346,7 @@ class VLNCE_DP_Dataset(IterableDataset):
                     prev_actions = self._compute_actions(np.flip(item_obs["globalgps"], axis=0),
                                                          np.flip(item_obs["globalyaw"], axis=0),
                                                          total_steps-step_idx-1,
-                                                         fill_mode='constant')[:self.config.len_traj_act]
+                                                         fill_mode='constant')[:self.config.MODEL.len_traj_act]
                     
                     action_deltas = get_delta(actions)
                     if self.learn_angle:                         
@@ -339,7 +356,7 @@ class VLNCE_DP_Dataset(IterableDataset):
                     
                     # compute temporal step distance
                     distance = (total_steps - step_idx - 1) // self.waypoint_spacing
-                    if self.config.DISTANCE_PREDICTOR.normalize:
+                    if self.config.MODEL.DISTANCE_PREDICTOR.normalize:
                         item_obs["step_distance"][step_idx] = distance / total_steps
                     else:
                         item_obs["step_distance"][step_idx] = distance
