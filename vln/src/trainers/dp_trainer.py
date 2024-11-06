@@ -22,7 +22,7 @@ import json
 
 from vln.src.models.LongCLIP.model import longclip
 from vln.src.models.utils.bert_token import BertTokenizer
-from vln.src.utils.logging import MyLogger, logger
+from vln.src.utils.logger import MyLogger, logger
 from vln.src.utils.utils import extract_best_eval_results, load_dataset
 from vln.src.dataset.vlnce_dp_dataset import VLNCE_DP_Dataset, collate_fn
 
@@ -180,10 +180,11 @@ class DaggerDiffusonPolicyTrainer:
         #     img_encoder = self.policy.net.image_encoder
 
         dataset = VLNCE_DP_Dataset(
-            self.config.MODEL,
+            self.config,
             self.lmdb_features_dir,
             dataset_data=self.train_dataset_data,
             batch_size=self.config.IL.batch_size,
+            bert_tokenizer=self.bert_tokenizer,
             is_distributed=is_distributed, 
             rank=rank,
             world_size=world_size,

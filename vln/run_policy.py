@@ -12,7 +12,7 @@ import yaml
 import numpy as np
 import torch
 
-from vln.src.utils.logging import MyLogger, logger
+from vln.src.utils.logger import MyLogger, logger
 from vln.src.trainers import dp_trainer
 from vln.src.utils.utils import dict_to_namespace
 

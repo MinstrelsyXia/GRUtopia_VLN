@@ -38,7 +38,7 @@ settings:
 sample_episodes:
   step_interval: 80
   save_form: "lmdb" # thread / lmdb
-  recollect_failure: true
+  recollect_failure: false
 
 robots:
   - name: "CylinderRobot"
