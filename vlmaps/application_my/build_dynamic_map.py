@@ -59,7 +59,7 @@ from omni.isaac.kit import SimulationApp
 from omni.isaac.core import World
 from omni.isaac.sensor import Camera
 import numpy as np
-from omni.isaac.lab.app import AppLauncher
+# from omni.isaac.lab.app import AppLauncher
 
 import clip
 
@@ -193,7 +193,7 @@ class TMP(VLMap):
         crop_size = 480  # 480
         base_size = 640  # 520: 无论多大的照片，长边都会变成640
         if torch.cuda.is_available():
-            self.device = "cuda:5"
+            self.device = "cuda:0"
         elif torch.backends.mps.is_available():
             self.device = "mps"
         else:

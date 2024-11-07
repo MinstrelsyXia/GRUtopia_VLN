@@ -33,6 +33,9 @@ from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_re
 from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
 from ..local_nav.BEVmap import BEVMap
 
+def is_in_container():
+    """检查是否在容器中运行"""
+    return os.path.exists('/.dockerenv')
 
 def load_data(args, split):
     ''' Load data based on VLN-CE
@@ -91,7 +94,8 @@ def load_scene_usd(args, scan):
             #     find_flag = True
             #     break
             # if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
-            if file == 'fixed.usd':
+            target_file = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
+            if file == target_file:
                 scene_usd_path = os.path.join(root, file)
                 # scene_usd_path = '/ssd/wangliuyi/code/Matterport3D/data/v1/scans/V2XKFyX4ASd/matterport_mesh/04d3f2105168491db767ad1fe7bc39df/fix_holes_ver2.usd'
                 find_flag = True

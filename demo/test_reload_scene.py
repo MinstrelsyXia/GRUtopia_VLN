@@ -9,7 +9,8 @@ if is_in_container():
     headless = True
     webrtc = True
 
-sim_config.config.tasks[0].scene_asset_path = '/ssd/wangliuyi/data/Matterport3D/data/v1/scans/1LXtFkjw3qL/matterport_mesh/b94039b4eb8947bdb9ff5719d9173eae/isaacsim_b94039b4eb8947bdb9ff5719d9173eae.usd'
+# sim_config.config.tasks[0].scene_asset_path = '/ssd/wangliuyi/data/Matterport3D/data/v1/scans/1LXtFkjw3qL/matterport_mesh/b94039b4eb8947bdb9ff5719d9173eae/isaacsim_b94039b4eb8947bdb9ff5719d9173eae.usd'
+sim_config.config.tasks[0].scene_asset_path = '/isaac-sim/Matterport3D/data/v1/scans/1LXtFkjw3qL/matterport_mesh/b94039b4eb8947bdb9ff5719d9173eae/isaacsim_b94039b4eb8947bdb9ff5719d9173eae.usd'
     
 # env = BaseEnv(sim_config, headless=headless, webrtc=webrtc)
 env = BaseEnv(sim_config, headless=True, webrtc=False, native=True)

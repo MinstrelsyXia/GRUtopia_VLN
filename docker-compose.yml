@@ -1,0 +1,33 @@
+#! not in use!
+version: "3.10"
+services:
+  my_service:
+    image: xxy
+    environment:
+      ACCEPT_EULA: "Y"
+      PRIVACY_CONSENT: "Y"
+      WEBUI_HOST: "127.0.0.1"
+      NVIDIA_VISIBLE_DEVICES: "0"
+      CACHE_ROOT: ${CACHE_ROOT:-/ssd/xiaxinyuan/docker}
+    volumes:
+      # model cache related
+      - /home/xiaxinyuan/.cache/torch/hub/checkpoints:/root/.cache/torch/hub/checkpoints
+      - /home/xiaxinyuan/.cache/clip:/root/.cache/clip
+      # data related
+      - /ssd/share/Matterport3D:/isaac-sim/code/Matterport3D:rw 
+      - /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw
+      - /ssd/xiaxinyuan/code/w61-grutopia/logs:/isaac-sim/GRUtopia/logs:rw
+      - /ssd/xiaxinyuan/code/w61-grutopia:/isaac-sim/:rw
+      # isaacsim cache related
+      - ${CACHE_ROOT}/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw
+      - ${CACHE_ROOT}/isaac-sim/cache/ov:/root/.cache/ov:rw
+      - ${CACHE_ROOT}/isaac-sim/cache/pip:/root/.cache/pip:rw
+      - ${CACHE_ROOT}/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw
+      - ${CACHE_ROOT}/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw
+      - ${CACHE_ROOT}/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw
+      - ${CACHE_ROOT}/isaac-sim/data:/root/.local/share/ov/data:rw
+      - ${CACHE_ROOT}/isaac-sim/documents:/root/Documents:rw
+      
+    container_name: xxy_1107
+    working_dir: /isaac-sim/GRUtopia
+    command: ["/isaac-sim/.venv/bin/python", "vlmaps/application_my/isaac_robot.py", "data_paths=docker","vln_config.vln_cfg_file=vln/configs/vln_cfg_docker.yaml"] 

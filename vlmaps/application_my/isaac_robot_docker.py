@@ -39,6 +39,7 @@ from typing import List, Tuple, Dict, Any, Union
 
 from grutopia.core.env import BaseEnv
 from grutopia.core.util.log import log
+from grutopia.core.util.container import is_in_container
 from vln.src.dataset.data_utils import load_data,load_scene_usd
 
 from vln.src.utils.utils import  compute_rel_orientations,visualize_pc,get_diff_beween_two_quat
@@ -1524,6 +1525,41 @@ def build_dataset(cfg):
 from vlmaps.vlmaps.utils.llm_utils import parse_object_goal_instruction, parse_spatial_instruction
 import pickle
 
+def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_camera_list):
+    '''Use multiprocess to handle different scans'''
+    tasks = [[] for _ in range(num_workers)]
+    scans = [[] for _ in range(num_workers)]
+    
+    i = 0
+    # for split, vln_envs in vln_envs_all.items():
+    for split in vln_envs.data.keys():
+        for scan in vln_envs.data[split].keys():
+            scans[i%num_workers].append((split, scan))
+            i += 1
+
+    for task_idx in range(num_workers):
+        tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
+    
+    mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
+    with mp.Pool(num_workers) as pool:
+        pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
+    
+    log.info('Finished.')
+    
+def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_list):
+    """
+    Worker function to be executed in parallel.
+    """
+    is_app_up = False
+    for split, scan in data_list:
+        scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
+        if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
+            log.info(f'Scan {scan} has been sampled. Pass.')
+            continue
+        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+        if env is not None:
+            is_app_up = True
+    env.simulation_app.close()
 
 @hydra.main(
     version_base=None,
@@ -1532,40 +1568,12 @@ import pickle
 )
 def main(config: DictConfig) -> None:
     vln_envs, vln_config, sim_config, data_camera_list = build_dataset(config.vln_config)
-    # with open('sim_config.pkl','rb') as f:
-    #     sim_config=pickle.load(f)
-    # with open('vln_config.pkl','rb') as f:
-    #     vln_config=pickle.load(f)
-
-    # with open('api_key/openai_api_key.txt','r') as f:
-    #     api_key = f.read().strip()
-    # os.environ["OPENAI_KEY"] = api_key
-
-    # for split in vln_config.datasets.splits:
-    #     # data_dir = Path(config.data_paths.vlmaps_data_dir) / "vlmaps_dataset"
-    #     robot = IsaacSimLanguageRobot(config,sim_config,vln_config = vln_config, split= split)
-    #     robot.setup_scene(config.episode_id,config.trajectory_id)
-    #     robot.map.init_categories(mp3dcat.copy())
-    #     object_categories = parse_object_goal_instruction(robot.instruction)
-        
-    #     # "Enter the bedroom and go around the bed. Go to the closet on the far wall on the left. Stop in the doorway"
-    #     # object_categories = ["bedroom", "bed", "closet", "doorway"]
-    #     # object_categories = ["bed", "closet", "doorway"]
-    #     print("object categories", object_categories)
-    #     print(f"instruction: {robot.instruction}")
-
-    #     while robot.env.simulation_app.is_running():
-    #         robot.warm_up(200)
-    #         # robot.turn(-90)
-            
-    #         for cat_i, cat in enumerate(object_categories):
-    #             print(f"Navigating to category {cat}")
-    #             # robot.move_to_object(cat)
-    #             robot.test_movement(f'self.move_to_object("{cat}")')
-    #             #! already moved, missing goal achieved parameter
-    #         break
-    #     robot.env.simulation_app.close()
-
+    log.info(f'Is in container: {is_in_container()}')
+    if vln_config.settings.mode == "sample_episodes_multiprocess":
+        sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
+    elif vln_config.settings.mode == "sample_episodes_reset_scans":
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='VzqfbhrpDEA')
+        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
     for split in vln_config.datasets.splits:
         # data_dir = Path(config.data_paths.vlmaps_data_dir) / "vlmaps_dataset"
         robot = IsaacSimLanguageRobot(config,sim_config,vln_config = vln_config, split= split)
