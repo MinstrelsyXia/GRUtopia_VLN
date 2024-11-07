@@ -361,7 +361,7 @@ class TMP(VLMap):
         lseg_model, lseg_transform, crop_size, base_size, norm_mean, norm_std = self._init_lseg()
         rgb = cv2.imread(str(self.rgb_paths[0]))
         frame_i = 1111
-        new_labels = [ l+', And I am about to cross the room' l for l in labels]
+        new_labels = [l + ', And I am about to cross the room' for l in labels]
 
         pix_feats, pred = get_lseg_feat(
             lseg_model, rgb, new_labels, lseg_transform, self.device, crop_size, base_size, norm_mean, norm_std, vis = True,frame_i = frame_i

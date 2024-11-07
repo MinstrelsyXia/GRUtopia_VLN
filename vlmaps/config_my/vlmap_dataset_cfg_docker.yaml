@@ -1,0 +1,22 @@
+defaults:
+  - data_paths: vlmap_dataset
+  - map_config: vlmap_dataset
+  - params: issacsim_test
+  - vln_config: docker
+  - _self_
+nav:
+  valid_range: 1
+  vis: True
+  tasks_per_scene: 20
+
+episode_id: 100 #! unique id for all trajectory
+trajectory_id: 5
+
+
+# indexing params
+decay_rate: 0.01
+index_2d: True
+init_categories: True
+from_scratch: True # no need to load in vlmap
+online: True # needn't load from rgbs/depths
+find_frontier_type: closest # or closest

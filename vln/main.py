@@ -99,6 +99,7 @@ def vis_one_path(args, vln_envs):
     else:
         actions = {'h1': {action_name: []}}
 
+    topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) 
     while env.simulation_app.is_running():
         i += 1
         reset_flag = False
@@ -116,15 +117,15 @@ def vis_one_path(args, vln_envs):
         if i % 10 == 0:
             print(i)
             if vln_config.settings.check_and_reset_robot:
-                topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) 
+                # topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) 
                 freemap, camera_pose = vln_envs.get_surrounding_free_map(verbose=False)
-                topdown_map.update_map(freemap, camera_pose, verbose=False) 
+                topdown_map.update_map(freemap, camera_pose, update_map=False, verbose=False) 
 
                 reset_robot = vln_envs.check_and_reset_robot(cur_iter=i, update_freemap=False, verbose=vln_config.test_verbose)
                 reset_flag = reset_robot
                 if reset_flag:
                     # actions = {'h1': {'stand_still': []}}
-                    vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
+                    # vln_envs.update_occupancy_map(verbose=vln_config.test_verbose)
                     robot_current_pos = vln_envs.agents.get_world_pose()[0]
                     exe_path, node_type = vln_envs.bev.navigate_p2p(robot_current_pos, paths[current_point], verbose=vln_config.test_verbose)
 

@@ -114,6 +114,7 @@ def  get_lseg_feat(
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches='tight')
         plt.close(fig)
-
-    print(f'rgb image saved to {save_path}')
+        print(f'rgb image saved to {save_path}')
+    else:
+        print(f'no visualize')
     return outputs, pred

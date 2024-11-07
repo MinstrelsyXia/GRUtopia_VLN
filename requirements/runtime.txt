@@ -9,5 +9,6 @@ pillow==10.2.0
 pydantic==1.9.2
 pyyaml==6.0.1
 requests==2.31.0
-rsl_rl @ git+https://github.com/leggedrobotics/rsl_rl@a1d25d1
+# rsl_rl @ git+https://github.com/leggedrobotics/rsl_rl@a1d25d1
+# rsl_rl @ git+ssh://git@github.com/leggedrobotics/rsl_rl.git@a1d25d1
 setuptools==68.0.0

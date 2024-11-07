@@ -1,0 +1,13 @@
+# vln_config.yaml
+# env: train
+# path_id: 5
+headless: True
+test_verbose: True
+wait: false
+mode: vis_one_path
+sim_cfg_file: "vln/configs/sim_cfg.yaml"
+vln_cfg_file: "vln/configs/vln_cfg_docker.yaml"
+save_obs: false
+windows_head: false
+windows_head_type: show
+

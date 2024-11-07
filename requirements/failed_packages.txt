@@ -1,0 +1,2 @@
+clip @ git+https://github.com/openai/CLIP.git@dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1
+-e git+https://github.com/cvg/Hierarchical-Localization/@41860cf4c69fb3f32fc75a4927fcce3d57f9c0a1#egg=hloc
