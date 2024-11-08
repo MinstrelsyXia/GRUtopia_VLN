@@ -1,44 +1,61 @@
-def _initialize_policy(
-        self,
-        config: Config,
-        load_from_ckpt: bool,
-        observation_space: Space,
-        action_space: Space,
+import os,sys
+import torch
+import numpy as np
+from gym import spaces
+
+from vln.src.models.misc import set_random_seed, set_dropout, set_cuda, wrap_model
+from vln.src.models.save import save_training_meta, load_checkpoint
+
+def get_policy(policy_name):
+    if policy_name == 'CMA_DP_Policy':
+        # TODO
+        from vln.src.models.cma_dp_policy import CMA_DP_Net
+        return CMA_DP_Net
+    elif policy_name == 'CMA_DP_ImgMultiPatch_Policy':
+        from vln.src.models.cma_dp_policy_ImgMultiPatch import CMA_DP_Net
+        return CMA_DP_Net
+
+def initialize_policy(
+        config,
+        logger,
+        load_from_ckpt,
+        device,
         load_from_pretrain: bool = False,
+        action_stats = None,
     ) -> None:
-        default_gpu, n_gpu, device = set_cuda(self.config)
+        default_gpu, n_gpu, device = set_cuda(config)
         if default_gpu:
             logger.info(
                 'device: {} n_gpu: {}, distributed training: {}, 16-bits training: {}'.format(
-                    device, n_gpu, bool(self.config.local_rank != -1), self.config.fp16
+                    device, n_gpu, bool(config.local_rank != -1), config.fp16
                 )
             )
         
-        seed = self.config.seed
-        if self.config.local_rank != -1:
-            seed += self.config.rank
+        seed = config.seed
+        if config.local_rank != -1:
+            seed += config.rank
         set_random_seed(seed)
-        
-        if hasattr(self.config.MODEL, 'Diffusion_Policy'):
-            self.action_stats = {}
-            action_stats = self.config.MODEL.Diffusion_Policy.action_stats
-            for key in action_stats:
-                self.action_stats[key] = torch.from_numpy(np.array(action_stats[key])).to(device)
-        
-        if default_gpu:
-            save_training_meta(self.config)
-        
-        policy = baseline_registry.get_policy(self.config.MODEL.policy_name)
 
-        self.policy = policy(
-            config=self.config,
+        if default_gpu:
+            save_training_meta(config)
+        
+        observation_space = spaces.Box(
+                low=0.0,
+                high=1.0,
+                shape=(256,256,1),
+                dtype=np.float32,
+            )
+        
+        policy = get_policy(config.MODEL.policy_name)
+
+        self_policy = policy(
+            config=config,
             observation_space=observation_space,
-            action_space=action_space,
-            action_stats=self.action_stats,
+            action_stats=action_stats,
         )
             
-        self.optimizer = torch.optim.Adam(
-            self.policy.parameters(), lr=self.config.IL.lr
+        optimizer = torch.optim.Adam(
+            self_policy.parameters(), lr=float(config.IL.lr)
         )
         if load_from_pretrain:
             new_ckpt_weights = {}
@@ -80,12 +97,12 @@ def _initialize_policy(
                 
                 del tmp_rgb
             
-            self.policy.load_state_dict(new_ckpt_weights, strict=False)       
+            self_policy.load_state_dict(new_ckpt_weights, strict=False)       
         
         start_epoch = 0
         if load_from_ckpt:
             ckpt_path = config.IL.ckpt_to_load
-            ckpt_dict = self.load_checkpoint(ckpt_path, map_location="cpu")
+            ckpt_dict = load_checkpoint(ckpt_path, map_location="cpu")
             state_dict = ckpt_dict['state_dict']
             new_state_dict = {}
             # Iterate through the state dictionary items
@@ -97,34 +114,32 @@ def _initialize_policy(
                     new_state_dict[new_key] = v
             del state_dict[k]  # Remove the old key with 'module.'
                     
-            incompatible_keys, _= self.policy.load_state_dict(new_state_dict,
+            incompatible_keys, _= self_policy.load_state_dict(new_state_dict,
                                         strict=False)
             if len(incompatible_keys) > 0:
                 logger.warning(f"Incompatible keys: {incompatible_keys}")
             if config.IL.is_requeue:
-                self.optimizer.load_state_dict(ckpt_dict["optim_state"])
-                self.start_epoch = start_epoch = ckpt_dict["epoch"] + 1
-                self.step_id = ckpt_dict["step_id"]
+                optimizer.load_state_dict(ckpt_dict["optim_state"])
+                start_epoch = start_epoch = ckpt_dict["epoch"] + 1
+                step_id = ckpt_dict["step_id"]
             logger.info(f"Loaded weights from checkpoint: {ckpt_path}")
 
-        params = sum(param.numel() for param in self.policy.parameters())
+        params = sum(param.numel() for param in self_policy.parameters())
         params_t = sum(
-            p.numel() for p in self.policy.parameters() if p.requires_grad
+            p.numel() for p in self_policy.parameters() if p.requires_grad
         )
         logger.info(f"Agent parameters: {params / 1e6:.2f}M. Trainable: {params_t / 1e6:.2f}M")
         logger.info("Finished setting up policy.")
         
-        if len(self.config.TORCH_GPU_IDS) == 1:
-            self.config.defrost()
-            self.config.DDP.use = False
-            self.config.freeze()
-        if self.config.DDP.use:
-            if self.config.local_rank != -1:
-                self.policy = wrap_model(self.policy, self.config.TORCH_GPU_IDS[0], self.config.local_rank, self.config.world_size)
+        if len(config.TORCH_GPU_IDS) == 1:
+            config.DDP.use = False
+        if config.DDP.use:
+            if config.local_rank != -1:
+                self_policy = wrap_model(self_policy, config.TORCH_GPU_IDS[0], config.local_rank, logger, config.world_size)
             else:
-                self.policy = wrap_model(self.policy, self.config.TORCH_GPU_IDS, self.config.local_rank, self.config.world_size)
+                self_policy = wrap_model(self_policy, config.TORCH_GPU_IDS, config.local_rank, logger, config.world_size)
         else:
-            self.policy.to(self.device)
+            self_policy.to(device)
         
-        return start_epoch
+        return self_policy, optimizer
     

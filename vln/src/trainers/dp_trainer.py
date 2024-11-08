@@ -25,6 +25,7 @@ from vln.src.models.utils.bert_token import BertTokenizer
 from vln.src.utils.logger import MyLogger, logger
 from vln.src.utils.utils import extract_best_eval_results, load_dataset
 from vln.src.dataset.vlnce_dp_dataset import VLNCE_DP_Dataset, collate_fn
+from vln.src.models.init_policy import initialize_policy
 
 import logging
 
@@ -142,46 +143,51 @@ class DaggerDiffusonPolicyTrainer:
                     "Cannot open database for teacher forcing preload."
                 )
                 raise err
-        else:
-            if not self.config.IL.DAGGER.recollect_first:
-                raise NameError("Recollect_first and lmdb_features_dir are both set to be false. Check!")
-                return
-            with lmdb.open(
-                self.lmdb_features_dir,
-                map_size=int(self.config.IL.DAGGER.lmdb_map_size),
-            ) as lmdb_env, lmdb_env.begin(write=True) as txn:
-                txn.drop(lmdb_env.open_db())
+        # else:
+        #     if not self.config.IL.DAGGER.recollect_first:
+        #         raise NameError("Recollect_first and lmdb_features_dir are both set to be false. Check!")
+        #         return
+        #     with lmdb.open(
+        #         self.lmdb_features_dir,
+        #         map_size=int(self.config.IL.DAGGER.lmdb_map_size),
+        #     ) as lmdb_env, lmdb_env.begin(write=True) as txn:
+        #         txn.drop(lmdb_env.open_db())
 
         if torch.cuda.is_available():
             with torch.cuda.device(self.device):
                 torch.cuda.empty_cache()
         gc.collect()
-
-        # TODO
-        # start_epoch = self._initialize_policy(
-        #     self.config,
-        #     self.config.IL.load_from_ckpt,
-        #     observation_space=observation_space,
-        #     action_space=action_space,
-        #     load_from_pretrain=self.config.IL.load_from_pretrain
-        # )
+        
+        self.action_stats = None
+        if hasattr(self.config.MODEL, 'Diffusion_Policy'):
+            self.action_stats = {}
+            self.action_stats = self.config.MODEL.Diffusion_Policy.action_stats
+            self.action_stats.min = torch.from_numpy(np.array(self.action_stats.min)).to(self.device)
+            self.action_stats.max = torch.from_numpy(np.array(self.action_stats.max)).to(self.device)
+                
+        self.policy, self.optimizer = initialize_policy(
+            self.config,
+            self.train_logger,
+            self.config.IL.load_from_ckpt,
+            self.device,
+            load_from_pretrain=self.config.IL.load_from_pretrain,
+            action_stats=self.action_stats
+        )
         
         is_distributed = False
         rank = 0
         world_size = 1
         start_epoch = 0
-        # if self.world_size > 1:
-        #     img_encoder = self.policy.module.net.image_encoder
-        #     if self.local_rank != -1: # use DDP
-        #         is_distributed = True
-        #         rank = self.local_rank
-        #         world_size = self.world_size
-        # else:
-        #     img_encoder = self.policy.net.image_encoder
+        if self.world_size > 1:
+            if self.local_rank != -1: # use DDP
+                is_distributed = True
+                rank = self.local_rank
+                world_size = self.world_size
 
         dataset = VLNCE_DP_Dataset(
             self.config,
             self.lmdb_features_dir,
+            self.policy,
             dataset_data=self.train_dataset_data,
             batch_size=self.config.IL.batch_size,
             bert_tokenizer=self.bert_tokenizer,
