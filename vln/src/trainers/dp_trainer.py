@@ -188,6 +188,7 @@ class DaggerDiffusonPolicyTrainer:
             self.config,
             self.lmdb_features_dir,
             self.policy,
+            self.device,
             dataset_data=self.train_dataset_data,
             batch_size=self.config.IL.batch_size,
             bert_tokenizer=self.bert_tokenizer,
