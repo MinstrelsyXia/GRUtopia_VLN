@@ -58,7 +58,6 @@ class VLNCE_DP_Dataset(IterableDataset):
         batch_size=1,
         bert_tokenizer=None,
         inflection_weight_coef=1.0,
-        img_encoder=None,
         is_distributed=False,
         rank = 0,
         world_size = 1,
@@ -126,7 +125,6 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.bert_tokenizer = bert_tokenizer
     
         self.dataset_data = dataset_data
-        self.img_encoder = img_encoder
 
         self.waypoint_spacing = self.dp_config.waypoint_spacing
         self.min_dist_cat = self.dp_config.distance.min_dist_cat
@@ -256,7 +254,7 @@ class VLNCE_DP_Dataset(IterableDataset):
                     depth_shape = item_obs["depth"][0].shape
                     if len(depth_shape) == 2:
                         # [256, 256] -> [256, 256, 1]
-                        item_obs["depth"] = np.expand_dims(item_obs["depth"], axis=-1)
+                        item_obs["depth"] = torch.unsqueeze(item_obs["depth"], dim=-1)
                         # TODO: change 256 to 224?
                     item_obs = extract_image_features(self.policy, item_obs,
                                                       img_mod=self.img_mod, len_traj_act=self.config.MODEL.len_traj_act,
