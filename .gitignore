@@ -124,7 +124,7 @@ work_dirs/
 /assets
 
 # user scripts
-/scripts
+# /scripts
 
 # sphinx build dir
 docs/en/_build

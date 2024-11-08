@@ -23,15 +23,18 @@ def extract_instruction_tokens(
     return observations
 
 def extract_image_features(policy, batch, img_mod, len_traj_act=4, world_size=1, stack_rgb=None, stack_depth=None, depth_encoder_type='TAC', save_img_raw=False,
-                           batch_stack_rgb_length=None, proj=True):
+                           batch_stack_rgb_length=None, proj=True, net_device=None):
     """Extracts image features from observations using the policy's image feature extractor."""
     device = batch['globalgps'].device
     bs = batch['globalgps'].shape[0]
+    
+    if device.type == 'cpu' and net_device is not None:
+        device = net_device
 
     if world_size > 1:
-        net = policy.module.net
+        net = policy.module
     else:
-        net = policy.net
+        net = policy
 
     if stack_rgb is None and stack_depth is None:
         rgb = batch['rgb']

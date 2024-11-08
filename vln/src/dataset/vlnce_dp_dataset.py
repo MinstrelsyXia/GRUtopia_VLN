@@ -46,6 +46,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         config,
         lmdb_features_dir,
         policy,
+        device,
         dataset_data: dict,
         context_type: str = "temporal",
         end_slack: int = 0,
@@ -70,6 +71,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.config = config
         self.dp_config = config.MODEL.Diffusion_Policy
         
+        self.device = device
         self.camera_name = self.config.IL.camera_name
         self.lmdb_features_dir = lmdb_features_dir
         self.lmdb_map_size = lmdb_map_size
@@ -228,7 +230,7 @@ class VLNCE_DP_Dataset(IterableDataset):
                 #     item_obs[k] = item_obs[k][:total_steps]
                 
                 for k,v in item_obs.items():
-                    item_obs[k] = torch.from_numpy(np.array(item_obs[k])).to(self.device)
+                    item_obs[k] = torch.from_numpy(np.array(item_obs[k]))
 
                 if self.config.MODEL.learn_angle:
                     item_obs["actions"] = np.zeros((total_steps, self.len_traj_pred, 3))
@@ -256,11 +258,12 @@ class VLNCE_DP_Dataset(IterableDataset):
                         # [256, 256] -> [256, 256, 1]
                         item_obs["depth"] = np.expand_dims(item_obs["depth"], axis=-1)
                         # TODO: change 256 to 224?
-                    item_obs = extract_image_features(self.policy, item_obs, 
+                    item_obs = extract_image_features(self.policy, item_obs,
                                                       img_mod=self.img_mod, len_traj_act=self.config.MODEL.len_traj_act,
                                                       world_size=self.world_size,
                                                       depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
-                                                      proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj)
+                                                      proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+                                                      net_device=self.device)
                     
 
                 img_shape = item_obs["rgb_features"][0].shape
