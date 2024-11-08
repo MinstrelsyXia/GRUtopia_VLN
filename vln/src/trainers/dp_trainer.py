@@ -179,10 +179,13 @@ class DaggerDiffusonPolicyTrainer:
         world_size = 1
         start_epoch = 0
         if self.world_size > 1:
+            img_encoder = self.policy.module.image_encoder
             if self.local_rank != -1: # use DDP
                 is_distributed = True
                 rank = self.local_rank
                 world_size = self.world_size
+        else:
+            img_encoder = self.policy.image_encoder
 
         dataset = VLNCE_DP_Dataset(
             self.config,
