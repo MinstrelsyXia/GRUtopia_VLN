@@ -131,6 +131,14 @@ MODEL:
       model_path: data/pretrained/TAC/tac_depth_encoder.pth
       feature_dim: 768
       projection_dim: 512
+
+      # for Resnet
+      cnn_type: VlnResnetDepthEncoder
+      output_size: 128
+      ddppo_checkpoint: data/ddppo-models/gibson-4plus-mp3d-train-val-test-resnet50.pth
+      backbone: resnet50
+
+
       
   CROSS_MODAL_ENCODER:
     load_model: False

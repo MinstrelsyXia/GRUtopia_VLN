@@ -6,13 +6,12 @@ import math
 import clip
 import numpy as np
 from transformers import CLIPImageProcessor, CLIPVisionModel, CLIPVisionConfig
-from vlnce_baselines.config.default import get_config
 import torch.nn.functional as F
 from torchvision.transforms import Resize
 from copy import deepcopy
 
 from .lora import LinearWithLoRA, MultiheadAttnWithLoRA
-from vlnce_baselines.models.LongCLIP.model import longclip
+from vln.src.models.LongCLIP.model import longclip
 from functools import partial
 
 from .bert_backbone import extend_neg_masks

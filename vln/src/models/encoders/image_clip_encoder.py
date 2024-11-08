@@ -6,17 +6,16 @@ import math
 import clip
 import numpy as np
 from transformers import CLIPImageProcessor, CLIPVisionModel, CLIPVisionConfig
-from vlnce_baselines.config.default import get_config
 import torch.nn.functional as F
 from torchvision.transforms import Resize, ToPILImage
 from copy import deepcopy
 from PIL import Image
 
-from vlnce_baselines.models.encoders import resnet_encoders
+from vln.src.models.encoders import resnet_encoders
 
 from .bert_backbone import PositionalEncoding
 from .lora import LinearWithLoRA
-from vlnce_baselines.models.LongCLIP.model import longclip
+from vln.src.models.LongCLIP.model import longclip
 from functools import partial
 
 class WrapModule(torch.nn.Module):
@@ -85,13 +84,13 @@ class ImageEncoder(torch.nn.Module):
         
         elif config.DEPTH.bottleneck == 'resnet':
             self.depth_encoder = getattr(
-                resnet_encoders, full_config.DEPTH_ENCODER.cnn_type
+                resnet_encoders, config.DEPTH.cnn_type
             )(
                 observation_space,
-                output_size=full_config.DEPTH_ENCODER.output_size,
-                checkpoint=full_config.DEPTH_ENCODER.ddppo_checkpoint,
-                backbone=full_config.DEPTH_ENCODER.backbone,
-                trainable=full_config.DEPTH_ENCODER.trainable,
+                output_size=config.DEPTH.output_size,
+                checkpoint=config.DEPTH.ddppo_checkpoint,
+                backbone=config.DEPTH.backbone,
+                trainable=config.DEPTH.update_depth_encoder,
                 spatial_output=True,
             )
             self.depth_linear = nn.Sequential(

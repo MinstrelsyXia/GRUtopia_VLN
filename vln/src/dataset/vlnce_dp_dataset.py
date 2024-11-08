@@ -45,6 +45,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         self,
         config,
         lmdb_features_dir,
+        policy,
         dataset_data: dict,
         context_type: str = "temporal",
         end_slack: int = 0,
@@ -77,8 +78,8 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.batch_size = batch_size
         
         self.action_stats = {}
-        self.action_stats['min'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.min)
-        self.action_stats['max'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.max)
+        self.action_stats['min'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.min.cpu())
+        self.action_stats['max'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.max.cpu())
 
         if self.config.MODEL.use_iw:
             self.use_iw = True
@@ -92,6 +93,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         
         self.img_mod = self.config.MODEL.IMAGE_ENCODER.RGB.img_mod
         self.is_clip_long = (self.config.MODEL.TEXT_ENCODER.type == 'clip-long')
+        self.policy = policy
                     
         with lmdb.open(
             self.lmdb_features_dir,
@@ -109,6 +111,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         
         self.start = 0
         self.end = self.length
+        self.world_size = world_size
         if is_distributed:
             per_rank = int(np.ceil(self.length / world_size))
             self.start = per_rank * rank
@@ -190,11 +193,11 @@ class VLNCE_DP_Dataset(IterableDataset):
                     finish_status = data_to_load['finish_status']
                     fail_reason = data_to_load['fail_reason']
                     if self.config.IL.Filter_failure.use:
-                        if finish_status != 'success' and len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
-                            continue
+                        if finish_status != 'success':
+                            if len(data['camera_info']) == 0 or len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
+                                continue
                         
                     instr = self.dataset_data[key]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
-                    # TODO: encode instr
                     new_data = {
                         'instruction': instr,
                         'progress': data['progress'],
@@ -221,10 +224,11 @@ class VLNCE_DP_Dataset(IterableDataset):
                 
                 '''Type-1: Restrict the total_steps to maximum length to avoid over-cuda memory'''
                 # total_steps = min(total_steps, 200)
-                
-                item_obs["globalyaw"] = np.zeros(total_steps)
                 # for k,v in item_obs.items():
                 #     item_obs[k] = item_obs[k][:total_steps]
+                
+                for k,v in item_obs.items():
+                    item_obs[k] = torch.from_numpy(np.array(item_obs[k])).to(self.device)
 
                 if self.config.MODEL.learn_angle:
                     item_obs["actions"] = np.zeros((total_steps, self.len_traj_pred, 3))
@@ -248,47 +252,38 @@ class VLNCE_DP_Dataset(IterableDataset):
                     # extract image features from raw images
                     img_shape = item_obs["rgb"][0].shape
                     depth_shape = item_obs["depth"][0].shape
+                    if len(depth_shape) == 2:
+                        # [256, 256] -> [256, 256, 1]
+                        item_obs["depth"] = np.expand_dims(item_obs["depth"], axis=-1)
+                        # TODO: change 256 to 224?
+                    item_obs = extract_image_features(self.policy, item_obs, 
+                                                      img_mod=self.img_mod, len_traj_act=self.config.MODEL.len_traj_act,
+                                                      world_size=self.world_size,
+                                                      depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
+                                                      proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj)
                     
-                    item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, 3, img_shape[0], img_shape[1]))
-                    if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
-                        item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, 1, depth_shape[0], depth_shape[1]))
-                    elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
-                        item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, 3, img_shape[0], img_shape[1]))
-                        item_obs["depth_process"] = np.zeros((total_steps, 3, img_shape[0], img_shape[1]))
-                        
-                    item_obs["rgb_process"] = np.zeros((total_steps, 3, img_shape[0], img_shape[1]))
-                else:
-                    img_shape = item_obs["rgb_features"][0].shape
-                    if self.img_mod == 'cls':
-                        item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, img_shape[-1]))
-                    elif self.img_mod == 'multi_patches_avg_pooling':
-                        img_patch_num = item_obs["rgb_features"][0].shape[0]
-                        item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, img_patch_num, img_shape[-1]))
-                    if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
-                        item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, img_shape[-1]))
-                    elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
-                        depth_shape = item_obs["depth_features"][0].shape
-                        item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
+
+                img_shape = item_obs["rgb_features"][0].shape
+                if self.img_mod == 'cls':
+                    item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, img_shape[-1]))
+                elif self.img_mod == 'multi_patches_avg_pooling':
+                    img_patch_num = item_obs["rgb_features"][0].shape[0]
+                    item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, img_patch_num, img_shape[-1]))
+                if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                    item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, img_shape[-1]))
+                elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
+                    depth_shape = item_obs["depth_features"][0].shape
+                    item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
                     
                 if self.config.MODEL.IMU_ENCODER.use:
                     item_obs["imu"] = np.zeros((total_steps, 2))
                 
-                start_pos = item_obs["globalgps"][0][[0, 2]]
+                start_pos = item_obs["globalgps"][0][[0, 1]]
                 for step_idx in range(total_steps):
                     # compute imu
                     if self.config.MODEL.IMU_ENCODER.use:
-                        current_pos = item_obs["globalgps"][step_idx][[0,2]]
+                        current_pos = item_obs["globalgps"][step_idx][[0,1]]
                         item_obs["imu"][step_idx] = current_pos - start_pos
-                    # compute yaw
-                    if item_obs["global_rotation"].shape[1] == 4:
-                        quat = item_obs["global_rotation"][step_idx]
-                        quat = np.quaternion(*quat)
-                        yaw = quat_to_angle_axis(quat)[0]
-                        item_obs["globalyaw"][step_idx] = yaw
-                    elif item_obs["global_rotation"].shape[1] == 5:
-                        item_obs["globalyaw"][step_idx] = item_obs["global_rotation"][step_idx][-1]
-                    else:
-                        raise ValueError("Invalid rotation dimension")
                     
                     # stack multiple images and depths
                     if self.extract_img_features and self.img_encoder is not None:

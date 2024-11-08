@@ -6,12 +6,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 from gym import Space, spaces
-from habitat.core.simulator import Observations
-from habitat_baselines.rl.ddppo.policy import resnet
-from habitat_baselines.rl.ddppo.policy.resnet_policy import ResNetEncoder
+import vln.src.models.resnet as resnet
+from vln.src.models.resnet import ResNetEncoder
 from torch import Tensor
-
-from vlnce_baselines.common.utils import single_frame_box_shape
 
 
 class VlnResnetDepthEncoder(nn.Module):
@@ -31,9 +28,7 @@ class VlnResnetDepthEncoder(nn.Module):
         self.visual_encoder = ResNetEncoder(
             spaces.Dict(
                 {
-                    "depth": single_frame_box_shape(
-                        observation_space.spaces["depth"]
-                    )
+                    "depth": observation_space
                 }
             ),
             baseplanes=resnet_baseplanes,
@@ -82,7 +77,7 @@ class VlnResnetDepthEncoder(nn.Module):
             self.output_shape[0] += self.spatial_embeddings.embedding_dim
             self.output_shape = tuple(self.output_shape)
 
-    def forward(self, observations: Observations, return_x_before_fc=False) -> Tensor:
+    def forward(self, observations, return_x_before_fc=False) -> Tensor:
         """
         Args:
             observations: [BATCH, HEIGHT, WIDTH, CHANNEL]
@@ -173,7 +168,7 @@ class TorchVisionResNet(nn.Module):
                 4,
             )
 
-    def forward(self, observations: Observations) -> Tensor:
+    def forward(self, observations) -> Tensor:
         def normalize(imgs: Tensor) -> Tensor:
             """Normalizes a batch of images by:
                 1) scaling pixel values to be in the range 0-1

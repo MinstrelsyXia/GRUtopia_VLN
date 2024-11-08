@@ -4,35 +4,23 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from gym import Space
+
 import copy
 from transformers import PretrainedConfig
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 import matplotlib.pyplot as plt
 
-from habitat import Config
 from copy import deepcopy
-from habitat_baselines.common.baseline_registry import baseline_registry
-# from habitat_baselines.rl.models.rnn_state_encoder import (
-#     build_rnn_state_encoder,
-# )
-from habitat_baselines.rl.ppo.policy import Net
+
 from torch import Tensor
 
-from diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1D
-from diffusion_policy.model.diffusion.transformer_for_diffusion_modified import TransformerForDiffusion 
+from vln.src.models.diffusion_policy.diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1D
+from vln.src.models.diffusion_policy.diffusion_policy.model.diffusion.transformer_for_diffusion_modified import TransformerForDiffusion 
 
-from vlnce_baselines.common.aux_losses import AuxLosses
-# from vlnce_baselines.models.encoders import resnet_encoders
-# from vlnce_baselines.models.encoders.instruction_encoder import (
-#     InstructionEncoder,
-# )
-from vlnce_baselines.models.policy import ILPolicy
+import vln.src.models.encoders as encoders
 
-import vlnce_baselines.models.encoders as encoders
-
-from vlnce_baselines.models.utils import get_delta, get_action, get_data_stats, normalize_data, unnormalize_data, action_reduce
+from vln.src.models.utils.utils import get_delta, get_action, get_data_stats, normalize_data, unnormalize_data, action_reduce
 
 action_spaces = {
     'stop': [0],
@@ -42,242 +30,21 @@ action_spaces = {
     'wait': [4]
 }
 
-@baseline_registry.register_policy
-class CMA_DP_ImgMultiPatch_Policy(ILPolicy):
+class CMA_DP_Net(nn.Module):
     def __init__(
-        self,
-        config: Config,
-        observation_space: Space,
-        action_space: Space,
-        action_stats: Dict,
-    ) -> None:
-        self.config = config
-        self.model_config = config.MODEL
-        self.action_stats = action_stats
-        # action_num = action_space.n
-        if self.model_config.learn_angle:
-            action_num = 3
-        else:
-            action_num = 2
-        super().__init__(
-            CMA_DP_Net(
-                observation_space=observation_space,
-                model_config=self.model_config,
-                num_actions=action_num,
-                action_stats=action_stats
-            ),
-            action_num,
-        )
-
-    @classmethod
-    def from_config(
-        cls, config: Config, observation_space: Space, action_space: Space, batch_size: int
-    ):
-        return cls(
-            observation_space=observation_space,
-            action_space=action_space,
-            model_config=config.MODEL,
-            batch_size=batch_size
-        )
-    
-    def forward(self, batch):
-        if batch['mode'] in ['img_embedding', 'pred_actions', 'update_rnn']:
-            return self.net(batch)
-        elif batch['mode'] == 'act':
-            return self.act(batch)
-
-    def parse_action(self, diffusion_output, dist_pred, pm_pred=None, stop_mode='distance', steps=None):
-        cumsum = False if self.config.EVAL.ACTION == 'descrete' else True
-        if self.model_config.learn_angle:
-            un_actions = get_action(diffusion_output, self.action_stats, cumsum=cumsum)
-            un_actions_nocumsum = get_action(diffusion_output, self.action_stats, cumsum=False)
-            actions_cumsum = get_action(diffusion_output, self.action_stats, cumsum=True)
-        else:
-            un_actions = diffusion_output
-            un_actions_nocumsum, actions_cumsum = un_actions, None
-
-        un_actions = un_actions.detach().cpu().numpy()
-
-        if self.config.EVAL.ACTION == 'xyyaw':
-            actions = []
-            for idx in range(un_actions.shape[0]):
-                # if dist_pred[idx].item() < 1e-1 or (un_actions[0] < 1e-1 and un_actions[1] < 1e-1):
-                value_sum = 0
-                for value in un_actions[idx][-1]:
-                    value_sum += abs(value)
-                if stop_mode == 'distance':
-                    if dist_pred[idx].item() < self.config.EVAL.distance_threshold or\
-                            (abs(un_actions[idx][0][0]) < 1e-1 and abs(un_actions[idx][0][1]) < 1e-1 and abs(un_actions[idx][step_idx][2]) < 1e-1):
-                        # stop
-                        actions.append({"action": "STOP"})
-                        continue
-                elif stop_mode == 'progress':
-                    if pm_pred[idx].item() > self.config.EVAL.pm_threshold or\
-                            (abs(un_actions[idx][0][0]) < 1e-1 and abs(un_actions[idx][0][1]) < 1e-1 and abs(un_actions[idx][0][2]) < 1e-1):
-                        # stop
-                        actions.append({"action": "STOP"})
-                        continue
-                actions.append(
-                    {
-                        "action": {
-                            "action": "GO_TOWARD_XYYAW",
-                            "action_args": {
-                                "actions": un_actions[idx],
-                            },
-                        }
-                    }
-                )
-        elif self.config.EVAL.ACTION == 'descrete':
-            # 0: stop, 1: move forward, 2: turn left, 3: turn right
-            actions = [[] for _ in range(un_actions.shape[0])]
-            for bs_idx in range(un_actions.shape[0]):
-                if self.model_config.learn_angle: # output is 3-dim
-                    stop_th = 3 # 20241026新更新：stop必须要后面连续3个动作都为0，才停；否则就执行后面不是0的动作。
-                    for step_idx in range(un_actions.shape[1]):
-                        if stop_mode == 'distance':
-                            assert dist_pred is not None # distance_predictor should be used for stop_mode 'distance'
-                            if dist_pred[bs_idx].item() < self.config.EVAL.distance_threshold:
-                                # stop
-                                actions[bs_idx].append(action_spaces['stop'])
-                                stop = True
-                                continue
-                        elif stop_mode == 'progress':
-                            stop_flag = False
-                            steps = None # !!! 
-                            if steps is not None:
-                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                                (steps[bs_idx] > 5 and abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
-                            else:
-                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                                    (abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
-                            # stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                            #     (abs(diffusion_output[bs_idx][step_idx][0]) < 3e-1 and abs(diffusion_output[bs_idx][step_idx][1]) < 3e-1 and abs(diffusion_output[bs_idx][step_idx][2]) < 3e-1)
-
-                            if stop_flag:
-                                actions[bs_idx].append(action_spaces['stop'])
-                                stop = True
-                                continue
-                        if abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1:
-                            # turn left or turn right
-                            if un_actions[bs_idx][step_idx][2] > 0:
-                                actions[bs_idx].append(action_spaces['turn_left'])
-                            elif un_actions[bs_idx][step_idx][2] < 0:
-                                actions[bs_idx].append(action_spaces['turn_right'])
-                        else:
-                            # move forward
-                            actions[bs_idx].append(action_spaces['go_forward'])
-
-                    # 20241026新更新：stop必须要后面连续3个动作都为0，才停；否则就执行后面不是0的动作。
-                    # for step_idx in range(self.model_config.len_traj_act):
-                    #     if actions[bs_idx][step_idx] == action_spaces['stop'] and actions[bs_idx][step_idx+1] == action_spaces['stop'] and actions[bs_idx][step_idx+2] == action_spaces['stop']:
-                    #         continue
-                    #     else:
-                    #         if actions[bs_idx][step_idx] == action_spaces['stop']:
-                    #             actions[bs_idx][step_idx] = action_spaces['wait']
-                    # if stop:
-                    #     # stop once the stop action is selected for multiple step predictions
-                    #     actions[bs_idx][0] = action_spaces['stop']
-                else:
-                    # output is 2-dim descrete action
-                    for step_idx in range(un_actions.shape[1]):
-                        stop_flag = False
-                        steps = None
-                        if steps is not None:
-                            stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                            (steps[bs_idx] > 5 and abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1)
-                        else:
-                            stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                            (abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1)
-                        if stop_flag:
-                            actions[bs_idx].append(action_spaces['stop'])
-                            continue
-                        if abs(un_actions[bs_idx][step_idx][0]) > 2e-1:
-                            actions[bs_idx].append(action_spaces['go_forward'])
-                        elif un_actions[bs_idx][step_idx][1] < 0:
-                            actions[bs_idx].append(action_spaces['turn_right'])
-                        elif un_actions[bs_idx][step_idx][1] > 0:
-                            actions[bs_idx].append(action_spaces['turn_left'])
-                
-        return actions, actions_cumsum, un_actions_nocumsum
-
-    def act(self, batch):
-        observations = batch['observations']
-        rnn_states = batch['rnn_states']
-        prev_actions = batch['prev_actions']
-        masks = batch['masks']
-        add_noise_to_action = batch['add_noise_to_action']
-        denoise_action = batch['denoise_action']
-        batch['mode'] = 'pred_actions'
-        
-        batch_size = rnn_states.shape[0]
-        vis = batch['vis']
-        step = batch['step']
-        episode_ids = batch['episode_ids']
-
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred = self.forward(batch)
-
-        # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
-        if batch['denoise_action'] and batch['num_sample'] > 1:         
-            diffusion_output_split = torch.split(diffusion_output, batch['num_sample'], dim=0)
-            if dist_pred is not None:
-                dist_pred_split = torch.split(dist_pred, batch['num_sample'], dim=0)
-            else:
-                dist_pred_split = None
-            rnn_states_split = torch.split(rnn_states_out, batch['num_sample'], dim=0)
-            actions = []
-            un_actions_nocumsum = []
-            rnn_states_list = []
-            for i in range(batch_size):
-                dp_output = diffusion_output_split[i]
-                fix, ax = plt.subplots(1, 1)
-                actions_list = []
-                un_actions_nocumsum_list = []
-                for traj_id, traj in enumerate(dp_output):
-                    traj = traj.unsqueeze(0)
-                    cand_actions, cand_actions_cumsum, cand_un_actions_nocumsum = self.parse_action(traj, dist_pred_split[i][traj_id], pm_pred=progress_pred[i][traj_id], stop_mode=batch['stop_mode'], steps=batch['steps'])
-                    actions_list.append(cand_actions)
-                    un_actions_nocumsum_list.append(cand_un_actions_nocumsum)
-                    if vis:
-                        ax.plot(cand_actions_cumsum[:, 0].detach().cpu(), cand_un_actions_nocumsum[:, 1].detach().cpu(), alpha=0.1, marker='o')
-                
-                if vis:
-                    # save images
-                    save_file = f'data/images/num_samples/EpisodeId_{episode_ids[i]}_step_{step}.png'
-                    plt.savefig(save_file)
-                    print(f"Save image to {save_file}")
-                    
-                    plt.close()
-                
-                # randomly sample one from list
-                actions.append(actions_list[np.random.randint(0, len(actions_list))][0])
-                un_actions_nocumsum.append(un_actions_nocumsum_list[np.random.randint(0, len(un_actions_nocumsum_list))])
-            
-            rnn_states_out = torch.stack([x[0] for x in rnn_states_split], dim=0)
-            
-        else:
-            actions, actions_cumsum, un_actions_nocumsum = self.parse_action(diffusion_output, dist_pred, pm_pred=progress_pred, stop_mode=batch['stop_mode'], steps=batch['steps'])
-        
-        return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred
-
-class CMA_DP_Net(Net):
-    """An implementation of the cross-modal attention (CMA) network in
-    https://arxiv.org/abs/2004.02857
-    Modified by the Diffusion Policy
-    """
-
-    def __init__(
-        self, observation_space: Space, model_config: Config, num_actions: int, 
-        action_stats=None
+        self, config, observation_space, action_stats=None
     ) -> None:
         super().__init__()
-        self.model_config = model_config
-        self.num_actions = num_actions
+        self.config = config
+        self.model_config = config.MODEL
+        if self.model_config.learn_angle:
+            self.num_actions = 3
+        else:
+            self.num_actions = 2
         self.action_stats = action_stats
         
-        model_config.defrost()
-        model_config.TEXT_ENCODER.final_state_only = False
+        self.model_config.TEXT_ENCODER.final_state_only = False
         # Note that I use TEXT_ENCODER to represent the instruction encoder rather than the original INSTRUCTION_ENCODER
-        model_config.freeze()
         
         if self.model_config.TEXT_ENCODER.model_name == 'clip-long':
             self.instruction_encoder = encoders.InstructionLongCLIPEncoder(self.model_config.TEXT_ENCODER, self.model_config.LORA)
@@ -302,7 +69,7 @@ class CMA_DP_Net(Net):
         # Init the cross-modal fusion network
         bert_config = PretrainedConfig.from_pretrained('roberta-base')
         cross_modal_config = copy.deepcopy(bert_config)
-        for k,v in self.model_config.CROSS_MODAL_ENCODER.items():
+        for k,v in vars(self.model_config.CROSS_MODAL_ENCODER).items():
             setattr(cross_modal_config, k, v)
 
         # self.cross_modal_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
@@ -311,39 +78,39 @@ class CMA_DP_Net(Net):
         self.img_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         
         # Init the prev action embedding
-        if model_config.IMAGE_ENCODER.use_stack:
-            prev_action_encoder_size = model_config.IMAGE_ENCODER.RGB.feature_dim
+        if self.model_config.IMAGE_ENCODER.use_stack:
+            prev_action_encoder_size = self.model_config.IMAGE_ENCODER.RGB.feature_dim
         else:
-            prev_action_encoder_size = model_config.PREV_ACTION_ENCODER.encoding_size
-        self.prev_action_embedding = nn.Linear(num_actions, prev_action_encoder_size)
-        self.prev_action_embedding_dp = nn.Linear(num_actions, model_config.STATE_ENCODER.hidden_size)
+            prev_action_encoder_size = self.model_config.PREV_ACTION_ENCODER.encoding_size
+        self.prev_action_embedding = nn.Linear(self.num_actions, prev_action_encoder_size)
+        self.prev_action_embedding_dp = nn.Linear(self.num_actions, self.model_config.STATE_ENCODER.hidden_size)
         self.prev_act_ln = nn.LayerNorm(self.model_config.PREV_ACTION_ENCODER.encoding_size)
         self.prev_action_pos_embedding = encoders.PositionalEncoding(self.model_config.PREV_ACTION_ENCODER.encoding_size, self.model_config.len_traj_act)
         
         # Init the step embedding
-        if model_config.STEP_ENCODER.use:
+        if self.model_config.STEP_ENCODER.use:
             self.step_embeddings = nn.Embedding(self.model_config.STEP_ENCODER.max_steps, self.model_config.STEP_ENCODER.encoding_size)
-            self.step_embeddings_dp = nn.Embedding(self.model_config.STEP_ENCODER.max_steps, model_config.STATE_ENCODER.hidden_size)
+            self.step_embeddings_dp = nn.Embedding(self.model_config.STEP_ENCODER.max_steps, self.model_config.STATE_ENCODER.hidden_size)
 
         # concat_size = model_config.IMAGE_ENCODER.RGB.feature_dim +\
         #     self.model_config.PREV_ACTION_ENCODER.encoding_size*model_config.len_traj_act
         
         if self.model_config.IMAGE_ENCODER.RGB.img_mod == 'cls':
-            concat_size = model_config.IMAGE_ENCODER.RGB.projection_dim
+            concat_size = self.model_config.IMAGE_ENCODER.RGB.projection_dim
         elif self.model_config.IMAGE_ENCODER.RGB.img_mod == 'multi_patches_avg_pooling':
             if self.model_config.STATE_ENCODER.rgb_depth_embed_method == 'flat':
-                concat_size = model_config.IMAGE_ENCODER.RGB.projection_dim * model_config.IMAGE_ENCODER.RGB.multi_patches_num
+                concat_size = self.model_config.IMAGE_ENCODER.RGB.projection_dim * self.model_config.IMAGE_ENCODER.RGB.multi_patches_num
             elif self.model_config.STATE_ENCODER.rgb_depth_embed_method == 'first':
-                concat_size = model_config.IMAGE_ENCODER.RGB.projection_dim
+                concat_size = self.model_config.IMAGE_ENCODER.RGB.projection_dim
                 
         # Init the IMU encoder
-        if model_config.IMU_ENCODER.use:
-            self.imu_linear = nn.Linear(model_config.IMU_ENCODER.input_size, model_config.IMU_ENCODER.encoding_size)
-            self.imu_linear_dp = nn.Linear(model_config.IMU_ENCODER.input_size, model_config.STATE_ENCODER.hidden_size) # This is used to encode IMU to hidden_states as the inputs for diffusion transformer
-            concat_size += model_config.IMU_ENCODER.encoding_size
+        if self.model_config.IMU_ENCODER.use:
+            self.imu_linear = nn.Linear(self.model_config.IMU_ENCODER.input_size, self.model_config.IMU_ENCODER.encoding_size)
+            self.imu_linear_dp = nn.Linear(self.model_config.IMU_ENCODER.input_size, self.model_config.STATE_ENCODER.hidden_size) # This is used to encode IMU to hidden_states as the inputs for diffusion transformer
+            concat_size += self.model_config.IMU_ENCODER.encoding_size
         
-        if model_config.STEP_ENCODER.use:
-            concat_size += model_config.STEP_ENCODER.encoding_size
+        if self.model_config.STEP_ENCODER.use:
+            concat_size += self.model_config.STEP_ENCODER.encoding_size
         
         # if not model_config.IMAGE_ENCODER.use_stack:
             # concat_size += self.model_config.PREV_ACTION_ENCODER.encoding_size*model_config.len_traj_act
@@ -355,35 +122,35 @@ class CMA_DP_Net(Net):
         # Init the GRU network
         self.state_encoder = encoders.build_rnn_state_encoder(
             input_size=concat_size,
-            hidden_size=model_config.STATE_ENCODER.hidden_size,
-            rnn_type=model_config.STATE_ENCODER.rnn_type,
-            num_layers=model_config.STATE_ENCODER.num_layers
+            hidden_size=self.model_config.STATE_ENCODER.hidden_size,
+            rnn_type=self.model_config.STATE_ENCODER.rnn_type,
+            num_layers=self.model_config.STATE_ENCODER.num_layers
         )
         
         # Init the diffusion policy network
-        self.use_local_cond = model_config.Diffusion_Policy.use_local_cond
-        local_cond_dim = model_config.STATE_ENCODER.hidden_size if self.use_local_cond else None
+        self.use_local_cond = self.model_config.Diffusion_Policy.use_local_cond
+        local_cond_dim = self.model_config.STATE_ENCODER.hidden_size if self.use_local_cond else None
 
-        self.global_cond_linear = nn.Linear(model_config.TEXT_ENCODER.hidden_size, model_config.Diffusion_Policy.encoding_size)
+        self.global_cond_linear = nn.Linear(self.model_config.TEXT_ENCODER.hidden_size, self.model_config.Diffusion_Policy.encoding_size)
         
-        self.dp_type = model_config.Diffusion_Policy.type
-        if model_config.Diffusion_Policy.type == 'resnet_unet':
+        self.dp_type = self.model_config.Diffusion_Policy.type
+        if self.model_config.Diffusion_Policy.type == 'resnet_unet':
             self.action_dp_pred_net = ConditionalUnet1D(
-                    input_dim=num_actions,
+                    input_dim=self.num_actions,
                     local_cond_dim=local_cond_dim,
-                    global_cond_dim=model_config.Diffusion_Policy.encoding_size,
-                    down_dims=model_config.Diffusion_Policy.down_dims,
-                    diffusion_step_embed_dim=model_config.Diffusion_Policy.diffusion_step_embed_dim,
-                    cond_predict_scale=model_config.Diffusion_Policy.cond_predict_scale
+                    global_cond_dim=self.model_config.Diffusion_Policy.encoding_size,
+                    down_dims=self.model_config.Diffusion_Policy.down_dims,
+                    diffusion_step_embed_dim=self.model_config.Diffusion_Policy.diffusion_step_embed_dim,
+                    cond_predict_scale=self.model_config.Diffusion_Policy.cond_predict_scale
                 )
-        elif model_config.Diffusion_Policy.type == 'transformer':
+        elif self.model_config.Diffusion_Policy.type == 'transformer':
             # define the length of conditions
-            if model_config.IMAGE_ENCODER.use_stack:
+            if self.model_config.IMAGE_ENCODER.use_stack:
                 vis_length = self.model_config.len_traj_act
             else:
-                if model_config.IMAGE_ENCODER.RGB.img_mod == 'cls':
+                if self.model_config.IMAGE_ENCODER.RGB.img_mod == 'cls':
                     vis_length = 1
-                elif model_config.IMAGE_ENCODER.RGB.img_mod == 'multi_patches_avg_pooling':
+                elif self.model_config.IMAGE_ENCODER.RGB.img_mod == 'multi_patches_avg_pooling':
                     vis_length = self.model_config.IMAGE_ENCODER.RGB.multi_patches_num
             
             txt_length = self.model_config.TEXT_ENCODER.max_length
@@ -406,40 +173,40 @@ class CMA_DP_Net(Net):
             elif self.model_config.Diffusion_Policy.cond == 'v2_instr':
                 n_obs_steps = rnn_length + 1 + vis_length+1 + imu_length + step_length + prev_act_length
             self.action_dp_pred_net = TransformerForDiffusion(
-                    input_dim=num_actions,
-                    output_dim=num_actions,
-                    horizon=model_config.Diffusion_Policy.len_traj_pred,
+                    input_dim=self.num_actions,
+                    output_dim=self.num_actions,
+                    horizon=self.model_config.Diffusion_Policy.len_traj_pred,
                     n_obs_steps=n_obs_steps,
-                    n_emb=model_config.Diffusion_Policy.transformer_encoding_size, # This is the hidden states insided the transformer!
-                    p_drop_emb=model_config.Diffusion_Policy.transformer_p_drop_emb,
-                    cond_dim=model_config.STATE_ENCODER.hidden_size,
+                    n_emb=self.model_config.Diffusion_Policy.transformer_encoding_size, # This is the hidden states insided the transformer!
+                    p_drop_emb=self.model_config.Diffusion_Policy.transformer_p_drop_emb,
+                    cond_dim=self.model_config.STATE_ENCODER.hidden_size,
                     causal_attn=True,
                     time_as_cond=True,
                     n_layer=self.model_config.Diffusion_Policy.transformer_n_layers,
                     n_cond_layers=self.model_config.Diffusion_Policy.transformer_n_cond_layers
                 )
-            self.action_type_embeds = nn.Embedding(10, model_config.Diffusion_Policy.transformer_encoding_size)
+            self.action_type_embeds = nn.Embedding(10, self.model_config.Diffusion_Policy.transformer_encoding_size)
         
-        if model_config.Diffusion_Policy.scheduler == 'DDPM':
+        if self.model_config.Diffusion_Policy.scheduler == 'DDPM':
             self.noise_scheduler = DDPMScheduler(
-                num_train_timesteps=model_config.Diffusion_Policy.num_diffusion_iters,
+                num_train_timesteps=self.model_config.Diffusion_Policy.num_diffusion_iters,
                 beta_schedule='squaredcos_cap_v2',
                 clip_sample=True,
-                prediction_type=model_config.Diffusion_Policy.pred_type
+                prediction_type=self.model_config.Diffusion_Policy.pred_type
             )
-        elif model_config.Diffusion_Policy.scheduler == 'DDIM':
+        elif self.model_config.Diffusion_Policy.scheduler == 'DDIM':
             self.noise_scheduler = DDIMScheduler(
-                num_train_timesteps=model_config.Diffusion_Policy.num_diffusion_iters,
+                num_train_timesteps=self.model_config.Diffusion_Policy.num_diffusion_iters,
                 beta_schedule='squaredcos_cap_v2',
                 clip_sample=True,
-                prediction_type=model_config.Diffusion_Policy.pred_type
+                prediction_type=self.model_config.Diffusion_Policy.pred_type
             )
-            self.noise_scheduler.set_timesteps(model_config.Diffusion_Policy.num_diffusion_iters)
+            self.noise_scheduler.set_timesteps(self.model_config.Diffusion_Policy.num_diffusion_iters)
        
         # Init the distance prediction network
         if self.model_config.DISTANCE_PREDICTOR.use:
             self.distance_pred_net = encoders.DistanceNetwork(
-                embedding_dim=model_config.STATE_ENCODER.hidden_size, normalize=model_config.DISTANCE_PREDICTOR.normalize)
+                embedding_dim=self.model_config.STATE_ENCODER.hidden_size, normalize=self.model_config.DISTANCE_PREDICTOR.normalize)
 
         # self._output_size = (
         #     model_config.STATE_ENCODER.hidden_size
@@ -453,14 +220,14 @@ class CMA_DP_Net(Net):
         # )
 
         # self._output_size = model_config.STATE_ENCODER.hidden_size
-        if model_config.PROGRESS_MONITOR.use:
+        if self.model_config.PROGRESS_MONITOR.use:
             self.progress_monitor = encoders.DistanceNetwork(
-            embedding_dim=model_config.STATE_ENCODER.hidden_size, 
+            embedding_dim=self.model_config.STATE_ENCODER.hidden_size, 
             normalize=True) # pm_pred 
 
             self._init_pm_layers()
         
-        self._output_size = num_actions
+        self._output_size = self.num_actions
 
         self.train()
 
@@ -864,3 +631,177 @@ class CMA_DP_Net(Net):
         
         elif mode == "update_rnn":
             return self.update_rnn_states(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+    
+    def parse_action(self, diffusion_output, dist_pred, pm_pred=None, stop_mode='distance', steps=None):
+        cumsum = False if self.config.EVAL.ACTION == 'descrete' else True
+        if self.model_config.learn_angle:
+            un_actions = get_action(diffusion_output, self.action_stats, cumsum=cumsum)
+            un_actions_nocumsum = get_action(diffusion_output, self.action_stats, cumsum=False)
+            actions_cumsum = get_action(diffusion_output, self.action_stats, cumsum=True)
+        else:
+            un_actions = diffusion_output
+            un_actions_nocumsum, actions_cumsum = un_actions, None
+
+        un_actions = un_actions.detach().cpu().numpy()
+
+        if self.config.EVAL.ACTION == 'xyyaw':
+            actions = []
+            for idx in range(un_actions.shape[0]):
+                # if dist_pred[idx].item() < 1e-1 or (un_actions[0] < 1e-1 and un_actions[1] < 1e-1):
+                value_sum = 0
+                for value in un_actions[idx][-1]:
+                    value_sum += abs(value)
+                if stop_mode == 'distance':
+                    if dist_pred[idx].item() < self.config.EVAL.distance_threshold or\
+                            (abs(un_actions[idx][0][0]) < 1e-1 and abs(un_actions[idx][0][1]) < 1e-1 and abs(un_actions[idx][step_idx][2]) < 1e-1):
+                        # stop
+                        actions.append({"action": "STOP"})
+                        continue
+                elif stop_mode == 'progress':
+                    if pm_pred[idx].item() > self.config.EVAL.pm_threshold or\
+                            (abs(un_actions[idx][0][0]) < 1e-1 and abs(un_actions[idx][0][1]) < 1e-1 and abs(un_actions[idx][0][2]) < 1e-1):
+                        # stop
+                        actions.append({"action": "STOP"})
+                        continue
+                actions.append(
+                    {
+                        "action": {
+                            "action": "GO_TOWARD_XYYAW",
+                            "action_args": {
+                                "actions": un_actions[idx],
+                            },
+                        }
+                    }
+                )
+        elif self.config.EVAL.ACTION == 'descrete':
+            # 0: stop, 1: move forward, 2: turn left, 3: turn right
+            actions = [[] for _ in range(un_actions.shape[0])]
+            for bs_idx in range(un_actions.shape[0]):
+                if self.model_config.learn_angle: # output is 3-dim
+                    stop_th = 3 # 20241026新更新：stop必须要后面连续3个动作都为0，才停；否则就执行后面不是0的动作。
+                    for step_idx in range(un_actions.shape[1]):
+                        if stop_mode == 'distance':
+                            assert dist_pred is not None # distance_predictor should be used for stop_mode 'distance'
+                            if dist_pred[bs_idx].item() < self.config.EVAL.distance_threshold:
+                                # stop
+                                actions[bs_idx].append(action_spaces['stop'])
+                                stop = True
+                                continue
+                        elif stop_mode == 'progress':
+                            stop_flag = False
+                            steps = None # !!! 
+                            if steps is not None:
+                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
+                                (steps[bs_idx] > 5 and abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
+                            else:
+                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
+                                    (abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
+                            # stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
+                            #     (abs(diffusion_output[bs_idx][step_idx][0]) < 3e-1 and abs(diffusion_output[bs_idx][step_idx][1]) < 3e-1 and abs(diffusion_output[bs_idx][step_idx][2]) < 3e-1)
+
+                            if stop_flag:
+                                actions[bs_idx].append(action_spaces['stop'])
+                                stop = True
+                                continue
+                        if abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1:
+                            # turn left or turn right
+                            if un_actions[bs_idx][step_idx][2] > 0:
+                                actions[bs_idx].append(action_spaces['turn_left'])
+                            elif un_actions[bs_idx][step_idx][2] < 0:
+                                actions[bs_idx].append(action_spaces['turn_right'])
+                        else:
+                            # move forward
+                            actions[bs_idx].append(action_spaces['go_forward'])
+
+                    # 20241026新更新：stop必须要后面连续3个动作都为0，才停；否则就执行后面不是0的动作。
+                    # for step_idx in range(self.model_config.len_traj_act):
+                    #     if actions[bs_idx][step_idx] == action_spaces['stop'] and actions[bs_idx][step_idx+1] == action_spaces['stop'] and actions[bs_idx][step_idx+2] == action_spaces['stop']:
+                    #         continue
+                    #     else:
+                    #         if actions[bs_idx][step_idx] == action_spaces['stop']:
+                    #             actions[bs_idx][step_idx] = action_spaces['wait']
+                    # if stop:
+                    #     # stop once the stop action is selected for multiple step predictions
+                    #     actions[bs_idx][0] = action_spaces['stop']
+                else:
+                    # output is 2-dim descrete action
+                    for step_idx in range(un_actions.shape[1]):
+                        stop_flag = False
+                        steps = None
+                        if steps is not None:
+                            stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
+                            (steps[bs_idx] > 5 and abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1)
+                        else:
+                            stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
+                            (abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1)
+                        if stop_flag:
+                            actions[bs_idx].append(action_spaces['stop'])
+                            continue
+                        if abs(un_actions[bs_idx][step_idx][0]) > 2e-1:
+                            actions[bs_idx].append(action_spaces['go_forward'])
+                        elif un_actions[bs_idx][step_idx][1] < 0:
+                            actions[bs_idx].append(action_spaces['turn_right'])
+                        elif un_actions[bs_idx][step_idx][1] > 0:
+                            actions[bs_idx].append(action_spaces['turn_left'])
+                
+        return actions, actions_cumsum, un_actions_nocumsum
+
+    def act(self, batch):
+        observations = batch['observations']
+        rnn_states = batch['rnn_states']
+        prev_actions = batch['prev_actions']
+        masks = batch['masks']
+        add_noise_to_action = batch['add_noise_to_action']
+        denoise_action = batch['denoise_action']
+        batch['mode'] = 'pred_actions'
+        
+        batch_size = rnn_states.shape[0]
+        vis = batch['vis']
+        step = batch['step']
+        episode_ids = batch['episode_ids']
+
+        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred = self.forward(batch)
+
+        # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
+        if batch['denoise_action'] and batch['num_sample'] > 1:         
+            diffusion_output_split = torch.split(diffusion_output, batch['num_sample'], dim=0)
+            if dist_pred is not None:
+                dist_pred_split = torch.split(dist_pred, batch['num_sample'], dim=0)
+            else:
+                dist_pred_split = None
+            rnn_states_split = torch.split(rnn_states_out, batch['num_sample'], dim=0)
+            actions = []
+            un_actions_nocumsum = []
+            rnn_states_list = []
+            for i in range(batch_size):
+                dp_output = diffusion_output_split[i]
+                fix, ax = plt.subplots(1, 1)
+                actions_list = []
+                un_actions_nocumsum_list = []
+                for traj_id, traj in enumerate(dp_output):
+                    traj = traj.unsqueeze(0)
+                    cand_actions, cand_actions_cumsum, cand_un_actions_nocumsum = self.parse_action(traj, dist_pred_split[i][traj_id], pm_pred=progress_pred[i][traj_id], stop_mode=batch['stop_mode'], steps=batch['steps'])
+                    actions_list.append(cand_actions)
+                    un_actions_nocumsum_list.append(cand_un_actions_nocumsum)
+                    if vis:
+                        ax.plot(cand_actions_cumsum[:, 0].detach().cpu(), cand_un_actions_nocumsum[:, 1].detach().cpu(), alpha=0.1, marker='o')
+                
+                if vis:
+                    # save images
+                    save_file = f'data/images/num_samples/EpisodeId_{episode_ids[i]}_step_{step}.png'
+                    plt.savefig(save_file)
+                    print(f"Save image to {save_file}")
+                    
+                    plt.close()
+                
+                # randomly sample one from list
+                actions.append(actions_list[np.random.randint(0, len(actions_list))][0])
+                un_actions_nocumsum.append(un_actions_nocumsum_list[np.random.randint(0, len(un_actions_nocumsum_list))])
+            
+            rnn_states_out = torch.stack([x[0] for x in rnn_states_split], dim=0)
+            
+        else:
+            actions, actions_cumsum, un_actions_nocumsum = self.parse_action(diffusion_output, dist_pred, pm_pred=progress_pred, stop_mode=batch['stop_mode'], steps=batch['steps'])
+        
+        return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred
+
