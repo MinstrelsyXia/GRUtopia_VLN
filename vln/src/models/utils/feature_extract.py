@@ -37,8 +37,8 @@ def extract_image_features(policy, batch, img_mod, len_traj_act=4, world_size=1,
         net = policy
 
     if stack_rgb is None and stack_depth is None:
-        rgb = batch['rgb']
-        depth = batch['depth']
+        rgb = batch['rgb'].to(device)
+        depth = batch['depth'].to(device)
         
         rgb_feat = net.image_encoder.process_image(rgb).float().to(device)
         if depth_encoder_type == 'TAC':
