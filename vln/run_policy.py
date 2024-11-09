@@ -125,4 +125,5 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
 
 
 if __name__ == "__main__":
+    torch.multiprocessing.set_start_method('spawn')
     main()

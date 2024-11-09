@@ -106,9 +106,20 @@ def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_c
         tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
     
     mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
-    with mp.Pool(num_workers) as pool:
-        pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
+    # with mp.Pool(num_workers) as pool:
+        # pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
     
+    processes = []
+    for task_idx in range(num_workers):
+        tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
+        process = mp.Process(target=sample_episode_worker, args=tasks[task_idx])
+        process.start()
+        processes.append(process)
+
+    # Join processes to ensure all complete
+    for process in processes:
+        process.join()
+        
     log.info('Finished.')
     
 
