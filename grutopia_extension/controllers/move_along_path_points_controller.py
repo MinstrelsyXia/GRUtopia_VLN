@@ -50,7 +50,7 @@ class MoveAlongPathPointsController(BaseController):
                 self.path_point_idx += 1
                 self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
                 self.current_path_point[-1] = 0
-                log.info(f'switch to next path point: {self.current_path_point}')
+                # log.info(f'switch to next path point: {self.current_path_point}')
 
         return self.sub_controllers[0].forward(
             start_position=start_position,

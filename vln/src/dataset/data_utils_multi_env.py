@@ -408,13 +408,15 @@ class VLNDataLoader(Dataset):
             path_id = new_data['trajectory_id']
             episode_path = os.path.join(self.args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
             self.args.episode_path_list[env_idx] = episode_path
-            if os.path.exists(episode_path):
-                if self.args.settings.force_sample:
+            # if os.path.exists(episode_path):
+            if self.args.settings.force_sample:
+                if os.path.exists(episode_path):
                     log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Force to sample again.")
                     # remove the previous sampled data
                     shutil.rmtree(episode_path)
                     os.makedirs(episode_path)
-                    is_data_valid = True
+                is_data_valid = True
+                    
             else:
                 if self.args.sample_episodes.save_form == 'lmdb':
                     if not self.check_pathId_exist_in_lmdb(path_id, recollect_failure=self.args.sample_episodes.recollect_failure):
@@ -427,8 +429,13 @@ class VLNDataLoader(Dataset):
                         is_data_valid = False
                         continue
                 else:
-                    is_data_valid = True
-                    os.makedirs(episode_path, exist_ok=True)
+                    if os.path.exists(episode_path):
+                        log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Pass.")
+                        is_data_valid = False
+                        continue
+                    else:
+                        is_data_valid = True
+                        os.makedirs(episode_path, exist_ok=True)
             # else:
             #     is_data_valid = True
             #     os.makedirs(episode_path)

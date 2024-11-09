@@ -90,6 +90,12 @@ def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_lis
             is_app_up = True
     env.simulation_app.close()
 
+def process_wrapper(*task):
+    try:
+        sample_episode_worker(*task)
+    except Exception as e:
+        log.error(f"Process encountered an error: {e}")
+            
 def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_camera_list):
     '''Use multiprocess to handle different scans'''
     tasks = [[] for _ in range(num_workers)]
@@ -110,9 +116,10 @@ def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_c
         # pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
     
     processes = []
+            
     for task_idx in range(num_workers):
         tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
-        process = mp.Process(target=sample_episode_worker, args=tasks[task_idx])
+        process = mp.Process(target=process_wrapper, args=tasks[task_idx])
         process.start()
         processes.append(process)
 
@@ -440,5 +447,5 @@ if __name__ == "__main__":
     if vln_config.settings.mode == "sample_episodes_multiprocess":
         sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
-        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='V2XKFyX4ASd')
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='sKLMLpTHeUy')
         # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
