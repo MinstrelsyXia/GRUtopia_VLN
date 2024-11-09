@@ -43,8 +43,6 @@ RUN bash -c "cd ../ && \
     bash ./docker_install_req.sh"
 
 RUN bash -c "cd ../ && \
-    chmod +x ./GRUtopia/webui_start.sh && \
-    cp ./GRUtopia/webui_start.sh . && \
     sed 's/^\$python_exe/#\$python_exe/g' ./python.sh > python.env.init && \
     echo 'source /isaac-sim/.venv/bin/activate' >> /root/.bashrc && \
     echo ' . /isaac-sim/python.env.init' >> /root/.bashrc && \

@@ -376,8 +376,15 @@ class VLNDataLoader(Dataset):
                         value = zlib.decompress(value)
                         value = pickle.loads(value)
                         if value['finish_status'] == 'fail':
-                            exist_flag = False
-                            log.info(f"path id {path_id} fails since {value['fail_reason']}. Recollect!")
+                            if self.args.sample_episodes.only_recollect_path_planning_failure:
+                                if value['fail_reason'] == 'path planning':
+                                    exist_flag = False
+                                    log.info(f"path id {path_id} fails since {value['fail_reason']}. Recollect!")
+                                else:
+                                    exist_flag = True
+                            else:
+                                exist_flag = False
+                                log.info(f"path id {path_id} fails since {value['fail_reason']}. Recollect!")
                         else:
                             exist_flag = True
                             log.info(f"path id {path_id} success. Pass.")
