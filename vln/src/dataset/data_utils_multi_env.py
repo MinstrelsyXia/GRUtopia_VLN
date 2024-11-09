@@ -376,8 +376,15 @@ class VLNDataLoader(Dataset):
                         value = zlib.decompress(value)
                         value = pickle.loads(value)
                         if value['finish_status'] == 'fail':
-                            exist_flag = False
-                            log.info(f"path id {path_id} fails since {value['fail_reason']}. Recollect!")
+                            if self.args.sample_episodes.only_recollect_path_plannning_fail:
+                                if value['fail_reason'] == 'path planning':
+                                    exist_flag = False
+                                    log.info(f"path id {path_id} fails since {value['fail_reason']}. Recollect!")
+                                else:
+                                    exist_flag = True
+                            else:    
+                                exist_flag = False
+                                log.info(f"path id {path_id} fails since {value['fail_reason']}. Recollect!")
                         else:
                             exist_flag = True
                             log.info(f"path id {path_id} success. Pass.")
@@ -408,24 +415,23 @@ class VLNDataLoader(Dataset):
                     shutil.rmtree(episode_path)
                     os.makedirs(episode_path)
                     is_data_valid = True
-                else:
-                    if self.args.sample_episodes.save_form == 'lmdb':
-                        if not self.check_pathId_exist_in_lmdb(path_id, recollect_failure=self.args.sample_episodes.recollect_failure):
-                            # the log dir exists but this path data is not in lmdb. So remove the dir and sample again.
-                            shutil.rmtree(episode_path)
-                            os.makedirs(episode_path)
-                            is_data_valid = True
-                        else:
-                            log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Pass.")
-                            is_data_valid = False
-                            continue
+            else:
+                if self.args.sample_episodes.save_form == 'lmdb':
+                    if not self.check_pathId_exist_in_lmdb(path_id, recollect_failure=self.args.sample_episodes.recollect_failure):
+                        # the log dir exists but this path data is not in lmdb. So remove the dir and sample again.
+                        # shutil.rmtree(episode_path)
+                        os.makedirs(episode_path, exist_ok=True)
+                        is_data_valid = True
                     else:
                         log.info(f"The episode [scan: {scan}] and [path_id: {path_id}] has been sampled. Pass.")
                         is_data_valid = False
                         continue
-            else:
-                is_data_valid = True
-                os.makedirs(episode_path)
+                else:
+                    is_data_valid = True
+                    os.makedirs(episode_path, exist_ok=True)
+            # else:
+            #     is_data_valid = True
+            #     os.makedirs(episode_path)
 
             '''log the data'''
             status_info = []
