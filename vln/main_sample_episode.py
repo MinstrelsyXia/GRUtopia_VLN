@@ -211,6 +211,8 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
     
     '''6. Enter the env flow loop'''
     while (not all(vln_envs.end_list)) and (not vln_envs.all_episode_finish) and env.simulation_app.is_running():
+        # if i == 30: # !!!
+        #     vln_envs.all_episode_finish = True
         ''' (0) check the maximum steps for each env'''
         max_step = 400 if args.debug else args.settings.max_step
         for env_idx in range(vln_envs.env_num):
