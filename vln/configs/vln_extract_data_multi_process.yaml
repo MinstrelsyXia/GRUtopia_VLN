@@ -32,19 +32,14 @@ settings:
   force_sample_scan: true
   filter_stairs: true
   sample_env_flow: true # allow the env flow
-  num_workers: 1
+  num_workers: 4
   max_episodes_per_scan: 100
 
 sample_episodes:
   step_interval: 80
   save_form: "lmdb" # thread / lmdb
-<<<<<<< HEAD
-  recollect_failure: true # recollect failed episodes
-  only_recollect_path_planning_failure: true
-=======
   recollect_failure: true
   only_recollect_path_plannning_fail: true
->>>>>>> 8555a7cecf806f0fb3b5a207ed3bc9f24eec922c
 
 robots:
   - name: "CylinderRobot"

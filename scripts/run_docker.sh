@@ -1,5 +1,5 @@
-NAME=w61_grutopia
-sudo docker run -d --name ${NAME} -it --rm --gpus='"device=4,5,6,7"' --network host \
+NAME=w61_grutopia_test
+sudo docker run -d --name ${NAME} -it --rm --gpus='"device=3"' --network host \
      -e "ACCEPT_EULA=Y" \
      -e "PRIVACY_CONSENT=Y" \
      -e "WEBUI_HOST=${WEBUI_HOST}" \
@@ -14,7 +14,7 @@ sudo docker run -d --name ${NAME} -it --rm --gpus='"device=4,5,6,7"' --network h
      -v ${CACHE_ROOT}/isaac-sim/documents:/root/Documents:rw \
      -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:rw \
      -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
-     w61_grutopia:v0.0
+     w61_grutopia:v0.0.4
 
 # enter the docker
 docker exec -it ${NAME} /bin/bash
