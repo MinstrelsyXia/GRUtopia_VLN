@@ -106,10 +106,16 @@ def extract_best_eval_results(log_file, split):
 
 def get_delta(actions):
     if isinstance(actions, torch.Tensor):
-        # append zeros to first action
-        device = actions.device  # Get the device of the input tensor
-        ex_actions = torch.cat([torch.zeros((actions.shape[0], 1, actions.shape[-1]), device=device), actions], dim=1)
-        delta = ex_actions[:, 1:] - ex_actions[:, :-1]
+        # Proceed with 2D case
+        if len(actions.shape) == 2:
+            ex_actions = torch.cat([torch.zeros((1, actions.shape[-1]), device=actions.device), actions], dim=0)
+            delta = ex_actions[1:] - ex_actions[:-1]
+
+        else:
+            # This remains unchanged for higher dimensions
+            ex_actions = torch.cat([torch.zeros((actions.shape[0], 1, actions.shape[-1]), device=actions.device), actions], dim=1)
+            delta = ex_actions[:, 1:] - ex_actions[:, :-1]
+
     elif isinstance(actions, np.ndarray):
         if len(actions.shape) == 2:
             ex_actions = np.concatenate([np.zeros((1, actions.shape[-1])), actions], axis=0)
@@ -120,8 +126,9 @@ def get_delta(actions):
     
     return delta
 
+
 def map_action_to_2d(delta_actions):
-    actions_2d = np.zeros((delta_actions.shape[0], 2))
+    actions_2d = torch.zeros((delta_actions.shape[0], 2))
     for a_idx, action in enumerate(delta_actions):
         if action[2] > 0:
             # turn right
@@ -203,18 +210,18 @@ def action_reduce(action_mask, unreduced_loss: torch.Tensor):
     assert unreduced_loss.shape == action_mask.shape, f"{unreduced_loss.shape} != {action_mask.shape}"
     return (unreduced_loss * action_mask).mean() / (action_mask.float().mean() + 1e-2)
 
-def yaw_rotmat(yaw: float) -> np.ndarray:
-    return np.array(
+def yaw_rotmat(yaw: float) -> torch.Tensor:
+    return torch.tensor(
         [
-            [np.cos(yaw), -np.sin(yaw), 0.0],
-            [np.sin(yaw), np.cos(yaw), 0.0],
+            [torch.cos(yaw), -torch.sin(yaw), 0.0],
+            [torch.sin(yaw), torch.cos(yaw), 0.0],
             [0.0, 0.0, 1.0],
         ],
     )
     
 def to_local_coords(
-    positions: np.ndarray, curr_pos: np.ndarray, curr_yaw: float
-) -> np.ndarray:
+    positions, curr_pos, curr_yaw: float
+):
     """
     Convert positions to local coordinates
 
@@ -233,7 +240,10 @@ def to_local_coords(
     else:
         raise ValueError
 
-    return (positions - curr_pos).dot(rotmat)
+    if isinstance(positions, torch.Tensor):
+        return (positions - curr_pos).matmul(rotmat)
+    else:
+        return (positions - curr_pos).dot(rotmat)
 
 
 def _compute_actions(globalgps, yaws, curr_time, fill_mode, len_traj_pred, waypoint_spacing, learn_angle, metric_waypoint_spacing, num_action_params,normalize=False):

@@ -23,7 +23,7 @@ import json
 from vln.src.models.LongCLIP.model import longclip
 from vln.src.models.utils.bert_token import BertTokenizer
 from vln.src.utils.logger import MyLogger, logger
-from vln.src.utils.utils import extract_best_eval_results, load_dataset
+from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce
 from vln.src.dataset.vlnce_dp_dataset import VLNCE_DP_Dataset, collate_fn
 from vln.src.models.init_policy import initialize_policy
 
@@ -232,10 +232,6 @@ class DaggerDiffusonPolicyTrainer:
                     observations_batch,
                     prev_actions_batch,
                     not_done_masks,
-                    corrected_actions_batch,
-                    weights_batch,
-                    episode_ids_batch,
-                    gt_actions_batch
                 ) = batch
 
                 observations_batch = {
@@ -255,12 +251,6 @@ class DaggerDiffusonPolicyTrainer:
                         device=self.device, non_blocking=True
                     ),
                     not_done_masks.to(
-                        device=self.device, non_blocking=True
-                    ),
-                    corrected_actions_batch.to(
-                        device=self.device, non_blocking=True
-                    ),
-                    weights_batch.to(
                         device=self.device, non_blocking=True
                     ),
                     denoise_action=self.config.IL.DAGGER.denoise_action,
@@ -296,65 +286,6 @@ class DaggerDiffusonPolicyTrainer:
                         step_id,
                     )
                     step_id += 1  # noqa: SIM113
-
-                # evaluate the model
-                if step_id % self.config.EVAL.train_eval_interval == 0:
-                    self.policy.eval()
-                    T, N = corrected_actions_batch.size()
-                    
-                    if self.world_size > 1:
-                        net = self.policy.module
-                    else:
-                        net = self.policy
-
-                    rnn_states = torch.zeros(
-                        N,
-                        net.net.num_recurrent_layers,
-                        self.config.MODEL.STATE_ENCODER.hidden_size,
-                        device=self.device,
-                    ) 
-
-                    with torch.no_grad():
-                        masks = not_done_masks.to(device=self.device, non_blocking=True)
-                        # original_action_mode = self.config.EVAL.ACTION 
-                        # self.config.defrost()
-                        # self.config.EVAL.ACTION = 'xyyaw'
-                        
-                        batch_settings = {
-                            'mode': 'act',
-                            'observations': observations_batch,
-                            'rnn_states': rnn_states,
-                            'prev_actions': prev_actions_batch.to(device=self.device, non_blocking=True),
-                            'masks': masks,
-                            'add_noise_to_action': False,
-                            'denoise_action': True,
-                            'num_sample': self.config.EVAL.num_sample,
-                            'vis': False,
-                            'step': 0,
-                            'episode_ids': None,
-                            'stop_mode': self.config.EVAL.stop_mode,
-                            'steps': None
-                        }
-
-                        actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred = net(batch_settings)
-
-                        # assert self.config.EVAL.ACTION == 'xyyaw'
-                        action_cos_similarities = action_reduce(masks.squeeze(), F.cosine_similarity(
-                            un_actions_nocumsum, observations_batch['actions'], dim=-1
-                        )).item()
-                        
-                        logger.info(f"***Eval action cos similarity Iter {step_id}: {action_cos_similarities}***")
-                        writer.add_scalar(
-                            f"eval_action_cos_similarity_iter_{dagger_it}",
-                            action_cos_similarities,
-                            step_id,
-                        )
-
-                        cos_sims.append(action_cos_similarities)
-                        
-                        # self.config.EVAL.ACTION = original_action_mode
-                        # self.config.freeze()
-                    self.policy.train()
             
             # save the log
             self.train_logger.info(f"*******Epoch {epoch}*********")
@@ -415,8 +346,6 @@ class DaggerDiffusonPolicyTrainer:
         observations,
         prev_actions,
         not_done_masks,
-        corrected_actions,
-        weights,
         step_grad: bool = True,
         loss_accumulation_scalar: int = 1,
         denoise_action=False
@@ -435,18 +364,18 @@ class DaggerDiffusonPolicyTrainer:
             self.config.MODEL.STATE_ENCODER.hidden_size,
             device=self.device,
         ) 
-
-        AuxLosses.clear()
         
         if 'rgb_features' not in observations \
             or self.config.MODEL.IMAGE_ENCODER.RGB.update_rgb_encoder \
                 or self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder\
                     or self.config.MODEL.LORA.add_for_rgb_encoder \
                         or self.config.MODEL.LORA.add_for_depth_encoder:
+            depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
             batch = {
                 'mode': 'img_embedding',
-                'rgb_inputs': observations['stack_rgb'],
-                'depth_inputs': observations['stack_depth'],
+                'rgb_inputs': observations['rgb'],
+                'depth_inputs': observations['depth'],
+                'depth_return_x_before_fc': depth_return_x_before_fc,
                 'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj
             }
             stack_rgb, stack_depth = self.policy(batch)
@@ -471,35 +400,6 @@ class DaggerDiffusonPolicyTrainer:
         
         # !!!
         # draw_loss_curve(N, noise_pred, noise, output_file='test.jpg')
-        
-        if denoise_action:
-            # for watch results
-            un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
-            gt_actions = get_action(batch['observations']['actions'], self.action_stats).cpu().detach().numpy()
-
-            # draw figures
-            import matplotlib.pyplot as plt
-            for item_idx in range(20):
-                plt.clf()
-                plt.figure(figsize=(10, 5))
-                plt.subplot(1, 2, 1)
-                plt.scatter(un_actions[item_idx][:, 0], un_actions[item_idx][:, 1], label='un_actions')
-                # Annotating the points for un_actions
-                for i in range(un_actions[item_idx].shape[0]):
-                    plt.text(un_actions[item_idx][i, 0], un_actions[item_idx][i, 1], str(i), fontsize=9, color='blue',ha='left')
-
-                plt.scatter(gt_actions[item_idx][:, 0],  gt_actions[item_idx][:, 1], label='gt_actions')
-                # Annotating the points for gt_actions
-                for i in range(gt_actions[item_idx].shape[0]):
-                    plt.text(gt_actions[item_idx][i, 0], gt_actions[item_idx][i, 1], str(i), fontsize=9, color='red', ha='right')
-
-                plt.legend()
-                save_path = f'data/images/debug_{item_idx}.jpg'
-                plt.savefig(save_path)
-                print(f"save fig to {save_path}")
-
-                plt.close()
-            
 
         # for train
         dist_loss = 0
@@ -517,7 +417,7 @@ class DaggerDiffusonPolicyTrainer:
 
         # Aux loss
         aux_loss = 0
-        if self.config.MODEL.PROGRESS_MONITOR.use and AuxLosses.is_active():
+        if self.config.MODEL.PROGRESS_MONITOR.use:
             progress_loss = F.mse_loss(
                 progress_hat,
                 observations["progress"],
