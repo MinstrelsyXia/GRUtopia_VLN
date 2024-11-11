@@ -588,7 +588,7 @@ class VLNDataLoader(Dataset):
         '''
         camera_list = []
         for camera in self.args.camera_list:
-            if 'debug' not in camera and 'topdown' not in camera:
+            if 'debug' not in camera and 'topdown' not in camera and 'pointcloud' not in camera:
                 camera_list.append(camera)
         pointclouds, _, _ = self.process_pointcloud(camera_list)
         robot_ankle_z = self.get_robot_bottom_z()

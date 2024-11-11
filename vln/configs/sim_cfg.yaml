@@ -35,27 +35,43 @@ tasks:
     - name: "pano_camera_0"
       enable: true
       size: [256, 256]
+      camera_config:
+        - point_cloud
     - name: "pano_camera_45"
       enable: true
       size: [256, 256]
+      camera_config:
+        - point_cloud
     - name: "pano_camera_90"
       enable: true
       size: [256, 256]
+      camera_config:
+        - point_cloud
     - name: "pano_camera_135"
       enable: true
       size: [256, 256]
+      camera_config:
+        - point_cloud
     - name: "pano_camera_180"
       enable: true
       size: [256, 256]
+      camera_config:
+        - point_cloud
     - name: "pano_camera_225"
       enable: true
       size: [256, 256]
+      camera_config:
+        - point_cloud
     - name: "pano_camera_270"
       enable: true
       size: [256, 256]
+      camera_config:
+        - point_cloud
     - name: "pano_camera_315"
       enable: true
       size: [256, 256]
+      camera_config:
+        - point_cloud
     - name: "h1_pano_camera_debug"
       enable: true
       size: [256, 256]
