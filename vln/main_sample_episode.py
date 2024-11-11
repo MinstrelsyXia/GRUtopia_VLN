@@ -447,5 +447,5 @@ if __name__ == "__main__":
     if vln_config.settings.mode == "sample_episodes_multiprocess":
         sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
-        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='sKLMLpTHeUy')
-        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
+        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='sKLMLpTHeUy')
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
