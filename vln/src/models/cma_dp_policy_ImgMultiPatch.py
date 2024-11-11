@@ -612,26 +612,15 @@ class CMA_DP_Net(nn.Module):
         state, rnn_states_out = self.state_encoder(concat_embeds, rnn_states, masks.bool()) # TODO: check sequence RNN
         return state, rnn_states_out
 
-    def img_embedding(self, rgb_inputs, depth_inputs, img_mod, depth_return_x_before_fc=False, proj=True):
+    def img_embedding(self, rgb_inputs, depth_inputs, img_mod, depth_return_x_before_fc=False, proj=True, process_images=False):
+        if process_images:
+            rgb_inputs = self.image_encoder.process_image(rgb_inputs)
+            if self.model_config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                depth_inputs = self.image_encoder.process_depth(depth_inputs)
         rgb_embeds = self.image_encoder.embed_image(rgb_inputs,img_mod=img_mod, proj=proj).squeeze(1)
         depth_embeds = self.image_encoder.embed_depth(depth_inputs, return_x_before_fc=depth_return_x_before_fc).squeeze(1)
         return rgb_embeds, depth_embeds
-            
-    def forward(
-        self, batch
-    ) -> Tuple[Tensor, Tensor]:
-        mode = batch['mode']
-        if mode == "img_embedding":
-            if 'depth_return_x_before_fc' not in batch:
-                batch['depth_return_x_before_fc'] = False
-            return self.img_embedding(batch['rgb_inputs'], batch['depth_inputs'], batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'])
         
-        elif mode == "pred_actions":   
-            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'])
-        
-        elif mode == "update_rnn":
-            return self.update_rnn_states(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
-    
     def parse_action(self, diffusion_output, dist_pred, pm_pred=None, stop_mode='distance', steps=None):
         cumsum = False if self.config.EVAL.ACTION == 'descrete' else True
         if self.model_config.learn_angle:
@@ -805,3 +794,18 @@ class CMA_DP_Net(nn.Module):
         
         return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred
 
+    def forward(
+        self, batch
+    ) -> Tuple[Tensor, Tensor]:
+        mode = batch['mode']
+        if mode == "img_embedding":
+            if 'depth_return_x_before_fc' not in batch:
+                batch['depth_return_x_before_fc'] = False
+            return self.img_embedding(batch['rgb_inputs'], batch['depth_inputs'], batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'])
+        
+        elif mode == "pred_actions":   
+            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'])
+        
+        elif mode == "update_rnn":
+            return self.update_rnn_states(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+    

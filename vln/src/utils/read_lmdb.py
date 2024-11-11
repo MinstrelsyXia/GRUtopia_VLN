@@ -84,6 +84,7 @@ class DataCollector:
         # load data
         lmdb_data = self.read_all_episode_data()
         dataset_data, scans = self.load_vln_dataset(dataset_root_dir, split)
+        total_results = {"success": 0, "total": 0, "failure": 0, "path planning": 0, "fall": 0, "stuck": 0, "maximum step": 0}
         
         # analysis
         scan_completion = defaultdict(lambda: {"success": 0, "total": 0, "failure": 0, "path planning": 0, "fall": 0, "stuck": 0, "maximum step": 0})
@@ -91,6 +92,7 @@ class DataCollector:
         for scan, ep_infos in dataset_data.items():
             # Count total episode_ids for the scan
             scan_completion[scan]['total'] = len(ep_infos)
+            total_results["total"] += len(ep_infos)
             
             # Check each episode_id in lmdb_data for completion
             for ep_info in ep_infos:
@@ -99,13 +101,18 @@ class DataCollector:
                     # Here, we assume lmdb_data[episode_id] has a 'completed' status
                     if lmdb_data[traj_id]['finish_status'] == 'success':  # Replace 'completed' with actual status key
                         scan_completion[scan]['success'] += 1
+                        total_results["success"] += 1
                     else:
                         scan_completion[scan]['failure'] += 1
                         scan_completion[scan][lmdb_data[traj_id]['fail_reason']] += 1
+                        total_results[lmdb_data[traj_id]['fail_reason']] += 1
 
         # Write results to a JSON file
         with open(output_json_file, 'w') as json_file:
             json.dump(scan_completion, json_file, indent=4)
+        
+        with open(output_json_file, 'a') as json_file:
+            json.dump(total_results, json_file, indent=4)
 
         print(f"Results written to {output_json_file}")
     
