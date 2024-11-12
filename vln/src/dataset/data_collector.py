@@ -6,6 +6,7 @@ from PIL import Image
 import multiprocessing as mp
 import lmdb
 import torch
+import msgpack_numpy
 from multiprocessing import Lock
 import pickle
 import math
@@ -310,11 +311,13 @@ class LmdbDataCollector:
                 'finish_status': finish_flag,
                 'fail_reason': fail_reason
             }
-            serialized_data = pickle.dumps(data_to_store)
-            compressed_data = zlib.compress(serialized_data)
+            # serialized_data = pickle.dumps(data_to_store)
+            # compressed_data = zlib.compress(serialized_data)
+            
+            serialized_data = msgpack_numpy.packb(data_to_store, use_bin_type=True)
 
             # Serialize data using pickle and write to LMDB
-            txn.put(key, compressed_data)
+            txn.put(key, serialized_data)
 
         env.close()
         # print(f"Episode {path_id} saved with status {self.finish_status[finish_flag]}.")
