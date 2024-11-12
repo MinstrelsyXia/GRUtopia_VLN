@@ -231,15 +231,15 @@ class VLNCE_DP_Dataset(IterableDataset):
                     item_obs[k] = torch.from_numpy(np.array(item_obs[k]))
 
                 if self.config.MODEL.learn_angle:
-                    item_obs["actions"] = np.zeros((total_steps, self.len_traj_pred, 3))
-                    item_obs["prev_actions"] = np.zeros((total_steps, self.config.MODEL.len_traj_act, 3))
+                    item_obs["actions"] = torch.zeros((total_steps, self.len_traj_pred, 3))
+                    item_obs["prev_actions"] = torch.zeros((total_steps, self.config.MODEL.len_traj_act, 3))
                 else:
-                    item_obs["actions"] = item_obs["prev_actions"] = np.zeros((total_steps, self.len_traj_pred, 2))
-                    item_obs["prev_actions"] = np.zeros((total_steps, self.config.MODEL.len_traj_act, 2))
-                item_obs["step_distance"] = np.zeros(total_steps)
+                    item_obs["actions"] = item_obs["prev_actions"] = torch.zeros((total_steps, self.len_traj_pred, 2))
+                    item_obs["prev_actions"] = torch.zeros((total_steps, self.config.MODEL.len_traj_act, 2))
+                item_obs["step_distance"] = torch.zeros(total_steps)
 
                 if self.config.MODEL.STEP_ENCODER.use:
-                    item_obs["steps"] = np.arange(min(total_steps, self.config.MODEL.STEP_ENCODER.max_steps))
+                    item_obs["steps"] = torch.arange(min(total_steps, self.config.MODEL.STEP_ENCODER.max_steps))
                 
                 if "rgb_features" in item_obs.keys():
                     self.extract_img_features = False
@@ -247,91 +247,62 @@ class VLNCE_DP_Dataset(IterableDataset):
                     self.extract_img_features = True
                 
                 # Stack images
-                img_stack_nums = 1 if not self.use_stack else self.config.MODEL.IMAGE_ENCODER.img_stack_nums
-                if self.extract_img_features:
-                    # extract image features from raw images
-                    img_shape = item_obs["rgb"][0].shape
-                    depth_shape = item_obs["depth"][0].shape
-                    if len(depth_shape) == 2:
-                        # [256, 256] -> [256, 256, 1]
-                        item_obs["depth"] = torch.unsqueeze(item_obs["depth"], dim=-1)
-                        # TODO: change 256 to 224?
-                    item_obs = extract_image_features(self.policy, item_obs,
-                                                      img_mod=self.img_mod, len_traj_act=self.config.MODEL.len_traj_act,
-                                                      world_size=self.world_size,
-                                                      depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
-                                                      proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
-                                                      net_device=self.device)
-                    
+                # img_stack_nums = 1 if not self.use_stack else self.config.MODEL.IMAGE_ENCODER.img_stack_nums
+                # if self.extract_img_features:
+                #     # extract image features from raw images
+                #     img_shape = item_obs["rgb"][0].shape
+                #     depth_shape = item_obs["depth"][0].shape
+                #     if len(depth_shape) == 2:
+                #         # [256, 256] -> [256, 256, 1]
+                #         item_obs["depth"] = torch.unsqueeze(item_obs["depth"], dim=-1)
+                #         # TODO: change 256 to 224?
+                #     item_obs = extract_image_features(self.policy, item_obs,
+                #                                       img_mod=self.img_mod, len_traj_act=self.config.MODEL.len_traj_act,
+                #                                       world_size=self.world_size,
+                #                                       depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
+                #                                       proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+                #                                       net_device=self.device)
+                #     item_obs["rgb_features"] = item_obs["stack_rgb"]
+                #     item_obs["depth_features"] = item_obs["stack_depth"]
 
-                img_shape = item_obs["rgb_features"][0].shape
-                if self.img_mod == 'cls':
-                    item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, img_shape[-1]))
-                elif self.img_mod == 'multi_patches_avg_pooling':
-                    img_patch_num = item_obs["rgb_features"][0].shape[0]
-                    item_obs["stack_rgb"] = np.zeros((total_steps, img_stack_nums, img_patch_num, img_shape[-1]))
-                if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
-                    item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, img_shape[-1]))
-                elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
-                    depth_shape = item_obs["depth_features"][0].shape
-                    item_obs["stack_depth"] = np.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
+                # img_shape = item_obs["rgb_features"][0].shape
+                # if self.img_mod == 'cls':
+                #     item_obs["stack_rgb"] = torch.zeros((total_steps, img_stack_nums, img_shape[-1]))
+                # elif self.img_mod == 'multi_patches_avg_pooling':
+                #     img_patch_num = item_obs["rgb_features"][0].shape[0]
+                #     item_obs["stack_rgb"] = torch.zeros((total_steps, img_stack_nums, img_patch_num, img_shape[-1]))
+                # if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                #     item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, img_shape[-1]))
+                # elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
+                #     depth_shape = item_obs["depth_features"][0].shape
+                #     item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
                     
-                if self.config.MODEL.IMU_ENCODER.use:
-                    item_obs["imu"] = np.zeros((total_steps, 2))
+                # if self.config.MODEL.IMU_ENCODER.use:
+                #     item_obs["imu"] = torch.zeros((total_steps, 2))
                 
-                start_pos = item_obs["globalgps"][0][[0, 1]]
-                for step_idx in range(total_steps):
-                    # compute imu
-                    if self.config.MODEL.IMU_ENCODER.use:
-                        current_pos = item_obs["globalgps"][step_idx][[0,1]]
-                        item_obs["imu"][step_idx] = current_pos - start_pos
+                # start_pos = item_obs["globalgps"][0][[0, 1]]
+                # for step_idx in range(total_steps):
+                #     # compute imu
+                #     if self.config.MODEL.IMU_ENCODER.use:
+                #         current_pos = item_obs["globalgps"][step_idx][[0,1]]
+                #         item_obs["imu"][step_idx] = current_pos - start_pos
                     
-                    # stack multiple images and depths
-                    if self.extract_img_features and self.img_encoder is not None:
-                        # TODO: adaptive to long-clip and multiple RGB patches
-                        item_obs["rgb_process"][step_idx] = self.img_encoder.process_image(item_obs["rgb"][step_idx])
-                        if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
-                            item_obs["depth_process"][step_idx] = self.img_encoder.process_depth(item_obs["depth"][step_idx])
-                        
-                        if self.use_stack:
-                            if step_idx == 0:
-                                item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_process"][0]
-                                if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
-                                    item_obs["stack_depth"][step_idx][0] = item_obs["depth_process"][0]
-                                elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
-                                    item_obs["stack_depth"][step_idx][0] = item_obs["depth"][0]
-                            else:
-                                prev_step_idx = min(img_stack_nums, step_idx+1)
-                                item_obs["stack_rgb"][step_idx][:prev_step_idx] = item_obs["rgb_process"][step_idx+1-prev_step_idx: step_idx+1]
-                                if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
-                                    item_obs["stack_depth"][step_idx][:prev_step_idx] = item_obs["depth_process"][step_idx+1-prev_step_idx: step_idx+1]
-                                elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
-                                    item_obs["stack_depth"][step_idx][:prev_step_idx] = item_obs["depth"][step_idx+1-prev_step_idx: step_idx+1]
-                        else:
-                            item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_process"][step_idx]
-                    else:
-                        if step_idx == 0:
-                            if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.MODEL.IMAGE_ENCODER.RGB.multi_patches_num:
-                                # sample data use multi patches, but only use the first cls token
-                                item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_features"][0][0]
-                            else:
-                                item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_features"][0]
-                            item_obs["stack_depth"][step_idx][0] = item_obs["depth_features"][0]
-                        else:
-                            prev_step_idx = min(img_stack_nums, step_idx+1)
-                            # use np.flip to make the latest image in the first token
-                            flip_images = np.flip(item_obs["rgb_features"][step_idx+1-prev_step_idx: step_idx+1], axis=0)
-                            if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.MODEL.IMAGE_ENCODER.RGB.multi_patches_num:
-                                flip_images = flip_images[:,0]
-                            item_obs["stack_rgb"][step_idx][:prev_step_idx] = flip_images
-                            item_obs["stack_depth"][step_idx][:prev_step_idx] = np.flip(item_obs["depth_features"][step_idx+1-prev_step_idx: step_idx+1], axis=0)
-                
-                if self.extract_img_features or "rgb" in item_obs.keys():
-                    del item_obs["rgb"]
-                    del item_obs["depth"]
-                    if "rgb_process" in item_obs.keys():
-                        del item_obs["rgb_process"]
-                        del item_obs["depth_process"]
+                #     # stack multiple images and depths
+                #     if step_idx == 0:
+                #         if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.MODEL.IMAGE_ENCODER.RGB.multi_patches_num:
+                #             # sample data use multi patches, but only use the first cls token
+                #             item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_features"][0][0]
+                #         else:
+                #             item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_features"][0]
+                #         item_obs["stack_depth"][step_idx][0] = item_obs["depth_features"][0]
+                #     else:
+                #         prev_step_idx = min(img_stack_nums, step_idx+1)
+                #         # use np.flip to make the latest image in the first token
+                #         flip_images = np.flip(item_obs["rgb_features"][step_idx+1-prev_step_idx: step_idx+1], axis=0)
+                #         if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.MODEL.IMAGE_ENCODER.RGB.multi_patches_num:
+                #             flip_images = flip_images[:,0]
+                #         item_obs["stack_rgb"][step_idx][:prev_step_idx] = flip_images
+                #         item_obs["stack_depth"][step_idx][:prev_step_idx] = np.flip(item_obs["depth_features"][step_idx+1-prev_step_idx: step_idx+1], axis=0)
                 
                 for step_idx in range(total_steps):
                     # compute actions
@@ -339,8 +310,8 @@ class VLNCE_DP_Dataset(IterableDataset):
                                                     item_obs["globalyaw"],
                                                     step_idx,
                                                     fill_mode='constant')
-                    prev_actions = self._compute_actions(np.flip(item_obs["globalgps"], axis=0),
-                                                         np.flip(item_obs["globalyaw"], axis=0),
+                    prev_actions = self._compute_actions(torch.flip(item_obs["globalgps"], dims=[0]),
+                                                         torch.flip(item_obs["globalyaw"], dims=[0]),
                                                          total_steps-step_idx-1,
                                                          fill_mode='constant')[:self.config.MODEL.len_traj_act]
                     
@@ -366,9 +337,9 @@ class VLNCE_DP_Dataset(IterableDataset):
                             item_obs["prev_actions"][step_idx] = map_action_to_2d(prev_action_deltas)
      
                 # add additional information
-                if self.lmdb_save_episode_id:
-                    new_preload[item_idx].append(episode_ids[item_idx])
-                    new_preload[item_idx].append(gt_actions[item_idx])
+                # if self.lmdb_save_episode_id:
+                #     new_preload[item_idx].append(episode_ids[item_idx])
+                #     new_preload[item_idx].append(gt_actions[item_idx])
                     
             sort_priority = list(range(len(lengths)))
             random.shuffle(sort_priority)
@@ -382,53 +353,28 @@ class VLNCE_DP_Dataset(IterableDataset):
         return self._preload.pop() # pop one item each time
     
     def __next__(self):
-        if self.lmdb_save_episode_id:
-            obs, prev_actions, oracle_actions, episode_ids, gt_actions = self._load_next()
-        else:
-            obs, prev_actions, oracle_actions = self._load_next()
-        
-        prev_actions = obs['prev_actions']
+        obs = self._load_next()
 
-        for k, v in obs.items():
-            obs[k] = torch.from_numpy(np.copy(v))
-
-        prev_actions = torch.from_numpy(np.copy(prev_actions))
-        oracle_actions = torch.from_numpy(np.copy(oracle_actions))
-
-        inflections = torch.cat(
-            [
-                torch.tensor([1], dtype=torch.long),
-                (oracle_actions[1:] != oracle_actions[:-1]).long(),
-            ]
-        )
-
-        return (
-            obs,
-            prev_actions,
-            oracle_actions,
-            self.inflec_weights[inflections],
-            episode_ids,
-            gt_actions
-        )
+        return (obs)
 
     def _compute_actions(self, globalgps, yaws, curr_time, fill_mode):
         start_index = curr_time
         end_index = curr_time + self.len_traj_pred * self.waypoint_spacing + 1
         yaw = yaws[start_index:end_index:self.waypoint_spacing]
-        globalgps = globalgps[:, [0, 2]]
+        globalgps = globalgps[:, [0, 1]]
         positions = globalgps[start_index:end_index:self.waypoint_spacing]
 
         if len(yaw.shape) == 2:
             yaw = yaw.squeeze(1)
-
+        
         if yaw.shape != (self.len_traj_pred + 1,):
             const_len = self.len_traj_pred + 1 - yaw.shape[0]
             if fill_mode == 'constant':
-                yaw = np.concatenate([yaw, np.repeat(yaw[-1], const_len)])
-                positions = np.concatenate([positions, np.repeat(positions[-1][None], const_len, axis=0)], axis=0)
+                yaw = torch.cat([yaw, yaw[-1].repeat(const_len)])
+                positions = torch.cat([positions, positions[-1].unsqueeze(0).repeat(const_len, 1)], dim=0)
             elif fill_mode == 'zero':
-                yaw = np.concatenate([yaw, np.zeros(const_len)])
-                positions = np.concatenate([positions, np.zeros((const_len, 2))], axis=0)
+                yaw = torch.cat([yaw, torch.zeros(const_len)])
+                positions = torch.cat([positions, torch.zeros((const_len, 2))], dim=0)
 
         assert yaw.shape == (self.len_traj_pred + 1,), f"{yaw.shape} and {(self.len_traj_pred + 1,)} should be equal"
         assert positions.shape == (self.len_traj_pred + 1, 2), f"{positions.shape} and {(self.len_traj_pred + 1, 2)} should be equal"
@@ -440,7 +386,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         # if self.learn_angle:
         # note that relative actions start from the next point
         delta_yaw = yaw[1:] - yaw[0]
-        actions = np.concatenate([waypoints[1:], delta_yaw[:, None]], axis=-1)
+        actions = torch.cat([waypoints[1:], delta_yaw[:, None]], dim=-1)
         # else:
             # actions = waypoints[1:]
         
@@ -509,19 +455,8 @@ def collate_fn(batch):
     transposed = list(zip(*batch))
 
     observations_batch = list(transposed[0])
-    prev_actions_batch = list(transposed[1])
-    corrected_actions_batch = list(transposed[2])
-    weights_batch = list(transposed[3])
 
-    
-    B = len(prev_actions_batch)
-
-    if len(transposed) == 6:
-        episode_ids_batch = list(transposed[4])
-        gt_actions_batch = list(transposed[5])
-    else:
-        episode_ids_batch = None
-        gt_actions_batch = None
+    B = len(observations_batch)
 
     new_observations_batch = defaultdict(list)
     for sensor in observations_batch[0]:
@@ -532,7 +467,7 @@ def collate_fn(batch):
 
     observations_batch = new_observations_batch
 
-    max_traj_len = max(ele.size(0) for ele in prev_actions_batch)
+    max_traj_len = max(ele['progress'].size(0) for ele in observations_batch)
     not_done_masks_batch = torch.ones(B, max_traj_len, dtype=torch.uint8)
     for bid in range(B):
         for sensor in observations_batch:
@@ -545,20 +480,6 @@ def collate_fn(batch):
                     observations_batch[sensor][bid], max_traj_len, fill_val=0.0
                 )
 
-        # pad_outputs = _pad_helper(
-        #     prev_actions_batch[bid], max_traj_len, return_masks=True
-        # )
-        # prev_actions_batch[bid] = pad_outputs[0]
-        # not_done_masks_batch[bid] = pad_outputs[1]
-
-        prev_actions_batch[bid], not_done_masks_batch[bid] = _pad_helper(
-            prev_actions_batch[bid], max_traj_len, return_masks=True
-        )
-        corrected_actions_batch[bid] = _pad_helper(
-            corrected_actions_batch[bid][:max_traj_len], max_traj_len
-        )
-        weights_batch[bid] = _pad_helper(weights_batch[bid][:max_traj_len], max_traj_len)
-
     for sensor in observations_batch:
         observations_batch[sensor] = torch.stack(
             observations_batch[sensor], dim=1
@@ -567,24 +488,10 @@ def collate_fn(batch):
             -1, *observations_batch[sensor].size()[2:]
         )
 
-    prev_actions_batch = torch.stack(prev_actions_batch, dim=1)
-    corrected_actions_batch = torch.stack(corrected_actions_batch, dim=1)
-    weights_batch = torch.stack(weights_batch, dim=1)
-    # not_done_masks = torch.ones_like(
-    #     corrected_actions_batch, dtype=torch.uint8
-    # )
-    # not_done_masks[0] = 0
-    # not_done_masks_batch = torch.stack(not_done_masks_batch, dim=1)
-
     observations_batch = ObservationsDict(observations_batch)
     # length 330: longest_episode_length*batch_size
     return (
         observations_batch,
-        # prev_actions_batch.view(-1, 1),
         observations_batch['prev_actions'],
         not_done_masks_batch.view(-1, 1),
-        corrected_actions_batch,
-        weights_batch,
-        episode_ids_batch,
-        gt_actions_batch
     )
