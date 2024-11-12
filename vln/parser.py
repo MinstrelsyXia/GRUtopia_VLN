@@ -44,7 +44,7 @@ def process_args():
     '''Init save directory'''
     vln_config.root_dir = ROOT_DIR
     vln_config.log_dir = os.path.join(ROOT_DIR, "logs")
-    vln_config.log_image_dir = os.path.join(vln_config.log_dir, "images", str(vln_config.split), str(vln_config.path_id))
+    vln_config.log_image_dir = os.path.join(vln_config.log_dir, "images", str(vln_config.split), str(vln_config.path_id), os.getlogin())
     if not os.path.exists(vln_config.log_image_dir):
         os.makedirs(vln_config.log_image_dir)
     

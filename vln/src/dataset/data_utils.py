@@ -406,6 +406,7 @@ class VLNDataLoader(Dataset):
                     save_img_flag = True
                 elif data == 'pointcloud':
                     save_img_flag = False
+                    #save_img_flag = True
                 if save_imgs and save_img_flag:
                     save_dir = os.path.join(self.args.log_image_dir, "obs")
                     if not os.path.exists(save_dir):
