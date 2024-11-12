@@ -15,6 +15,7 @@ datasets:
 settings:
   mode: "sample_episodes_multiprocess"
   # mode: "sample_episodes_reset_scans" # sample_episodes_reset_scans
+  # mode: "sample_episodes_reset_scans_with_assigned_path"
   batch_size: 1
   action: "move_along_path"
   # action: "oracle_move_along_path"
@@ -39,8 +40,9 @@ sample_episodes:
   step_interval: 80
   save_form: "lmdb" # thread / lmdb
   recollect_failure: true # recollect failed episodes
-  recollect_failure: true
   only_recollect_path_planning_fail: true
+
+  docker_nums: 4 # number of docker containers
 
 robots:
   - name: "CylinderRobot"

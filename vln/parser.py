@@ -29,6 +29,11 @@ def process_args():
     parser.add_argument("--windows_head_type", default="show", choices=['show', 'save'], help="The type of the window head")
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--clear_sample_dir", action="store_true", default=False)
+    
+    # for multi-docker
+    # parser.add_argument("--docker_nums", type=int, default=1) # for multi-docker # This should be set in config file
+    parser.add_argument("--docker_id", type=int, default=0) # for multi-docker
+    parser.add_argument("--lmdb_pathId_dir", type=str)
     args = parser.parse_args()
 
     '''Init simulation config'''
@@ -58,9 +63,15 @@ def process_args():
         
         if vln_config.sample_episodes.save_form == 'lmdb':
             lmdb_name_dir = os.path.join(vln_config.sample_episode_dir, vln_config.name)
+            vln_config.lmdb_name_dir = lmdb_name_dir
             vln_config.lmdb_path = os.path.join(lmdb_name_dir, "sample_data.lmdb")
             if not os.path.exists(lmdb_name_dir):
                 os.makedirs(lmdb_name_dir)
+            
+            if vln_config.sample_episodes.docker_nums > 1:
+                vln_config.lmdb_pathId_dir = os.path.join(lmdb_name_dir, 'pathIds')
+                if not os.path.exists(vln_config.lmdb_pathId_dir):
+                    os.makedirs(vln_config.lmdb_pathId_dir)
 
     return vln_config, sim_config
 

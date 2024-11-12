@@ -6,9 +6,9 @@ GPU_LIST=("0" "1" "2" "3" "4" "5" "6")
 EXPERIMENTS_PER_GPU=2
 
 # 容器基础名称
-BASE_CONTAINER_NAME="isaac-sim-hxs"
+BASE_CONTAINER_NAME="w61_grutopia:v0.0"
 # 镜像名称
-IMAGE_NAME="xshenhan/real2sim-all"
+IMAGE_NAME="w61_grutopia"
 
 # 实验命令
 EXPERIMENT_COMMANDS=(
@@ -21,7 +21,7 @@ EXPERIMENT_COMMANDS=(
 )
 
 # 创建日志目录
-LOG_DIR="./.auto-run-docker"
+LOG_DIR="./logs/multi-dockers"
 mkdir -p ${LOG_DIR}
 
 # 遍历每个 GPU
@@ -46,6 +46,7 @@ for GPU in "${GPU_LIST[@]}"; do
             --network=bridge \
             --shm-size="32g" \
             -e "PRIVACY_CONSENT=Y" \
+            -e "WEBUI_HOST=${WEBUI_HOST}" \
             -v ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
             -v ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw \
             -v ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw \
