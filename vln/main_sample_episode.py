@@ -238,6 +238,7 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
             obs = env.step(actions=env_actions)
             
             if i % 50 == 0:
+                # break
                 if args.windows_head:
                     # show the topdown camera
                     vln_envs.cam_occupancy_map_local_list[0].update_windows_head(robot_pos=vln_envs.isaac_robots[0].get_world_pose()[0], mode=args.windows_head_type)
