@@ -348,6 +348,17 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
                     # assign new path to the finished env
                     if vln_envs.end_list[env_idx]:
                         data_collector.save_data(env_idx,vln_envs.path_id_list[env_idx], vln_envs.success_list[env_idx], vln_envs.fail_reasons[env_idx])
+                        if args.sample_episodes.docker_nums > 1:
+                            # update the json file for multi docker
+                            with open(args.lmdb_json_path, 'r') as f:
+                                json_data = json.load(f)
+                                if vln_envs.success_list[env_idx]:
+                                    json_data[scan][vln_envs.path_id_list[env_idx]] = 'success'
+                                else:
+                                    json_data[scan][vln_envs.path_id_list[env_idx]] = vln_envs.fail_reasons[env_idx]
+                            with open(args.lmdb_json_path, 'w') as f:
+                                json.dump(json_data, f, indent=4)
+            
                         update_flag = vln_envs.update_next_single_data(env_idx, split, scan, current_step=i)
                         if update_flag:
                             log.error(f"{env_idx}-th Env: Assign new path_id: {vln_envs.path_id_list[env_idx]}. Reset this env!")
@@ -430,7 +441,7 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
     print('finish')
     if args.sample_episodes.save_form == 'thread':
         parent_conn.send({'finish_flag': True})
-        save_process.join() 
+        save_process.join()
 
     return env
 
@@ -439,7 +450,12 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
         # vln_envs.cam_occupancy_map_local.close_windows_head()
     
     # env.simulation_app.close()
-        
+
+def read_assigned_json(args, json_dir, docker_id):
+    args.lmdb_json_path = os.path.join(json_dir, f"scan_pathId_part_{docker_id}.json")
+    with open(args.lmdb_json_path, 'r') as f:
+        data = json.load(f)
+    return data
 
 if __name__ == "__main__":
     vln_envs, vln_config, sim_config, data_camera_list = build_dataset()
@@ -448,5 +464,11 @@ if __name__ == "__main__":
     if vln_config.settings.mode == "sample_episodes_multiprocess":
         sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
-        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='sKLMLpTHeUy')
         sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
+    elif vln_config.settings.mode == "sample_episodes_reset_scans_with_assigned_path":
+        # This is for multi-docker
+        data = read_assigned_json(vln_config, vln_config.lmdb_pathId_dir, vln_config.docker_id)
+        
+        for scan, path_id in data.items():
+            log.info(f"***Start with Scan: {scan}***")
+            sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split=vln_config.split, assigned_scan=scan)

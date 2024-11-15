@@ -1,4 +1,4 @@
-name:  "20241115_sample_episodes"
+name:  "20241105_sample_episodes"
 
 datasets:
   base_data_dir: "../VLN/VLNCE/R2R_VLNCE_v1-3"
@@ -13,9 +13,9 @@ datasets:
     # - test
 
 settings:
-  mode: "sample_episodes_multiprocess"
+  # mode: "sample_episodes_multiprocess"
   # mode: "sample_episodes_reset_scans" # sample_episodes_reset_scans
-  # mode: "sample_episodes_reset_scans_with_assigned_path"
+  mode: "sample_episodes_reset_scans_with_assigned_path"
   batch_size: 1
   action: "move_along_path"
   # action: "oracle_move_along_path"
@@ -33,7 +33,7 @@ settings:
   force_sample_scan: true
   filter_stairs: true
   sample_env_flow: true # allow the env flow
-  num_workers: 4
+  num_workers: 1
   max_episodes_per_scan: 100
 
 sample_episodes:
