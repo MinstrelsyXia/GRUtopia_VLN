@@ -8,11 +8,13 @@ import argparse
 import os
 import random
 import yaml
+import logging
+import shutil
 
 import numpy as np
 import torch
 
-from vln.src.utils.logger import MyLogger, logger
+from vln.src.utils.logger import MyLogger
 from vln.src.trainers import dp_trainer
 from vln.src.utils.utils import dict_to_namespace
 
@@ -57,7 +59,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
         opts: list of strings of additional config options.
     """
     config = get_config(exp_config, opts)
-    logger.info(f"config: {config}")
+    # logger.info(f"config: {config}")
     
     # Process the log dir
     if hasattr(config, 'NAME'):
@@ -76,6 +78,15 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
         
         config.local_rank = local_rank 
         config.world_size = config.GPU_NUMBERS = len(config.TORCH_GPU_IDS)
+        
+        logdir = config.LOG_DIR
+        config.LOG_FILE = os.path.join(logdir, "log.txt")
+        if logdir:
+            os.makedirs(logdir, exist_ok=True)
+            
+        logger = MyLogger(
+            name="w61_grutopia", level=logging.INFO, filename=config.LOG_FILE, format_str="%(asctime)-15s %(message)s"
+        )   
     
     # DDP
     # if hasattr(config, 'DDP') and config.DDP.use:
@@ -91,12 +102,6 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
         if config.local_rank == -1 and config.world_size > 1:
             # Ensure the batch size must be divisible by the number of GPUs for DP
             assert config.IL.batch_size % len(config.TORCH_GPU_IDS) == 0
-    
-    logdir = config.LOG_DIR
-    config.LOG_FILE = os.path.join(logdir, "log.txt")
-    if logdir:
-        os.makedirs(logdir, exist_ok=True)
-    logger.add_filehandler(config.LOG_FILE)
 
     random.seed(config.SEED)
     np.random.seed(config.SEED)
@@ -112,8 +117,14 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
     if config.MODEL.policy_name == 'CMA_DP_ImgMultiPatch_Policy':
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
-    trainer = trainer_init(config)
+    trainer = trainer_init(config, logger)
 
+    logger.info(f"config: {config}")
+    
+    # copy the config yaml file to the log dir
+    if config.LOG_DIR:
+        shutil.copy(exp_config, os.path.join(config.LOG_DIR, os.path.basename(exp_config)))
+    
     if run_type == "train":
         trainer.train()
     elif run_type == "eval":
@@ -125,5 +136,5 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
 
 
 if __name__ == "__main__":
-    torch.multiprocessing.set_start_method('spawn')
+    # torch.multiprocessing.set_start_method('spawn')
     main()

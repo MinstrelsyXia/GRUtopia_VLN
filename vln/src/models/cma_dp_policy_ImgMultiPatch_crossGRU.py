@@ -1,3 +1,4 @@
+# TODO
 from typing import Dict, Optional, Tuple
 
 import numpy as np
@@ -73,9 +74,8 @@ class CMA_DP_Net(nn.Module):
             setattr(cross_modal_config, k, v)
 
         # self.cross_modal_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
-        # self.his_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
-        if self.model_config.CROSS_MODAL_ENCODER.txt_to_img:
-            self.txt_img_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
+        self.his_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
+        self.txt_img_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         self.img_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         
         # Init the prev action embedding
@@ -357,15 +357,11 @@ class CMA_DP_Net(nn.Module):
         # txt_hit_attn_probs = txt_hit_attn_probs[:,0,:]
 
         # 6.4 Current text features combine with the current img features
-        if self.model_config.CROSS_MODAL_ENCODER.txt_to_img:
-            txt_img_embeds, txt_img_attn_probs = self.txt_img_cross_encoder(text_embeds, rgb_depth_his_embeds, q_masks=txt_masks, kv_masks=None, output_attentions=True,do_self_attn=do_self_attn) # kv_masks set to be None since there is no mask for imgs
-            fused_update_txt_embeds = txt_img_embeds
-        else:
-            fused_update_txt_embeds = text_embeds
+        txt_img_embeds, txt_img_attn_probs = self.txt_img_cross_encoder(text_embeds, rgb_depth_his_embeds, q_masks=txt_masks, kv_masks=None, output_attentions=True,do_self_attn=do_self_attn) # kv_masks set to be None since there is no mask for imgs
 
         # 6.5 Combine the text features
         # fused_update_txt_embeds = (txt_his_embeds + txt_img_embeds) / 2
-        # fused_update_txt_embeds = txt_img_embeds
+        fused_update_txt_embeds = txt_img_embeds
 
         # fused_cross_modal_embeds, attention_probs = self.cross_modal_encoder(rgb_depth_embeds, text_embeds, txt_masks, output_attentions=True,do_self_attn=do_self_attn)
         # attention_probs = attention_probs[:,0,:]

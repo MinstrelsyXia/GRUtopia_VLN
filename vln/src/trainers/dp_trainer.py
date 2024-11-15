@@ -24,6 +24,7 @@ from vln.src.models.LongCLIP.model import longclip
 from vln.src.models.utils.bert_token import BertTokenizer
 from vln.src.utils.logger import MyLogger, logger
 from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce
+from vln.src.utils.tensorboard_utils import TensorboardWriter
 from vln.src.dataset.vlnce_dp_dataset import VLNCE_DP_Dataset, collate_fn
 from vln.src.models.init_policy import initialize_policy
 
@@ -54,9 +55,10 @@ def draw_loss_curve(N, noise_pred, noise, output_file='test.jpg'):
     print(f"save fig to {output_file}")
 
 class DaggerDiffusonPolicyTrainer:
-    def __init__(self, config=None):
+    def __init__(self, config=None, logger=None):
         self.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir
         self.config = config
+        self.logger = logger
         self.device = torch.device("cuda", config.TORCH_GPU_IDS[0])
         
         self.use_bert = False
@@ -135,6 +137,7 @@ class DaggerDiffusonPolicyTrainer:
 
     def train(self) -> None:
         """Main method for training DAgger."""
+        dagger_it = 0 # TODO: Dagger
         if self.config.IL.DAGGER.preload_lmdb_features:
             try:
                 lmdb.open(self.lmdb_features_dir, readonly=True, lock=False)
@@ -178,142 +181,145 @@ class DaggerDiffusonPolicyTrainer:
         rank = 0
         world_size = 1
         start_epoch = 0
-        if self.world_size > 1:
-            img_encoder = self.policy.module.image_encoder
-            if self.local_rank != -1: # use DDP
-                is_distributed = True
-                rank = self.local_rank
-                world_size = self.world_size
-        else:
-            img_encoder = self.policy.image_encoder
-
-        dataset = VLNCE_DP_Dataset(
-            self.config,
-            self.lmdb_features_dir,
-            self.policy,
-            self.device,
-            dataset_data=self.train_dataset_data,
-            batch_size=self.config.IL.batch_size,
-            bert_tokenizer=self.bert_tokenizer,
-            is_distributed=is_distributed, 
-            rank=rank,
-            world_size=world_size,
-            lmdb_save_episode_id=self.config.IL.DAGGER.lmdb_save_episode_id,
-            use_stack=self.config.MODEL.IMAGE_ENCODER.use_stack
-        )
         
-        diter = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=self.config.IL.batch_size,
-            shuffle=False,
-            collate_fn=collate_fn,
-            pin_memory=False,
-            drop_last=True,  # drop last batch if smaller
-            num_workers=8,
-        )
+        with TensorboardWriter(self.config.TENSORBOARD_DIR, flush_secs=30, purge_step=0) as writer:        
+            if self.world_size > 1:
+                img_encoder = self.policy.module.image_encoder
+                if self.local_rank != -1: # use DDP
+                    is_distributed = True
+                    rank = self.local_rank
+                    world_size = self.world_size
+            else:
+                img_encoder = self.policy.image_encoder
 
-        last_least_loss = 9999
-        last_best_cossims = -1
-        least_loss_epoch = 0
-        best_cossims_epoch = 0
-        for epoch in tqdm.trange(
-            start_epoch, self.config.IL.epochs, dynamic_ncols=True
-        ):
-            losses = []
-            cos_sims= []
-
-            for batch in tqdm.tqdm(
-                diter,
-                total=dataset.length // dataset.batch_size,
-                leave=False,
-                dynamic_ncols=True,
-            ):
-                (
-                    observations_batch,
-                    prev_actions_batch,
-                    not_done_masks,
-                ) = batch
-
-                observations_batch = {
-                    k: v.to(
-                        device=self.device,
-                        dtype=torch.float32,
-                        non_blocking=True,
-                    )
-                    for k, v in observations_batch.items()
-                }
-                
-                if step_id % 100 == 0:
-                    torch.cuda.empty_cache()
-                loss, diffusion_loss, dist_loss, aux_loss = self._update_agent(
-                    observations_batch,
-                    prev_actions_batch.to(
-                        device=self.device, non_blocking=True
-                    ),
-                    not_done_masks.to(
-                        device=self.device, non_blocking=True
-                    ),
-                    denoise_action=self.config.IL.DAGGER.denoise_action,
-                )
-
-                if self.local_rank < 1:
-                    losses.append(loss)
-
-                    logger.info(f"train_loss: {loss}")
-                    logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
-                    logger.info(f"train_dist_loss: {dist_loss}")
-                    logger.info(f"train_aux_loss: {aux_loss}")
-                    logger.info(f"Batches processed: {step_id}.")
-                    logger.info(
-                        f"On DAgger iter {dagger_it}, Epoch {epoch}."
-                    )
-                    writer.add_scalar(
-                        f"train_loss_iter_{dagger_it}", loss, step_id
-                    )
-                    writer.add_scalar(
-                        f"train_diffusion_policy_loss_iter_{dagger_it}",
-                        diffusion_loss,
-                        step_id,
-                    )
-                    writer.add_scalar(
-                        f"train_dist_loss_iter_{dagger_it}",
-                        dist_loss,
-                        step_id,
-                    )
-                    writer.add_scalar(
-                        f"train_aux_loss_iter_{dagger_it}",
-                        aux_loss,
-                        step_id,
-                    )
-                    step_id += 1  # noqa: SIM113
-            
-            # save the log
-            self.train_logger.info(f"*******Epoch {epoch}*********")
-            epoch_loss = sum(losses) / len(losses)
-            if epoch_loss < last_least_loss:
-                least_loss_epoch = epoch
-                last_least_loss = epoch_loss
-            self.train_logger.info(
-                f"loss: {epoch_loss:.6f}"
+            dataset = VLNCE_DP_Dataset(
+                self.config,
+                self.lmdb_features_dir,
+                self.policy,
+                self.device,
+                dataset_data=self.train_dataset_data,
+                batch_size=self.config.IL.batch_size,
+                bert_tokenizer=self.bert_tokenizer,
+                is_distributed=is_distributed, 
+                rank=rank,
+                world_size=world_size,
+                lmdb_save_episode_id=self.config.IL.DAGGER.lmdb_save_episode_id,
+                use_stack=self.config.MODEL.IMAGE_ENCODER.use_stack
             )
-            self.train_logger.info(
-                f"Epoch {least_loss_epoch} has the least loss: {last_least_loss:.6f}"
-            )     
-            epoch_cos_sim = sum(cos_sims) / len(cos_sims)
-            if epoch_cos_sim > last_best_cossims:
-                best_cossims_epoch = epoch
-                last_best_cossims = epoch_cos_sim
-                self.train_logger.info(
-                    f"cos sim: {epoch_cos_sim:.6f}")
-                self.train_logger.info(
-                    f"Epoch {best_cossims_epoch} has the highest cos sim: {last_best_cossims:.6f}"
-                )
+            
+            diter = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=self.config.IL.batch_size,
+                shuffle=False,
+                collate_fn=collate_fn,
+                pin_memory=False,
+                drop_last=True,  # drop last batch if smaller
+                num_workers=8,
+            )
 
-                if self.local_rank < 1 and epoch % self.config.IL.save_interval_epochs==0:
-                    self.save_checkpoint(
-                        f"ckpt.{dagger_it * self.config.IL.epochs + epoch}.pth",
-                        filter_frozen_weights=self.config.IL.save_filter_frozen_weights
+            step_id = 0
+            last_least_loss = 9999
+            last_best_cossims = -1
+            least_loss_epoch = 0
+            best_cossims_epoch = 0
+            for epoch in tqdm.trange(
+                start_epoch, self.config.IL.epochs, dynamic_ncols=True
+            ):
+                losses = []
+                cos_sims= []
+
+                for batch in tqdm.tqdm(
+                    diter,
+                    total=dataset.length // dataset.batch_size,
+                    leave=False,
+                    dynamic_ncols=True,
+                ):
+                    (
+                        observations_batch,
+                        prev_actions_batch,
+                        not_done_masks,
+                    ) = batch
+
+                    observations_batch = {
+                        k: v.to(
+                            device=self.device,
+                            dtype=torch.float32,
+                            non_blocking=True,
+                        )
+                        for k, v in observations_batch.items()
+                    }
+                    
+                    if step_id % 100 == 0:
+                        torch.cuda.empty_cache()
+                    loss, diffusion_loss, dist_loss, aux_loss = self._update_agent(
+                        observations_batch,
+                        prev_actions_batch.to(
+                            device=self.device, non_blocking=True
+                        ),
+                        not_done_masks.to(
+                            device=self.device, non_blocking=True
+                        ),
+                        denoise_action=self.config.IL.DAGGER.denoise_action,
                     )
+
+                    if self.local_rank < 1:
+                        losses.append(loss)
+
+                        logger.info(f"train_loss: {loss}")
+                        logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
+                        logger.info(f"train_dist_loss: {dist_loss}")
+                        logger.info(f"train_aux_loss: {aux_loss}")
+                        logger.info(f"Batches processed: {step_id}.")
+                        logger.info(
+                            f"On DAgger iter {dagger_it}, Epoch {epoch}."
+                        )
+                        writer.add_scalar(
+                            f"train_loss_iter_{dagger_it}", loss, step_id
+                        )
+                        writer.add_scalar(
+                            f"train_diffusion_policy_loss_iter_{dagger_it}",
+                            diffusion_loss,
+                            step_id,
+                        )
+                        writer.add_scalar(
+                            f"train_dist_loss_iter_{dagger_it}",
+                            dist_loss,
+                            step_id,
+                        )
+                        writer.add_scalar(
+                            f"train_aux_loss_iter_{dagger_it}",
+                            aux_loss,
+                            step_id,
+                        )
+                        step_id += 1  # noqa: SIM113
+                
+                # save the log
+                self.train_logger.info(f"*******Epoch {epoch}*********")
+                epoch_loss = sum(losses) / len(losses)
+                if epoch_loss < last_least_loss:
+                    least_loss_epoch = epoch
+                    last_least_loss = epoch_loss
+                self.train_logger.info(
+                    f"loss: {epoch_loss:.6f}"
+                )
+                self.train_logger.info(
+                    f"Epoch {least_loss_epoch} has the least loss: {last_least_loss:.6f}"
+                )     
+                epoch_cos_sim = sum(cos_sims) / len(cos_sims)
+                if epoch_cos_sim > last_best_cossims:
+                    best_cossims_epoch = epoch
+                    last_best_cossims = epoch_cos_sim
+                    self.train_logger.info(
+                        f"cos sim: {epoch_cos_sim:.6f}")
+                    self.train_logger.info(
+                        f"Epoch {best_cossims_epoch} has the highest cos sim: {last_best_cossims:.6f}"
+                    )
+
+                    if self.local_rank < 1 and epoch % self.config.IL.save_interval_epochs==0:
+                        self.save_checkpoint(
+                            f"ckpt.{dagger_it * self.config.IL.epochs + epoch}.pth",
+                            filter_frozen_weights=self.config.IL.save_filter_frozen_weights
+                        )
             
     def save_checkpoint(self, file_name: str, filter_frozen_weights=False) -> None:
         """Save checkpoint with specified name.
@@ -350,13 +356,14 @@ class DaggerDiffusonPolicyTrainer:
         loss_accumulation_scalar: int = 1,
         denoise_action=False
     ):
-        T, N = corrected_actions.size()
+        # T, N = prev_actions.size()
+        N = self.config.IL.batch_size
         masks = not_done_masks
 
         if self.world_size > 1:
-            net = self.policy.module.net
+            net = self.policy.module
         else:
-            net = self.policy.net
+            net = self.policy
             
         recurrent_hidden_states = torch.zeros(
             N,
@@ -376,12 +383,17 @@ class DaggerDiffusonPolicyTrainer:
                 'rgb_inputs': observations['rgb'],
                 'depth_inputs': observations['depth'],
                 'depth_return_x_before_fc': depth_return_x_before_fc,
-                'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj
+                'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+                'img_mod': self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
+                'process_images': True # not process in dataLoader. Process now.
             }
             stack_rgb, stack_depth = self.policy(batch)
             if len(stack_rgb.shape) == 2:
                 observations['stack_rgb'] = stack_rgb.unsqueeze(1)
                 observations['stack_depth'] = stack_depth.unsqueeze(1)
+            else:
+                observations['stack_rgb'] = stack_rgb
+                observations['stack_depth'] = stack_depth
             
         batch = {
             'mode': 'pred_actions',
@@ -419,17 +431,11 @@ class DaggerDiffusonPolicyTrainer:
         aux_loss = 0
         if self.config.MODEL.PROGRESS_MONITOR.use:
             progress_loss = F.mse_loss(
-                progress_hat,
+                progress_hat.squeeze(),
                 observations["progress"],
                 reduction="none",
             )
-            AuxLosses.register_loss(
-                "progress_monitor",
-                progress_loss,
-                self.config.MODEL.PROGRESS_MONITOR.alpha,
-            )
-            aux_mask = (weights > 0).view(-1)
-            aux_loss = AuxLosses.reduce(aux_mask)
+            aux_loss = action_reduce(masks.squeeze(), progress_loss)
         
         # Total loss
         loss = self.config.MODEL.LOSS.alpha * self.config.MODEL.LOSS.dist_scale * dist_loss + (1-self.config.MODEL.LOSS.alpha) * diffusion_loss + aux_loss

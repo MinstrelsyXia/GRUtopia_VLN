@@ -198,6 +198,14 @@ class VLNCE_DP_Dataset(IterableDataset):
                                 continue
                         
                     instr = self.dataset_data[key]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
+                    
+                    # convert yaw from [-2pi,2pi] to [-pi, pi]
+                    for yaw_i, yaw in enumerate(data['robot_info']['yaw']):
+                        yaw = yaw%(2*np.pi)
+                        if yaw > np.pi:
+                            yaw -= 2*np.pi
+                        data['robot_info']['yaw'][yaw_i] = yaw
+                        
                     new_data = {
                         'instruction': instr,
                         'progress': data['progress'],
@@ -205,7 +213,7 @@ class VLNCE_DP_Dataset(IterableDataset):
                         'global_rotation': data['robot_info']['orientation'],
                         'globalyaw': data['robot_info']['yaw'],
                         'rgb': data['camera_info'][self.camera_name]['rgb'],
-                        'depth': data['camera_info'][self.camera_name]['depth']
+                        'depth': np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1),
                     }
                     new_preload.append(new_data)
                     finish_status_list.append(finish_status)
@@ -214,6 +222,14 @@ class VLNCE_DP_Dataset(IterableDataset):
 
             # compute stack images, positions, yaw, and relative actions, time_distance for each observations
             new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
+            
+            # process the instruction
+            for i in range(len(new_preload)):
+                new_preload[i]['instruction'] = np.tile(np.array(new_preload[i]['instruction']), (len(new_preload[i]['progress']),1))
+            
+            # compute the action_stats ranges
+            min_x, min_y, min_yaw = 999, 999, 999
+            max_x, max_y, max_yaw = -999, -999, -999
             
             for item_idx in range(len(new_preload)):
                 item_obs = new_preload[item_idx]
@@ -277,15 +293,15 @@ class VLNCE_DP_Dataset(IterableDataset):
                 #     depth_shape = item_obs["depth_features"][0].shape
                 #     item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
                     
-                # if self.config.MODEL.IMU_ENCODER.use:
-                #     item_obs["imu"] = torch.zeros((total_steps, 2))
+                if self.config.MODEL.IMU_ENCODER.use:
+                    item_obs["imu"] = torch.zeros((total_steps, 2))
                 
-                # start_pos = item_obs["globalgps"][0][[0, 1]]
-                # for step_idx in range(total_steps):
-                #     # compute imu
-                #     if self.config.MODEL.IMU_ENCODER.use:
-                #         current_pos = item_obs["globalgps"][step_idx][[0,1]]
-                #         item_obs["imu"][step_idx] = current_pos - start_pos
+                start_pos = item_obs["globalgps"][0][[0, 1]]
+                for step_idx in range(total_steps):
+                    # compute imu
+                    if self.config.MODEL.IMU_ENCODER.use:
+                        current_pos = item_obs["globalgps"][step_idx][[0,1]]
+                        item_obs["imu"][step_idx] = current_pos - start_pos
                     
                 #     # stack multiple images and depths
                 #     if step_idx == 0:
@@ -316,6 +332,15 @@ class VLNCE_DP_Dataset(IterableDataset):
                                                          fill_mode='constant')[:self.config.MODEL.len_traj_act]
                     
                     action_deltas = get_delta(actions)
+                    # Compute the action stats ranges
+                    for act in action_deltas:
+                        min_x = min(min_x, act[0])
+                        min_y = min(min_y, act[1])
+                        min_yaw = min(min_yaw, act[2])
+                        max_x = max(max_x, act[0])
+                        max_y = max(max_y, act[1])
+                        max_yaw = max(max_yaw, act[2])
+                    
                     if self.learn_angle:                         
                         item_obs["actions"][step_idx] = normalize_data(action_deltas, self.action_stats) # convert actions to [-1, 1]
                     else:
@@ -386,6 +411,9 @@ class VLNCE_DP_Dataset(IterableDataset):
         # if self.learn_angle:
         # note that relative actions start from the next point
         delta_yaw = yaw[1:] - yaw[0]
+        # Normalize the angles to be within [-π, π] (get the small angle between two yaws)
+        delta_yaw = (delta_yaw + torch.pi) % (2 * torch.pi) - torch.pi
+        
         actions = torch.cat([waypoints[1:], delta_yaw[:, None]], dim=-1)
         # else:
             # actions = waypoints[1:]
@@ -452,14 +480,15 @@ def collate_fn(batch):
             return torch.cat([t, pad], dim=0), mask
         return torch.cat([t, pad], dim=0)
 
-    transposed = list(zip(*batch))
+    # transposed = list(zip(*batch))
 
-    observations_batch = list(transposed[0])
+    # observations_batch = list(transposed[0])
+    observations_batch = batch
 
     B = len(observations_batch)
 
     new_observations_batch = defaultdict(list)
-    for sensor in observations_batch[0]:
+    for sensor in observations_batch[0].keys():
         for bid in range(B):
             new_observations_batch[sensor].append(
                 observations_batch[bid][sensor]
@@ -467,7 +496,7 @@ def collate_fn(batch):
 
     observations_batch = new_observations_batch
 
-    max_traj_len = max(ele['progress'].size(0) for ele in observations_batch)
+    max_traj_len = max(ele.size(0) for ele in observations_batch['progress'])
     not_done_masks_batch = torch.ones(B, max_traj_len, dtype=torch.uint8)
     for bid in range(B):
         for sensor in observations_batch:
@@ -476,6 +505,8 @@ def collate_fn(batch):
                 observations_batch[sensor][bid], max_traj_len, fill_val=1.0
             )
             else:
+                # if sensor == 'instruction':
+                #     observations_batch[sensor][bid] = observations_batch[sensor][bid].unsqueeze(0)
                 observations_batch[sensor][bid] = _pad_helper(
                     observations_batch[sensor][bid], max_traj_len, fill_val=0.0
                 )

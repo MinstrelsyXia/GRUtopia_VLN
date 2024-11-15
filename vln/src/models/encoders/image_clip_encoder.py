@@ -214,7 +214,7 @@ class ImageEncoder(torch.nn.Module):
         depth_feat = self._normalize(depth_inputs)
         return depth_feat
         
-    def embed_image(self, image_batch, fc=False, max_batch_size=500, img_mod='cls', proj=True):
+    def embed_image(self, image_batch, fc=False, max_batch_size=400, img_mod='cls', proj=True):
         """Embed a batch of image."""
         BS = image_batch.shape[0]
         if len(image_batch.shape) == 5:
@@ -239,7 +239,7 @@ class ImageEncoder(torch.nn.Module):
         if img_mod == 'cls':
             outputs = torch.cat(embeddings, dim=0).reshape(BS, -1, outputs.shape[-1])
         elif img_mod == 'multi_patches_avg_pooling':
-            outputs = torch.cat(embeddings, dim=0)
+            outputs = torch.cat(embeddings, dim=0).float() # convert float16 -> 32
 
         if fc:
             outputs = self.image_fc(outputs)

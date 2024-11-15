@@ -65,6 +65,7 @@ def wrap_model(
         # on rank0 are broadcasted to all other ranks.
     elif torch.cuda.device_count() > 1 and world_size > 1:
         logger.info(f"Using data parallel on GPUS: {device}")
+        print(f"Using data parallel on GPUS: {device}")
         if isinstance(device, list):
             model = torch.nn.DataParallel(model, device_ids=device)
         else:
