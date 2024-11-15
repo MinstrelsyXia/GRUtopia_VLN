@@ -227,7 +227,7 @@ class VLNCE_DP_Dataset(IterableDataset):
             for i in range(len(new_preload)):
                 new_preload[i]['instruction'] = np.tile(np.array(new_preload[i]['instruction']), (len(new_preload[i]['progress']),1))
             
-            # compute the action_stats ranges
+            # compute the action_stats ranges # !!!
             min_x, min_y, min_yaw = 999, 999, 999
             max_x, max_y, max_yaw = -999, -999, -999
             
@@ -332,7 +332,7 @@ class VLNCE_DP_Dataset(IterableDataset):
                                                          fill_mode='constant')[:self.config.MODEL.len_traj_act]
                     
                     action_deltas = get_delta(actions)
-                    # Compute the action stats ranges
+                    # Compute the action stats ranges # !!!
                     for act in action_deltas:
                         min_x = min(min_x, act[0])
                         min_y = min(min_y, act[1])
@@ -412,7 +412,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         # note that relative actions start from the next point
         delta_yaw = yaw[1:] - yaw[0]
         # Normalize the angles to be within [-π, π] (get the small angle between two yaws)
-        delta_yaw = (delta_yaw + torch.pi) % (2 * torch.pi) - torch.pi
+        delta_yaw = torch.atan2(torch.sin(delta_yaw), torch.cos(delta_yaw))
         
         actions = torch.cat([waypoints[1:], delta_yaw[:, None]], dim=-1)
         # else:
