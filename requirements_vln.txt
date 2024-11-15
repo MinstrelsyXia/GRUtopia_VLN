@@ -5,4 +5,9 @@ ftfy
 clip
 transformers
 lmdb
+<<<<<<< HEAD
 diffusers==0.21.4
+=======
+diffusers
+msgpack_numpy
+>>>>>>> 6f8fbf6b161db56e3dde13966628319459854119

@@ -1,4 +1,4 @@
-NAME=w61_grutopia_test
+NAME=w61_grutopia
 sudo docker run -d --name ${NAME} -it --rm --gpus='"device=3"' --network host \
      -e "ACCEPT_EULA=Y" \
      -e "PRIVACY_CONSENT=Y" \
