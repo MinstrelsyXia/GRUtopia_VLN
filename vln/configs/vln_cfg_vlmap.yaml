@@ -5,8 +5,8 @@ datasets:
   mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
   mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
   splits:
-    # - val_seen
-    - train
+    - val_seen
+    # - train
     # - val_unseen
     # - test
 

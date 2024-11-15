@@ -753,9 +753,7 @@ class TMP(VLMap):
 
         return mask
     
-    def get_robot_bottom_z(self):
-        '''get robot bottom z'''
-        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+
 
     
     ############################## from VLMap(Map) ########################################
@@ -772,7 +770,7 @@ class TMP(VLMap):
         # pc_mask = labeled_map_cropped == cat_id # (N,)
         # self.grid_pos[pc_mask]
         pc_mask = self.index_map(name, with_init_cat=True)
-        if pc_mask is None or np.sum(pc_mask) < 10:
+        if pc_mask is None or np.sum(pc_mask) < 50:
             raise NotFound(f"pc_mask for object '{name}' is either empty or too small.")
 
         mask_2d = pool_3d_label_to_2d(pc_mask, self.grid_pos, self.gs)
@@ -804,7 +802,8 @@ class TMP(VLMap):
         #     for j in range(len(contours[i])):
         #         contours[i][j, 0] += self.rmin
         #         contours[i][j, 1] += self.cmin
-
+        if len(contours) == 0 or len(centers) == 0 or len(bbox_list) == 0:
+            raise NotFound(f"contours, centers, bbox_list for object '{name}' is empty.")
         return contours, centers, bbox_list
 
     def check_object(self, name: str) -> bool:

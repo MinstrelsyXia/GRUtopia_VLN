@@ -215,30 +215,36 @@ class CamOccupancyMap:
     def close_windows_head(self):
         plt.close('all')  # Close all figures
 
-    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, update_camera_pose=False, verbose=False):
+    def get_surrounding_free_map(self, robot_pos, robot_height=1.05+0.8, update_camera_pose=False, verbose=True):
+        # robot height: indeed ankle height
+
         # Define height range for free map
         # free_map: 1 for free space, 0 for occupied space
 
-        min_height = robot_height
-        max_height = robot_height + 0.8
+        #! fall down range, when standing, it should be 0,0.8
+        # min_height = robot_height - 0.8
+        # max_height = robot_height
+        min_height = 0
+        max_height = self.issac_camera.get_world_pose()[0][2]-robot_height
         normal_threshold = 0.005
 
         # rgb_init, depth_init, mask, (row_min, row_max), (col_min, col_max), pointcloud = self._get_topdown_map(self.topdown_camera)
 
         # get info
+        original_robot_height = 1.05+0.8
         data_info = self.get_camera_data()
         rgb = np.array(data_info["rgba"])
         depth = np.array(data_info["depth"])
 
-        # Generate mask for depth within the acceptable range
-        depth_mask = (depth >= min_height) & (depth < max_height)
+        # Generate mask for depth that are obstacles
+        depth_mask =((depth >= min_height) & (depth < max_height)) | (depth > max_height + 0.2)
 
         # robot_mask
         robot_mask = self.create_robot_mask()
 
         # Combine masks to determine free space
         free_map = np.zeros_like(depth, dtype=int)
-        free_map[depth_mask] = 1  # Free space is where conditions are met
+        free_map[depth_mask == 0] = 1  # Free space is where conditions are met
         free_map[robot_mask == 1] = 1  # Robot's location is free space
 
         if verbose:
@@ -249,7 +255,7 @@ class CamOccupancyMap:
             img.save(img_path)
             # print("Image saved at", img_path)
 
-            depth_img = self.vis_depth(depth, robot_height)
+            depth_img = self.vis_depth(depth, original_robot_height)
             depth_img_path = os.path.join(self.args.log_image_dir, "cam_free", "depth_scene_local.png")
             depth_img.save(depth_img_path)
             # print("Depth saved at", depth_img_path)

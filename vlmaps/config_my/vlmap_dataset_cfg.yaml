@@ -20,3 +20,6 @@ init_categories: True
 from_scratch: True # no need to load in vlmap
 online: True # needn't load from rgbs/depths
 find_frontier_type: closest # or closest
+episode_file: vlmaps/docker/multi_gpu_list/0.txt
+last_scan_file: null
+resume_scan: null

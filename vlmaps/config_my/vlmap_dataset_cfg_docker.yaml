@@ -1,5 +1,5 @@
 defaults:
-  - data_paths: vlmap_dataset
+  - data_paths: docker
   - map_config: vlmap_dataset
   - params: issacsim_test
   - vln_config: docker
@@ -20,3 +20,6 @@ init_categories: True
 from_scratch: True # no need to load in vlmap
 online: True # needn't load from rgbs/depths
 find_frontier_type: closest # or closest
+episode_file: vlmaps/docker/test/0.txt
+last_scan_file: vlmaps/docker/last_scan_0.txt
+resume_scan: null

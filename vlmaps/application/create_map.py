@@ -3,7 +3,7 @@ import hydra
 from omegaconf import DictConfig
 import sys,os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-print(sys.path)
+# print(sys.path)
 from vlmaps.vlmaps.map.vlmap import VLMap
 
 

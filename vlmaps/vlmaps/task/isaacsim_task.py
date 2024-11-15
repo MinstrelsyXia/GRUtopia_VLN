@@ -67,10 +67,11 @@ class IsaacSimSpatialGoalNavigationTask():
         results_dict["scan"] = self.scan
         # results_dict["num_subgoals"] = self.n_subgoals_in_task
         # results_dict["num_subgoal_success"] = self.n_success_subgoals
-        results_dict["subgoal_success_rate"] = self.subgoal_success_rate
-        results_dict["finished_subgoal_ids"] = self.finished_subgoals
-        results_dict["SPL"] = self.spl
+        results_dict["subgoal_success_rate"] = float(self.subgoal_success_rate)
+        results_dict["finished_subgoal_ids"] = [x.tolist() if isinstance(x, np.ndarray) else x for x in self.finished_subgoals]
+        results_dict["SPL"] = float(self.spl)
         results_dict["instruction"] = self.instruction
-        results_dict["actions"] = self.actions
+        results_dict["actions"] = [x.tolist() if isinstance(x, np.ndarray) else x for x in self.actions]
+        
         with open(save_path, "w") as f:
             json.dump(results_dict, f, indent=4)
