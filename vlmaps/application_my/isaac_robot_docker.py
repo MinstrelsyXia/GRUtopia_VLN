@@ -14,11 +14,11 @@ import open3d as o3d
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "vlmaps"))
-print(sys.path)
+# print(sys.path)
 
 from scipy.ndimage import binary_closing, binary_dilation, gaussian_filter
-
-
+import pickle
+import time
 from vlmaps.vlmaps.robot.lang_robot import LangRobot
 from vlmaps.vlmaps.dataloader.isaacsim_dataloader import VLMapsDataloaderHabitat
 from vlmaps.vlmaps.navigator.navigator import Navigator
@@ -34,6 +34,7 @@ from vlmaps.vlmaps.utils.index_utils import find_similar_category_id, get_segmen
 from vlmaps.vlmaps.utils.isaacsim_utils import  display_sample
 from vlmaps.vlmaps.utils.matterport3d_categories import mp3dcat
 from vlmaps.vlmaps.utils.visualize_utils import pool_3d_label_to_2d
+from vlmaps.vlmaps.utils.llm_utils import parse_object_goal_instruction, parse_spatial_instruction
 
 from typing import List, Tuple, Dict, Any, Union
 
@@ -54,7 +55,7 @@ from vlmaps.vlmaps.map.map import Map
 from vlmaps.application_my.utils import NotFound, EarlyFound, extract_parameters, extract_self_methods
 
 import logging
-
+import argparse
 
 logging.getLogger('PIL').setLevel(logging.WARNING) # used to delete the log file from PIL
 logging.getLogger('numba').setLevel(logging.WARNING)
@@ -93,7 +94,7 @@ class IsaacSimLanguageRobot(LangRobot):
         self.test_scene_dir = self.config["data_paths"]["habitat_scene_dir"]
         # data_dir = Path(self.config["data_paths"]["vlmaps_data_dir"]) / "vlmaps_dataset" 
         self.vlmaps_data_dir = self.config["data_paths"]["vlmaps_data_dir"]
-        self.test_file_save_dir = self.config["data_paths"]["test_file_save_dir"]
+        self.test_dir = self.config["data_paths"]["test_file_save_dir"]
         # self.vlmaps_data_save_dirs = [
         #     data_dir / x for x in sorted(os.listdir(data_dir)) if x != ".DS_Store"
         # ]  # ignore artifact generated in MacOS
@@ -178,7 +179,7 @@ class IsaacSimLanguageRobot(LangRobot):
         camera_in = self.camera.get_intrinsics_matrix()
         self.fov = 2 * np.arctan(camera_in[0, 2] / camera_in[0, 0]) # 60 degrees; counted in rad
 
-    def setup_scene(self,  episode_id: int ,trajectory_id: int):
+    def setup_scene(self,  episode_id: int ,trajectory_id: int,reset_scene=False,init_omni_scene=False):
         """
         Setup the simulator, load scene data and prepare
         the LangRobot interface for navigation
@@ -190,7 +191,7 @@ class IsaacSimLanguageRobot(LangRobot):
         # self.scene_name = vlmaps_data_dir.name.split("_")[0]
 
         # trajectory_id:37; scene_id:s8pcm....glb; scan_id: s8...
-        item = self._setup_sim(self.sim_config, episode_id,  trajectory_id, vlmap_dataset=self.online) # from VLNdataloader init_one_path
+        item = self._setup_sim(self.sim_config, episode_id,  trajectory_id, vlmap_dataset=self.online,reset_scene=reset_scene,init_omni_scene=init_omni_scene) # from VLNdataloader init_one_path
 
         self.item = item
 
@@ -258,8 +259,15 @@ class IsaacSimLanguageRobot(LangRobot):
     
     def set_agent_pose(self, position, rotation):
         self.agents.set_world_pose(position, rotation)
-        
-    def _setup_sim(self, sim_config, episode_id,path_id,  headless=False, vlmap_dataset=False):
+    
+    def reset_sim_scene(self,scan):
+        # reset scene without restart app
+        start_time = time.time()
+        self.env._runner._world.clear()
+        self.env._runner.add_tasks(self.sim_config.config.tasks)
+        log.info(f"Reset scene {scan} without restarting app for using {((time.time()-start_time)/60):.2f} minutes.")
+
+    def _setup_sim(self, sim_config, episode_id,path_id,  headless=False, vlmap_dataset=False,reset_scene=False,init_omni_scene=False):
         """
         Setup IsaacSim simulator, load IsaacSim scene and relevant mesh data
         """
@@ -312,22 +320,29 @@ class IsaacSimLanguageRobot(LangRobot):
             if item['episode_id'] == episode_id:
                 scene_usd_path = load_scene_usd(self.vln_config, item['scan'])
                 instruction = item['instruction']['instruction_text']
-                if 'stair' in instruction:
-                    print('erroe!!! stair occurrs')
-                    continue
+                # if 'stair' in instruction:
+                #     print('erroe!!! stair occurrs')
+                #     continue
                 self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
                 self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
                 self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
                 self.vlmaps_data_dir = self.vlmaps_data_dir + f"/{item['scan']}/id_{item['episode_id']}"
-                self.test_file_save_dir = self.test_file_save_dir + f"/{item['scan']}/id_{item['episode_id']}"
+                self.test_file_save_dir = self.test_dir + f"/{item['scan']}/id_{item['episode_id']}"
                 self.vln_config.log_image_dir = self.test_file_save_dir
                 if not os.path.exists(self.test_file_save_dir):
                     os.makedirs(self.test_file_save_dir, exist_ok=True)
                 self.nav_save_dir = self.test_file_save_dir + "/nav"
                 if not os.path.exists(self.nav_save_dir):
                     os.makedirs(self.nav_save_dir, exist_ok=True)
-                self.init_env(self.sim_config, headless=self.vln_config.headless)
-                self.init_omni_env()
+                if init_omni_scene:
+                    self.init_env(self.sim_config, headless=self.vln_config.headless)
+                    self.init_omni_env()
+                if reset_scene:
+                    self.env.simulation_app.close()
+                    self.env = None
+                    self.init_env(self.sim_config, headless=self.vln_config.headless)
+                    self.init_omni_env()
+                    # self.reset_sim_scene(item['scan'])
                 self.init_agents()
                 self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
                 self.init_occupancy_map()
@@ -429,13 +444,13 @@ class IsaacSimLanguageRobot(LangRobot):
         else:
             # randomly pick a frontier:
             # frontier in world coord
-            if self.frontier_type == "default":
-                num = frontiers.shape[0]
-                idx = np.random.randint(0,num)
-                pos = frontiers[idx]
+            # if self.frontier_type == "default":
+            #     num = frontiers.shape[0]
+            #     idx = np.random.randint(0,num)
+            #     pos = frontiers[idx]
                 
-                # return self.ObstacleMap._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
-                return self.ObstacleMap._xy_to_px(np.array([pos]))[0]
+            #     # return self.ObstacleMap._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+            #     return self.ObstacleMap._xy_to_px(np.array([pos]))[0]
             if self.frontier_type == 'closest':
                 min_dist = 0
                 for index, frontier in enumerate(frontiers):
@@ -485,10 +500,10 @@ class IsaacSimLanguageRobot(LangRobot):
             return True
         except NotFound as e:
             log.warning(f"{e}. Object not found after looking around, moving to a frontier.")
-            frontier_point = self.get_frontier()
-            move_flag =  self.move_to(frontier_point,type = 'obs')            
+            frontier_point = self.get_frontier()         
             turn_angle = self.get_angle(frontier_point) # in obstacle map coord
-            turn_flag = self.turn(-turn_angle) # turn left turn_angle
+            turn_flag = self.turn(turn_angle,threshold = 0.05) # turn left turn_angle
+            move_flag =  self.move_to(frontier_point,type = 'obs',threshold = 0.3)   
             if move_flag == False and turn_flag == False:
                 log.warning(f"Failed to move to the frontier point {frontier_point}")
                 return False
@@ -530,8 +545,9 @@ class IsaacSimLanguageRobot(LangRobot):
             try:
                 self.map.load_3d_map()
                 # 尝试执行传入的动作
+                log.info(f"testing action {action_name}")
                 eval(action_name)
-                
+                self._set_nav_curr_pose()
                 # 如果位置发生变化，说明动作成功，退出循环
                 if not (is_equal(self.curr_pos_on_map, prev_pos) and is_equal(self.curr_ang_deg_on_map, prev_ang)):
                     log.info(f"Successfully executed {action_name}")
@@ -575,10 +591,12 @@ class IsaacSimLanguageRobot(LangRobot):
         return self.global_freemap, self.global_freemap_camera_pose
 
     def update_all_maps(self):
+        # print("to avoid out of memory, doesn't update for debug")
+        # return
         topdown_map = self.GlobalTopdownMap(self.vln_config, self.item['scan']) 
         freemap, camera_pose = self.get_global_free_map(verbose=self.vln_config.test_verbose) 
         topdown_map.update_map(freemap, camera_pose, verbose=self.vln_config.test_verbose) 
-
+        self.get_surrounding_free_map(verbose = True)  
         pc, max_depth = self.update_semantic_map()
         self.update_obstacle_map(pc,max_depth)
         self.eval_helper.add_pos(self.agents.get_world_pose()[0])
@@ -594,7 +612,7 @@ class IsaacSimLanguageRobot(LangRobot):
             self.env.step(actions=env_actions)
             self.step += 1
             if (self.step % 50 == 0):
-                self.check_and_reset_robot(self.step, update_freemap=True, verbose=False)
+                self.check_and_reset_robot(self.step, update_freemap=True, verbose=True)
         self.update_all_maps()
         log.info("Warm up finished, updated all maps")
 
@@ -630,7 +648,7 @@ class IsaacSimLanguageRobot(LangRobot):
             self.turn(60)
             
 
-    def move_to(self, pos: Tuple[float, float], type = 'sem') -> List[str]:
+    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 1.0) -> List[str]:
         """Move the robot to the position on the obstacle map
             based on accurate localization in the environment
             with falls and movements
@@ -671,18 +689,18 @@ class IsaacSimLanguageRobot(LangRobot):
         goal_xy = self.ObstacleMap._px_to_xy(np.array([[goal[0],goal[1]]]))[0]
 
 
-        if (np.linalg.norm(goal_xy - self.agents.get_world_pose()[0][:2]) <= 1.0):
+        if (np.linalg.norm(goal_xy - self.agents.get_world_pose()[0][:2]) <= threshold):
             log.warning("no need to move, already very close")
             return False
 
         paths, paths_3d = self.planning_path(start_modified,goal_modified)
         init_step = self.step
         actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
-        log.info(f"moving from {start} to {goal} on {paths}")
-        log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
+        log.info(f"actions: {actions}")
+        log.info(f"moving from {start} to {goal} on {paths},moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}'")
         self.eval_helper.add_action(actions)
 
-        while np.linalg.norm(goal_xy - self.agents.get_world_pose()[0][:2]) > 1.0:
+        while np.linalg.norm(goal_xy - self.agents.get_world_pose()[0][:2]) > threshold:
             # np.linalg.norm(self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2]) - np.array(goal_modified) )
             # np.linalg.norm(goal_xy - self.agents.get_world_pose()[0][:2])>1:
             self.step = self.step + 1
@@ -693,25 +711,32 @@ class IsaacSimLanguageRobot(LangRobot):
 
             #! check whether robot falls first, then update map
             if (self.step % 200 == 0):
-                reset_robot = self.check_and_reset_robot(cur_iter=self.step, update_freemap=False, verbose=self.vln_config.test_verbose)
-                reset_flag = reset_robot
-                if reset_flag:
-                    # self.map.update_occupancy_map(verbose = self.vln_config.test_verbose) #! find dilate->vlmap occupancy map
-                    # self._set_nav_curr_pose()
-                    # # plan the path
-                    # curr_pose_on_full_map = self.get_agent_pose_on_map()
-                    # start = self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2])
+                while True:
+                    reset_robot = self.check_and_reset_robot(cur_iter=self.step, update_freemap=False, verbose=self.vln_config.test_verbose)
+                    reset_flag = reset_robot
+                    if reset_flag:
+                        # self.map.update_occupancy_map(verbose = self.vln_config.test_verbose) #! find dilate->vlmap occupancy map
+                        # self._set_nav_curr_pose()
+                        # # plan the path
+                        # curr_pose_on_full_map = self.get_agent_pose_on_map()
+                        # start = self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2])
 
-                    current_pos = self.agents.get_world_pose()[0][:2]
-                    start = self.ObstacleMap._xy_to_px(np.array([[current_pos[0],current_pos[1]]]))[0]
-                    start_modified = [start[0],start[1]]
-                    log.info(f"stuck or fall down, reset the robot to {start_modified}")
-                    paths, paths_3d = self.planning_path(start_modified,goal_modified)
-                    actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
-                    log.info(f"moving from {start} to {goal} on {paths}")
-                    log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
-                    self.eval_helper.add_action(actions)
-                    self._retrive_robot_stuck_check()
+                        current_pos = self.agents.get_world_pose()[0][:2]
+                        start = self.ObstacleMap._xy_to_px(np.array([[current_pos[0],current_pos[1]]]))[0]
+                        start_modified = [start[0],start[1]]
+                        log.info(f"stuck or fall down, reset the robot to {start_modified}")
+                        paths, paths_3d = self.planning_path(start_modified,goal_modified)
+                        goal_xy = paths_3d[-1][:2]
+                        actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
+                        log.info(f"moving from {start} to {goal_modified} on {paths}")
+                        log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
+                        self.eval_helper.add_action(actions)
+                        self._retrive_robot_stuck_check()
+                        for _ in range(50):
+                            self.step += 1
+                            self.env.step(actions=env_actions)
+                    else:
+                        break
 
 
             if (self.step % 200 == 0):
@@ -738,24 +763,30 @@ class IsaacSimLanguageRobot(LangRobot):
                     log.warning("Path is blocked, replanning")
                     paths, paths_3d = self.planning_path(start_modified,goal_modified)
                     actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
-                    log.info(f"moving from {start} to {goal} on {paths}")
+                    goal_xy = paths_3d[-1][:2]
+                    log.info(f"moving from {start} to {goal_modified} on {paths}")
                     log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
                     env_actions = []
                     env_actions.append(actions)
                     self.eval_helper.add_action(actions)
                     continue
-            if ((self.step-init_step) % 10000 == 0):
+            if ((self.step-init_step) % 1000 == 0):
                 # end this loop
-                log.warning("Failed to reach the subgoal after 10000 steps")
                 goal = self.ultimate_goal
                 if(self.map.check_object(goal)):
-                    raise EarlyFound
+                    raise EarlyFound(f"Goal {goal} is reached early")
+            if ((self.step-init_step) % 10000 == 0):
+                log.warning("Failed to reach the subgoal after 1000 steps")
+                return False
 
 
         return True
 
 
     def planning_path(self,start_modified,goal_modified):
+        '''
+        will change goal_modified if goal is not reachable
+        '''
         rows, cols = np.where(self.ObstacleMap._navigable_map == 0)
         min_row = np.max(np.min(rows)-1,0)
         min_col = np.max(np.min(cols)-1,0)
@@ -767,19 +798,20 @@ class IsaacSimLanguageRobot(LangRobot):
         path_save_path = self.nav_save_dir + f"/path_{self.step}.png"
         paths = self.nav.plan_to( [start_modified[1],start_modified[0]],[goal_modified[1],goal_modified[0]] , vis=self.config["nav"]["vis"],navigable_map_visual = self.ObstacleMap.nav_map_visual,save_path=path_save_path)
         paths = np.array(paths)
-        paths = np.array([paths[:,1], paths[:,0]]).T
+        paths = np.array([paths[:,1], paths[:,0]]).T # paths in normal order
         paths_3d = []
         for path in paths:
             xy = self.ObstacleMap._px_to_xy(np.array([[path[0], path[1]]]))[0]
             paths_3d.append([xy[0],xy[1],self.agent_init_pose[2]]) # fix height
         paths_3d = np.array(paths_3d)
-        
+        goal_modified[:] = paths[-1]
         return paths, paths_3d
 
-    def turn(self, angle_deg: float):
+    def turn(self, angle_deg: float,threshold = 0.1):
         """
         Turn right a relative angle in degrees
         """
+        angle_deg = -angle_deg
         if np.abs(angle_deg) < 5:
             log.warning(f'no need to turn for degree {angle_deg}')
             return False
@@ -804,7 +836,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 }
             env_actions.append(actions)
             # log.info(f'action now {actions}')
-            while abs(self.quat_to_euler_angles(current_orientation)[2] - rotation_goal) > 0.1:
+            while abs(self.quat_to_euler_angles(current_orientation)[2] - rotation_goal) > threshold:
                 self.step += 1
                 # if step_time%100==0 or step_time <= 3:
                 #     agent.bev_map.step_time = step_time
@@ -930,378 +962,6 @@ class IsaacSimLanguageRobot(LangRobot):
         ''' GEt observations from the sensors
         '''
         return self.env.get_observations()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    ########################## from habitat language robot ###################################
-    def get_agent_tf(self) -> np.ndarray:
-        agent_state = self.sim.get_agent(0).get_state()
-        return agent_state2tf(agent_state)
-
-    def load_gt_region_map(self, region_gt: List[Dict[str, np.ndarray]]):
-        obst_cropped = self.vlmaps_dataloader.get_obstacles_cropped()
-        self.region_categories = sorted(list(region_gt.keys()))
-        self.gt_region_map = np.zeros(
-            (len(self.region_categories), obst_cropped.shape[0], obst_cropped.shape[1]), dtype=np.uint8
-        )
-
-        for cat_i, cat in enumerate(self.region_categories):
-            for box_i, box in enumerate(region_gt[cat]):
-                center = np.array(box["region_center"])
-                size = np.array(box["region_size"])
-                top_left = center - size / 2
-                bottom_right = center + size / 2
-                top_left_2d = self.vlmaps_dataloader.convert_habitat_pos_list_to_cropped_map_pos_list([top_left])[0]
-                bottom_right_2d = self.vlmaps_dataloader.convert_habitat_pos_list_to_cropped_map_pos_list(
-                    [bottom_right]
-                )[0]
-
-                self.gt_region_map[cat_i] = cv2.rectangle(
-                    self.gt_region_map[cat_i],
-                    (int(top_left_2d[1]), int(top_left_2d[0])),
-                    (int(bottom_right_2d[1]), int(bottom_right_2d[0])),
-                    1,
-                    -1,
-                )
-
-    def get_distribution_map(
-        self, name: str, scores: np.ndarray, pos_list_cropped: List[List[float]], decay_rate: float = 0.1
-    ):
-        if scores.shape[0] > 1:
-            scores = (scores - np.min(scores)) / (np.max(scores) - np.min(scores))
-        obst_map_cropped = self.map.get_customized_obstacle_cropped()
-        dist_map = np.zeros_like(obst_map_cropped, dtype=np.float32)
-        for pos_i, pos in enumerate(pos_list_cropped):
-            # dist_map[int(pos[0]), int(pos[1])] = scores[pos_i]
-            tmp_dist_map = np.zeros_like(dist_map, dtype=np.float32)
-            pos = np.round(pos[0]), np.round(pos[1])
-            tmp_dist_map[int(pos[0]), int(pos[1])] = scores[pos_i]
-
-            con = scores[pos_i]
-            dists = distance_transform_edt(tmp_dist_map == 0)
-            reduct = con * dists * decay_rate
-            tmp = np.ones_like(tmp_dist_map) * con - reduct
-            tmp_dist_map = np.clip(tmp, 0, 1)
-            dist_map += tmp_dist_map
-        dist_map = (dist_map - np.min(dist_map)) / (np.max(dist_map) - np.min(dist_map))
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map(dist_map, name=name)
-        return dist_map
-
-    def get_distribution_map_3d(
-        self, name: str, scores: np.ndarray, pos_list_3d: List[List[float]], decay_rate: float = 0.1
-    ):
-        """
-        pos_list_3d: list of 3d positions in 3d map coordinate
-        """
-        if scores.shape[0] > 1:
-            scores = (scores - np.min(scores)) / (np.max(scores) - np.min(scores))
-        sim_mat = np.zeros((self.global_pc.shape[0], len(scores)))
-        for pro_i, (con, pos) in enumerate(zip(scores, pos_list_3d)):
-            print("confidence: ", con)
-
-            dists = np.linalg.norm(self.global_pc[:, [0, 2]] - pos[[0, 2]], axis=1) / self.vlmaps_dataloader.cs
-            sim = np.clip(con - decay_rate * dists, 0, 1)
-            sim_mat[:, pro_i] = sim
-
-        sim = np.max(sim_mat, axis=1)
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map_3d(sim, name=name)
-
-        return sim.flatten()
-
-    def get_vl_distribution_map(self, name: str, decay_rate: float = 0.1) -> np.ndarray:
-        predict_mask = self.map.get_predict_mask(name)
-        predict_mask = predict_mask.astype(np.float32)
-        predict_mask = (gaussian_filter(predict_mask, sigma=1) > 0.5).astype(np.float32)
-        dists = distance_transform_edt(predict_mask == 0)
-        tmp = np.ones_like(dists) - (dists * decay_rate)
-        dist_map = np.where(tmp < 0, np.zeros_like(tmp), tmp)
-        dist_map = (dist_map - np.min(dist_map)) / (np.max(dist_map) - np.min(dist_map))
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map(predict_mask, name=name + "_predict_mask")
-            self._vis_dist_map(dist_map, name=name + f"_{decay_rate}")
-        return dist_map
-
-    def get_vl_distribution_map_3d(self, name: str, decay_rate: float = 0.1) -> np.ndarray:
-        predict = np.argmax(self.map.scores_mat, axis=1)
-        i = find_similar_category_id(name, self.map.categories)
-        sim = predict == i
-
-        target_pc = self.global_pc[sim, :]
-        other_ids = np.where(sim == 0)[0]
-        other_pc = self.global_pc[other_ids, :]
-        target_sim = np.ones((target_pc.shape[0], 1))
-        other_sim = np.zeros((other_pc.shape[0], 1))
-        for other_p_i, p in enumerate(other_pc):
-            dist = np.linalg.norm(target_pc - p, axis=1) / self.cs
-            min_dist_i = np.argmin(dist)
-            min_dist = dist[min_dist_i]
-            other_sim[other_p_i] = np.clip(1 - min_dist * decay_rate, 0, 1)
-
-        new_pc_global = self.global_pc.copy()
-        new_sim = np.ones((new_pc_global.shape[0], 1), dtype=np.float32)
-        for s_i, s in enumerate(other_sim):
-            new_sim[other_ids[s_i]] = s
-
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map_3d(new_sim, name=name)
-        return new_sim.flatten()
-
-    def get_region_distribution_map(self, name: str, decay_rate: float = 0.1) -> np.ndarray:
-        if self.area_map_type == "clip_sparse":
-            return self.get_clip_sparse_region_distribution_map(name, decay_rate)
-        elif self.area_map_type == "concept_fusion":
-            return self.get_concept_fusion_region_distribution_map(name, decay_rate)
-        elif self.area_map_type == "lseg":
-            return self.get_lseg_region_map(name, decay_rate)
-        elif self.area_map_type == "gt":
-            return self.get_gt_region_map(name, decay_rate)
-
-    def get_gt_region_map(self, name: str, decay_rate: float = 0.1) -> np.ndarray:
-        assert self.area_map_type == "gt"
-        id = find_similar_category_id(name, self.region_categories)
-        predict_mask = self.gt_region_map[id]
-
-        obst_map_cropped = self.map.get_customized_obstacle_cropped()
-        dist_map = np.zeros_like(obst_map_cropped, dtype=np.float32)
-        dists = distance_transform_edt(predict_mask == 0)
-        tmp = np.ones_like(dists) - (dists * decay_rate)
-        dist_map = np.clip(tmp, 0, 1)
-        dist_map = (dist_map - np.min(dist_map)) / (np.max(dist_map) - np.min(dist_map))
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map(dist_map, name=name)
-        return dist_map
-
-    def get_lseg_region_map(self, name: str, decay_rate: float = 0.1) -> np.ndarray:
-        assert self.map_type == "lseg"
-        assert self.area_map_type == "lseg"
-        obst_map_cropped = self.map.get_customized_obstacle_cropped()
-        dist_map = np.zeros_like(obst_map_cropped, dtype=np.float32)
-        predict_mask = self.map.get_region_predict_mask(name)
-        dists = distance_transform_edt(predict_mask == 0)
-        tmp = np.ones_like(dists) - (dists * decay_rate)
-        dist_map = np.clip(tmp, 0, 1)
-        dist_map = (dist_map - np.min(dist_map)) / (np.max(dist_map) - np.min(dist_map))
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map(dist_map, name=name)
-        return dist_map
-
-    def get_concept_fusion_region_distribution_map(self, name: str, decay_rate: float = 0.1) -> np.ndarray:
-        assert self.area_map is not None, "Area map is not initialized."
-        obst_map_cropped = self.map.get_customized_obstacle_cropped()
-        dist_map = np.zeros_like(obst_map_cropped, dtype=np.float32)
-        predict_mask = self.area_map.get_predict_mask(name)
-        # print("predict_mask: ", predict_mask.shape)
-        # mask_vis = cv2.cvtColor((predict_mask * 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
-        # cv2.imshow("mask_vis", mask_vis)
-        # cv2.waitKey(1)
-        dists = distance_transform_edt(predict_mask == 0)
-        tmp = np.ones_like(dists) - (dists * decay_rate)
-        dist_map = np.where(tmp < 0, np.zeros_like(tmp), tmp)
-        dist_map = (dist_map - np.min(dist_map)) / (np.max(dist_map) - np.min(dist_map))
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map(dist_map, name=name)
-        return dist_map
-
-    def get_clip_sparse_region_distribution_map(self, name: str, decay_rate: float = 0.1) -> np.ndarray:
-        assert self.area_map is not None, "Area map is not initialized."
-        obst_map_cropped = self.map.get_customized_obstacle_cropped()
-        dist_map = np.zeros_like(obst_map_cropped, dtype=np.float32)
-        scores = self.area_map.get_scores(name)
-        scores = (scores - np.min(scores)) / (np.max(scores) - np.min(scores))
-        robot_pose_list = self.area_map.get_robot_pose_list()
-        ids = np.argsort(-scores.flatten())
-        # max_id = np.argmax(scores)
-        # obst_map = self.vlmaps_dataloader.get_obstacles_cropped_no_floor()
-        # obst_map = np.tile(obst_map[:, :, None] * 255, [1, 1, 3]).astype(np.uint8)
-
-        for i, tf_hab in enumerate(robot_pose_list):
-            tmp_dist_map = np.zeros_like(dist_map, dtype=np.float32)
-            row, col, deg = self.vlmaps_dataloader.convert_habitat_tf_to_cropped_map_pose(tf_hab)
-            if row < 0 or row >= dist_map.shape[0] or col < 0 or col >= dist_map.shape[1]:
-                continue
-            # print(i, tf_hab[:3, 3].flatten(), row, col)
-            # obst_map[int(row), int(col)] = (0, 255, 0)
-            # cv2.circle(obst_map, (int(col), int(row)), 3, (0, 255, 0), -1)
-            # cv2.imshow("obst_map", obst_map)
-            # cv2.waitKey(1)
-            s = scores[i]
-            tmp_dist_map[row, col] = s
-            dists = distance_transform_edt(tmp_dist_map == 0)
-            tmp = np.ones_like(dists) * s - (dists * decay_rate)
-            tmp_dist_map = np.clip(tmp, 0, 1)
-            dist_map = np.where(dist_map > tmp_dist_map, dist_map, tmp_dist_map)
-
-        dist_map = (dist_map - np.min(dist_map)) / (np.max(dist_map) - np.min(dist_map))
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map(dist_map, name=name)
-        return dist_map
-
-    def get_map(self, obj: str = None, sound: str = None):
-        """
-        Return the distribution map of a certain object or sound category with decay 0.01
-        """
-        assert obj is not None or sound is not None, "Object and sound names are both None."
-        if obj is not None:
-            return self.get_vl_distribution_map(obj, decay_rate=0.01)
-        elif sound is not None:
-            return self.get_sound_distribution_map(sound, decay_rate=0.01)
-
-    def get_major_map(self, obj: str = None, sound: str = None):
-        """
-        Return the distribution map of a certain object or sound category with decay 0.1
-        """
-        assert obj is not None or sound is not None, "Object and sound names are both None."
-        if obj is not None:
-            return self.get_vl_distribution_map(obj, decay_rate=0.1)
-        elif sound is not None:
-            return self.get_sound_distribution_map(sound, decay_rate=0.1)
-
-    def get_map_3d(self, obj: str = None, sound: str = None, img: np.ndarray = None, intr_mat: np.ndarray = None):
-        """
-        Return the distribution map of a certain object or sound category with decay 0.01
-        """
-        assert obj is not None or sound is not None or img is not None, "Object, sound names, and image are all None."
-        if obj is not None:
-            return self.get_vl_distribution_map_3d(obj, decay_rate=0.03)
-        elif sound is not None:
-            return self.get_sound_distribution_map_3d(sound, decay_rate=0.05)
-        elif img is not None:
-            return self.get_image_distribution_map_3d(img, query_intr_mat=intr_mat, decay_rate=0.05)
-
-    def get_major_map_3d(self, obj: str = None, sound: str = None, img: np.ndarray = None, intr_mat: np.ndarray = None):
-        """
-        Return the distribution map of a certain object or sound category with decay 0.1
-        """
-        assert obj is not None or sound is not None or img is not None, "Object, sound names, and image are all None."
-        if obj is not None:
-            return self.get_vl_distribution_map_3d(obj, decay_rate=0.1)
-        elif sound is not None:
-            return self.get_sound_distribution_map_3d(sound, decay_rate=0.05)
-        elif img is not None and intr_mat is not None:
-            return self.get_image_distribution_map_3d(img, query_intr_mat=intr_mat, decay_rate=0.01)
-
-    def _vis_dist_map(self, dist_map: np.ndarray, name: str = ""):
-        obst_map = self.vlmaps_dataloader.get_obstacles_cropped_no_floor()
-        obst_map = np.tile(obst_map[:, :, None] * 255, [1, 1, 3]).astype(np.uint8)
-        target_heatmap = show_cam_on_image(obst_map.astype(float) / 255.0, dist_map)
-        cv2.imshow(f"heatmap_{name}", target_heatmap)
-
-    def _vis_dist_map_3d(self, heatmap: np.ndarray, transparency: float = 0.3, name: str = ""):
-        print(f"heatmap of {name}")
-        sim_new = (heatmap * 255).astype(np.uint8)
-        rgb_pc = cv2.applyColorMap(sim_new, cv2.COLORMAP_JET)
-        rgb_pc = rgb_pc.reshape(-1, 3)[:, ::-1].astype(np.float32) / 255.0
-        rgb_pc = rgb_pc * transparency + self.map.grid_rgb / 255.0 * (1 - transparency)
-
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(self.global_pc)
-        pcd.colors = o3d.utility.Vector3dVector(rgb_pc)
-        visualize_pc(pcd,headless=False) #! change different name
-        # o3d.visualization.draw_geometries([pcd])
-
-    def get_max_pos(self, map: np.ndarray) -> Tuple[float, float]:
-        id = np.argmax(map)
-        row, col = np.unravel_index(id, map.shape)
-
-        if self.config["nav"]["vis"]:
-            self._vis_dist_map(map, name="fuse")
-        return row + self.vlmaps_dataloader.rmin, col + self.vlmaps_dataloader.cmin
-
-    def get_max_pos_3d(self, heat: np.ndarray) -> Tuple[float, float, float]:
-        id = np.argmax(heat)
-        grid_map_pos_3d = self.map.grid_pos[id]
-        return grid_map_pos_3d
-
-
-    
-    def display_obs(self, waitkey: bool = False,camera='pano_camera_180'):
-        obs = self.get_observations("rgba")[self.task_name][self.robot_name][camera]
-        display_sample(self.sim_setting, obs, waitkey=waitkey)
-
-    def display_curr_pos_on_map(self, map: np.ndarray):
-        row, col, angle = self._get_full_map_pose()
-        self.vlmaps_dataloader.from_full_map_pose(row, col, angle)
-        row, col, angle = self.vlmaps_dataloader.to_cropped_map_pose()
-        map = cv2.circle(map, (int(col), int(row)), 3, (255, 0, 0), -1)
-        cv2.imshow("real path", map)
-        cv2.waitKey(1)
-
-    def display_full_map_pos_list_on_map(self, map: np.ndarray, pos_list: List[List[float]]) -> np.ndarray:
-        for pos_i, pos in enumerate(pos_list):
-            self.vlmaps_dataloader.from_full_map_pose(pos[0], pos[1], 0)
-            row, col, _ = self.vlmaps_dataloader.to_cropped_map_pose()
-            map = cv2.circle(map, (int(col), int(row)), 3, (255, 0, 0), -1)
-        return map
-
-    def display_goals_on_map(
-        self,
-        map: np.ndarray,
-        radius_pix: int = 3,
-        color: Tuple[int, int, int] = (0, 255, 0),
-    ) -> np.ndarray:
-        if not hasattr(self, "goal_tfs") and not hasattr(self, "goal_bboxes"):
-            return map
-        if hasattr(self, "goal_tfs"):
-            map = self.display_goal_tfs_on_map(map, radius_pix, color)
-        elif hasattr(self, "goal_bboxes"):
-            map = self.display_goal_bboxes_on_map(map, color)
-        else:
-            print("no goal tfs or bboxes passed to the robot.")
-        return map
-
-    def display_goal_bboxes_on_map(
-        self,
-        map: np.ndarray,
-        color: Tuple[int, int, int] = (0, 255, 0),
-    ) -> np.ndarray:
-        centers = self.goal_bboxes["centers"]
-        sizes = self.goal_bboxes["sizes"]
-        cs = self.vlmaps_dataloader.cs
-        centers_cropped = self.vlmaps_dataloader.convert_habitat_pos_list_to_cropped_map_pos_list(centers)
-        for center_i, center in enumerate(centers_cropped):
-            size = [float(x) / cs for x in sizes[center_i]]  # in habitat robot coord
-            size = size[[2, 0]]
-            min_corner, max_corner = get_bbox(center, size)
-            rmin, rmax = int(min_corner[0]), int(max_corner[0])
-            cmin, cmax = int(min_corner[1]), int(max_corner[1])
-            cv2.rectangle(map, (cmin, rmin), (cmax, rmax), color, 2)
-
-        return map
-
-    def display_goal_tfs_on_map(
-        self,
-        map: np.ndarray,
-        radius_pix: int = 3,
-        color: Tuple[int, int, int] = (0, 255, 0),
-    ) -> np.ndarray:
-        if self.goal_tfs is None:
-            if self.all_goal_tfs is None:
-                print("no goal tfs passed to the robot")
-                return map
-            self.goal_tfs = self.all_goal_tfs[self.goal_id]
-            self.goal_id += 1
-
-        for tf_i, tf in enumerate(self.goal_tfs):
-            self.vlmaps_dataloader.from_habitat_tf(tf)
-            (row, col, angle_deg) = self.vlmaps_dataloader.to_cropped_map_pose()
-            cv2.circle(map, (col, row), radius_pix, color, 2)
-        self.goal_tfs = None
-        return map
     
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
@@ -1451,7 +1111,8 @@ class IsaacSimLanguageRobot(LangRobot):
         '''
         # agent_current_pose = self.get_agent_pose()[0]
         # agent_bottom_z = self.get_robot_bottom_z()
-        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map_local.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=1.65, verbose=verbose)
+        robot_ankle = self.env._runner.current_tasks[self.task_name].robots[self.robot_name]._robot_right_ankle.get_world_pose()[0][2]
+        self.surrounding_freemap, self.surrounding_freemap_connected = self.cam_occupancy_map_local.get_surrounding_free_map(robot_pos=self.get_agent_pose()[0],robot_height=robot_ankle, verbose=verbose)
         self.surrounding_freemap_camera_pose = self.cam_occupancy_map_local.topdown_camera.get_world_pose()[0]
     
     def set_ultimate_goal(self, goal:str):
@@ -1459,7 +1120,13 @@ class IsaacSimLanguageRobot(LangRobot):
     
     def save_metric(self):
         self.eval_helper.calculate_metric()
-        self.eval_helper.save_single_task_metric(save_path = self.test_file_save_dir)
+        self.eval_helper.save_single_task_metric(save_path = self.test_file_save_dir + '/metric.json')
+
+    def clear_maps(self):
+        self.map = None
+        self.cam_occupancy_map_local = None
+        self.cam_occupancy_map_global = None
+        self.ObstacleMap = None
 
 
 
@@ -1522,44 +1189,9 @@ def build_dataset(cfg):
     return vln_datasets, vln_config, sim_config, data_camera_list
 
 
-from vlmaps.vlmaps.utils.llm_utils import parse_object_goal_instruction, parse_spatial_instruction
-import pickle
 
-def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_camera_list):
-    '''Use multiprocess to handle different scans'''
-    tasks = [[] for _ in range(num_workers)]
-    scans = [[] for _ in range(num_workers)]
-    
-    i = 0
-    # for split, vln_envs in vln_envs_all.items():
-    for split in vln_envs.data.keys():
-        for scan in vln_envs.data[split].keys():
-            scans[i%num_workers].append((split, scan))
-            i += 1
 
-    for task_idx in range(num_workers):
-        tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
-    
-    mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
-    with mp.Pool(num_workers) as pool:
-        pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
-    
-    log.info('Finished.')
-    
-def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_list):
-    """
-    Worker function to be executed in parallel.
-    """
-    is_app_up = False
-    for split, scan in data_list:
-        scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
-        if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
-            log.info(f'Scan {scan} has been sampled. Pass.')
-            continue
-        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
-        if env is not None:
-            is_app_up = True
-    env.simulation_app.close()
+
 
 @hydra.main(
     version_base=None,
@@ -1567,53 +1199,119 @@ def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_lis
     config_name="vlmap_dataset_cfg_docker.yaml",
 )
 def main(config: DictConfig) -> None:
+
+    # Read episode IDs from the file
+    # with open(config.episode_file, 'r') as f:
+    #     episode_trajectory_pairs = [line.strip().split(',') for line in f.readlines()]
+    # change the episode_trajectory_pairs to be a list of tuples
+    try:
+        with open(config.episode_file, 'r') as f:
+            episode_trajectory_pairs = [line.strip().split(',') for line in f.readlines()]
+    except PermissionError:
+        log.error(f"Permission denied when trying to read file: {config.episode_file}")
+        log.error("Please check file permissions and ownership")
+        sys.exit(1)
+    except FileNotFoundError:
+        log.error(f"Episode file not found: {config.episode_file}")
+        log.error("Please check if the file path is correct")
+        sys.exit(1)
+    except IOError as e:
+        log.error(f"IO Error when reading episode file: {e}")
+        sys.exit(1)
+    except Exception as e:
+        log.error(f"Unexpected error when reading episode file: {e}")
+        sys.exit(1)
+
+    
+    episode_trajectory_pairs = [(int(episode_id), int(trajectory_id)) for episode_id, trajectory_id in episode_trajectory_pairs]
+
+    # record last trajectory id
+    if config.resume_scan is not None:
+        # 找到resume_scan对应的行号
+        start_idx = None
+        for idx, (episode_id,_) in enumerate(episode_trajectory_pairs):
+            if episode_id == config.resume_scan:
+                start_idx = idx
+                break
+        if start_idx is None:
+            log.error(f"Could not find scan {config.resume_scan} in episode_trajectory_pairs")
+            return
+        log.info(f"Resuming from index {start_idx} (scan {config.resume_scan})")
+    else:
+        start_idx = 0
+    print(f"start_idx: {start_idx}")
     vln_envs, vln_config, sim_config, data_camera_list = build_dataset(config.vln_config)
     log.info(f'Is in container: {is_in_container()}')
-    if vln_config.settings.mode == "sample_episodes_multiprocess":
-        sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
-    elif vln_config.settings.mode == "sample_episodes_reset_scans":
-        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='VzqfbhrpDEA')
-        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
+    init_omni_scene = True
+    reset_scene = False
+
     for split in vln_config.datasets.splits:
-        # data_dir = Path(config.data_paths.vlmaps_data_dir) / "vlmaps_dataset"
-        robot = IsaacSimLanguageRobot(config,sim_config,vln_config = vln_config, split= split)
-        robot.setup_scene(config.episode_id,config.trajectory_id)
-        robot.map.init_categories(mp3dcat.copy())
-        gpt_ans = parse_spatial_instruction(robot.instruction)
-        parsed_instructions = extract_self_methods(gpt_ans)
-        log.info(f"instruction: {robot.instruction}")
-        log.info(f"parsed instructions: {parsed_instructions}")
-        
-        for idx in range(len(parsed_instructions)-1,-1, -1):
-            subgoal = parsed_instructions[idx]
-            if not('move_forward' or 'turn' in subgoal):
-                fin_obj = extract_parameters(subgoal)
-                robot.set_ultimate_goal(subgoal)
-                skipped_i = idx
-                break
-        skip_flag = 0
-        while robot.env.simulation_app.is_running():
-            robot.warm_up(200)
-            
-            # robot.turn(-90)
-            
-            for cat_i, subgoal in enumerate(parsed_instructions):
-                if (cat_i >= skip_flag):
-                    print(f"Executing {subgoal}")
-                    # robot.move_to_object(cat)
-                    try:
-                        robot.test_movement(subgoal)
-                    except EarlyFound as e:
-                        log.info(f"{e}. Found object early, stopping exploration.")
-                        skip_flag = skipped_i
+        robot = IsaacSimLanguageRobot(config, sim_config, vln_config=vln_config, split=split)
+        last_trajectory_id = episode_trajectory_pairs[start_idx][1]
+        for episode_id, trajectory_id in episode_trajectory_pairs[start_idx:]: 
+            # if the first episode: open the scene
+            reset_scene = trajectory_id != last_trajectory_id
+            if reset_scene:
+                # with open(config.last_scan_file, 'w') as f:
+                #     f.write(str(episode_id))
+                try:
+                    # 确保父目录存在
+                    os.makedirs(os.path.dirname(config.last_scan_file), exist_ok=True)
+                    
+                    # 写入文件
+                    with open(config.last_scan_file, 'w') as f:
+                        f.write(str(episode_id))
+                    log.info(f"Successfully wrote scan {episode_id} to {config.last_scan_file}")
+                except Exception as e:
+                    log.error(f"Unexpected error while writing file: {e}")
+                # sys.exit(1)
+                robot.env.simulation_app.close()
+            robot.setup_scene(episode_id, trajectory_id,reset_scene=reset_scene,init_omni_scene=init_omni_scene)
+            init_omni_scene = False
+            # for the following episodes: if the new trajectory id is different from the last one, then use reset_scene()
+
+            print('not moving for debug')
+            # ! remember to align with isaac_robot.py
+            # else: only set the task and robot position
+            robot.map.init_categories(mp3dcat.copy())
+            gpt_ans = parse_spatial_instruction(robot.instruction)
+            parsed_instructions = extract_self_methods(gpt_ans)
+            log.info(f"instruction: {robot.instruction}")
+            log.info(f"parsed instructions: {parsed_instructions}")
+
+            for idx in range(len(parsed_instructions) - 1, -1, -1):
+                subgoal = parsed_instructions[idx]
+                if not (('move_forward' in subgoal) or ('turn' in subgoal)):
+                    fin_obj = extract_parameters(subgoal)
+                    robot.set_ultimate_goal(fin_obj)
+                    skipped_i = idx
                     break
+            skip_flag = 0
+            while robot.env.simulation_app.is_running():
+                robot.warm_up(200)
 
-                #! already moved, missing goal achieved parameter
-            break
-        
-        robot.save_metric()
-        robot.env.simulation_app.close()
+                for cat_i, subgoal in enumerate(parsed_instructions):
+                    if cat_i >= skip_flag:
+                        log.info(f"Executing {subgoal}")
+                        try:
+                            robot.test_movement(subgoal)
+                        except EarlyFound as e:
+                            log.info(f"{e}. Found object early, stopping exploration.")
+                            skip_flag = skipped_i
+                        break
 
+                break
+            ''' execute the last spatial instruction'''
+            for subgoal in parsed_instructions[skip_flag:]:
+                log.info(f"Executing {subgoal}")
+                robot.test_movement(subgoal)
+            robot.save_metric()
+            # robot.env.simulation_app.close()
+            robot.warm_up(100)
+            last_trajectory_id = trajectory_id
+            robot.clear_maps()
+            # if (episode_id > 100):
+            #     break
 
 if __name__ == "__main__":
     main()

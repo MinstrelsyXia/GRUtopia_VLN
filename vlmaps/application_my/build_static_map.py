@@ -19,7 +19,7 @@ import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "vlmaps"))
-print(sys.path)
+# print(sys.path)
 
 from vlmaps.vlmaps.utils.lseg_utils import get_lseg_feat
 from vlmaps.vlmaps.utils.mapping_utils import (

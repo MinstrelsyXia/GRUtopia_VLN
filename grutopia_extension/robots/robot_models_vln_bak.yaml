@@ -86,7 +86,7 @@ robots:
     - name: move_to_point
   - name: "rotate"
     type: RotateController
-    rotation_speed: 2.0
+    rotation_speed: 4.0
     threshold: 0.02
     sub_controllers:
     - name: move_by_speed

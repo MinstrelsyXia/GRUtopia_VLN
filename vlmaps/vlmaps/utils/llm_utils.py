@@ -462,7 +462,7 @@ def parse_spatial_instruction(language_instr):
                 {"role": "assistant", "content": "self.move_to('door')\nself.move_forward(1)\nself.turn(90)\nself.move_in_between('door','tanning bed')\nself.face('tanning bed')"},
                 {"role": "user", "content": "Exit the bathroom, head straight, turn right at the wall, then turn right again and stop in the doorway by the table. "},
                 {"role": "assistant", "content": "self.move_to('bathroom')\nself.move_to('door')\nself.move_forward(1)\nself.turn(90)\nself.move_to('table')"},                                   
-                {"role": "user", "content": f"{lang}. Please only answer the functions. Functions to use are: self.move_to_left(object_name), self.move_to_right(object_name), self.get_pos(object_name), self.get_contour(object_name), self.with_object_on_left(object_name), self.with_object_on_right(obect_name) ,self.move_in_between(object_a, object_b), self.face(object_name), self.turn_abslute(angle),  self.move_forward(distance), self.turn(angle), self.move_to_object(object_name)"},
+                {"role": "user", "content": f"{lang}. Please only answer the functions. Functions to use are: self.move_to_left(object_name), self.move_to_right(object_name), self.get_pos(object_name), self.get_contour(object_name), self.with_object_on_left(object_name), self.with_object_on_right(obect_name) ,self.move_in_between(object_a, object_b), self.face(object_name), self.turn_absolute(angle),  self.move_forward(distance), self.turn(angle), self.move_to_object(object_name)"},
             ],
             # self.move_north(object_name), self.move_south(object_name), self.move_east(object_name), self.move_west(object_name),
             max_tokens=150,

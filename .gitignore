@@ -12,6 +12,7 @@ local_model/
 images/
 results/
 logs/
+logs_docker/
 GRUtopia/logs/
 .vscode/
 test/

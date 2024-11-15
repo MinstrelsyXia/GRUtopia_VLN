@@ -13,6 +13,7 @@ from shapely.geometry import Point, Polygon
 from vlmaps.vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
 import types
 # from vlmaps.vlmaps.utils.mapping_utils import load_map
+from vlmaps.application_my.utils import NotFound
 
 def get_attr(obj, attr):
     """
@@ -201,12 +202,12 @@ class Map:
         # self.occupancy_map = self.load_occupancy_map()
         # 
         contours, centers, bbox_list = self.get_pos(name)
-        ids_list = self.filter_small_objects(bbox_list, area_thres=10)
+        ids_list = self.filter_small_objects(bbox_list, area_thres=50)
         contours = [contours[i] for i in ids_list]
         centers = [centers[i] for i in ids_list]
         bbox_list = [bbox_list[i] for i in ids_list]
-        if len(centers) == 0:
-            return curr_pos
+        if len(centers) == 0 or len(bbox_list) == 0 or len(contours) == 0:
+            raise NotFound(f"centers for object '{name}' is empty.")
         id = self.select_nearest_obj(centers, bbox_list, curr_pos)
 
         return self.nearest_point_on_polygon(curr_pos, contours[id])
@@ -313,6 +314,8 @@ class Map:
         # centers_cropped = [[x[0] - self.rmin, x[1] - self.cmin] for x in centers]
         ids_list = self.select_front_objs(centers, curr_pos, curr_angle_deg)
         print("ids_list: ", ids_list)
+        if len(centers) == 0 or len(bbox_list) == 0:
+            raise NotFound(f"centers or bbox_list for object '{name}' is empty.")
         if not ids_list:
             return None, None
 
