@@ -109,20 +109,42 @@ def get_delta(actions):
         # Proceed with 2D case
         if len(actions.shape) == 2:
             ex_actions = torch.cat([torch.zeros((1, actions.shape[-1]), device=actions.device), actions], dim=0)
-            delta = ex_actions[1:] - ex_actions[:-1]
-
+            # Regular difference for all dimensions except the last one
+            delta = ex_actions[1:, :-1] - ex_actions[:-1, :-1]
+            # Angular difference for the last dimension
+            angle_delta = ex_actions[1:, -1] - ex_actions[:-1, -1]
+            angle_delta = torch.atan2(torch.sin(angle_delta), torch.cos(angle_delta))
+            # Combine regular and angular differences
+            delta = torch.cat([delta, angle_delta.unsqueeze(-1)], dim=-1)
         else:
-            # This remains unchanged for higher dimensions
+            # For higher dimensions (batch dimension)
             ex_actions = torch.cat([torch.zeros((actions.shape[0], 1, actions.shape[-1]), device=actions.device), actions], dim=1)
-            delta = ex_actions[:, 1:] - ex_actions[:, :-1]
-
+            # Regular difference for all dimensions except the last one
+            delta = ex_actions[:, 1:, :-1] - ex_actions[:, :-1, :-1]
+            # Angular difference for the last dimension
+            angle_delta = ex_actions[:, 1:, -1] - ex_actions[:, :-1, -1]
+            angle_delta = torch.atan2(torch.sin(angle_delta), torch.cos(angle_delta))
+            # Combine regular and angular differences
+            delta = torch.cat([delta, angle_delta.unsqueeze(-1)], dim=-1)
     elif isinstance(actions, np.ndarray):
         if len(actions.shape) == 2:
             ex_actions = np.concatenate([np.zeros((1, actions.shape[-1])), actions], axis=0)
-            delta = ex_actions[1:] - ex_actions[:-1]
+            # Regular difference for all dimensions except the last one
+            delta = ex_actions[1:, :-1] - ex_actions[:-1, :-1]
+            # Angular difference for the last dimension
+            angle_delta = ex_actions[1:, -1] - ex_actions[:-1, -1]
+            angle_delta = np.arctan2(np.sin(angle_delta), np.cos(angle_delta))
+            # Combine regular and angular differences
+            delta = np.concatenate([delta, angle_delta[:, np.newaxis]], axis=-1)
         else:
             ex_actions = np.concatenate([np.zeros((actions.shape[0], 1, actions.shape[-1])), actions], axis=1)
-            delta = ex_actions[:, 1:] - ex_actions[:, :-1]
+            # Regular difference for all dimensions except the last one
+            delta = ex_actions[:, 1:, :-1] - ex_actions[:, :-1, :-1]
+            # Angular difference for the last dimension
+            angle_delta = ex_actions[:, 1:, -1] - ex_actions[:, :-1, -1]
+            angle_delta = np.arctan2(np.sin(angle_delta), np.cos(angle_delta))
+            # Combine regular and angular differences
+            delta = np.concatenate([delta, angle_delta[..., np.newaxis]], axis=-1)
     
     return delta
 

@@ -172,9 +172,11 @@ MODEL:
       max_dist_cat: 20
 
     action_stats:
-      min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
-      max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
-    
+      # min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
+      # max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
+      min: [-0.5, -0.5, -1.0] # [min_dx, min_dy, min_dyaw]
+      max: [0.5, 0.5, 1.0] # [max_dx, max_dy, max_dyaw]
+
     metric_waypoint_spacing: 1
     negative_mining: False
 

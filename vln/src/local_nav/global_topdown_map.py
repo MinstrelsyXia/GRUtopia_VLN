@@ -39,7 +39,7 @@ class GlobalTopdownMap:
                                          map_width=self.width,map_height=self.height,max_step=self.planner_config.a_star_max_iter,
                             windows_head=self.args.windows_head,
                             for_llm=self.args.settings.use_llm,
-                            verbose=True)
+                            verbose=self.args.save_path_planning)
 
         # init vis settings
         self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
