@@ -23,10 +23,12 @@ import json
 from vln.src.models.LongCLIP.model import longclip
 from vln.src.models.utils.bert_token import BertTokenizer
 from vln.src.utils.logger import MyLogger, logger
-from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce
+from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce, get_checkpoint_id, poll_checkpoint_folder, is_slurm_batch_job, batch_obs, FixedLengthStack
 from vln.src.utils.tensorboard_utils import TensorboardWriter
 from vln.src.dataset.vlnce_dp_dataset import VLNCE_DP_Dataset, collate_fn
 from vln.src.models.init_policy import initialize_policy
+from vln.src.envs.env import TaskEnv
+from vln.src.models.utils.feature_extract import extract_image_features, extract_instruction_tokens
 
 import logging
 
@@ -91,6 +93,14 @@ class DaggerDiffusonPolicyTrainer:
         log_dir = self.config.LOG_DIR
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
+
+        # Init the action stats
+        self.action_stats = None
+        if hasattr(self.config.MODEL, 'Diffusion_Policy'):
+            self.action_stats = {}
+            self.action_stats = self.config.MODEL.Diffusion_Policy.action_stats
+            self.action_stats.min = torch.from_numpy(np.array(self.action_stats.min)).to(self.device)
+            self.action_stats.max = torch.from_numpy(np.array(self.action_stats.max)).to(self.device)
         
         # Init the file_logger
         if self.config.run_type == 'train':
@@ -107,7 +117,14 @@ class DaggerDiffusonPolicyTrainer:
             self.train_dataset_data = load_dataset(config.IL.dataset_root_dir, 'train', logger=self.train_logger)
         
         elif self.config.run_type == 'eval':
-            eval_logger_filename = os.path.join(log_dir, f"{self.config.EVAL.SPLIT}_eval.log")
+            if isinstance(self.config.EVAL.SPLIT, list):
+                if len(self.config.EVAL.SPLIT) > 1:
+                    self.split_names = f"{self.config.EVAL.SPLIT[0]}_{self.config.EVAL.SPLIT[1]}"
+                else:
+                    self.split_names = f"{self.config.EVAL.SPLIT[0]}"
+            else:
+                self.split_names = self.config.EVAL.SPLIT
+            eval_logger_filename = os.path.join(log_dir, f"{self.split_names}_eval.log")
             if self.config.EVAL.start_eval_epoch != -1:
                 eval_logger_filename = os.path.join(log_dir, f"{self.config.EVAL.SPLIT}_eval_{self.config.EVAL.start_eval_epoch}.log")
             # if os.path.exists(eval_logger_filename):
@@ -126,8 +143,13 @@ class DaggerDiffusonPolicyTrainer:
             self.eval_results = extract_best_eval_results(log_file=eval_logger_filename, split=self.config.EVAL.SPLIT)
             self.eval_logger.info(f"Start Eval! Good Luck!!!")
             
-            self.val_seen_dataset_data = load_dataset(config.IL.dataset_root_dir, 'val_seen', logger=self.eval_logger)
-            self.val_unseen_dataset_data = load_dataset(config.IL.dataset_root_dir, 'val_unseen', logger=self.eval_logger)
+            # self.val_seen_dataset_data = load_dataset(config.IL.dataset_root_dir, 'val_seen', logger=self.eval_logger)
+            # self.val_unseen_dataset_data = load_dataset(config.IL.dataset_root_dir, 'val_unseen', logger=self.eval_logger)
+            
+            self.splits = self.config.EVAL.SPLIT
+            
+            '''Init the eval env'''
+            self.eval_env = TaskEnv(self.config, self.splits, self.eval_logger, filter_same_trajectory=False, policy_eval=True)
             
     def _make_dirs(self) -> None:
         self._make_ckpt_dir()
@@ -160,13 +182,6 @@ class DaggerDiffusonPolicyTrainer:
             with torch.cuda.device(self.device):
                 torch.cuda.empty_cache()
         gc.collect()
-        
-        self.action_stats = None
-        if hasattr(self.config.MODEL, 'Diffusion_Policy'):
-            self.action_stats = {}
-            self.action_stats = self.config.MODEL.Diffusion_Policy.action_stats
-            self.action_stats.min = torch.from_numpy(np.array(self.action_stats.min)).to(self.device)
-            self.action_stats.max = torch.from_numpy(np.array(self.action_stats.max)).to(self.device)
                 
         self.policy, self.optimizer = initialize_policy(
             self.config,
@@ -305,21 +320,21 @@ class DaggerDiffusonPolicyTrainer:
                 self.train_logger.info(
                     f"Epoch {least_loss_epoch} has the least loss: {last_least_loss:.6f}"
                 )     
-                epoch_cos_sim = sum(cos_sims) / len(cos_sims)
-                if epoch_cos_sim > last_best_cossims:
-                    best_cossims_epoch = epoch
-                    last_best_cossims = epoch_cos_sim
-                    self.train_logger.info(
-                        f"cos sim: {epoch_cos_sim:.6f}")
-                    self.train_logger.info(
-                        f"Epoch {best_cossims_epoch} has the highest cos sim: {last_best_cossims:.6f}"
-                    )
+                # epoch_cos_sim = sum(cos_sims) / len(cos_sims)
+                # if epoch_cos_sim > last_best_cossims:
+                #     best_cossims_epoch = epoch
+                #     last_best_cossims = epoch_cos_sim
+                #     self.train_logger.info(
+                #         f"cos sim: {epoch_cos_sim:.6f}")
+                #     self.train_logger.info(
+                #         f"Epoch {best_cossims_epoch} has the highest cos sim: {last_best_cossims:.6f}"
+                #     )
 
-                    if self.local_rank < 1 and epoch % self.config.IL.save_interval_epochs==0:
-                        self.save_checkpoint(
-                            f"ckpt.{dagger_it * self.config.IL.epochs + epoch}.pth",
-                            filter_frozen_weights=self.config.IL.save_filter_frozen_weights
-                        )
+                if self.local_rank < 1 and epoch % self.config.IL.save_interval_epochs==0:
+                    self.save_checkpoint(
+                        f"ckpt.{dagger_it * self.config.IL.epochs + epoch}.pth",
+                        filter_frozen_weights=self.config.IL.save_filter_frozen_weights
+                    )
             
     def save_checkpoint(self, file_name: str, filter_frozen_weights=False) -> None:
         """Save checkpoint with specified name.
@@ -467,18 +482,18 @@ class DaggerDiffusonPolicyTrainer:
             else torch.device("cpu")
         )
 
-        if "tensorboard" in self.config.VIDEO_OPTION:
-            assert (
-                len(self.config.TENSORBOARD_DIR) > 0
-            ), "Must specify a tensorboard directory for video display"
-            os.makedirs(self.config.TENSORBOARD_DIR, exist_ok=True)
-        if "disk" in self.config.VIDEO_OPTION:
-            assert (
-                len(self.config.VIDEO_DIR) > 0
-            ), "Must specify a directory for storing videos on disk"
+        # if "tensorboard" in self.config.VIDEO_OPTION:
+        #     assert (
+        #         len(self.config.TENSORBOARD_DIR) > 0
+        #     ), "Must specify a tensorboard directory for video display"
+        #     os.makedirs(self.config.TENSORBOARD_DIR, exist_ok=True)
+        # if "disk" in self.config.VIDEO_OPTION:
+        #     assert (
+        #         len(self.config.VIDEO_DIR) > 0
+        #     ), "Must specify a directory for storing videos on disk"
 
         with TensorboardWriter(
-            self.config.TENSORBOARD_DIR, flush_secs=self.flush_secs
+            self.config.TENSORBOARD_DIR, flush_secs=30
         ) as writer:
             if os.path.isfile(self.config.EVAL_CKPT_PATH_DIR):
                 # evaluate singe checkpoint
@@ -578,7 +593,7 @@ class DaggerDiffusonPolicyTrainer:
         checkpoint_path: str,
         writer,
         checkpoint_index: int = 0,
-        split=None
+        split=None,
     ) -> None:
         """Evaluates a single checkpoint.
 
@@ -587,68 +602,56 @@ class DaggerDiffusonPolicyTrainer:
             writer: tensorboard writer object
             checkpoint_index: index of the current checkpoint
         """
-        logger.info(f"checkpoint_path: {checkpoint_path}")
+        self.eval_logger.info(f"checkpoint_path: {checkpoint_path}")
+        config = self.config
 
-        config = self.config.clone()
         if self.config.EVAL.USE_CKPT_CONFIG:
+            # TODO
             ckpt = self.load_checkpoint(checkpoint_path, map_location="cpu")
             config = self._setup_eval_config(ckpt)
 
         split = config.EVAL.SPLIT if split is None else split
-
-        config.defrost()
-        config.TASK_CONFIG.DATASET.SPLIT = split
-        config.TASK_CONFIG.DATASET.ROLES = ["guide"]
-        config.TASK_CONFIG.DATASET.LANGUAGES = config.EVAL.LANGUAGES
-        config.TASK_CONFIG.TASK.NDTW.SPLIT = split
-        config.TASK_CONFIG.ENVIRONMENT.ITERATOR_OPTIONS.SHUFFLE = False
-        config.TASK_CONFIG.ENVIRONMENT.ITERATOR_OPTIONS.MAX_SCENE_REPEAT_STEPS = (
-            -1
-        )
         config.IL.ckpt_to_load = checkpoint_path
         config.use_pbar = not is_slurm_batch_job()
 
-        if len(config.VIDEO_OPTION) > 0:
+        if config.VIDEO_OPTION != -1:
+            # TODO
             config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP_VLNCE")
-
-        config.freeze()
 
         if config.EVAL.SAVE_RESULTS:
             fname = os.path.join(
                 config.RESULTS_DIR,
-                f"stats_ckpt_{checkpoint_index}_{split}.json",
+                f"stats_ckpt_{checkpoint_index}_{self.split_names}.json",
             )
             if os.path.exists(fname):
                 logger.info("skipping -- evaluation exists.")
                 return 0, 0
 
-        envs = construct_envs_auto_reset_false(
-            config, get_env_class(config.ENV_NAME)
-        )
-        observation_space, action_space = self._get_spaces(config, envs=envs)
+        '''Init the task env'''
+        self.eval_env.construct_env(init_omni_env=True)
 
-        epoch = self._initialize_policy(
-            config,
+        self.policy, _ = initialize_policy(
+            self.config,
+            self.eval_logger,
             load_from_ckpt=True, # config.IL.load_from_ckpt
-            observation_space=observation_space,
-            action_space=action_space,
-            load_from_pretrain=False
+            device=self.device,
+            load_from_pretrain=self.config.IL.load_from_pretrain,
+            action_stats=self.action_stats
         )
         self.policy.eval()
 
-        observations = envs.reset()
-        start_positions = [x['globalgps'][[0,2]] for x in observations]
+        observations = self.eval_env.get_obs()
+        start_positions = [x['globalgps'][[0,1]] for x in observations]
         start_positions = torch.from_numpy(np.stack(start_positions, axis=0)).to(self.device)
-        start_yaws = [x['global_rotation'][-1] for x in observations]
+        start_yaws = [x['globalyaw'] for x in observations]
         start_yaws = torch.from_numpy(np.stack(start_yaws, axis=0)).to(self.device)
 
         observations = extract_instruction_tokens(
-            observations, config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
+            observations, 
             bert_tokenizer=self.bert_tokenizer,
             is_clip_long=self.is_clip_long
         )
         batch = batch_obs(observations, self.device)
-        batch = apply_obs_transforms_batch(batch, self.obs_transforms)
 
         if self.config.MODEL.IMAGE_ENCODER.use_stack:
             batch_stack_rgb_length = [1 for _ in range(len(observations))]
@@ -683,30 +686,30 @@ class DaggerDiffusonPolicyTrainer:
             net = self.policy
 
         rnn_states = torch.zeros(
-            envs.num_envs,
-            net.net.num_recurrent_layers,
+            self.eval_env.env_nums,
+            net.num_recurrent_layers,
             config.MODEL.STATE_ENCODER.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
-            envs.num_envs, config.MODEL.len_traj_act, self.action_dim, device=self.device, dtype=torch.long
+            self.eval_env.env_nums, config.MODEL.len_traj_act, self.action_dim, device=self.device, dtype=torch.long
         )
         not_done_masks = torch.zeros(
-            envs.num_envs, 1, dtype=torch.uint8, device=self.device
+            self.eval_env.env_nums, 1, dtype=torch.uint8, device=self.device
         )
 
         # IMU
         if self.config.MODEL.IMU_ENCODER.use:
-            imu = torch.zeros(envs.num_envs, 2, device=self.device)
+            imu = torch.zeros(self.eval_env.env_nums, 2, device=self.device)
             batch["imu"] = imu
 
         stats_episodes = {}
 
-        rgb_frames = [[] for _ in range(envs.num_envs)]
-        if len(config.VIDEO_OPTION) > 0:
+        rgb_frames = [[] for _ in range(self.eval_env.env_nums)]
+        if config.VIDEO_OPTION != -1:
             os.makedirs(config.VIDEO_DIR, exist_ok=True)
 
-        num_eps = sum(envs.number_of_episodes)
+        num_eps = sum(self.eval_env.number_of_episodes)
         if config.EVAL.EPISODE_COUNT > -1:
             num_eps = min(config.EVAL.EPISODE_COUNT, num_eps)
 
@@ -726,12 +729,12 @@ class DaggerDiffusonPolicyTrainer:
         # init fix_length_stack
         stack_rgb_length = self.config.MODEL.len_traj_act if config.MODEL.IMAGE_ENCODER.use_stack else 1
         # stack_rgb_length = self.config.MODEL.len_traj_act
-        stack_rgb = [FixedLengthStack(stack_rgb_length) for _ in range(envs.num_envs)]
-        stack_depth = [FixedLengthStack(stack_rgb_length) for _ in range(envs.num_envs)]
-        prev_globalgps = [FixedLengthStack(self.config.MODEL.len_traj_act+1) for _ in range(envs.num_envs)] # TODO !!! act length
-        prev_globalyaw = [FixedLengthStack(self.config.MODEL.len_traj_act+1) for _ in range(envs.num_envs)]
+        stack_rgb = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_nums)]
+        stack_depth = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_nums)]
+        prev_globalgps = [FixedLengthStack(self.config.MODEL.len_traj_act+1) for _ in range(self.eval_env.env_nums)] # TODO !!! act length
+        prev_globalyaw = [FixedLengthStack(self.config.MODEL.len_traj_act+1) for _ in range(self.eval_env.env_nums)]
         
-        for env_idx in range(envs.num_envs):
+        for env_idx in range(self.eval_env.env_nums):
             # record the current position before action
             stack_rgb[env_idx].push(observations[env_idx]["rgb"])
             stack_depth[env_idx].push(observations[env_idx]["depth"])
@@ -739,31 +742,17 @@ class DaggerDiffusonPolicyTrainer:
             prev_globalyaw[env_idx].push(batch[env_idx]['global_rotation'][-1].detach().cpu().item())
         
         spl_dict = {}
-        specific_epoch_id = str(self.config.EVAL.specific_episode_id)
 
+        # TODO: 需要修改
         # Create the dict to record the global status of envs
         global_env_threads_paused = {}
-        for env_thread in enumerate(envs._workers):
+        for env_thread in enumerate(self.eval_env._workers):
             # env_thread: (env_idx, env_thread)
             global_env_threads_paused[env_thread[1]._name] = {'env_idx':env_thread[0], 'paused':False}
 
         while envs.num_envs > 0 and len(stats_episodes) < num_eps:
             # steps[:] = [x+1 for x in steps]
             current_episodes = envs.current_episodes()
-            if int(specific_epoch_id) != -1:
-                # find the specific episode!
-                find_flag = False
-                while not find_flag: 
-                    for episode_id in range(len(current_episodes)):
-                        if current_episodes[episode_id].episode_id != specific_epoch_id:
-                            envs.reset_at(episode_id)
-                        else:
-                            find_flag = True
-                            print(f"find the target episode {specific_epoch_id} at the {episode_id}-th env.")
-                    current_episodes = envs.current_episodes()
-                if current_episodes['epoch_id'] != specific_epoch_id:
-                    print('1')
-                    continue
             if len(spl_dict) > 0 and np.mean(list(spl_dict.values())) < 0.02 and len(stats_episodes) > 100:
                 # this ckpt is too bad to continue
                 self.eval_logger.info(f"Break. This ckpt is too bad to continue with average SPL {np.mean(list(spl_dict.values())):.3f}")
@@ -1044,7 +1033,7 @@ class DaggerDiffusonPolicyTrainer:
                 # Initialize parameters
                 prev_actions[i] = torch.zeros(self.config.MODEL.len_traj_act, self.action_dim)
                 rnn_states[i] = torch.zeros(
-                    net.net.num_recurrent_layers,
+                    net.num_recurrent_layers,
                     config.MODEL.STATE_ENCODER.hidden_size,
                     device=self.device,
                 )
@@ -1108,7 +1097,6 @@ class DaggerDiffusonPolicyTrainer:
                 is_clip_long=self.is_clip_long
             )
             batch = batch_obs(observations, self.device)
-            batch = apply_obs_transforms_batch(batch, self.obs_transforms)
 
             ## Update image features in batch
             # if self.config.MODEL.IMAGE_ENCODER.use_stack:

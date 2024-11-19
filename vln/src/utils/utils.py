@@ -5,9 +5,32 @@ import torch
 import json
 import gzip
 import copy
+import glob
+
+import numpy as np
+import torch
+from gym.spaces import Box
+from PIL import Image
+from torch import Size, Tensor
+from torch import nn as nn
+
+from collections import defaultdict
 # from scipy.spatial.transform import Rotation as R
 
 from grutopia.core.util.log import log
+
+from typing import (
+    Any,
+    DefaultDict,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
+
+from vln.src.utils.tensor_dict import TensorDict
 
 def euler_angles_to_quat(angles, degrees=False):
     """
@@ -347,3 +370,119 @@ def load_dataset(dataset_root_dir, split, logger=None):
     if logger is not None:
         logger.info(f"Loaded data with a total of {len(load_data)} items from {split}")
     return load_data
+
+def get_checkpoint_id(ckpt_path: str) -> Optional[int]:
+    r"""Attempts to extract the ckpt_id from the filename of a checkpoint.
+    Assumes structure of ckpt.ID.path .
+
+    Args:
+        ckpt_path: the path to the ckpt file
+
+    Returns:
+        returns an int if it is able to extract the ckpt_path else None
+    """
+    ckpt_path = os.path.basename(ckpt_path)
+    nums: List[int] = [int(s) for s in ckpt_path.split(".") if s.isdigit()]
+    if len(nums) > 0:
+        return nums[-1]
+    return None
+
+
+def poll_checkpoint_folder(
+    checkpoint_folder: str, previous_ckpt_ind: int,
+    start_eval_epoch=-1, first_find_start_epoch=False
+):
+    r"""Return (previous_ckpt_ind + 1)th checkpoint in checkpoint folder
+    (sorted by time of last modification).
+
+    Args:
+        checkpoint_folder: directory to look for checkpoints.
+        previous_ckpt_ind: index of checkpoint last returned.
+
+    Returns:
+        return checkpoint path if (previous_ckpt_ind + 1)th checkpoint is found
+        else return None.
+    """
+    assert os.path.isdir(checkpoint_folder), (
+        f"invalid checkpoint folder " f"path {checkpoint_folder}"
+    )
+    models_paths = list(
+        filter(os.path.isfile, glob.glob(checkpoint_folder + "/*"))
+    )
+    new_model_paths = []
+    for path in models_paths:
+        if path.endswith(".pth"):
+            new_model_paths.append(path)
+    models_paths = new_model_paths
+    if len(models_paths) == 0:
+        print('No checkpoints found in folder: ', checkpoint_folder)
+        return -1
+    models_paths.sort(key=os.path.getmtime)
+    ind = previous_ckpt_ind + 1
+    if start_eval_epoch != -1:
+        if first_find_start_epoch:
+            for idx, model_path in enumerate(models_paths):
+                ckpt_len = len(model_path.split('/')[-1].split('.'))
+                if ckpt_len == 3:
+                    ckpt_num = model_path.split('/')[-1].split('.')[1]
+                elif ckpt_len == 4:
+                    # save as epoch, steps
+                    ckpt_num = model_path.split('/')[-1].split('.')[1] + model_path.split('/')[-1].split('.')[2]
+                # ckpt_file_ind = int(model_path.split('/')[-1].split('.')[1])
+                ckpt_file_ind = int(ckpt_num)
+                if ckpt_file_ind >= start_eval_epoch:
+                    ind = idx
+                    print(f'Find the start eval epoch file for {start_eval_epoch}-th epoch.')
+                    break
+            previous_ckpt_ind = ind
+            return (models_paths[ind], previous_ckpt_ind)
+            
+    if ind < len(models_paths):
+        return models_paths[ind]
+    return None
+
+SLURM_JOBID = os.environ.get("SLURM_JOB_ID", None)
+def is_slurm_job() -> bool:
+    return SLURM_JOBID is not None
+
+def is_slurm_batch_job() -> bool:
+    r"""Heuristic to determine if a slurm job is a batch job or not. Batch jobs
+    will have a job name that is not a shell unless the user specifically set the job
+    name to that of a shell. Interactive jobs have a shell name as their job name.
+    """
+    return is_slurm_job() and os.environ.get("SLURM_JOB_NAME", None) not in (
+        None,
+        "bash",
+        "zsh",
+        "fish",
+        "tcsh",
+        "sh",
+    )
+
+def batch_obs(
+    observations,
+    device: Optional[torch.device] = None,
+):
+    r"""Transpose a batch of observation dicts to a dict of batched
+    observations.
+
+    Args:
+        observations:  list of dicts of observations.
+        device: The torch.device to put the resulting tensors on.
+            Will not move the tensors if None
+
+    Returns:
+        transposed dict of torch.Tensor of observations.
+    """
+    batch: DefaultDict[str, List] = defaultdict(list)
+
+    for obs in observations:
+        for sensor in obs:
+            batch[sensor].append(torch.as_tensor(obs[sensor]))
+
+    batch_t: TensorDict = TensorDict()
+
+    for sensor in batch:
+        batch_t[sensor] = torch.stack(batch[sensor], dim=0)
+
+    return batch_t.map(lambda v: v.to(device))

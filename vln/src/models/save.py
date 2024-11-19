@@ -28,7 +28,7 @@ def save_training_meta(args):
         with open(os.path.join(args.LOG_DIR, 'training_args.json'), 'w') as writer:
             json.dump(args_dict, writer, indent=4)
 
-def load_checkpoint(self, checkpoint_path, *args, **kwargs):
+def load_checkpoint(checkpoint_path, *args, **kwargs):
     return torch.load(checkpoint_path, *args, **kwargs)
 
 class ModelSaver(object):

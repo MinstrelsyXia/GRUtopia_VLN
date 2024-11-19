@@ -36,8 +36,8 @@ def initialize_policy(
             seed += config.rank
         set_random_seed(seed)
 
-        if default_gpu:
-            save_training_meta(config)
+        # if default_gpu:
+        #     save_training_meta(config)
         
         observation_space = spaces.Box(
                 low=0.0,
@@ -118,10 +118,10 @@ def initialize_policy(
                                         strict=False)
             if len(incompatible_keys) > 0:
                 logger.warning(f"Incompatible keys: {incompatible_keys}")
-            if config.IL.is_requeue:
-                optimizer.load_state_dict(ckpt_dict["optim_state"])
-                start_epoch = start_epoch = ckpt_dict["epoch"] + 1
-                step_id = ckpt_dict["step_id"]
+            # if config.IL.is_requeue:
+            #     optimizer.load_state_dict(ckpt_dict["optim_state"])
+            #     start_epoch = start_epoch = ckpt_dict["epoch"] + 1
+            #     step_id = ckpt_dict["step_id"]
             logger.info(f"Loaded weights from checkpoint: {ckpt_path}")
 
         params = sum(param.numel() for param in self_policy.parameters())

@@ -18,6 +18,8 @@ from vln.src.utils.logger import MyLogger
 from vln.src.trainers import dp_trainer
 from vln.src.utils.utils import dict_to_namespace
 
+from vln.parser import process_args
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -38,6 +40,11 @@ def main():
         nargs=argparse.REMAINDER,
         help="Modify config options from command line",
     )
+    parser.add_argument(
+        "--headless",
+        default=True,
+        action='store_true',
+    )
     args = parser.parse_args()
     run_exp(**vars(args))
 
@@ -50,7 +57,7 @@ def get_config(exp_config, opts):
             setattr(config, key, value)
     return config
 
-def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
+def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs) -> None:
     """Runs experiment given mode and config
 
     Args:
@@ -73,7 +80,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
         config.IL.DAGGER.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir.replace("*name", name)
         config.IL.DAGGER.lmdb_features_dagger_update_dir = config.IL.DAGGER.lmdb_features_dagger_update_dir.replace("*name", name)
         if hasattr(config, 'VIDEO_OPTION'):
-            if len(config.VIDEO_OPTION) > 0:
+            if config.VIDEO_OPTION != -1:
                 config.VIDEO_DIR = config.VIDEO_DIR.replace("*name", name)
         
         config.local_rank = local_rank 
@@ -113,7 +120,12 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
 
     if run_type == "eval":
         torch.backends.cudnn.deterministic = True
-
+        # Read vln_config and sim_config
+        vln_config, sim_config = process_args(sim_cfg_file=config.EVAL.sim_cfg_file, vln_cfg_file=config.EVAL.vln_cfg_file)
+        # Combine vln_config and sim_config with the config
+        config.vln_config = vln_config
+        config.sim_config = sim_config
+        
     if config.MODEL.policy_name == 'CMA_DP_ImgMultiPatch_Policy':
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
@@ -124,6 +136,9 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None) -> None:
     # copy the config yaml file to the log dir
     if config.LOG_DIR:
         shutil.copy(exp_config, os.path.join(config.LOG_DIR, os.path.basename(exp_config)))
+    
+    if config.CHECKPOINT_FOLDER:
+        os.makedirs(config.CHECKPOINT_FOLDER, exist_ok=True)
     
     if run_type == "train":
         trainer.train()
