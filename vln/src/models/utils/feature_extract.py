@@ -52,7 +52,8 @@ def extract_image_features(policy, batch, img_mod, len_traj_act=4, world_size=1,
             'depth_inputs': depth_feat,
             'depth_return_x_before_fc': True, # For ResNet depth encoder,
             'img_mod': img_mod,
-            'proj': proj
+            'proj': proj,
+            'process_images': False
         }
         rgb_features, depth_features = policy(batch_inputs)
         rgb_features = rgb_features.type(torch.float32)

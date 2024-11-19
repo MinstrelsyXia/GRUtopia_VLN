@@ -207,14 +207,16 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
                 log.error(f"Error in saving camera image: {e}")
 
 class VLNDataLoader(Dataset):
-    def __init__(self, args, sim_config, splits, filter_same_trajectory=False):
+    def __init__(self, args, sim_config, splits, filter_same_trajectory=False, policy_eval=False, eval_logger=None):
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size
         self.splits = splits
         self.data = {}
+        if eval_logger is not None:
+            log = eval_logger
         for split in splits:
-            if "sample_episodes" in args.settings.mode:
+            if "sample_episodes" in args.settings.mode or policy_eval:
                 data, _ = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs)
             else:
                 data, _ = load_data(args, split)
@@ -230,7 +232,7 @@ class VLNDataLoader(Dataset):
             raise ValueError("Robot offset not found for robot type")
         
         # process paths offset
-        if "sample_episodes" in args.settings.mode:
+        if "sample_episodes" in args.settings.mode or policy_eval:
             for split in self.splits:
                 for scan, data in self.data[split].items():
                     for item in data:
