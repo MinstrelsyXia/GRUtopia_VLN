@@ -744,12 +744,6 @@ class DaggerDiffusonPolicyTrainer:
         spl_dict = {}
 
         # TODO: 需要修改
-        # Create the dict to record the global status of envs
-        global_env_threads_paused = {}
-        for env_thread in enumerate(self.eval_env._workers):
-            # env_thread: (env_idx, env_thread)
-            global_env_threads_paused[env_thread[1]._name] = {'env_idx':env_thread[0], 'paused':False}
-
         while envs.num_envs > 0 and len(stats_episodes) < num_eps:
             # steps[:] = [x+1 for x in steps]
             current_episodes = envs.current_episodes()

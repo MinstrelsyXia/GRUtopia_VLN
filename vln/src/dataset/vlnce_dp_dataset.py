@@ -14,6 +14,7 @@ import lmdb
 import random
 from collections import defaultdict
 import zlib
+import msgpack_numpy
 
 import torch
 from torch.utils.data import Dataset, IterableDataset
@@ -109,7 +110,7 @@ class VLNCE_DP_Dataset(IterableDataset):
                 self.lmdb_keys = []
                 for key, _ in cursor:
                     self.lmdb_keys.append(key.decode())
-        
+
         self.start = 0
         self.end = self.length
         self.world_size = world_size
@@ -187,8 +188,11 @@ class VLNCE_DP_Dataset(IterableDataset):
 
                     key = self.lmdb_keys[self.load_ordering.pop()]
                     packed_data = txn.get(key.encode())
-                    data_to_load = zlib.decompress(packed_data)
-                    data_to_load = pickle.loads(data_to_load)                 
+                    try:
+                        data_to_load = zlib.decompress(packed_data)
+                        data_to_load = pickle.loads(data_to_load)                 
+                    except:
+                        data_to_load = msgpack_numpy.unpackb(packed_data, raw=False)
                     data = data_to_load['episode_data']
                     finish_status = data_to_load['finish_status']
                     fail_reason = data_to_load['fail_reason']
@@ -196,29 +200,31 @@ class VLNCE_DP_Dataset(IterableDataset):
                         if finish_status != 'success':
                             if len(data['camera_info']) == 0 or len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
                                 continue
-                        
-                    instr = self.dataset_data[key]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
                     
                     # convert yaw from [-2pi,2pi] to [-pi, pi]
+                    yaws = np.array(data['robot_info']['yaw']).copy()
                     for yaw_i, yaw in enumerate(data['robot_info']['yaw']):
                         yaw = yaw%(2*np.pi)
                         if yaw > np.pi:
                             yaw -= 2*np.pi
-                        data['robot_info']['yaw'][yaw_i] = yaw
-                        
-                    new_data = {
-                        'instruction': instr,
-                        'progress': data['progress'],
-                        'globalgps': data['robot_info']['position'],
-                        'global_rotation': data['robot_info']['orientation'],
-                        'globalyaw': data['robot_info']['yaw'],
-                        'rgb': data['camera_info'][self.camera_name]['rgb'],
-                        'depth': np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1),
-                    }
-                    new_preload.append(new_data)
-                    finish_status_list.append(finish_status)
-                    fail_reasons_list.append(fail_reason)
-                    lengths.append(len(new_preload[-1]))
+                        yaws[yaw_i] = yaw
+                            
+                    for ep_idx in range(len(self.dataset_data[key])):
+                        instr = self.dataset_data[key][ep_idx]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
+                            
+                        new_data = {
+                            'instruction': instr,
+                            'progress': data['progress'],
+                            'globalgps': data['robot_info']['position'],
+                            'global_rotation': data['robot_info']['orientation'],
+                            'globalyaw': yaws,
+                            'rgb': data['camera_info'][self.camera_name]['rgb'],
+                            'depth': np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1),
+                        }
+                        new_preload.append(new_data)
+                        finish_status_list.append(finish_status)
+                        fail_reasons_list.append(fail_reason)
+                        lengths.append(len(new_preload[-1]))
 
             # compute stack images, positions, yaw, and relative actions, time_distance for each observations
             new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
