@@ -353,7 +353,7 @@ class FixedLengthStack:
 def load_dataset(dataset_root_dir, split, logger=None):
     ''' Load data based on VLN-CE
     '''
-    load_data = {}
+    load_data = defaultdict(list)
     with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
         data = json.load(f)
         for item in data["episodes"]:
@@ -366,7 +366,7 @@ def load_dataset(dataset_root_dir, split, logger=None):
                     item["c_reference_path"].append([path[0], -path[2], path[1]])
                 item["reference_path"] = item["c_reference_path"]
                 del item["c_reference_path"]
-            load_data[str(item['trajectory_id'])] = item
+            load_data[str(item['trajectory_id'])].append(item)
     if logger is not None:
         logger.info(f"Loaded data with a total of {len(load_data)} items from {split}")
     return load_data
