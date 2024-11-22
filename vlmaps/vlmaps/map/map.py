@@ -314,7 +314,7 @@ class Map:
         # centers_cropped = [[x[0] - self.rmin, x[1] - self.cmin] for x in centers]
         ids_list = self.select_front_objs(centers, curr_pos, curr_angle_deg)
         print("ids_list: ", ids_list)
-        if len(centers) == 0 or len(bbox_list) == 0:
+        if len(centers) == 0 or len(bbox_list) == 0 or not ids_list:
             raise NotFound(f"centers or bbox_list for object '{name}' is empty.")
         if not ids_list:
             return None, None

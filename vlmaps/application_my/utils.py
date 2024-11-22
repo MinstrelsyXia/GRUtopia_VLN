@@ -67,6 +67,47 @@ def extract_self_methods(input_string):
 import numpy as np
 import matplotlib.pyplot as plt
 
+def visualize_subgoal_images(rgbs, similarities, chosen_idx, subgoal, save_path):
+    """
+    将多张图像拼接并添加说明文字
+    
+    Args:
+        rgbs: 图像列表
+        similarities: 相似度列表 
+        chosen_idx: 被选中的图像索引
+        subgoal: 子目标描述
+        save_path: 保存路径
+    """
+    rgbs = [np.asarray(img).astype(np.uint8) if not isinstance(img, np.ndarray) 
+else img.astype(np.uint8) for img in rgbs]
+    # 计算图像网格布局
+    n_images = len(rgbs)
+    n_cols = min(4, n_images)  # 每行最多4张图
+    n_rows = (n_images + n_cols - 1) // n_cols
+    
+    # 创建图像
+    plt.figure(figsize=(5*n_cols, 5*n_rows))
+    
+    # 添加总标题
+    plt.suptitle(f"Subgoal is: {subgoal}, chosen image {chosen_idx}", fontsize=14)
+    
+    # 绘制每张图像
+    for idx, (img, sim) in enumerate(zip(rgbs, similarities)):
+        plt.subplot(n_rows, n_cols, idx+1)
+        plt.imshow(img)
+        plt.axis('off')
+        
+        # 为选中的图像使用红色标题,其他使用黑色
+        color = 'red' if idx == chosen_idx else 'black'
+        plt.title(f"Image {idx}, similarity: {sim:.3f}", color=color, pad=10)
+    
+    # 调整布局并保存
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # 为总标题留出空间
+    plt.savefig(save_path)
+    plt.close()
+
+
+
 def visualize_occupancy_map_with_contours(occupied_ids, contours, curr_pos, curr_angle_deg, save_path):
     # 创建占用地图
     occupancy_map = np.zeros(occupied_ids.shape[:2])

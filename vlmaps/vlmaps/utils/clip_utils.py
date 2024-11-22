@@ -103,6 +103,7 @@ def get_img_feats(img, preprocess, clip_model):
     return img_feats
 
 
+
 def get_imgs_feats(raw_imgs, preprocess, clip_model, clip_feat_dim):
     imgs_feats = np.zeros((len(raw_imgs), clip_feat_dim))
     for img_id, img in enumerate(raw_imgs):
