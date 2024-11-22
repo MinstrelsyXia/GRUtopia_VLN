@@ -19,7 +19,7 @@ index_2d: True
 init_categories: True
 from_scratch: True # no need to load in vlmap
 online: True # needn't load from rgbs/depths
-find_frontier_type: closest # or closest
+find_frontier_type: vlmap # or closest
 episode_file: vlmaps/docker/test/0.txt
 last_scan_file: vlmaps/docker/last_scan_0.txt
 resume_scan: null

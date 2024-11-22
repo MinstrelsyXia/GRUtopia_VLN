@@ -50,7 +50,7 @@ from vln.src.local_nav.BEVmap import BEVMap
 
 from vlmaps.vlmaps.map.map import Map
 
-from vlmaps.application_my.utils import NotFound, EarlyFound, extract_parameters, extract_self_methods
+from vlmaps.application_my.utils import NotFound, EarlyFound, extract_parameters, extract_self_methods, visualize_subgoal_images
 
 import logging
 
@@ -413,7 +413,7 @@ class IsaacSimLanguageRobot(LangRobot):
             step = self.step
             )
     
-    def get_frontier(self):
+    def get_frontier(self,action=None,verbose=False):
         '''
         return pos in obstacle map coord.
         '''
@@ -444,8 +444,39 @@ class IsaacSimLanguageRobot(LangRobot):
                         min_dist = dist
                         pos = frontier
                 return self.ObstacleMap._xy_to_px(np.array([pos]))[0]
+            if self.frontier_type == 'vlmap':
+                log.info(f"found {len(frontiers)} frontiers")
+                if len(frontiers) == 1:
+                    pos = self.ObstacleMap._xy_to_px(np.array([frontiers[0]]))[0]
+                    return pos
+                else:
+                    subgoal = extract_parameters(action)
+                    simialrity_rate = []
+                    rgb_list = []
+                    for frontier in frontiers:
+                        rgb, similarity = self.get_frontier_viewpoint(frontier,subgoal)
+                        rgb_list.append(rgb)
+                        simialrity_rate.append(similarity)
+                    idx = np.argmax(simialrity_rate)
+                    pos = frontiers[idx]
+                    if verbose == True:
+                        # save rgbs in one image, with text f"subgoal is {subgoal}, chosen {idx} pos}", for all images, the caption is "image {idx}, with similarity {similarity[idx]}", for the chosen image, the caption should be in red
+                        path_save_path = self.nav_save_dir + f"/frontier_viewpoints_{self.step}.png"
+                        visualize_subgoal_images(rgb_list,simialrity_rate,idx,subgoal,path_save_path)
+                    return self.ObstacleMap._xy_to_px(np.array([pos]))[0]
 
 
+    def get_frontier_viewpoint(self,pos,subgoal):
+        '''
+        pos: isaac coord
+        '''
+        turn_angle = self.get_angle(pos)
+        self.turn(turn_angle,threshold = 0.05)
+        obs = self.get_observations(["rgba","depth"])
+        rgb = obs[self.task_name][self.robot_name][self.camera_list[0]]["rgba"][...,:3]
+
+        similarity = self.map.get_score_mat_clip(rgb,subgoal)
+        return rgb, similarity
         
     def from_map_to_xyz(self, camera_pose, pcd_min):
         current_position, current_quaternion = camera_pose[0],camera_pose[1]
@@ -484,7 +515,7 @@ class IsaacSimLanguageRobot(LangRobot):
             return True
         except NotFound as e:
             log.warning(f"{e}. Object not found after looking around, moving to a frontier.")
-            frontier_point = self.get_frontier()         
+            frontier_point = self.get_frontier(action_name)         
             turn_angle = self.get_angle(frontier_point) # in obstacle map coord
             turn_flag = self.turn(turn_angle,threshold = 0.05) # turn left turn_angle
             move_flag =  self.move_to(frontier_point,type = 'obs',threshold = 0.3)   
@@ -632,7 +663,7 @@ class IsaacSimLanguageRobot(LangRobot):
             self.turn(60)
             
 
-    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 1.0) -> List[str]:
+    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 1.0,subgoal = None) -> List[str]:
         """Move the robot to the position on the obstacle map
             based on accurate localization in the environment
             with falls and movements
@@ -757,11 +788,16 @@ class IsaacSimLanguageRobot(LangRobot):
                     continue
             if ((self.step-init_step) % 1000 == 0):
                 # end this loop
+                if subgoal is not None:
+                    if self.map.check_object(subgoal):
+                        log.info(f"Subgoal {subgoal} is reached at step {self.step}")
+                        return True
+
+            if ((self.step-init_step) % 3000 == 0):
+                log.warning("Failed to reach the subgoal after 1000 steps")
                 goal = self.ultimate_goal
                 if(self.map.check_object(goal)):
                     raise EarlyFound(f"Goal {goal} is reached early")
-            if ((self.step-init_step) % 10000 == 0):
-                log.warning("Failed to reach the subgoal after 1000 steps")
                 return False
 
 
@@ -789,7 +825,7 @@ class IsaacSimLanguageRobot(LangRobot):
         goal_modified[:] = paths[-1]
         return paths, paths_3d
 
-    def turn(self, angle_deg: float,threshold = 0.1):
+    def turn(self, angle_deg: float,threshold = 0.1,vis = True):
         """
         Turn right a relative angle in degrees
         """
@@ -832,7 +868,8 @@ class IsaacSimLanguageRobot(LangRobot):
 
 
                 if (self.step % 200 == 0): # change from 50 to 200
-                    self.update_all_maps()
+                    if vis: 
+                        self.update_all_maps()
                     log.info(f"Step {self.step}: Present at {self.quat_to_euler_angles(current_orientation)[2]}, need to navigate to {rotation_goal}")
                     #! fall down check
                     if (self.step % 1000 == 0):

@@ -52,6 +52,8 @@ from vlmaps.vlmaps.utils.visualize_utils import (
 )
 from vlmaps.vlmaps.utils.matterport3d_categories import mp3dcat
 from vlmaps.vlmaps.utils.index_utils import find_similar_category_id, get_segment_islands_pos, get_dynamic_obstacles_map_3d
+from vlmaps.vlmaps.utils.clip_utils import get_img_feats, get_text_feats_multiple_templates
+
 import isaacsim
 from omni.isaac.kit import SimulationApp
 
@@ -189,6 +191,7 @@ class TMP(VLMap):
         self.clip_model, self.preprocess = clip.load(self.clip_version)  # clip.available_models()
         self.clip_model.to(self.device).eval()
 
+
     def _init_lseg(self):
         crop_size = 480  # 480
         base_size = 640  # 520: 无论多大的照片，长边都会变成640
@@ -229,6 +232,9 @@ class TMP(VLMap):
         )
         self.clip_feat_dim = lseg_model.out_c
         return lseg_model, lseg_transform, crop_size, base_size, norm_mean, norm_std
+
+
+
 
     def _init_map(self, pcd_min: np.ndarray, pcd_max: np.ndarray, cs: float, map_path: Path) -> Tuple:
             """
@@ -474,7 +480,7 @@ class TMP(VLMap):
 
         pc_pcd = o3d.geometry.PointCloud()
         pc_pcd.points = o3d.utility.Vector3dVector(pc)
-        visualize_pc(pc_pcd,headless=False)
+        # visualize_pc(pc_pcd,headless=False)
         if (pc.size == 0):
             print("pc is empty! Error")
             return
@@ -689,7 +695,62 @@ class TMP(VLMap):
         column = int((y - self.pcd_min[1]) / self.cs)
         return row, column
     
+    def get_score_mat_clip(self, bgr,categories):
+        # load image
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        img_feats = get_img_feats(rgb, self.preprocess, self.clip_model)
+        text_feats = get_text_feats_multiple_templates(categories, self.clip_model, self.clip_feat_dim)
 
+        img_feats = img_feats / np.linalg.norm(img_feats, axis=-1, keepdims=True)
+        text_feats = text_feats / np.linalg.norm(text_feats, axis=-1, keepdims=True)
+
+        # 计算相似度（需要转换为tensor进行softmax）
+        similarity = img_feats @ text_feats.T
+        return similarity[0]
+
+    def get_score_mat_lseg(bgr,categories):
+        '''
+        not in use yet
+        '''
+        # bgr = cv2.imread(img_path)
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        text_feats = get_text_feats_multiple_templates(categories, self.clip_model, self.clip_feat_dim)
+        outputs, _ = get_lseg_feat(
+            lseg_model, 
+            rgb,  # 需要提供RGB图像
+            categories,  # 需要提供标签列表
+            lseg_transform, 
+            device, 
+            crop_size=crop_size, 
+            base_size=base_size, 
+            norm_mean=norm_mean, 
+            norm_std=norm_std, 
+            vis=False, 
+            save_path=img_path.split('/')[-1]
+        )
+        B, D, H, W = outputs.shape
+        # 对H,W维度进行平均池化，得到[B,D]
+        if isinstance(outputs, np.ndarray):
+            outputs = torch.from_numpy(outputs)
+        if isinstance(text_feats, np.ndarray):
+            text_feats = torch.from_numpy(text_feats)
+        
+        # 移动到指定设备
+        outputs = outputs.to(device)
+        text_feats = text_feats.to(device)
+        
+        # 对特征图进行平均池化
+        img_feats = outputs.mean(dim=(-2,-1))  # [B,D]
+        
+        # 归一化
+        img_feats = img_feats / img_feats.norm(dim=-1, keepdim=True)
+        text_feats = text_feats / text_feats.norm(dim=-1, keepdim=True)
+        
+        # 计算相似度
+        # similarity = (100.0 * img_feats @ text_feats.T).softmax(dim=-1)
+        similarity = img_feats @ text_feats.T
+        
+        return similarity
 
     def init_categories(self, categories: List[str]) -> np.ndarray:
             self.categories = categories
