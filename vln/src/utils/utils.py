@@ -9,7 +9,7 @@ import glob
 
 import numpy as np
 import torch
-from gym.spaces import Box
+
 from PIL import Image
 from torch import Size, Tensor
 from torch import nn as nn

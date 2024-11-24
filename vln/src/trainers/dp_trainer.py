@@ -482,6 +482,8 @@ class DaggerDiffusonPolicyTrainer:
             else torch.device("cpu")
         )
 
+        self.rotation_threshold = float(self.config.EVAL.rotation_threshold)
+
         # if "tensorboard" in self.config.VIDEO_OPTION:
         #     assert (
         #         len(self.config.TENSORBOARD_DIR) > 0
@@ -729,7 +731,7 @@ class DaggerDiffusonPolicyTrainer:
         # init fix_length_stack
         stack_rgb_length = self.config.MODEL.len_traj_act if config.MODEL.IMAGE_ENCODER.use_stack else 1
         # stack_rgb_length = self.config.MODEL.len_traj_act
-        stack_rgb = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_nums)]
+        stack_rgb = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_num)]
         stack_depth = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_nums)]
         prev_globalgps = [FixedLengthStack(self.config.MODEL.len_traj_act+1) for _ in range(self.eval_env.env_nums)] # TODO !!! act length
         prev_globalyaw = [FixedLengthStack(self.config.MODEL.len_traj_act+1) for _ in range(self.eval_env.env_nums)]
@@ -744,9 +746,9 @@ class DaggerDiffusonPolicyTrainer:
         spl_dict = {}
 
         # TODO: 需要修改
-        while envs.num_envs > 0 and len(stats_episodes) < num_eps:
+        while len(stats_episodes) < num_eps:
             # steps[:] = [x+1 for x in steps]
-            current_episodes = envs.current_episodes()
+            current_episodes = self.eval_env.data_item
             if len(spl_dict) > 0 and np.mean(list(spl_dict.values())) < 0.02 and len(stats_episodes) > 100:
                 # this ckpt is too bad to continue
                 self.eval_logger.info(f"Break. This ckpt is too bad to continue with average SPL {np.mean(list(spl_dict.values())):.3f}")
@@ -764,7 +766,7 @@ class DaggerDiffusonPolicyTrainer:
                     'num_sample': self.config.EVAL.num_sample,
                     'vis': True,
                     'step': steps[0],
-                    'episode_ids': [x.episode_id for x in current_episodes],
+                    'episode_ids': current_episodes['episode_id'],
                     'stop_mode': self.config.EVAL.stop_mode,
                     'steps': steps
                 }
@@ -783,16 +785,13 @@ class DaggerDiffusonPolicyTrainer:
                     actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred = net(batch_settings)
                 # print(steps[0])
             
-            prev_actions = [[] for _ in range(envs.num_envs)]
+            prev_actions = [[] for _ in range(self.eval_env.env_nums)]
             
             len_traj_act = self.config.MODEL.len_traj_act
             # len_traj_act = 1 # !!!
             stop_envs = [False] * len(actions)
             first_stop_envs = [False] * len(actions)
-            outputs_dict_copy_for_stops = [[] for _ in range(len(actions))]
-            info_copy_for_stops = [[] for _ in range(len(actions))]
-            # global_env_paused = [(x[0],x[3]._name) for x in envs._paused] # x[0] is the env_idx, x[3]._name is the thread name like 'Thread-11'
-            working_thread_names = [x._name for x in envs._workers] # record the working thread names
+
             for step_i in range(len_traj_act):
                 tmp_a = []
                 if self.config.EVAL.ACTION == 'descrete':
@@ -827,51 +826,51 @@ class DaggerDiffusonPolicyTrainer:
                             
                 elif self.config.EVAL.ACTION == 'xyyaw':
                     for a_i, a in enumerate(actions):
-                        if a['action'] != 'STOP':
-                            a_copy = deepcopy(a)
-                            if step_i == 0:
-                                a_copy['action']['action_args']['actions'] = a['action']['action_args']['actions'][step_i]
-                            else:
-                                a_copy['action']['action_args']['actions'] = a['action']['action_args']['actions'][step_i] - a['action']['action_args']['actions'][step_i-1] # relative action
-                            tmp_a.append(a_copy)
+                        if isinstance(a, str) and a == 'STOP':
+                            action = [
+                                {'h1': {'stop': ['stop']}}
+                            ]
                         else:
-                            if step_i != len_traj_act - 1:
-                                a_copy = {'action':{
-                                    'action': 'GO_TOWARD_XYYAW',
-                                    'action_args': {
-                                        'actions': np.zeros(self.action_dim)
-                                    }
-                                }}
-                                tmp_a.append(a_copy)
+                            target_pos, target_quat = self.eval_env.predicted_action_to_global(a[step_i])
+                            if abs(a[step_i][0]) < self.rotation_threshold and abs(a[step_i][1]) < self.rotation_threshold:
+                                # rotation
+                                action = [
+                                    {'h1': {'rotate': [target_quat]}} 
+                                ]
                             else:
-                                # stop at the last stack step
-                                tmp_a.append(a)
-                    outputs = envs.step(tmp_a)
+                                # go to point
+                                action = [
+                                    {'h1': {'move_to_point': [target_pos]}}
+                                ] # TODO: rotation
+                        outputs = self.eval_env.step(action)
+
+                    #     if a['action'] != 'STOP':
+                    #         a_copy = deepcopy(a)
+                    #         if step_i == 0:
+                    #             a_copy['action']['action_args']['actions'] = a['action']['action_args']['actions'][step_i]
+                    #         else:
+                    #             a_copy['action']['action_args']['actions'] = a['action']['action_args']['actions'][step_i] - a['action']['action_args']['actions'][step_i-1] # relative action
+                    #         tmp_a.append(a_copy)
+                    #     else:
+                    #         if step_i != len_traj_act - 1:
+                    #             a_copy = {'action':{
+                    #                 'action': 'GO_TOWARD_XYYAW',
+                    #                 'action_args': {
+                    #                     'actions': np.zeros(self.action_dim)
+                    #                 }
+                    #             }}
+                    #             tmp_a.append(a_copy)
+                    #         else:
+                    #             # stop at the last stack step
+                    #             tmp_a.append(a)
+                    # outputs = envs.step(tmp_a)
                     # steps[:] = [x+1 for x in steps]
                 # outputs = envs.step([a[step_i] for a in actions])
                 # outputs_dict, _, dones, infos = [list(x) for x in zip(*outputs)]
                 if len(outputs) > 0:
-                    outputs_dict, _, dones, infos = [list(x) for x in zip(*outputs)]
+                    outputs_dict, dones, infos = outputs
                 else:
-                    outputs_dict, infos, dones = [], [], []
-                for b_idx in range(len(actions)):
-                    if first_stop_envs[b_idx] and not stop_envs[b_idx]:
-                        pre_pop_nums = 0
-                        for pre_b_idx in range(b_idx):
-                            if not first_stop_envs[pre_b_idx] and stop_envs[pre_b_idx]:
-                                pre_pop_nums += 1
-                        # pre_pop_nums = sum(stop_envs[:b_idx])
-                        cur_idx = b_idx - pre_pop_nums
-                        outputs_dict_copy_for_stops[b_idx] = deepcopy(outputs_dict[cur_idx])
-                        info_copy_for_stops[b_idx] = deepcopy(infos[cur_idx])
-                        stop_envs[b_idx] = True
-                for b_idx in range(len(actions)):
-                    # 注意这里循环不能和上面的循环合并，因为insert会影响index的具体位置
-                    if not first_stop_envs[b_idx] and stop_envs[b_idx]:
-                        outputs_dict.insert(b_idx, outputs_dict_copy_for_stops[b_idx])
-                        infos.insert(b_idx, info_copy_for_stops[b_idx])
-                        dones.insert(b_idx, True)
-                    first_stop_envs[b_idx] = False
+                    outputs_dict, dones, infos = [], [], []
 
                 for idx in range(len(outputs_dict)):
                     stack_rgb[idx].push(outputs_dict[idx]["rgb"])
@@ -950,13 +949,9 @@ class DaggerDiffusonPolicyTrainer:
                         
                         _, update_rnn_states= net(batch_settings)
                         rnn_states = update_rnn_states
-            
-            # resume the paused env for multi_step actions
-            for i in range(len(actions)):
-                if stop_envs[i]:
-                    envs.resume_at(i, working_thread_names[i])
-            stack_rgb_for_video = deepcopy([x.get_stack() for x in stack_rgb])
-            stack_depth_for_video = deepcopy([x.get_stack() for x in stack_depth])
+                
+                stack_rgb_for_video = deepcopy([x.get_stack() for x in stack_rgb])
+                stack_depth_for_video = deepcopy([x.get_stack() for x in stack_depth])
 
             for idx in range(len(actions)):
                 # reverse to make the latest frame to be 0 position
@@ -1001,7 +996,7 @@ class DaggerDiffusonPolicyTrainer:
             )
 
             # reset envs and observations if necessary
-            for i in range(envs.num_envs):
+            for i in range(envs.env_nums):
                 if len(config.VIDEO_OPTION) > 0:
                     for stack_id in range(stack_rgb_length):
                         frame = observations_to_image(observations[i], infos[i],stack_rgb=stack_rgb_for_video[i][stack_id], stack_depth=stack_depth_for_video[i][stack_id])
@@ -1138,7 +1133,7 @@ class DaggerDiffusonPolicyTrainer:
             envs_to_pause = []
             next_episodes = envs.current_episodes()
 
-            for i in range(envs.num_envs):
+            for i in range(envs.env_nums):
                 if next_episodes[i].episode_id in stats_episodes:
                     envs_to_pause.append(i)
 
@@ -1202,6 +1197,12 @@ class DaggerDiffusonPolicyTrainer:
 
         return aggregated_stats['spl'], aggregated_stats['success']
 
+    def process_stop_episode(self, stats_episodes):
+        # TODO
+        self.eval_env.construct_env()
+        return stats_episodes
+        
+        # stats_episodes{ep_id} = self.compute_metric(ep)
 
 def plot_spl_list(spl_list):
     # Create a figure and axis

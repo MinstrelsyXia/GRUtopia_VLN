@@ -2,9 +2,15 @@ open3d
 shapely
 pandas
 ftfy
+regex
 clip
 transformers
 lmdb
 diffusers==0.21.4
 huggingface-hub==0.25.2
 msgpack_numpy
+tensorboard
+gym
+einops
+
+# pip install -e vln/src/models/diffusion_policy

@@ -129,16 +129,21 @@ class TaskEnv(VLNDataLoader):
         self.init_robots()
         
         if init_omni_env:
-            # wait for the agent to be ready.
-            warm_up_step = 0
-            env_actions = [{'h1':{self.action_name:[[item["start_position"]]]}}]
-            start_time = time.time()
-            while self.env.simulation_app.is_running() and warm_up_step < self.warm_up_steps:
-                self.env.step(actions=env_actions)
-                warm_up_step += 1
-            end_time = time.time()
-            fps = warm_up_step / (end_time - start_time)
-            self.eval_logger.info(f"Warm up for {warm_up_step} steps. FPS: {fps:.2f}")
+            warm_up_steps = self.warm_up_steps
+        else:
+            warm_up_steps = 20
+
+        # wait for the agent to be ready.
+        warm_up_step = 0
+        env_actions = [{'h1':{self.action_name:[[item["start_position"]]]}}]
+        start_time = time.time()
+        while self.env.simulation_app.is_running() and warm_up_step < warm_up_steps:
+            self.env.step(actions=env_actions)
+            warm_up_step += 1
+        end_time = time.time()
+        fps = warm_up_step / (end_time - start_time)
+        self.eval_logger.info(f"Warm up for {warm_up_step} steps. FPS: {fps:.2f}")
+
     
     def norm_depth(self, depth_info, min_depth=0, max_depth=10):
         depth_info[depth_info > max_depth] = max_depth
@@ -194,21 +199,71 @@ class TaskEnv(VLNDataLoader):
         # 2. predict the next action every interval
         finish_state = False
         start_step = 0
-        while not finish_state:
-            obs = self.env.step(actions=actions, add_rgb_subframes=False, render=False)
-            for env_idx, (task_name, task) in enumerate(obs.items()):
-                for robot_name, robot in task.items():
-                    action_state = robot[self.action_name]
-                    finish_state = action_state['finished']
-            start_step += 1
-            self.current_step_list[env_idx] += 1
+        dones = [False]
+        infos = [] # TODO: compute the metrics!
+        action_name = list(actions[0]['h1'].keys())[0]
+        if action_name == 'stop':
+            dones = [True]
 
-            if self.current_step_list[env_idx] > self.max_step:
-                finish_state = False
-                self.eval_logger.error(f"Step has surpass the maximum steps. Break!")
-                break
+        else:
+            while not finish_state:
+                obs = self.env.step(actions=actions, add_rgb_subframes=False, render=False)
+                for env_idx, (task_name, task) in enumerate(obs.items()):
+                    for robot_name, robot in task.items():
+                        action_state = robot[action_name]
+                        finish_state = action_state['finished']
+                start_step += 1
+                self.current_step_list[env_idx] += 1
 
-            if verbose and start_step % 50 == 0:
-                self.eval_logger.info(f"Step {start_step} in this action.")
+                if self.current_step_list[env_idx] > self.max_step:
+                    finish_state = False
+                    self.eval_logger.error(f"Step has surpass the maximum steps. Break!")
+                    break
+
+                if verbose and start_step % 50 == 0:
+                    self.eval_logger.info(f"Step {start_step} in this action.")
         
-        return finish_state
+        outputs_dict = self.get_obs()
+        
+        return outputs_dict, dones, infos
+    
+    def predicted_action_to_global(self, predicted_action):
+        """
+        将预测的单个动作转换为全局坐标系下的位置
+        
+        Args:
+            predicted_action (torch.Tensor): 预测的动作 shape: [3] (dx, dy, dyaw)
+        
+        Returns:
+            global_position (np.ndarray): 全局坐标系下的位置 [x, y]
+            global_quat (np.ndarray): 全局坐标系下的四元数朝向 [w, x, y, z]
+        """
+        # 获取当前机器人的位置和朝向
+        current_position, current_rot = self.get_robot_poses()[self.env_idx]
+        _, _, current_yaw = self.quat_to_euler_angles(current_rot)
+        
+        # 计算当前朝向的旋转矩阵
+        cos_theta = np.cos(current_yaw)
+        sin_theta = np.sin(current_yaw)
+        R = np.array([[cos_theta, -sin_theta],
+                    [sin_theta, cos_theta]])
+        
+        # 将局部坐标变化转换到全局坐标系
+        local_dxy = predicted_action[:2] # [dx, dy]
+        global_dxy = np.dot(R, local_dxy)
+        
+        # 计算全局位置
+        global_position = np.array([
+            current_position[0] + global_dxy[0],
+            current_position[1] + global_dxy[1],
+            current_position[2]  # 保持原始z坐标
+        ])
+        
+        # 计算全局朝向的欧拉角（roll=0, pitch=0）
+        global_yaw = current_yaw + predicted_action[2]
+        global_euler = np.array([0.0, 0.0, global_yaw])
+        
+        # 将欧拉角转换为四元数
+        global_quat = self.euler_angles_to_quat(global_euler)
+        
+        return global_position, global_quat
