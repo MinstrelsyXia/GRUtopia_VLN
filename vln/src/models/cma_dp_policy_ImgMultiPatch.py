@@ -67,7 +67,10 @@ class CMA_DP_Net(nn.Module):
         self.image_encoder = encoders.ImageEncoder(self.model_config, self.model_config.IMAGE_ENCODER, observation_space, self.model_config.LORA)
         
         # Init the cross-modal fusion network
-        bert_config = PretrainedConfig.from_pretrained('roberta-base')
+        try:
+            bert_config = PretrainedConfig.from_pretrained('roberta-base')
+        except Exception as e:
+            bert_config = PretrainedConfig.from_pretrained('data/pretrained/roberta')
         cross_modal_config = copy.deepcopy(bert_config)
         for k,v in vars(self.model_config.CROSS_MODAL_ENCODER).items():
             setattr(cross_modal_config, k, v)
@@ -640,33 +643,15 @@ class CMA_DP_Net(nn.Module):
 
         if self.config.EVAL.ACTION == 'xyyaw':
             actions = []
+            un_actions = un_actions_nocumsum.detach().cpu().numpy()
             for idx in range(un_actions.shape[0]):
-                # if dist_pred[idx].item() < 1e-1 or (un_actions[0] < 1e-1 and un_actions[1] < 1e-1):
-                value_sum = 0
-                for value in un_actions[idx][-1]:
-                    value_sum += abs(value)
-                if stop_mode == 'distance':
-                    if dist_pred[idx].item() < self.config.EVAL.distance_threshold or\
-                            (abs(un_actions[idx][0][0]) < 1e-1 and abs(un_actions[idx][0][1]) < 1e-1 and abs(un_actions[idx][step_idx][2]) < 1e-1):
-                        # stop
-                        actions.append({"action": "STOP"})
-                        continue
-                elif stop_mode == 'progress':
+                if stop_mode == 'progress':
                     if pm_pred[idx].item() > self.config.EVAL.pm_threshold or\
                             (abs(un_actions[idx][0][0]) < 1e-1 and abs(un_actions[idx][0][1]) < 1e-1 and abs(un_actions[idx][0][2]) < 1e-1):
                         # stop
-                        actions.append({"action": "STOP"})
+                        actions.append("STOP")
                         continue
-                actions.append(
-                    {
-                        "action": {
-                            "action": "GO_TOWARD_XYYAW",
-                            "action_args": {
-                                "actions": un_actions[idx],
-                            },
-                        }
-                    }
-                )
+                actions.append(un_actions[idx]) 
         elif self.config.EVAL.ACTION == 'descrete':
             # 0: stop, 1: move forward, 2: turn left, 3: turn right
             actions = [[] for _ in range(un_actions.shape[0])]
@@ -747,14 +732,14 @@ class CMA_DP_Net(nn.Module):
         masks = batch['masks']
         add_noise_to_action = batch['add_noise_to_action']
         denoise_action = batch['denoise_action']
-        batch['mode'] = 'pred_actions'
+        # batch['mode'] = 'pred_actions'
         
         batch_size = rnn_states.shape[0]
         vis = batch['vis']
         step = batch['step']
         episode_ids = batch['episode_ids']
 
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred = self.forward(batch)
+        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'])
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         
@@ -813,4 +798,7 @@ class CMA_DP_Net(nn.Module):
         
         elif mode == "update_rnn":
             return self.update_rnn_states(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+        
+        elif mode == "act":
+            return self.act(batch)
     

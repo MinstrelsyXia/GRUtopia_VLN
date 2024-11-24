@@ -636,6 +636,7 @@ class CMA_DP_Net(nn.Module):
 
         if self.config.EVAL.ACTION == 'xyyaw':
             actions = []
+
             for idx in range(un_actions.shape[0]):
                 # if dist_pred[idx].item() < 1e-1 or (un_actions[0] < 1e-1 and un_actions[1] < 1e-1):
                 value_sum = 0
@@ -643,25 +644,18 @@ class CMA_DP_Net(nn.Module):
                     value_sum += abs(value)
                 if stop_mode == 'distance':
                     if dist_pred[idx].item() < self.config.EVAL.distance_threshold or\
-                            (abs(un_actions[idx][0][0]) < 1e-1 and abs(un_actions[idx][0][1]) < 1e-1 and abs(un_actions[idx][step_idx][2]) < 1e-1):
+                            (abs(un_actions[idx][0][0]) < self.config.EVAL.stop_x_threshold and abs(un_actions[idx][0][1]) < self.config.EVAL.stop_y_threshold and abs(un_actions[idx][0][2]) < self.config.EVAL.stop_yaw_threshold):
                         # stop
                         actions.append({"action": "STOP"})
                         continue
                 elif stop_mode == 'progress':
                     if pm_pred[idx].item() > self.config.EVAL.pm_threshold or\
-                            (abs(un_actions[idx][0][0]) < 1e-1 and abs(un_actions[idx][0][1]) < 1e-1 and abs(un_actions[idx][0][2]) < 1e-1):
+                            (abs(un_actions[idx][0][0]) < self.config.EVAL.stop_x_threshold and abs(un_actions[idx][0][1]) < self.config.EVAL.stop_y_threshold and abs(un_actions[idx][0][2]) < self.config.EVAL.stop_yaw_threshold):
                         # stop
                         actions.append({"action": "STOP"})
                         continue
                 actions.append(
-                    {
-                        "action": {
-                            "action": "GO_TOWARD_XYYAW",
-                            "action_args": {
-                                "actions": un_actions[idx],
-                            },
-                        }
-                    }
+                    {"action": "xyyaw", "args": un_actions[idx]}
                 )
         elif self.config.EVAL.ACTION == 'descrete':
             # 0: stop, 1: move forward, 2: turn left, 3: turn right

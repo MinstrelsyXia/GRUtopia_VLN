@@ -194,7 +194,7 @@ class LmdbReader:
 if __name__ == '__main__':
     mode = 'analysis'
     
-    lmdb_path = 'data/sample_episodes/20241105_sample_episodes/sample_data.lmdb'
+    lmdb_path = 'data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
     data_collector = LmdbReader(lmdb_path)
     if mode == 'save_video':
         '''1. Load all data'''
