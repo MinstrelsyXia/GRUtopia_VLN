@@ -314,6 +314,37 @@ class GlobalTopdownMap:
 
         return transfer_paths
 
+    def draw_point(self, predicted_world_pose, color=[1,0,0], current_world_pose=None, target_world_pose=None, img_save_path=None, step=0, logger=None):
+        occupancy_map = self.get_map(predicted_world_pose)
+        
+        plt.figure(figsize=(6, 6))
+        plt.imshow(occupancy_map, cmap=self.cmap, norm=self.norm, origin='upper')
+        
+        if predicted_world_pose is not None:
+            predicted_pixel = self.world_to_pixel(predicted_world_pose)
+            plt.scatter(predicted_pixel[1], predicted_pixel[0], color=color, marker='o', label=f"预测位置 ({predicted_world_pose[0]:.2f}, {predicted_world_pose[1]:.2f}, {predicted_world_pose[2]:.2f})", s=30)
+        
+        if current_world_pose is not None:
+            current_pixel = self.world_to_pixel(current_world_pose)
+            plt.scatter(current_pixel[1], current_pixel[0], color=[0,0,1], marker='*', label=f"当前位置 ({current_world_pose[0]:.2f}, {current_world_pose[1]:.2f}, {current_world_pose[2]:.2f})", s=30)
+        
+        if target_world_pose is not None:
+            target_pixel = self.world_to_pixel(target_world_pose)
+            plt.scatter(target_pixel[1], target_pixel[0], color=[0,1,0], marker='x', label=f"目标位置 ({target_world_pose[0]:.2f}, {target_world_pose[1]:.2f}, {target_world_pose[2]:.2f})", s=30)
+        
+        plt.legend(fontsize='x-small')
+        plt.grid(alpha=0.3)
+        plt.colorbar(label='占用情况 (0: 空闲, 1: 占用)', shrink=0.8)
+        plt.title('全局俯视图', fontsize=10)
+        
+        if img_save_path is not None:
+            img_save_path = os.path.join(img_save_path, f"global_topdown_map_{step}.jpg")
+            plt.savefig(img_save_path, dpi=100, bbox_inches='tight')
+            if logger is not None:
+                logger.info(f"已保存路径规划可视化图像到 {img_save_path}")
+        
+        plt.close()
+
     def vis_nav_path(self, start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
         plt.figure(figsize=(10, 10))
         # plt.imshow(occupancy_map, cmap='binary', origin='lower')

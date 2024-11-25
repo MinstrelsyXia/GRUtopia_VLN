@@ -449,7 +449,7 @@ def poll_checkpoint_folder(
                 ckpt_file_ind = int(ckpt_num)
                 if ckpt_file_ind >= start_eval_epoch:
                     ind = idx
-                    print(f'Find the start eval epoch file for {start_eval_epoch}-th epoch.')
+                    print(f'Find the start eval epoch file for {ckpt_file_ind}-th epoch.')
                     break
             previous_ckpt_ind = ind
             return (models_paths[ind], previous_ckpt_ind)

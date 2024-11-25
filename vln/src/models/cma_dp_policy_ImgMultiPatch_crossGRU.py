@@ -649,11 +649,22 @@ class CMA_DP_Net(nn.Module):
                         actions.append({"action": "STOP"})
                         continue
                 elif stop_mode == 'progress':
-                    if pm_pred[idx].item() > self.config.EVAL.pm_threshold or\
-                            (abs(un_actions[idx][0][0]) < self.config.EVAL.stop_x_threshold and abs(un_actions[idx][0][1]) < self.config.EVAL.stop_y_threshold and abs(un_actions[idx][0][2]) < self.config.EVAL.stop_yaw_threshold):
-                        # stop
-                        actions.append({"action": "STOP"})
-                        continue
+                    stop_flag = False
+                    # Check if 4 consecutive steps are stop actions
+                    if idx + 3 < len(un_actions):  # Make sure we have enough steps ahead
+                        consecutive_stops = True
+                        for i in range(4):  # Check current and next 3 steps
+                            curr_action = un_actions[idx+i][0]
+                            if not (abs(curr_action[0]) < self.config.EVAL.stop_x_threshold and \
+                                  abs(curr_action[1]) < self.config.EVAL.stop_y_threshold and \
+                                  abs(curr_action[2]) < self.config.EVAL.stop_yaw_threshold):
+                                consecutive_stops = False
+                                break
+                        
+                        if consecutive_stops and pm_pred[idx].item() > self.config.EVAL.pm_threshold:
+                            # Only stop if we have 4 consecutive stop actions and progress monitor threshold is met
+                            actions.append({"action": "STOP"})
+                            continue
                 actions.append(
                     {"action": "xyyaw", "args": un_actions[idx]}
                 )
