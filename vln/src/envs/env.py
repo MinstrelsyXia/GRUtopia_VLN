@@ -86,6 +86,10 @@ class TaskEnv(VLNDataLoader):
             self.current_episode_idx = 0
             
         self.data_item = self.current_scan_data[self.current_scan][self.current_episode_idx]
+
+        self.eval_logger.info(f"Current scan: {self.current_scan}, trajectory_id: {self.data_item['trajectory_id']}")
+        self.eval_logger.info(f"Instruction: {self.data_item['instruction']['instruction_text']}")
+        self.eval_logger.info(f"Start position: {self.data_item['start_position']}, Start rotation: {self.data_item['start_rotation']}")
         
         return self.current_scan, self.data_item, reset_scene
     
