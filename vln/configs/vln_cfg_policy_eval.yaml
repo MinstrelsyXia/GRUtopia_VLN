@@ -22,6 +22,7 @@ settings:
     - pano_camera_0
   
   max_step: 25000
+  per_action_max_step: 1000
 
 robots:
   - name: "CylinderRobot"
