@@ -45,6 +45,11 @@ def main():
         default=True,
         action='store_true',
     )
+    parser.add_argument(
+        "--test_verbose",
+        default=False,
+        action='store_true',
+    )
     args = parser.parse_args()
     run_exp(**vars(args))
 
@@ -66,6 +71,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         opts: list of strings of additional config options.
     """
     config = get_config(exp_config, opts)
+    config.test_verbose = kwargs.get('test_verbose', False)
     # logger.info(f"config: {config}")
     
     # Process the log dir

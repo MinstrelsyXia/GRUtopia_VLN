@@ -27,7 +27,7 @@ settings:
 robots:
   - name: "CylinderRobot"
     z_offset: 0.7 # !!!
-  - name: "HumanoidRobot"
+  - name: "HumanoidRobotVLNEval"
     z_offset: 1.05 # !!!
   
 maps:

@@ -593,7 +593,7 @@ class DaggerDiffusonPolicyTrainer:
     def _eval_checkpoint(
         self,
         checkpoint_path: str,
-        writer,
+        writer=None,
         checkpoint_index: int = 0,
         split=None,
     ) -> None:
@@ -638,6 +638,25 @@ class DaggerDiffusonPolicyTrainer:
 
         '''Init the task env'''
         self.eval_env.construct_env(init_omni_env=True)
+
+        # warm up
+        warm_up_steps = self.eval_env.warm_up_steps
+
+        # wait for the agent to be ready.
+        # warm_up_step = 0
+        # env_actions = [{'h1':{self.eval_env.action_name:[[self.eval_env.data_item["start_position"]]]}}]
+        # start_time = time.time()
+        # render = True
+        # while self.eval_env.env.simulation_app.is_running() and warm_up_step < warm_up_steps:
+        #     obs = self.eval_env.env.step(actions=env_actions, render=render)
+        #     warm_up_step += 1
+        #     if warm_up_step % self.eval_env.sim_config.config.simulator.rendering_interval == 0:
+        #         render = True
+        #     else:
+        #         render = False
+        # end_time = time.time()
+        # fps = warm_up_step / (end_time - start_time)
+        # self.eval_logger.info(f"Warm up for {warm_up_step} steps. FPS: {fps:.2f}")
 
         self.policy, _ = initialize_policy(
             self.config,
@@ -843,7 +862,7 @@ class DaggerDiffusonPolicyTrainer:
                                 {'h1': {'stop': ['stop']}}
                             ]
                         else:
-                            target_pos, target_quat = self.eval_env.predicted_action_to_global(a[step_i])
+                            target_pos, target_quat = self.eval_env.predicted_action_to_global(a[step_i], verbose=self.config.test_verbose)
                             if abs(a[step_i][0]) < self.rotation_threshold and abs(a[step_i][1]) < self.rotation_threshold:
                                 # rotation
                                 action = [
@@ -853,7 +872,8 @@ class DaggerDiffusonPolicyTrainer:
                                 # go to point
                                 action = [
                                     {'h1': {'move_to_point': [target_pos]}}
-                                ] # TODO: rotation
+                                ]
+
                         outputs = self.eval_env.step(action)
                         steps[0] += 1
                         total_actions.append(action)

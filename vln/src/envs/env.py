@@ -95,6 +95,10 @@ class TaskEnv(VLNDataLoader):
             self.current_episode_idx = 0
             
         self.data_item = self.current_scan_data[self.current_scan][self.current_episode_idx]
+
+        self.eval_logger.info(f"Current scan: {self.current_scan}, trajectory_id: {self.data_item['trajectory_id']}")
+        self.eval_logger.info(f"Instruction: {self.data_item['instruction']['instruction_text']}")
+        self.eval_logger.info(f"Start position: {self.data_item['start_position']}, Start rotation: {self.data_item['start_rotation']}")
         
         return self.current_scan, self.data_item, reset_scene
     
@@ -142,7 +146,7 @@ class TaskEnv(VLNDataLoader):
         if init_omni_env:
             warm_up_steps = self.warm_up_steps
         else:
-            warm_up_steps = 20
+            warm_up_steps = 50
 
         # wait for the agent to be ready.
         warm_up_step = 0
@@ -168,12 +172,12 @@ class TaskEnv(VLNDataLoader):
     def get_shortest_path(self, scan):
         # Init the topdown map
         self.topdown_map = self.GlobalTopdownMap(self.args, scan)
-        self.freemap, self.camera_pose = self.get_global_free_map_single(self.env_idx, verbose=self.args.test_verbose)
-        self.topdown_map.update_map(self.freemap, self.camera_pose, verbose=self.args.test_verbose, env_idx=self.env_idx)
+        self.freemap, self.camera_pose = self.get_global_free_map_single(self.env_idx, verbose=False)
+        self.topdown_map.update_map(self.freemap, self.camera_pose, verbose=False, env_idx=self.env_idx)
         self.eval_logger.info(f"The shortest path has been initialized for Scan {scan}, Path_id {self.data_item['trajectory_id']}")  
 
         # Compute the shortest path
-        exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=self.args.test_verbose, save_dir=self.config.GT_PATH_DIR)
+        exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=False, save_dir=self.config.GT_PATH_DIR)
         # exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=True, save_dir=self.config.GT_PATH_DIR, all_paths=self.data_item['reference_path']) # DEBUG 
 
         # compute the length
@@ -287,6 +291,7 @@ class TaskEnv(VLNDataLoader):
                                 elif stuck_list[status_idx]:
                                     reason = 'stuck'
                                 self.episode_end_setting(self.current_split, self.current_scan, status_idx, reason)
+                                self.eval_logger.warning(f"Current action has been interrupted by {reason}.")
                             dones[env_idx] = True
         
         outputs_dict = self.get_obs()
@@ -296,7 +301,7 @@ class TaskEnv(VLNDataLoader):
         
         return outputs_dict, dones, infos, self.current_step_list
     
-    def predicted_action_to_global(self, predicted_action):
+    def predicted_action_to_global(self, predicted_action, verbose=False):
         """
         将预测的单个动作转换为全局坐标系下的位置
         
@@ -337,6 +342,9 @@ class TaskEnv(VLNDataLoader):
         
         # 将欧拉角转换为四元数
         global_quat = self.euler_angles_to_quat(global_euler)
+
+        if verbose:
+            self.topdown_map.draw_point(predicted_world_pose=global_position, color=[1,0,0], current_world_pose=current_position, target_world_pose=self.data_item['reference_path'][-1], img_save_path=self.config.GT_PATH_DIR, step=self.current_step_list[self.env_idx], logger=self.eval_logger)
         
         return global_position, global_quat
     
