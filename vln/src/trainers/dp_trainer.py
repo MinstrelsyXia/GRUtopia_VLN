@@ -467,6 +467,111 @@ class DaggerDiffusonPolicyTrainer:
         #     aux_loss = aux_loss.item()
         return_dist_loss = dist_loss.item() if dist_pred is not None else 0
         return loss.item(), diffusion_loss.item(), return_dist_loss, aux_loss
+
+    def eval_debug(self, use_gt=False) -> None:
+        r"""Main method of trainer evaluation. Calls _eval_checkpoint() that
+        is specified in Trainer class that inherits from BaseRLTrainer
+        or BaseILTrainer
+
+        Returns:
+            None
+        """
+        self.device = (
+            torch.device("cuda", self.config.TORCH_GPU_IDS[0])
+            if torch.cuda.is_available()
+            else torch.device("cpu")
+        )
+
+        self.rotation_threshold = float(self.config.EVAL.rotation_threshold)
+        writer = None
+
+
+        if os.path.isfile(self.config.EVAL_CKPT_PATH_DIR):
+            # evaluate singe checkpoint
+            proposed_index = get_checkpoint_id(
+                self.config.EVAL_CKPT_PATH_DIR
+            )
+            if proposed_index is not None:
+                ckpt_idx = proposed_index
+            else:
+                ckpt_idx = 0
+            self.eval_logger.info(f'====Eval Ckpt File:{self.config.EVAL_CKPT_PATH_DIR}====')
+            self._eval_checkpoint(
+                self.config.EVAL_CKPT_PATH_DIR,
+                writer,
+                checkpoint_index=ckpt_idx,
+            )
+        else:
+            # evaluate multiple checkpoints in order
+            save_eval_mode = 'best_spl_sr'
+            prev_ckpt_ind = -1
+            first_find_start_epoch = True
+            while True:
+                current_ckpt = None
+                while current_ckpt is None:
+                    # print(current_ckpt)
+                    current_ckpt = poll_checkpoint_folder(
+                        self.config.EVAL_CKPT_PATH_DIR, prev_ckpt_ind,
+                        start_eval_epoch=self.config.EVAL.start_eval_epoch,
+                        first_find_start_epoch=first_find_start_epoch
+                    )
+                    if current_ckpt == -1:
+                        print('Waiting ckpts...')
+                        current_ckpt = None
+                        time.sleep(2)  # sleep for 2 secs before polling again
+                        continue
+                    if current_ckpt is not None and len(current_ckpt) == 2:
+                        # assign the start_eval_epoch and return the new prev_ckpt_ind
+                        current_ckpt, prev_ckpt_ind = current_ckpt
+                        first_find_start_epoch = False
+                    time.sleep(2)  # sleep for 2 secs before polling again
+                prev_ckpt_ind += 1
+                ckpt_file_ind = current_ckpt.split('/')[-1].split('.')[1]
+                spl, sr = self._eval_checkpoint(
+                    checkpoint_path=current_ckpt,
+                    writer=writer,
+                    checkpoint_index=ckpt_file_ind,
+                )
+                if spl == 0 and sr == 0:
+                    # skip the ckpt if it has 0 SPL and 0 SR
+                    continue
+                
+                self.eval_logger.info(f"=======Eval Current_ckpt: {current_ckpt}=======")
+                # update results
+                if not os.path.exists(os.path.join(self.config.EVAL_CKPT_PATH_DIR, 'ckpts')):
+                    os.makedirs(os.path.join(self.config.EVAL_CKPT_PATH_DIR, 'ckpts'))
+                if spl > self.eval_results['best_spl']:
+                    self.eval_results['best_spl'] = spl
+                    self.eval_results['best_spl_index'] = ckpt_file_ind
+                    # copy the current ckpt file to best_spl
+                    # shutil.copy(current_ckpt, os.path.join(self.config.EVAL_CKPT_PATH_DIR, 'ckpts', f'{self.config.EVAL.SPLIT}_best_spl.pth'))
+                if sr > self.eval_results['best_sr']:
+                    self.eval_results['best_sr'] = sr
+                    self.eval_results['best_sr_index'] = ckpt_file_ind
+                    # copy the current ckpt file to best_sr
+                    # shutil.copy(current_ckpt, os.path.join(self.config.EVAL_CKPT_PATH_DIR, 'ckpts', f'{self.config.EVAL.SPLIT}_best_sr.pth'))
+                if spl+sr > self.eval_results['best_spl_sr']:
+                    self.eval_results['best_spl_sr'] = spl+sr
+                    self.eval_results['best_spl_sr_index'] = ckpt_file_ind
+                    # copy the current ckpt file to best_spl_sr
+                    shutil.copy(current_ckpt, os.path.join(self.config.EVAL_CKPT_PATH_DIR, 'ckpts', f'{self.config.EVAL.SPLIT}_best_spl_sr.pth'))
+                    self.eval_results['best_spl_sr_spl'] = spl
+                    self.eval_results['best_spl_sr_sr'] = sr
+                
+                if self.config.EVAL.auto_remove:
+                    if ckpt_file_ind != self.eval_results['best_spl_index'] and ckpt_file_ind != self.eval_results['best_sr_index']:
+                        # remove the ckpt_file
+                        os.remove(current_ckpt)
+                
+                # update the eval log
+                self.eval_logger.info(f"Current {self.config.EVAL.SPLIT} SPL: {spl:.4f} at index {ckpt_file_ind}")
+                self.eval_logger.info(f"Current {self.config.EVAL.SPLIT} SR: {sr:.4f} at index {ckpt_file_ind}")
+                self.eval_logger.info(f"Current {self.config.EVAL.SPLIT} SPL and SR: {spl+sr:.4f} at index {ckpt_file_ind}")
+                
+                self.eval_logger.info(f"Best {self.config.EVAL.SPLIT} SPL: {self.eval_results['best_spl']:.4f} at index {self.eval_results['best_spl_index']}")
+                self.eval_logger.info(f"Best {self.config.EVAL.SPLIT} SR: {self.eval_results['best_sr']:.4f} at index {self.eval_results['best_sr_index']}")
+                self.eval_logger.info(f"Best {self.config.EVAL.SPLIT} SPL and SR: {self.eval_results['best_spl_sr']:.4f} at index {self.eval_results['best_spl_sr_index']} . SPL: {self.eval_results['best_spl_sr_spl']:.4f} , SR: {self.eval_results['best_spl_sr_sr']:.4f}")
+
       
     def eval(self, use_gt=False) -> None:
         r"""Main method of trainer evaluation. Calls _eval_checkpoint() that
@@ -593,7 +698,7 @@ class DaggerDiffusonPolicyTrainer:
     def _eval_checkpoint(
         self,
         checkpoint_path: str,
-        writer,
+        writer=None,
         checkpoint_index: int = 0,
         split=None,
     ) -> None:
@@ -631,6 +736,25 @@ class DaggerDiffusonPolicyTrainer:
 
         '''Init the task env'''
         self.eval_env.construct_env(init_omni_env=True)
+
+        # warm up
+        warm_up_steps = self.eval_env.warm_up_steps
+
+        # wait for the agent to be ready.
+        # warm_up_step = 0
+        # env_actions = [{'h1':{self.eval_env.action_name:[[self.eval_env.data_item["start_position"]]]}}]
+        # start_time = time.time()
+        # render = True
+        # while self.eval_env.env.simulation_app.is_running() and warm_up_step < warm_up_steps:
+        #     obs = self.eval_env.env.step(actions=env_actions, render=render)
+        #     warm_up_step += 1
+        #     if warm_up_step % self.eval_env.sim_config.config.simulator.rendering_interval == 0:
+        #         render = True
+        #     else:
+        #         render = False
+        # end_time = time.time()
+        # fps = warm_up_step / (end_time - start_time)
+        # self.eval_logger.info(f"Warm up for {warm_up_step} steps. FPS: {fps:.2f}")
 
         self.policy, _ = initialize_policy(
             self.config,
