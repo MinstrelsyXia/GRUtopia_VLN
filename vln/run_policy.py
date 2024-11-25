@@ -125,6 +125,13 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         # Combine vln_config and sim_config with the config
         config.vln_config = vln_config
         config.sim_config = sim_config
+
+        config.GT_PATH_DIR = os.path.join(config.LOG_DIR, "gt_paths")
+        if not os.path.exists(config.GT_PATH_DIR):
+            os.makedirs(config.GT_PATH_DIR)
+        
+        if not os.path.exists(config.VIDEO_DIR):
+            os.makedirs(config.VIDEO_DIR)
         
     if config.MODEL.policy_name == 'CMA_DP_ImgMultiPatch_Policy':
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer

@@ -23,7 +23,7 @@ import json
 from vln.src.models.LongCLIP.model import longclip
 from vln.src.models.utils.bert_token import BertTokenizer
 from vln.src.utils.logger import MyLogger, logger
-from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce, get_checkpoint_id, poll_checkpoint_folder, is_slurm_batch_job, batch_obs, FixedLengthStack
+from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce, get_checkpoint_id, poll_checkpoint_folder, is_slurm_batch_job, batch_obs, FixedLengthStack, _compute_actions, get_delta, normalize_data, map_action_to_2d, save_video
 from vln.src.utils.tensorboard_utils import TensorboardWriter
 from vln.src.dataset.vlnce_dp_dataset import VLNCE_DP_Dataset, collate_fn
 from vln.src.models.init_policy import initialize_policy
@@ -612,13 +612,20 @@ class DaggerDiffusonPolicyTrainer:
             ckpt = self.load_checkpoint(checkpoint_path, map_location="cpu")
             config = self._setup_eval_config(ckpt)
 
-        split = config.EVAL.SPLIT if split is None else split
+        # split = config.EVAL.SPLIT if split is None else split
+        if split is None:
+            if isinstance(config.EVAL.SPLIT, list):
+                split = config.EVAL.SPLIT[0]
+            else:
+                split = config.EVAL.SPLIT
+
         config.IL.ckpt_to_load = checkpoint_path
         config.use_pbar = not is_slurm_batch_job()
 
         if config.VIDEO_OPTION != -1:
             # TODO
-            config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP_VLNCE")
+            # config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP_VLNCE")
+            total_rgb_list = []
 
         if config.EVAL.SAVE_RESULTS:
             fname = os.path.join(
@@ -703,7 +710,7 @@ class DaggerDiffusonPolicyTrainer:
         # IMU
         if self.config.MODEL.IMU_ENCODER.use:
             imu = torch.zeros(self.eval_env.env_nums, 2, device=self.device)
-            batch["imu"] = imu
+            batch["imu"] = imu.float()
 
         stats_episodes = {}
 
@@ -742,8 +749,13 @@ class DaggerDiffusonPolicyTrainer:
             stack_depth[env_idx].push(observations[env_idx]["depth"])
             prev_globalgps[env_idx].push(batch[env_idx]['globalgps'].detach().cpu().numpy())
             prev_globalyaw[env_idx].push(batch[env_idx]['global_rotation'][-1].detach().cpu().item())
+
+            if config.VIDEO_OPTION != -1:
+                total_rgb_list.append(observations[env_idx]["rgb"])
         
         spl_dict = {}
+        total_actions = []
+        current_episode_start_time = time.time()
 
         # TODO: 需要修改
         while len(stats_episodes) < num_eps:
@@ -843,6 +855,8 @@ class DaggerDiffusonPolicyTrainer:
                                     {'h1': {'move_to_point': [target_pos]}}
                                 ] # TODO: rotation
                         outputs = self.eval_env.step(action)
+                        steps[0] += 1
+                        total_actions.append(action)
 
                     #     if a['action'] != 'STOP':
                     #         a_copy = deepcopy(a)
@@ -868,9 +882,9 @@ class DaggerDiffusonPolicyTrainer:
                 # outputs = envs.step([a[step_i] for a in actions])
                 # outputs_dict, _, dones, infos = [list(x) for x in zip(*outputs)]
                 if len(outputs) > 0:
-                    outputs_dict, dones, infos = outputs
+                    outputs_dict, dones, infos, sim_steps = outputs
                 else:
-                    outputs_dict, dones, infos = [], [], []
+                    outputs_dict, dones, infos, sim_steps = [], [], [], []
 
                 for idx in range(len(outputs_dict)):
                     stack_rgb[idx].push(outputs_dict[idx]["rgb"])
@@ -878,6 +892,9 @@ class DaggerDiffusonPolicyTrainer:
                     
                     prev_globalgps[idx].push(outputs_dict[idx]["globalgps"])
                     prev_globalyaw[idx].push(outputs_dict[idx]["global_rotation"][-1])
+
+                    if config.VIDEO_OPTION != -1:
+                        total_rgb_list.append(outputs_dict[idx]["rgb"])
                 
                 # update RNN states
                 ## Update prev_actions
@@ -996,28 +1013,33 @@ class DaggerDiffusonPolicyTrainer:
             )
 
             # reset envs and observations if necessary
-            for i in range(envs.env_nums):
-                if len(config.VIDEO_OPTION) > 0:
-                    for stack_id in range(stack_rgb_length):
-                        frame = observations_to_image(observations[i], infos[i],stack_rgb=stack_rgb_for_video[i][stack_id], stack_depth=stack_depth_for_video[i][stack_id])
-                        frame = append_text_to_image(
-                            frame, current_episodes[i].instruction.instruction_text
-                        )
+            for i in range(self.eval_env.env_nums):
+                # if config.VIDEO_OPTION != -1:
+                    # for stack_id in range(stack_rgb_length):
+                    #     frame = observations_to_image(observations[i], infos[i],stack_rgb=stack_rgb_for_video[i][stack_id], stack_depth=stack_depth_for_video[i][stack_id])
+                    #     frame = append_text_to_image(
+                    #         frame, current_episodes[i].instruction.instruction_text
+                    #     )
 
-                        # resize the image
-                        new_width = (frame.shape[1] // 16) * 16
-                        new_height = (frame.shape[0] // 16) * 16
-                        resized_image = cv2.resize(frame, (new_width, new_height))
-                        rgb_frames[i].append(resized_image)
+                    #     # resize the image
+                    #     new_width = (frame.shape[1] // 16) * 16
+                    #     new_height = (frame.shape[0] // 16) * 16
+                    #     resized_image = cv2.resize(frame, (new_width, new_height))
+                    #     rgb_frames[i].append(resized_image)
 
                 if not dones[i] and steps[i] < self.config.EVAL.MAX_STEPS:
                     # continue if not done
                     continue
                 
                 '''The i-th episode has done'''
-                ep_id = current_episodes[i].episode_id
+                ep_id = current_episodes['episode_id']
                 stats_episodes[ep_id] = infos[i]
-                observations[i] = envs.reset_at(i)[0]
+
+                ep_time = time.time() - current_episode_start_time
+                self.eval_logger.info(f"Episode {ep_id} time: {ep_time:.2f}s")
+
+                observations[i] = self.eval_env.construct_env(step_time=steps[i])[0]
+                current_episode_start_time = time.time()
                 
                 # Initialize parameters
                 prev_actions[i] = torch.zeros(self.config.MODEL.len_traj_act, self.action_dim)
@@ -1026,8 +1048,8 @@ class DaggerDiffusonPolicyTrainer:
                     config.MODEL.STATE_ENCODER.hidden_size,
                     device=self.device,
                 )
-                start_positions[i] = torch.from_numpy(observations[i]['globalgps'][[0,2]]).to(self.device)
-                start_yaws[i] = torch.from_numpy(np.array(observations[i]['global_rotation'][-1])).to(self.device)
+                start_positions[i] = torch.from_numpy(observations[i]['globalgps'][[0,1]]).to(self.device)
+                start_yaws[i] = torch.from_numpy(np.array(observations[i]['globalyaw'])).to(self.device)
                 steps[i] = 0
                 stack_rgb[i] = FixedLengthStack(stack_rgb_length)
                 stack_depth[i] = FixedLengthStack(stack_rgb_length)
@@ -1042,6 +1064,8 @@ class DaggerDiffusonPolicyTrainer:
                 dones[i] = False
                 not_done_masks[i] = 1
 
+                total_actions = []
+
                 if config.use_pbar:
                     pbar.update()
                     pbar_iter += 1
@@ -1054,22 +1078,25 @@ class DaggerDiffusonPolicyTrainer:
                         )
                     )
 
-                if len(config.VIDEO_OPTION) > 0:
+                if config.VIDEO_OPTION != -1:
                     # ensure the same size in rgb_frames[i]
-                    init_width, init_height = rgb_frames[i][0].shape[:2]
-                    for j in range(len(rgb_frames[i])):
-                        rgb_frames[i][j] = cv2.resize(rgb_frames[i][j], (init_height, init_width))
-                    generate_video(
-                        video_option=config.VIDEO_OPTION,
-                        video_dir=config.VIDEO_DIR,
-                        images=rgb_frames[i],
-                        episode_id=ep_id,
-                        checkpoint_idx=checkpoint_index,
-                        metrics={"spl": stats_episodes[ep_id]["spl"]},
-                        tb_writer=writer,
-                    )
-                    del stats_episodes[ep_id]["top_down_map_vlnce"]
-                    rgb_frames[i] = []
+                    init_width, init_height = total_rgb_list[0].shape[:2]
+                    for j in range(len(total_rgb_list)):
+                        total_rgb_list[j] = cv2.resize(total_rgb_list[j], (init_height, init_width))
+                    # save rgbs as videos
+                    save_video(config.VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, stats_episodes[ep_id]["spl"])
+
+                    # generate_video(
+                    #     video_option=config.VIDEO_OPTION,
+                    #     video_dir=config.VIDEO_DIR,
+                    #     images=rgb_frames[i],
+                    #     episode_id=ep_id,
+                    #     checkpoint_idx=checkpoint_index,
+                    #     metrics={"spl": stats_episodes[ep_id]["spl"]},
+                    #     tb_writer=writer,
+                    # )
+                    # del stats_episodes[ep_id]["top_down_map_vlnce"]
+                    total_rgb_list = []
                 # else:
                     # print stats_episodes[ep_id]["spl"]
                     # self.eval_logger.info(
@@ -1080,8 +1107,7 @@ class DaggerDiffusonPolicyTrainer:
                 print('Average SPL: ', mean_spl) # !!!
 
             observations = extract_instruction_tokens(
-                observations,
-                self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
+                observations, 
                 bert_tokenizer=self.bert_tokenizer,
                 is_clip_long=self.is_clip_long
             )
@@ -1127,48 +1153,9 @@ class DaggerDiffusonPolicyTrainer:
             
             # IMU
             if self.config.MODEL.IMU_ENCODER.use:
-                delta_pos = batch["globalgps"][:, [0,2]] - start_positions
-                batch["imu"] = delta_pos
+                delta_pos = batch["globalgps"][:, [0,1]] - start_positions
+                batch["imu"] = delta_pos.float()
 
-            envs_to_pause = []
-            next_episodes = envs.current_episodes()
-
-            for i in range(envs.env_nums):
-                if next_episodes[i].episode_id in stats_episodes:
-                    envs_to_pause.append(i)
-
-            (
-                envs,
-                rnn_states,
-                not_done_masks,
-                prev_actions,
-                batch,
-                rgb_frames,
-                start_positions,
-                stack_rgb,
-                stack_depth,
-                prev_globalgps,
-                prev_globalyaw,
-                global_env_threads_paused,
-                steps
-            ) = self._pause_envs(
-                envs_to_pause,
-                envs,
-                rnn_states,
-                not_done_masks,
-                prev_actions,
-                batch,
-                rgb_frames,
-                start_positions,
-                stack_rgb,
-                stack_depth,
-                prev_globalgps,
-                prev_globalyaw,
-                global_env_threads_paused,
-                steps
-            )
-
-        envs.close()
         if config.use_pbar:
             pbar.close()
 

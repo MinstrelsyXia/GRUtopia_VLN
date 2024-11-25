@@ -6,6 +6,7 @@ import json
 import gzip
 import copy
 import glob
+import cv2
 
 import numpy as np
 import torch
@@ -224,7 +225,10 @@ def normalize_data(data, stats, device=None):
             stats['max'] = stats['max'].to(device)
     
     # nomalize to [0,1]
-    ndata = (data - stats['min']) / (stats['max'] - stats['min'])
+    try:
+        ndata = (data - stats['min']) / (stats['max'] - stats['min'])
+    except Exception as e:
+        ndata = (data - stats.min) / (stats.max - stats.min)
     # normalize to [-1, 1]
     ndata = ndata * 2 - 1
     # else:
@@ -241,7 +245,11 @@ def unnormalize_data(ndata, stats):
         ndata_part = (ndata + 1) / 2
     else:
         ndata_part = (ndata[:, :2] + 1) / 2
-    data = ndata_part * (stats['max'].to(device) - stats['min'].to(device)) + stats['min'].to(device)
+    
+    try:
+        data = ndata_part * (stats['max'].to(device) - stats['min'].to(device)) + stats['min'].to(device)
+    except Exception as e:
+        data = ndata_part * (stats.max.to(device) - stats.min.to(device)) + stats.min.to(device)
     
     # if len(ndata.shape) == 3:
     #     data = torch.cat([data, ndata[:, 2:]], dim=1)
@@ -255,14 +263,23 @@ def action_reduce(action_mask, unreduced_loss: torch.Tensor):
     assert unreduced_loss.shape == action_mask.shape, f"{unreduced_loss.shape} != {action_mask.shape}"
     return (unreduced_loss * action_mask).mean() / (action_mask.float().mean() + 1e-2)
 
-def yaw_rotmat(yaw: float) -> torch.Tensor:
-    return torch.tensor(
-        [
-            [torch.cos(yaw), -torch.sin(yaw), 0.0],
-            [torch.sin(yaw), torch.cos(yaw), 0.0],
-            [0.0, 0.0, 1.0],
-        ],
-    )
+def yaw_rotmat(yaw: float):
+    try:
+        R = torch.tensor(
+            [
+                [torch.cos(yaw), -torch.sin(yaw), 0.0],
+                [torch.sin(yaw), torch.cos(yaw), 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+        )
+    except Exception as e:
+        R = np.array([
+            [np.cos(yaw), -np.sin(yaw), 0.0],
+            [np.sin(yaw), np.cos(yaw), 0.0], 
+            [0.0, 0.0, 1.0]
+        ])
+
+    return R
     
 def to_local_coords(
     positions, curr_pos, curr_yaw: float
@@ -486,3 +503,17 @@ def batch_obs(
         batch_t[sensor] = torch.stack(batch[sensor], dim=0)
 
     return batch_t.map(lambda v: v.to(device))
+
+def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl):
+    # 保存视频
+    video_path = os.path.join(VIDEO_DIR, f"{split}_episode_{ep_id}_ckpt_{checkpoint_index}_spl_{spl}.mp4")
+    video_writer = cv2.VideoWriter(
+        video_path,
+        cv2.VideoWriter_fourcc(*'mp4v'),
+        10, # fps
+        (total_rgb_list[0].shape[1], total_rgb_list[0].shape[0])
+    )
+    for frame in total_rgb_list:
+        video_writer.write(frame)
+    video_writer.release()
+    print(f"Save video to {video_path}")

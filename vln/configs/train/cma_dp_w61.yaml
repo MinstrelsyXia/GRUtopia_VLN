@@ -15,7 +15,8 @@ EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
-VIDEO_OPTION: -1
+VIDEO_OPTION: true # -1 / true
+VIDEO_DIR: data/checkpoints/*name/videos
 
 SEED: 0
 DDP:
@@ -32,18 +33,20 @@ DDP:
 EVAL:
   USE_CKPT_CONFIG: False
   SAVE_RESULTS: True
-  SPLIT: [val_seen, val_unseen]
+  # SPLIT: [val_seen, val_unseen]
+  SPLIT: [train]
   EPISODE_COUNT: -1
   MAX_STEPS: 195
   train_eval_interval: 100
   ACTION: xyyaw # descrete or xyyaw
 
   # for xyyaw
-  stop_x_threshold: 1e-1
-  stop_y_threshold: 1e-1
-  stop_yaw_threshold: 1e-1
+  success_distance: 3.0
+  stop_x_threshold: 1e-2
+  stop_y_threshold: 1e-2
+  stop_yaw_threshold: 1e-2
 
-  rotation_threshold: 1e-1
+  rotation_threshold: 1e-2
 
   distance_threshold: 1.5
   num_sample: 1
