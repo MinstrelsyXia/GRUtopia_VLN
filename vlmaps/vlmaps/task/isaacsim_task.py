@@ -20,6 +20,9 @@ class IsaacSimSpatialGoalNavigationTask():
     def add_action(self,action):
         self.actions.append(action)
 
+    def get_past_path(self):
+        return self.pos_list
+    
     def add_pos(self,pos):
         self.pos_list.append(pos)
     

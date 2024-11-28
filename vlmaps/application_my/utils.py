@@ -21,21 +21,14 @@ import re
 
 def extract_parameters(input_string):
     """
-    提取字符串中括号内的参数
-    :param input_string: 输入字符串
-    :return: 参数列表
+    提取字符串中括号内的所有参数，并去除引号
+    :param input_string: 输入字符串，如 "self.move_to_object('open doors')" 或 "self.move_in_between('desk','chair')"
+    :return: 提取的参数列表，如 ["open doors"] 或 ["desk", "chair"]
     """
-    # 使用正则表达式匹配括号内的内容
-    match = re.search(r'\((.*?)\)', input_string)
+    # 使用正则表达式匹配所有引号内的内容
+    matches = re.findall(r'[\'"](.*?)[\'"]', input_string)
     
-    if match:
-        # 提取括号内的内容并分割成参数列表
-        parameters = match.group(1).split(',')
-        # 去除参数两端的空格
-        parameters = [param.strip() for param in parameters]
-        return parameters[0]
-    else:
-        return None
+    return matches if matches else None
 
 def extract_self_methods(input_string):
     """
@@ -104,6 +97,7 @@ else img.astype(np.uint8) for img in rgbs]
     # 调整布局并保存
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # 为总标题留出空间
     plt.savefig(save_path)
+    plt.savefig('/tmp/choice_of_frontier.png')
     plt.close()
 
 

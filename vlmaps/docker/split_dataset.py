@@ -15,24 +15,26 @@ def judge_stair_exists(path):
     path_z = [p[1] for p in path]
     return max(path_z) - min(path_z) > 1.5
 
-def load_and_split_data(data_dir, num_of_gpus, splits):
+def load_and_split_data(data_dir, num_of_gpus, splits, type = 'all'):
     dataset_root_dir = data_dir
     trajectory_id_list = []
     split_data = [[] for _ in range(num_of_gpus)]
-
-    for split in splits:
-        with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
-            data = json.load(f)
-            for item in data["episodes"]:
-                if item['trajectory_id'] not in trajectory_id_list:
-                    trajectory_id_list.append(item['trajectory_id'])
-            for item in data["episodes"]:
-                if judge_stair_exists(item['reference_path']):
-                    # print(item['episode_id'], item['trajectory_id'], item['instruction']['instruction_text'])
-                    continue
-                gpu_id = find_gpu_id(item['trajectory_id'], num_of_gpus, trajectory_id_list)
-                split_data[gpu_id].append((item['episode_id'], item['trajectory_id']))
-
+    if type == 'all':
+        for split in splits:
+            with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
+                data = json.load(f)
+                for item in data["episodes"]:
+                    if item['trajectory_id'] not in trajectory_id_list:
+                        trajectory_id_list.append(item['trajectory_id'])
+                for item in data["episodes"]:
+                    if judge_stair_exists(item['reference_path']):
+                        # print(item['episode_id'], item['trajectory_id'], item['instruction']['instruction_text'])
+                        continue
+                    gpu_id = find_gpu_id(item['trajectory_id'], num_of_gpus, trajectory_id_list)
+                    split_data[gpu_id].append((item['episode_id'], item['trajectory_id']))
+    else:
+        with open()
+        trajectory_id_list = 
     return split_data
 
 def save_split_data(split_data, output_dir):
