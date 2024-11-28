@@ -188,11 +188,11 @@ class VLNCE_DP_Dataset(IterableDataset):
 
                     key = self.lmdb_keys[self.load_ordering.pop()]
                     packed_data = txn.get(key.encode())
-                    try:
-                        data_to_load = zlib.decompress(packed_data)
-                        data_to_load = pickle.loads(data_to_load)                 
-                    except:
-                        data_to_load = msgpack_numpy.unpackb(packed_data, raw=False)
+                    # try:
+                    #     data_to_load = zlib.decompress(packed_data)
+                    #     data_to_load = pickle.loads(data_to_load)                 
+                    # except:
+                    data_to_load = msgpack_numpy.unpackb(packed_data, raw=False)
                     data = data_to_load['episode_data']
                     finish_status = data_to_load['finish_status']
                     fail_reason = data_to_load['fail_reason']
