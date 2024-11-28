@@ -53,6 +53,7 @@ class Navigator:
         # cv2.waitKey(1)
         
         cv2.imwrite(save_path, obs_map_vis)
+        cv2.imwrite('/ssd/xiaxinyuan/code/w61-grutopia/tmp/planned_path.jpg', obs_map_vis)
 
 
     def shift_path(self, paths: List[List[float]], row_shift: int, col_shift: int) -> List[List[float]]:

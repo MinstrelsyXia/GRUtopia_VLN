@@ -253,6 +253,7 @@ class ObstacleMap(BaseMap):
             # 保存最终结果
             save_path = os.path.join(self.save_dir, f'explored_with_frontiers_{step}.jpg')
             cv2.imwrite(save_path, navigable_map_visual)
+            cv2.imwrite('/ssd/xiaxinyuan/code/w61-grutopia/tmp/explored_with_frontiers.jpg', navigable_map_visual)
 
             # 另存 explored_area，仅为灰度图，探索区域为灰色，未探索区域为黑色
             # explored_area_gray = self.explored_area.astype(np.uint8) * 255  # 将 explored_area 转为黑白图像

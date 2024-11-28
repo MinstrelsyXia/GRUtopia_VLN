@@ -52,7 +52,7 @@ from vln.src.local_nav.BEVmap import BEVMap
 
 from vlmaps.vlmaps.map.map import Map
 
-from vlmaps.application_my.utils import NotFound, EarlyFound, extract_parameters, extract_self_methods
+from vlmaps.application_my.utils import NotFound, EarlyFound, extract_parameters, extract_self_methods, visualize_subgoal_images
 
 import logging
 import argparse
@@ -429,7 +429,7 @@ class IsaacSimLanguageRobot(LangRobot):
             step = self.step
             )
     
-    def get_frontier(self):
+    def get_frontier(self,action=None,verbose=True):
         '''
         return pos in obstacle map coord.
         '''
@@ -444,13 +444,13 @@ class IsaacSimLanguageRobot(LangRobot):
         else:
             # randomly pick a frontier:
             # frontier in world coord
-            # if self.frontier_type == "default":
-            #     num = frontiers.shape[0]
-            #     idx = np.random.randint(0,num)
-            #     pos = frontiers[idx]
+            if self.frontier_type == "default":
+                num = frontiers.shape[0]
+                idx = np.random.randint(0,num)
+                pos = frontiers[idx]
                 
-            #     # return self.ObstacleMap._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
-            #     return self.ObstacleMap._xy_to_px(np.array([pos]))[0]
+                # return self.ObstacleMap._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+                return self.ObstacleMap._xy_to_px(np.array([pos]))[0]
             if self.frontier_type == 'closest':
                 min_dist = 0
                 for index, frontier in enumerate(frontiers):
@@ -460,8 +460,41 @@ class IsaacSimLanguageRobot(LangRobot):
                         min_dist = dist
                         pos = frontier
                 return self.ObstacleMap._xy_to_px(np.array([pos]))[0]
+            if self.frontier_type == 'vlmap':
+                frontiers = self.ObstacleMap.frontiers.copy()
+                print(frontiers)
+                log.info(f"found {len(frontiers)} frontiers")
+                if len(frontiers) == 1:
+                    pos = self.ObstacleMap._xy_to_px(np.array([frontiers[0]]))[0]
+                    return pos
+                else:
+                    subgoal = extract_parameters(action)
+                    similarity_rate = []
+                    rgb_list = []
+                    for frontier in frontiers:
+                        rgb, similarity = self.get_frontier_viewpoint(frontier,subgoal)
+                        rgb_list.append(rgb)
+                        similarity_rate.append(similarity[0])
+                    idx = np.argmax(similarity_rate)
+                    pos = frontiers[idx]
+                    if verbose == True:
+                        # save rgbs in one image, with text f"subgoal is {subgoal}, chosen {idx} pos}", for all images, the caption is "image {idx}, with similarity {similarity[idx]}", for the chosen image, the caption should be in red
+                        path_save_path = self.nav_save_dir + f"/frontier_viewpoints_{self.step}.png"
+                        visualize_subgoal_images(rgb_list,similarity_rate,idx,subgoal,path_save_path)
+                    return self.ObstacleMap._xy_to_px(np.array([pos]))[0]
 
 
+    def get_frontier_viewpoint(self,pos,subgoal):
+        '''
+        pos: isaac coord
+        '''
+        turn_angle = self.get_angle(pos)
+        self.turn(turn_angle,threshold = 0.05)
+        obs = self.get_observations(["rgba","depth"])
+        rgb = obs[self.task_name][self.robot_name][self.camera_list[0]]["rgba"][...,:3]
+
+        similarity = self.map.get_score_mat_clip(rgb,subgoal)
+        return rgb, similarity
         
     def from_map_to_xyz(self, camera_pose, pcd_min):
         current_position, current_quaternion = camera_pose[0],camera_pose[1]
@@ -495,13 +528,14 @@ class IsaacSimLanguageRobot(LangRobot):
         Explore the environment by moving the robot around
         """
         # self.look_around()
+        log.info(f"enter explore with action {action_name}")
         try:
             eval(action_name)
             return True
         except NotFound as e:
             log.warning(f"{e}. Object not found after looking around, moving to a frontier.")
-            frontier_point = self.get_frontier()         
-            turn_angle = self.get_angle(frontier_point) # in obstacle map coord
+            frontier_point = self.get_frontier(action_name)         
+            turn_angle = self.get_angle(frontier_point,coord = 'uv') # in obstacle map coord
             turn_flag = self.turn(turn_angle,threshold = 0.05) # turn left turn_angle
             move_flag =  self.move_to(frontier_point,type = 'obs',threshold = 0.3)   
             if move_flag == False and turn_flag == False:
@@ -509,9 +543,10 @@ class IsaacSimLanguageRobot(LangRobot):
                 return False
             return False
 
-    def get_angle(self, frontier_point):
+    def get_angle(self, frontier_point, coord = 'xy'):
         """
-        Get the angle between the robot and the frontier point
+        Get the angle between the robot and the frontier point in degree
+        frontier_point: in Obs coord
         """
         # Get the robot's current position on vlmap
         # self._set_nav_curr_pose()
@@ -524,12 +559,17 @@ class IsaacSimLanguageRobot(LangRobot):
 
         orientation_yaw = self.quat_to_euler_angles(orientation)[2]
         xy = position[:2]
-        current_pos = self.ObstacleMap._xy_to_px(np.array([[xy[0],xy[1]]]))[0]
-        current_angle = self.ObstacleMap._get_current_angle_on_map(orientation_yaw + np.pi / 2) 
-        target_rotation = np.arctan2(frontier_point[1] - current_pos[1], frontier_point[0] - current_pos[0]) / np.pi * 180 # already in [-pi,pi]
+        if coord == 'uv':
+            current_pos = self.ObstacleMap._xy_to_px(np.array([[xy[0],xy[1]]]))[0]
+            current_angle = self.ObstacleMap._get_current_angle_on_map(orientation_yaw + np.pi / 2) 
+            target_rotation = np.arctan2(frontier_point[1] - current_pos[1], frontier_point[0] - current_pos[0]) / np.pi * 180 # already in [-pi,pi]
+            return ((current_angle -target_rotation+180) % 360-180)
+            # Calculate the angle between the robot and the frontier point
+        else:
+            current_angle = orientation_yaw/np.pi*180
+            target_rotation = np.arctan2(frontier_point[1] - xy[1], frontier_point[0] - xy[0]) / np.pi * 180 # already in [-pi,pi]
+            return ((-orientation_yaw +target_rotation+180) % 360-180)
 
-        return ((current_angle -target_rotation+180) % 360-180)
-        # Calculate the angle between the robot and the frontier point
         
 
     def test_movement(self, action_name: str):
@@ -541,6 +581,7 @@ class IsaacSimLanguageRobot(LangRobot):
         prev_pos = np.array([0,0])
         # prev_ang = self.curr_ang_deg_on_map
         prev_ang = 0
+        log.info(f"enter test_movement with action {action_name}")
         while True:
             try:
                 self.map.load_3d_map()
@@ -560,7 +601,7 @@ class IsaacSimLanguageRobot(LangRobot):
 
             except NotFound as e:
                 # 捕获 NotFound 异常，记录日志并进行探索
-                log.warning(f"{e}. Object not found, starting exploration.")
+                log.warning(f"{e}. Object not found , starting exploration.")
                 found = self.explore(action_name) # update occupancy map, semantic map
                 if found == True:
                     break
@@ -577,6 +618,9 @@ class IsaacSimLanguageRobot(LangRobot):
             prev_pos = self.curr_pos_on_map
             prev_ang = self.curr_ang_deg_on_map
 
+    def get_robot_bottom_z(self):
+        '''get robot bottom z'''
+        return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
     def move_to_object(self, name: str):
         self._set_nav_curr_pose()
         pos = self.map.get_nearest_pos(self.curr_pos_on_map, name)
@@ -648,7 +692,7 @@ class IsaacSimLanguageRobot(LangRobot):
             self.turn(60)
             
 
-    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 1.0) -> List[str]:
+    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 1.0,subgoal = None) -> List[str]:
         """Move the robot to the position on the obstacle map
             based on accurate localization in the environment
             with falls and movements
@@ -672,11 +716,15 @@ class IsaacSimLanguageRobot(LangRobot):
             print('calls from object indexed from semantic map')
             print("transfering to obstacle map coord")
             goal = self.from_vlmap_to_obsmap(pos)
-            start = self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2])
+            # start = self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2])
+            position = self.agents.get_world_pose()[0][:2]
+            start = self.ObstacleMap._xy_to_px(np.array([[position[0],position[1]]]))[0]
         else:
             print("calls from Frontier, pos already in Obs coord")
             goal = pos
-            start = self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2])
+            # start = self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2])
+            position = self.agents.get_world_pose()[0][:2]
+            start = self.ObstacleMap._xy_to_px(np.array([[position[0],position[1]]]))[0]
         
         # nav should be built on obstacle map; 
         # !
@@ -692,6 +740,13 @@ class IsaacSimLanguageRobot(LangRobot):
         if (np.linalg.norm(goal_xy - self.agents.get_world_pose()[0][:2]) <= threshold):
             log.warning("no need to move, already very close")
             return False
+        # if goal is near past path, see as seen, neglect moving
+        # only impliment when type is sem
+        if (type == 'sem'):
+            past_path = self.eval_helper.get_past_path()
+            if (np.linalg.norm(goal_xy - np.array(past_path[-1][:2])) <= threshold):
+                log.warning("goal is near past path, see as seen, neglect moving")
+                return False
 
         paths, paths_3d = self.planning_path(start_modified,goal_modified)
         init_step = self.step
@@ -772,8 +827,16 @@ class IsaacSimLanguageRobot(LangRobot):
                     continue
             if ((self.step-init_step) % 1000 == 0):
                 # end this loop
+                if subgoal is not None:
+                    if self.map.check_object(subgoal):
+                        log.info(f"Subgoal {subgoal} is reached at step {self.step}")
+                        return True
+
+            if ((self.step-init_step) % 3000 == 0):
+                log.warning("Failed to reach the subgoal after 1000 steps")
                 goal = self.ultimate_goal
                 if(self.map.check_object(goal)):
+                    eval()
                     raise EarlyFound(f"Goal {goal} is reached early")
             if ((self.step-init_step) % 10000 == 0):
                 log.warning("Failed to reach the subgoal after 1000 steps")
@@ -807,7 +870,7 @@ class IsaacSimLanguageRobot(LangRobot):
         goal_modified[:] = paths[-1]
         return paths, paths_3d
 
-    def turn(self, angle_deg: float,threshold = 0.1):
+    def turn(self, angle_deg: float,threshold = 0.1,vis = True):
         """
         Turn right a relative angle in degrees
         """
@@ -817,14 +880,14 @@ class IsaacSimLanguageRobot(LangRobot):
             return False
         current_orientation = self.agents.get_world_pose()[1]
         current_orientation_in_degree = self.quat_to_euler_angles(current_orientation)
-        current_yaw = current_orientation_in_degree[2] # indeed in rot
+        current_yaw = current_orientation_in_degree[2] # ！ indeed in rot
         base_yaw = current_yaw 
 
         rotation_goals = [(current_yaw + degree)%(2*np.pi) - (2*np.pi) if (current_yaw + degree)%(2*np.pi) > np.pi else (self.quat_to_euler_angles(current_orientation)[2] + degree)%(2*np.pi) for degree in np.linspace( angle_deg / 180.0 * np.pi, 0, 10, endpoint=False)]
         # rotation_goals = [(current_yaw + degree) % 360 - 360 if (current_yaw + degree) % 360 > 180 else (current_yaw + degree) % 360 for degree in np.linspace(2 * angle_deg, 0, 360, endpoint=False)]
         # rotation_goals = [(current_yaw + degree) % 360 - 360 if (current_yaw + degree) % 360 > 180 else (current_yaw + degree) % 360 for degree in np.arange( angle_deg, 0, -5)] # [-180,180]
 
-        log.info(f"turning from {current_yaw} to {base_yaw+angle_deg}")
+        log.info(f"turning from {current_yaw} to {base_yaw+angle_deg / 180.0 * np.pi}")
         while len(rotation_goals)>0:
 
             env_actions = []
@@ -850,7 +913,8 @@ class IsaacSimLanguageRobot(LangRobot):
 
 
                 if (self.step % 200 == 0): # change from 50 to 200
-                    self.update_all_maps()
+                    if vis: 
+                        self.update_all_maps()
                     log.info(f"Step {self.step}: Present at {self.quat_to_euler_angles(current_orientation)[2]}, need to navigate to {rotation_goal}")
                     #! fall down check
                     if (self.step % 1000 == 0):
@@ -1189,8 +1253,8 @@ def build_dataset(cfg):
     return vln_datasets, vln_config, sim_config, data_camera_list
 
 
-
-
+from vlmaps.vlmaps.utils.llm_utils import parse_object_goal_instruction, parse_spatial_instruction
+import pickle
 
 
 @hydra.main(
@@ -1273,23 +1337,23 @@ def main(config: DictConfig) -> None:
             print('not moving for debug')
             # ! remember to align with isaac_robot.py
             # else: only set the task and robot position
-            robot.map.init_categories(mp3dcat.copy())
-            gpt_ans = parse_spatial_instruction(robot.instruction)
-            parsed_instructions = extract_self_methods(gpt_ans)
-            log.info(f"instruction: {robot.instruction}")
-            log.info(f"parsed instructions: {parsed_instructions}")
+            # robot.map.init_categories(mp3dcat.copy())
+            # gpt_ans = parse_spatial_instruction(robot.instruction)
+            # parsed_instructions = extract_self_methods(gpt_ans)
+            # log.info(f"instruction: {robot.instruction}")
+            # log.info(f"parsed instructions: {parsed_instructions}")
 
-            for idx in range(len(parsed_instructions) - 1, -1, -1):
-                subgoal = parsed_instructions[idx]
-                if not (('move_forward' in subgoal) or ('turn' in subgoal)):
-                    fin_obj = extract_parameters(subgoal)
-                    robot.set_ultimate_goal(fin_obj)
-                    skipped_i = idx
-                    break
-            skip_flag = 0
+            # for idx in range(len(parsed_instructions) - 1, -1, -1):
+            #     subgoal = parsed_instructions[idx]
+            #     if not (('move_forward' in subgoal) or ('turn' in subgoal)):
+            #         fin_obj = extract_parameters(subgoal)
+            #         robot.set_ultimate_goal(fin_obj)
+            #         skipped_i = idx
+            #         break
+            # skip_flag = 0
             while robot.env.simulation_app.is_running():
                 robot.warm_up(200)
-
+                break
                 for cat_i, subgoal in enumerate(parsed_instructions):
                     if cat_i >= skip_flag:
                         log.info(f"Executing {subgoal}")
@@ -1302,12 +1366,11 @@ def main(config: DictConfig) -> None:
 
                 break
             ''' execute the last spatial instruction'''
-            for subgoal in parsed_instructions[skip_flag:]:
-                log.info(f"Executing {subgoal}")
-                robot.test_movement(subgoal)
+            # for subgoal in parsed_instructions[skip_flag:]:
+            #     log.info(f"Executing {subgoal}")
+            #     robot.test_movement(subgoal)
             robot.save_metric()
             # robot.env.simulation_app.close()
-            robot.warm_up(100)
             last_trajectory_id = trajectory_id
             robot.clear_maps()
             # if (episode_id > 100):

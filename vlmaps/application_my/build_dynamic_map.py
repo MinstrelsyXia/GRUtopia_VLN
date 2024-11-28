@@ -698,7 +698,7 @@ class TMP(VLMap):
     def get_score_mat_clip(self, bgr,categories):
         # load image
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-        img_feats = get_img_feats(rgb, self.preprocess, self.clip_model)
+        img_feats = get_img_feats(rgb, self.preprocess, self.clip_model) # [1,512]
         text_feats = get_text_feats_multiple_templates(categories, self.clip_model, self.clip_feat_dim)
 
         img_feats = img_feats / np.linalg.norm(img_feats, axis=-1, keepdims=True)
@@ -765,7 +765,7 @@ class TMP(VLMap):
             print("score_mat", self.scores_mat.shape)
             return self.scores_mat
 
-    def index_map(self, language_desc: str, with_init_cat: bool = True) -> np.ndarray:
+    def index_map(self, language_desc: str, with_init_cat: bool = True, verbose: bool = True) -> np.ndarray:
         # init map
         # if with_init_cat and self.scores_mat is not None and self.categories is not None:
         #     if language_desc in self.known_dict.keys():
@@ -797,12 +797,12 @@ class TMP(VLMap):
                 use_multiple_templates=True,
                 add_other=True,
             )  # score for name and other
-        if language_desc in self.known_dict.keys():
-            cat_id = self.known_dict[language_desc]
-        else:
-            cat_id = find_similar_category_id(language_desc, self.categories)
-            self.known_dict[language_desc] = cat_id
-        # score_mat: [h*w,c]
+        # if language_desc in self.known_dict.keys():
+        #     cat_id = self.known_dict[language_desc]
+        # else:
+        #     cat_id = find_similar_category_id(language_desc, self.categories)
+        #     self.known_dict[language_desc] = cat_id
+        # # score_mat: [h*w,c]
         max_ids = np.argmax(scores_mat, axis=1)
         
         # mask = max_ids == cat_id
@@ -811,7 +811,11 @@ class TMP(VLMap):
         for i in range(len(max_ids)):
             if scores_mat[i, max_ids[i]] <= self.threshold:
                 mask[i]  = 0  # 将不符合条件的值设为 -1
-
+        if np.sum(mask)>50 and verbose:
+            mask_2d = pool_3d_label_to_2d(mask, self.grid_pos, self.gs)
+            rgb_2d = pool_3d_rgb_to_2d(self.grid_rgb, self.grid_pos, self.gs)
+            save_path = Path(self.map_save_path) / f"{language_desc}_masked_2d.jpg"
+            visualize_masked_map_2d(rgb_2d, mask_2d,save_path=save_path)
         return mask
     
 

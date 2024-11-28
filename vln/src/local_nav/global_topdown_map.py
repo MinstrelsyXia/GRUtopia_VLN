@@ -72,7 +72,7 @@ class GlobalTopdownMap:
             img_save_path = os.path.join(self.args.log_image_dir, f"global_topdown_map_{self.scan_name}_{height}.jpg")
         plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
 
-        log.info(f"Saved global topdown map at height {height} to {img_save_path}")
+        # log.info(f"Saved global topdown map at height {height} to {img_save_path}")
         plt.close()
     
     def get_height(self, pos, is_camera_base=False):
@@ -93,7 +93,7 @@ class GlobalTopdownMap:
                 'occupancy_map': self.freemap_to_accupancy_map(freemap, add_dilation=self.args.maps.add_dilation)
             }
             if verbose: 
-                log.info("update global topdown map at height: {}".format(height))
+                # log.info("update global topdown map at height: {}".format(height))
                 self.save_map(robot_pos=camera_pose, is_camera_base=True, env_idx=env_idx)
         else:
             if update_map:

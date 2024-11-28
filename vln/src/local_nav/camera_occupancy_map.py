@@ -411,6 +411,6 @@ class CamOccupancyMap:
             connected_free_area_image = Image.fromarray(connected_free_area)
             connected_free_area_path = os.path.join(self.args.log_image_dir, "cam_free", "connected_free_area.png")
             connected_free_area_image.save(connected_free_area_path)
-            print("Connected free area saved at", connected_free_area_path)
+            # print("Connected free area saved at", connected_free_area_path)
 
         return connected_free_area
