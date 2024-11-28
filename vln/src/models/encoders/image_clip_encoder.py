@@ -147,9 +147,9 @@ class ImageEncoder(torch.nn.Module):
             if len(image_inputs.shape)==3 and image_inputs.shape[-1] == 3:
                 # convert H,W,C to C,H,W
                 image_inputs = image_inputs.permute(2,0,1)
-                image_inputs = self.to_pil(image_inputs)
-                image_feat = np.array(self.image_processor(image_inputs))
-                image_inputs = torch.from_numpy(np.array(image_inputs))
+                image_Image = self.to_pil(image_inputs)
+                image_feat = np.array(self.image_processor(image_Image))
+                image_feat = torch.from_numpy(np.array(image_feat)).to(image_inputs.device)
             
             elif len(image_inputs.shape) == 4 and image_inputs.shape[-1] == 3:
                 # convert B,H,W,C to B,C,H,W
@@ -216,6 +216,9 @@ class ImageEncoder(torch.nn.Module):
         
     def embed_image(self, image_batch, fc=False, max_batch_size=400, img_mod='cls', proj=True):
         """Embed a batch of image."""
+        if len(image_batch.shape) == 3:
+            image_batch = image_batch.unsqueeze(0)
+        
         BS = image_batch.shape[0]
         if len(image_batch.shape) == 5:
             image_batch = image_batch.reshape(-1, 3, image_batch.shape[3], image_batch.shape[4])

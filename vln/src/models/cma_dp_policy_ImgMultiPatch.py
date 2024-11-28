@@ -643,15 +643,15 @@ class CMA_DP_Net(nn.Module):
 
         if self.config.EVAL.ACTION == 'xyyaw':
             actions = []
-            un_actions = un_actions_nocumsum.detach().cpu().numpy()
-            for idx in range(un_actions.shape[0]):
+            # un_actions = un_actions_nocumsum.detach().cpu().numpy()
+            for idx in range(un_actions_nocumsum.shape[0]):
                 if stop_mode == 'progress':
                     stop_flag = False
                     # Check if 4 consecutive steps are stop actions
-                    if idx + 3 < len(un_actions):  # Make sure we have enough steps ahead
+                    if idx + 3 < len(un_actions_nocumsum):  # Make sure we have enough steps ahead
                         consecutive_stops = True
                         for i in range(4):  # Check current and next 3 steps
-                            curr_action = un_actions[idx+i][0]
+                            curr_action = un_actions_nocumsum[idx+i][0]
                             if not (abs(curr_action[0]) < self.config.EVAL.stop_x_threshold and \
                                   abs(curr_action[1]) < self.config.EVAL.stop_y_threshold and \
                                   abs(curr_action[2]) < self.config.EVAL.stop_yaw_threshold):
@@ -735,6 +735,66 @@ class CMA_DP_Net(nn.Module):
                             actions[bs_idx].append(action_spaces['turn_left'])
                 
         return actions, actions_cumsum, un_actions_nocumsum
+    
+    def save_predicted_actions(self, un_actions, gt_actions=None, N=1):
+        for item_idx in range(N):
+            plt.clf()
+            plt.figure(figsize=(5, 5))
+            
+            # Plot predicted actions with arrows
+            plt.scatter(un_actions[item_idx][:, 0], un_actions[item_idx][:, 1], label='un_actions', color='blue', alpha=0.5)
+            for i in range(un_actions[item_idx].shape[0]):
+                # Calculate arrow direction components using yaw angle
+                arrow_length = 0.2  # Adjust this value to change arrow length
+                dx = arrow_length * np.cos(un_actions[item_idx][i, 2])
+                dy = arrow_length * np.sin(un_actions[item_idx][i, 2])
+                
+                # Draw arrow
+                plt.arrow(un_actions[item_idx][i, 0], 
+                        un_actions[item_idx][i, 1], 
+                        dx, dy, 
+                        head_width=0.05, 
+                        head_length=0.1, 
+                        fc='blue', 
+                        ec='blue',
+                        alpha=0.5)
+                
+                # Add point index
+                plt.text(un_actions[item_idx][i, 0], un_actions[item_idx][i, 1], 
+                        str(i), fontsize=9, color='blue', ha='left')
+
+            # Plot ground truth actions with arrows
+            if gt_actions is not None:
+                plt.scatter(gt_actions[item_idx][:, 0], gt_actions[item_idx][:, 1], label='gt_actions', color='red', alpha=0.5)
+                for i in range(gt_actions[item_idx].shape[0]):
+                    # Calculate arrow direction components using yaw angle
+                    arrow_length = 0.2  # Adjust this value to change arrow length
+                    dx = arrow_length * np.cos(gt_actions[item_idx][i, 2])
+                    dy = arrow_length * np.sin(gt_actions[item_idx][i, 2])
+                    
+                    # Draw arrow
+                    plt.arrow(gt_actions[item_idx][i, 0], 
+                            gt_actions[item_idx][i, 1], 
+                            dx, dy, 
+                            head_width=0.05, 
+                            head_length=0.1, 
+                            fc='red', 
+                            ec='red',
+                            alpha=0.5)
+                    
+                    # Add point index
+                    plt.text(gt_actions[item_idx][i, 0], gt_actions[item_idx][i, 1], 
+                            str(i), fontsize=9, color='red', ha='right')
+
+            plt.legend()
+            plt.grid(True)
+            plt.axis('equal')  # Make sure the aspect ratio is equal
+            
+            save_path = f'data/images/act_debug_{item_idx}.jpg'
+            plt.savefig(save_path)
+            print(f"save fig to {save_path}")
+
+            plt.close()
 
     def act(self, batch):
         observations = batch['observations']
@@ -751,6 +811,10 @@ class CMA_DP_Net(nn.Module):
         episode_ids = batch['episode_ids']
 
         noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'])
+        
+        if vis:
+            un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
+            self.save_predicted_actions(un_actions, gt_actions=None, N=1)
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         

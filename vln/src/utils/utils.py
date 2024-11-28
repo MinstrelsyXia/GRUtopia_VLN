@@ -307,6 +307,48 @@ def to_local_coords(
     else:
         return (positions - curr_pos).dot(rotmat)
 
+def to_global_coords(
+    local_coords, curr_pos, curr_yaw: float
+):
+    """
+    Convert local coordinates to global coordinates
+
+    Args:
+        local_coords (np.ndarray): coordinates in local frame (dx, dy, dyaw) or (dx, dy)
+        curr_pos (np.ndarray): current position in global frame
+        curr_yaw (float): current yaw in global frame
+    Returns:
+        np.ndarray: positions in global coordinates
+        float: global yaw (only if input includes dyaw)
+    """
+    rotmat = yaw_rotmat(-curr_yaw)  # Inverse rotation matrix (negative yaw)
+    if local_coords.shape[-1] == 2:
+        rotmat = rotmat[:2, :2]
+        if isinstance(local_coords, torch.Tensor):
+            global_pos = local_coords.matmul(rotmat) + curr_pos
+            return global_pos, None
+        else:
+            global_pos = local_coords.dot(rotmat) + curr_pos
+            return global_pos, None
+    elif local_coords.shape[-1] == 3:
+        rotmat = rotmat[:2, :2]  # Only rotate x,y coordinates
+        local_xy = local_coords[..., :2]
+        local_yaw = local_coords[..., 2]
+        
+        if isinstance(local_coords, torch.Tensor):
+            global_pos_xy = local_xy.matmul(rotmat) + curr_pos[:2].unsqueeze(0)  # [N,2]
+            # Add z-dimension back, broadcasting to match batch size
+            global_pos = torch.cat([global_pos_xy, curr_pos[2].expand(len(local_coords), 1)], dim=-1)  # [N,3]
+            global_yaw = curr_yaw + local_yaw
+        else:
+            global_pos_xy = local_xy.dot(rotmat) + curr_pos[:2]  # [N,2]
+            # Add z-dimension back, broadcasting to match batch size
+            global_pos = np.concatenate([global_pos_xy, np.full((len(local_coords), 1), curr_pos[2])], axis=-1)  # [N,3]
+            global_yaw = curr_yaw + local_yaw
+        return global_pos, global_yaw
+    else:
+        raise ValueError("Input coordinates must have shape [..., 2] or [..., 3]")
+
 
 def _compute_actions(globalgps, yaws, curr_time, fill_mode, len_traj_pred, waypoint_spacing, learn_angle, metric_waypoint_spacing, num_action_params,normalize=False):
     start_index = curr_time

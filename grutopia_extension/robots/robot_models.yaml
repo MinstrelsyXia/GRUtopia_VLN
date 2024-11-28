@@ -142,12 +142,9 @@ robots:
     prim_path: "torso_link/h1_pano_camera_315"
 
 
-
-# Developer only. User read-only.
-robots:
 - type: "HumanoidRobotVLNEval"
-  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
   gains: [0.0, 0.0]
   controllers:
@@ -199,7 +196,7 @@ robots:
   - name: "move_to_point"
     type: "MoveToPointBySpeedController"
     forward_speed: 1.5
-    rotation_speed: 2.0
+    rotation_speed: 1.0
     threshold: 0.02
     sub_controllers:
     - name: move_by_speed

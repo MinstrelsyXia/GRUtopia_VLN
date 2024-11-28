@@ -6,8 +6,12 @@ import os,sys
 import yaml
 import time
 import numpy as np
+import copy
+import torch
+import matplotlib.pyplot as plt
 
 from vln.src.dataset.data_utils_multi_env import VLNDataLoader, load_scene_usd
+from vln.src.utils.utils import to_global_coords
 
 class TaskEnv(VLNDataLoader):
     def __init__(self, config, splits, eval_logger, filter_same_trajectory=False, policy_eval=True,):
@@ -26,7 +30,7 @@ class TaskEnv(VLNDataLoader):
         self.finish_splits = []
         
         # warm up
-        self.warm_up_steps = 240 if self.args.headless else 2000
+        self.warm_up_steps = 240 if self.args.headless else 2500
         self.max_step = self.args.settings.max_step
         self.per_action_max_step = self.args.settings.per_action_max_step
 
@@ -236,7 +240,7 @@ class TaskEnv(VLNDataLoader):
     
         return [obs_data] # 批量大小为1
     
-    def step(self, actions, verbose=False, check_fall_and_stuck=True):
+    def step(self, actions, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose=False, check_fall_and_stuck=True):
         '''step in isaac-sim until the action has finished'''
         # TODO: This actually depends on the eval strategy:
         # 1. predict the next action until the action has finished. (now)
@@ -247,6 +251,9 @@ class TaskEnv(VLNDataLoader):
         infos = [] # TODO: compute the metrics!
         action_name = list(actions[0]['h1'].keys())[0]
         reason = ''
+        
+        current_position = self.get_robot_poses()[self.env_idx][0]
+        self.eval_logger.info(f"========== Current position: {current_position}")
 
         if action_name == 'stop':
             dones = [True]
@@ -278,8 +285,21 @@ class TaskEnv(VLNDataLoader):
                     reason = 'single_action_exceed_max_step'
                     break
 
-                if start_step % 50 == 0:
-                    self.eval_logger.info(f"Step {start_step} for the action {actions}.")
+                if start_step % self.config.EVAL.step_interval == 0:
+                    # self.eval_logger.info(f"Step {start_step} for the action {actions}.")
+                    self.eval_logger.info(f"Current position: {current_position}")
+                    
+                    # Update the states
+                    outputs_dict = self.get_obs()
+                    for idx in range(len(outputs_dict)):
+                        stack_rgb[idx].push(outputs_dict[idx]["rgb"])
+                        stack_depth[idx].push(outputs_dict[idx]["depth"])
+                        
+                        prev_globalgps[idx].push(outputs_dict[idx]["globalgps"])
+                        prev_globalyaw[idx].push(outputs_dict[idx]["global_rotation"][-1])
+
+                        if self.config.VIDEO_OPTION != -1:
+                            total_rgb_list.append(outputs_dict[idx]["rgb"])
                 
                 if check_fall_and_stuck and start_step % 20 == 0:
                     status_abnormal_list, fall_list, stuck_list = self.check_and_reset_robot(cur_iter=self.current_step_list[self.env_idx], update_freemap=False, verbose=verbose)
@@ -299,14 +319,15 @@ class TaskEnv(VLNDataLoader):
             self.pred_traj_list[self.env_idx].extend(actions[0]['h1'][action_name])
         infos = self.compute_metrics(fail_reason=reason)
         
-        return outputs_dict, dones, infos, self.current_step_list
+        return outputs_dict, dones, infos, self.current_step_list, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list
     
-    def predicted_action_to_global(self, predicted_action, verbose=False):
+    def predicted_action_to_global(self, predicted_action, step_i,verbose=False):
         """
         将预测的单个动作转换为全局坐标系下的位置
         
         Args:
             predicted_action (torch.Tensor): 预测的动作 shape: [3] (dx, dy, dyaw)
+            step_i (int): if step_i == -1, 则返回所有预测动作对应的全局位置和朝向
         
         Returns:
             global_position (np.ndarray): 全局坐标系下的位置 [x, y]
@@ -317,37 +338,56 @@ class TaskEnv(VLNDataLoader):
         _, _, current_yaw = self.quat_to_euler_angles(current_rot)
 
         # 先将current_yaw归一化到[-π, π]区间
+        original_yaw = copy.copy(current_yaw)
         current_yaw = np.arctan2(np.sin(current_yaw), np.cos(current_yaw))
         
-        # 计算当前朝向的旋转矩阵
-        cos_theta = np.cos(current_yaw)
-        sin_theta = np.sin(current_yaw)
-        R = np.array([[cos_theta, -sin_theta],
-                    [sin_theta, cos_theta]])
+        global_positions, global_yaws = to_global_coords(predicted_action, current_position, current_yaw)
+        N = len(global_yaws)
+        euler_angles = np.zeros((N, 3))  # [N, 3] array of [roll, pitch, yaw]
+        euler_angles[:, 2] = global_yaws  # Set yaw values, keeping roll and pitch as 0
         
-        # 将局部坐标变化转换到全局坐标系
-        local_dxy = predicted_action[:2] # [dx, dy]
-        global_dxy = np.dot(R, local_dxy)
-        
-        # 计算全局位置
-        global_position = np.array([
-            current_position[0] + global_dxy[0],
-            current_position[1] + global_dxy[1],
-            current_position[2]  # 保持原始z坐标
-        ])
-        
-        # 计算全局朝向的欧拉角（roll=0, pitch=0）
-        global_yaw = current_yaw + predicted_action[2]
-        global_euler = np.array([0.0, 0.0, global_yaw])
-        
-        # 将欧拉角转换为四元数
-        global_quat = self.euler_angles_to_quat(global_euler)
+        global_quats = []
+        for i in range(N):
+            global_quats.append(self.euler_angles_to_quat(euler_angles[i]))  # Now expects [N, 3] input
 
         if verbose:
-            self.topdown_map.draw_point(predicted_world_pose=global_position, color=[1,0,0], current_world_pose=current_position, target_world_pose=self.data_item['reference_path'][-1], img_save_path=self.config.GT_PATH_DIR, step=self.current_step_list[self.env_idx], logger=self.eval_logger)
-        
-        return global_position, global_quat
+            self.topdown_map.draw_point(predicted_world_poses=global_positions, color=[1,0,0], current_world_pose=current_position, target_world_pose=self.data_item['reference_path'][-1], img_save_path=self.config.GT_PATH_DIR, step=self.current_step_list[self.env_idx], logger=self.eval_logger)
+            
+            self.draw_prediction(predicted_action, step_i)
     
+        return global_positions, global_quats
+    
+    def draw_prediction(self, un_actions, step_i):
+        cussum_actions = np.cumsum(un_actions, axis=1)
+        plt.clf()
+        plt.figure(figsize=(10, 5))
+        plt.subplot(1, 2, 1)
+        
+        # Plot predicted actions with arrows
+        plt.scatter(cussum_actions[:, 0], cussum_actions[:, 1], label='pred_actions', color='blue', alpha=0.5)
+        for i in range(cussum_actions.shape[0]):
+            # Calculate arrow direction components using yaw angle
+            arrow_length = 0.2  # Adjust this value to change arrow length
+            dx = arrow_length * np.cos(cussum_actions[i, 2])
+            dy = arrow_length * np.sin(cussum_actions[i, 2])
+            
+            # Draw arrow
+            plt.arrow(cussum_actions[i, 0], 
+                    cussum_actions[i, 1], 
+                    dx, dy, 
+                    head_width=0.05, 
+                    head_length=0.1, 
+                    fc='blue', 
+                    ec='blue',
+                    alpha=0.5)
+            
+            # Add point index
+            plt.text(cussum_actions[i, 0], cussum_actions[i, 1], 
+                    i, fontsize=9, color='blue', ha='left')
+        
+        plt.savefig(os.path.join(self.config.GT_PATH_DIR, f'predicted_actions_{self.current_step_list[self.env_idx]}_step{step_i}.png'))
+        self.eval_logger.info(f"Saved predicted actions to {os.path.join(self.config.GT_PATH_DIR, f'predicted_actions_{self.current_step_list[self.env_idx]}_step{step_i}.png')}")
+        
     def compute_metrics(self, fail_reason=''):
         """计算VLN任务的评估指标
         
