@@ -59,7 +59,7 @@ class TaskEnv(VLNDataLoader):
             self.eval_logger.info(f"Start to evaluate on {self.current_split} split")
             
             self.finish_scans = []
-            self.current_episode_idx = -1 # this is not episode_id in data. but the location in data.
+            self.current_episode_idx = 2 # this is not episode_id in data. but the location in data. # !!! DEBUG. should be -1
             self.current_scan_data = self.data[self.current_split]
             self.number_of_episodes = [len(self.current_scan_data[scan]) for scan in self.current_scan_data.keys()]
             self.current_scan_list = list(self.current_scan_data.keys())
@@ -306,7 +306,8 @@ class TaskEnv(VLNDataLoader):
         # 获取俯视相机的观察结果
         obs = self.get_obs()
         topdown_rgb = obs[0]['topdown_rgb']
-        save_path = os.path.join(self.config.GT_PATH_DIR, f'topdown_{self.current_step_list[self.env_idx]}.png')
+        # save_path = os.path.join(self.config.GT_PATH_DIR, f'topdown_{self.current_step_list[self.env_idx]}.png')
+        save_path = os.path.join(self.config.GT_PATH_DIR, f'topdown_view.png')
         plt.imsave(save_path, topdown_rgb)
         self.eval_logger.info(f"Saved topdown view to {save_path}")
     
