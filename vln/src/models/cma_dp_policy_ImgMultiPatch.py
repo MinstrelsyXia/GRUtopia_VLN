@@ -1,3 +1,4 @@
+import os, sys
 from typing import Dict, Optional, Tuple
 
 import numpy as np
@@ -736,7 +737,7 @@ class CMA_DP_Net(nn.Module):
                 
         return actions, actions_cumsum, un_actions_nocumsum
     
-    def save_predicted_actions(self, un_actions, gt_actions=None, N=1):
+    def save_predicted_actions(self, un_actions, gt_actions=None, N=1, save_dir=None, step=None):
         for item_idx in range(N):
             plt.clf()
             plt.figure(figsize=(5, 5))
@@ -790,7 +791,10 @@ class CMA_DP_Net(nn.Module):
             plt.grid(True)
             plt.axis('equal')  # Make sure the aspect ratio is equal
             
-            save_path = f'data/images/act_debug_{item_idx}.jpg'
+            if save_dir is not None:
+                save_path = os.path.join(save_dir, f'model_output_{item_idx}_step_{step}.jpg')
+            else:
+                save_path = f'data/images/model_output_{item_idx}_step_{step}.jpg'
             plt.savefig(save_path)
             print(f"save fig to {save_path}")
 
@@ -803,6 +807,7 @@ class CMA_DP_Net(nn.Module):
         masks = batch['masks']
         add_noise_to_action = batch['add_noise_to_action']
         denoise_action = batch['denoise_action']
+        predicted_actions_save_dir = batch['predicted_actions_save_dir'] if 'predicted_actions_save_dir' in batch else None
         # batch['mode'] = 'pred_actions'
         
         batch_size = rnn_states.shape[0]
@@ -814,7 +819,7 @@ class CMA_DP_Net(nn.Module):
         
         if vis:
             un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
-            self.save_predicted_actions(un_actions, gt_actions=None, N=1)
+            self.save_predicted_actions(un_actions, gt_actions=None, N=1, save_dir=predicted_actions_save_dir, step=step)
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         

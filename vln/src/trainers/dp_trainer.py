@@ -797,6 +797,7 @@ class DaggerDiffusonPolicyTrainer:
         start_time = time.time()
 
         steps = [0] * batch_size
+        sim_steps = [0] * batch_size
         steps_batch = torch.from_numpy(np.array(steps)).to(self.device)
         batch["steps"] = steps_batch
         
@@ -841,10 +842,11 @@ class DaggerDiffusonPolicyTrainer:
                     'denoise_action': True,
                     'num_sample': self.config.EVAL.num_sample,
                     'vis': True,
-                    'step': steps[0],
+                    'step': sim_steps[0],
                     'episode_ids': current_episodes['episode_id'],
                     'stop_mode': self.config.EVAL.stop_mode,
-                    'steps': steps
+                    'steps': steps,
+                    'predicted_actions_save_dir': config.GT_PATH_DIR,
                 }
                 
                 if batch_settings['denoise_action'] and batch_settings['num_sample'] > 1:
@@ -863,7 +865,8 @@ class DaggerDiffusonPolicyTrainer:
             
             prev_actions = [[] for _ in range(self.eval_env.env_nums)]
             
-            len_traj_act = self.config.MODEL.len_traj_act
+            # len_traj_act = self.config.MODEL.len_traj_act
+            len_traj_act = self.config.EVAL.len_traj_act
             # len_traj_act = 1 # !!!
             stop_envs = [False] * len(actions)
             first_stop_envs = [False] * len(actions)
@@ -907,27 +910,17 @@ class DaggerDiffusonPolicyTrainer:
                             {'h1': {'stop': ['stop']}}
                         ]
                     else:
-                        # target_pos, target_quat = self.eval_env.predicted_action_to_global(a[step_i], verbose=self.config.test_verbose)
-                        # target_pos, target_quat = self.eval_env.predicted_action_to_global(a, step_i,verbose=self.config.test_verbose)
-                        # if abs(a[step_i][0]) < self.rotation_threshold and abs(a[step_i][1]) < self.rotation_threshold:
-                        #     # rotation
-                        #     action = [
-                        #         {'h1': {'rotate': [target_quat]}} 
-                        #     ]
-                        # else:
-                        #     # go to point
-                        #     action = [
-                        #         {'h1': {'move_to_point': [target_pos]}}
-                        #     ]
-                        
                         # move along path
                         target_poses, target_quats = self.eval_env.predicted_action_to_global(a, step_i=-1, verbose=self.config.test_verbose)
                         exe_action = target_poses[:len_traj_act]
                         action = [
                             {'h1': {'move_along_path': [exe_action]}}
                         ]
+                        rot_action = [
+                            {'h1': {'rotate': [target_quats[len_traj_act-1]]}}
+                        ] # 先沿着预测的路径走，按最后一步的朝向旋转
 
-                outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list)
+                outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, rot_action)
                 steps[0] += len_traj_act
                 total_actions.append(exe_action)
 

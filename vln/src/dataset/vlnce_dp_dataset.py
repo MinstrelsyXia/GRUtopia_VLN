@@ -15,7 +15,8 @@ import random
 from collections import defaultdict
 import zlib
 import msgpack_numpy
-
+import matplotlib.pyplot as plt
+import copy
 import torch
 from torch.utils.data import Dataset, IterableDataset
 import torchvision.transforms.functional as TF
@@ -24,6 +25,7 @@ from vln.src.models.utils.feature_extract import extract_image_features, extract
 
 from vln.src.utils.utils import (
     to_local_coords,
+    to_global_coords,
     normalize_data,get_delta,map_action_to_2d
 )
 
@@ -331,7 +333,9 @@ class VLNCE_DP_Dataset(IterableDataset):
                     actions = self._compute_actions(item_obs["globalgps"], 
                                                     item_obs["globalyaw"],
                                                     step_idx,
-                                                    fill_mode='constant')
+                                                    fill_mode='constant',
+                                                    vis=self.config.test_verbose, # !!! DEBUG
+                                                    save_dir=self.config.LOG_DIR)
                     prev_actions = self._compute_actions(torch.flip(item_obs["globalgps"], dims=[0]),
                                                          torch.flip(item_obs["globalyaw"], dims=[0]),
                                                          total_steps-step_idx-1,
@@ -388,10 +392,11 @@ class VLNCE_DP_Dataset(IterableDataset):
 
         return (obs)
 
-    def _compute_actions(self, globalgps, yaws, curr_time, fill_mode):
+    def _compute_actions(self, globalgps, yaws, curr_time, fill_mode, vis=False, save_dir=None):
         start_index = curr_time
         end_index = curr_time + self.len_traj_pred * self.waypoint_spacing + 1
         yaw = yaws[start_index:end_index:self.waypoint_spacing]
+        original_globalgps = copy.copy(globalgps)
         globalgps = globalgps[:, [0, 1]]
         positions = globalgps[start_index:end_index:self.waypoint_spacing]
 
@@ -429,7 +434,73 @@ class VLNCE_DP_Dataset(IterableDataset):
 
         if self.learn_angle:
             assert actions.shape == (self.len_traj_pred, self.num_action_params), f"{actions.shape} and {(self.len_traj_pred, self.num_action_params)} should be equal"
+
+        if vis:
+            self.visualize_waypoints(waypoints, delta_yaw, curr_time, save_dir)
+            # Expand waypoints from [9,2] to [9,3] by adding z dimension from original_globalgps
+            cat_waypoints = torch.cat([waypoints[1:], delta_yaw.unsqueeze(-1)], dim=-1)
+            return_gps, return_yaw = to_global_coords(cat_waypoints, original_globalgps[0], yaw[0])
+
         return actions
+
+    def visualize_waypoints(self, waypoints, delta_yaw, step_idx, save_dir):
+        """
+        Visualize waypoints and their orientations
+        Args:
+            waypoints: shape (len_traj_pred + 1, 2) - includes start point
+            delta_yaw: shape (len_traj_pred,) - relative angles from start
+            step_idx: current step index
+            save_dir: directory to save visualization
+        """
+        plt.clf()
+        plt.figure(figsize=(5, 5))
+        
+        # Plot waypoints
+        plt.scatter(waypoints[:, 0], waypoints[:, 1], 
+                label='waypoints', color='red', alpha=0.5)
+        
+        # Plot start point in different color
+        plt.scatter(waypoints[0, 0], waypoints[0, 1], 
+                color='green', alpha=1.0, label='start')
+        
+        # Add arrows for each waypoint (except start point)
+        arrow_length = 0.2
+        start_yaw = 0  # Reference angle at start point
+        for i in range(1, len(waypoints)):
+            # Current absolute angle = start_yaw + accumulated delta
+            current_yaw = start_yaw + delta_yaw[i-1]
+            
+            # Calculate arrow direction
+            dx = arrow_length * np.cos(current_yaw)
+            dy = arrow_length * np.sin(current_yaw)
+            
+            # Draw arrow
+            plt.arrow(waypoints[i, 0], 
+                    waypoints[i, 1], 
+                    dx, dy,
+                    head_width=0.05,
+                    head_length=0.1,
+                    fc='red',
+                    ec='red',
+                    alpha=0.5)
+            
+            # Add waypoint index
+            plt.text(waypoints[i, 0], waypoints[i, 1],
+                    f'{i}', fontsize=9, color='red', ha='right')
+        
+        plt.title(f'Waypoints and Orientations at Step {step_idx}')
+        plt.legend()
+        plt.grid(True)
+        
+        # Equal aspect ratio to prevent distortion
+        plt.axis('equal')
+        
+        # Save figure
+        save_path = os.path.join(save_dir, f'waypoints_step_{step_idx}.png')
+        plt.savefig(save_path)
+        print(f"Dataset: Saved waypoints to {save_path}")
+        plt.close()
+
 
     def __len__(self) -> int:
         return len(self.index_to_data)
