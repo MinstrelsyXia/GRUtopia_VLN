@@ -49,6 +49,12 @@ EVAL:
 
   rotation_threshold: 1e-2
 
+  # for dynamic len_traj_act
+  use_dynamic_len_traj_act: true
+  min_len_traj_act: 3
+  max_len_traj_act: 8
+  min_displacement: 0.15
+
   distance_threshold: 1.5
   num_sample: 1
   auto_remove: false
@@ -66,7 +72,7 @@ EVAL:
   step_interval: 80 # the same in data sampling
 
   # len_traj_act
-  len_traj_act: 2
+  len_traj_act: 3
 
 IL:
   epochs: 60

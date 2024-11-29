@@ -904,25 +904,45 @@ class DaggerDiffusonPolicyTrainer:
                         envs.pause_at(b_idx, working_thread_names=working_thread_names, global_env_threads_paused=global_env_threads_paused)
                         
             elif self.config.EVAL.ACTION == 'xyyaw':
-                for a_i, a in enumerate(actions): # TODO: 这里需要优化
+                for a_i, a in enumerate(actions):
                     if isinstance(a, str) and a == 'STOP':
                         action = [
                             {'h1': {'stop': ['stop']}}
                         ]
                     else:
-                        # move along path
                         target_poses, target_quats = self.eval_env.predicted_action_to_global(a, step_i=-1, verbose=self.config.test_verbose)
-                        exe_action = target_poses[:len_traj_act]
+                            
+                        if self.config.EVAL.use_dynamic_len_traj_act:
+                            # 计算自适应的len_traj_act
+                            adaptive_len = self.config.EVAL.min_len_traj_act
+                            min_displacement = self.config.EVAL.min_displacement 
+                            max_len = min(len(target_poses), self.config.EVAL.max_len_traj_act)  # 配置文件中添加最大长度限制
+                            
+                            while adaptive_len < max_len:
+                                # 计算当前长度下的总位移
+                                current_poses = target_poses[:adaptive_len]
+                                total_displacement = np.linalg.norm(current_poses[-1] - current_poses[0])
+                                
+                                if total_displacement >= min_displacement:
+                                    break
+                                
+                                adaptive_len += 1
+                        else:
+                            adaptive_len = len_traj_act
+                        
+                        # TODO: check if all nodes are valid on the map?
+                        
+                        exe_action = target_poses[:adaptive_len]
                         action = [
                             {'h1': {'move_along_path': [exe_action]}}
                         ]
                         rot_action = [
-                            {'h1': {'rotate': [target_quats[len_traj_act-1]]}}
-                        ] # 先沿着预测的路径走，按最后一步的朝向旋转
+                            {'h1': {'rotate': [target_quats[adaptive_len-1]]}}
+                        ]
 
-                outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, rot_action)
-                steps[0] += len_traj_act
-                total_actions.append(exe_action)
+                        outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, rot_action)
+                        steps[0] += adaptive_len
+                        total_actions.append(exe_action)
 
             if len(outputs) > 0:
                 outputs_dict, dones, infos, sim_steps, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list = outputs
@@ -1072,6 +1092,7 @@ class DaggerDiffusonPolicyTrainer:
                     continue
                 
                 '''The i-th episode has done'''
+                self.eval_logger.info(f"*******Episode {current_episodes['episode_id']} has done")
                 ep_id = current_episodes['episode_id']
                 stats_episodes[ep_id] = infos[i]
 
@@ -1144,7 +1165,7 @@ class DaggerDiffusonPolicyTrainer:
                     # )
                 spl_dict[ep_id] = float(stats_episodes[ep_id]["spl"])
                 mean_spl = np.mean(list(spl_dict.values()))
-                print('Average SPL: ', mean_spl) # !!!
+                self.eval_logger.info('Average SPL: ', mean_spl) # !!!
 
             observations = extract_instruction_tokens(
                 observations, 
