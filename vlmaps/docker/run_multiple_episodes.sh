@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # 配置参数
-NUM_GPUS=4
+NUM_GPUS=7
 DATA_DIR="/ssd/xiaxinyuan/code/VLN/VLNCE/R2R_VLNCE_v1-3"
-OUTPUT_DIR="multi_gpu_list" #/vlmaps/docker/multi_gpu_list
+# add date+hour+minute
+OUTPUT_DIR="multi_gpu_list_$NUM_GPUS"  # 相对路径，例如: multi_gpu_list_1128_1430
 CACHE_ROOT="/ssd/xiaxinyuan/docker"
 WEBUI_HOST="127.0.0.1"
 NAME="xxy_v3.3"
@@ -12,17 +13,23 @@ NAME="xxy_v3.3"
 LOG_DIR="./.auto-run-docker"
 mkdir -p ${LOG_DIR}
 
-cd vlmaps/docker/
-# 数据集拆分
-python split_dataset.py --num_gpus $NUM_GPUS --data_dir $DATA_DIR --output_dir $OUTPUT_DIR
 
-cd ../..
+
+
 # GPU ID 列表
-GPU_LIST=("0" "1" "2" "3")
+GPU_LIST=( "1" "2" "3" "4" "5" "6" "7")
 EXPERIMENTS_PER_GPU=1
 BASE_CONTAINER_NAME="isaac-sim-xxy"
 IMAGE_NAME="xxy_new:3.4"
 
+
+
+# 数据集拆分
+# python split_dataset.py --num_gpus $NUM_GPUS --data_dir $DATA_DIR --output_dir $OUTPUT_DIR
+cd vlmaps/docker/
+python split_dataset.py --gpu_list "${GPU_LIST[@]}" --data_dir $DATA_DIR --output_dir $OUTPUT_DIR
+
+cd ../..
 # 实验命令
 # EXPERIMENT_COMMANDS=(
 #     "cd /isaac-sim/GRUtopia"
@@ -38,7 +45,7 @@ IMAGE_NAME="xxy_new:3.4"
 EXPERIMENT_COMMANDS=(
     "source /root/.bashrc"
     "cd /isaac-sim/GRUtopia"
-    "bash vlmaps/docker/restart_env_docker.sh  \${GPU}"
+    "bash restart_env_docker.sh  \${GPU}"
 )
 
 for GPU in "${GPU_LIST[@]}"; do
@@ -47,7 +54,6 @@ for GPU in "${GPU_LIST[@]}"; do
         LOG_FILE="${LOG_DIR}/${CONTAINER_NAME}.log"
 
         echo "Starting experiment on GPU ${GPU} with container name ${CONTAINER_NAME}"
-
         sudo docker run --name ${CONTAINER_NAME} \
             --entrypoint "/bin/bash" \
             --runtime=nvidia \
@@ -63,7 +69,7 @@ for GPU in "${GPU_LIST[@]}"; do
             -v /ssd/xiaxinyuan/checkpoints/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz:/root/.cache/torch/hub/checkpoints/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz:ro \
             -v /home/xiaxinyuan/.cache/huggingface/hub/models--timm--vit_large_patch16_384.augreg_in21k_ft_in1k:/root/.cache/huggingface/hub/models--timm--vit_large_patch16_384.augreg_in21k_ft_in1k:ro \
             -v /ssd/xiaxinyuan/code/demo_e200.ckpt:/isaac-sim/GRUtopia/vlmaps/vlmaps/lseg/checkpoints/demo_e200.ckpt:ro \
-            -v /home/xiaxinyuan/.cache/clip:/root/.cache/clip:ro \
+            -v /ssd/xiaxinyuan/checkpoints/ViT-B-32.pt:/root/.cache/clip/ViT-B-32.pt:ro \
             -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:ro \
             -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
             -v /ssd/xiaxinyuan/code/w61-grutopia/logs_docker:/isaac-sim/GRUtopia/logs:rw \
@@ -79,7 +85,7 @@ for GPU in "${GPU_LIST[@]}"; do
             -v ${CACHE_ROOT}/isaac-sim/documents:/root/Documents:rw \
             -w /isaac-sim/GRUtopia \
             ${IMAGE_NAME} \
-            -c "bash -i -c 'source /root/.bashrc && cd /isaac-sim/GRUtopia && bash vlmaps/docker/restart_env_docker.sh ${GPU}'" > "${LOG_FILE}" 2>&1 &
+            -c "bash -i -c 'source /root/.bashrc && cd /isaac-sim/GRUtopia && bash vlmaps/docker/restart_env_docker.sh ${GPU} /isaac-sim/GRUtopia/vlmaps/docker/${OUTPUT_DIR}'" > "${LOG_FILE}" 2>&1 &
              
 
 

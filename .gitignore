@@ -4,7 +4,8 @@ __pycache__/
 *.pyo
 *.pyd
 *.ckpt
-
+*.jpg
+*.png
 api_key/
 evaluate_data/
 assets/

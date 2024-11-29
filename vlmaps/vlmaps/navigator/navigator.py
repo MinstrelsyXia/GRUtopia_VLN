@@ -3,7 +3,7 @@ import pyvisgraph as vg
 from vlmaps.vlmaps.utils.navigation_utils import build_visgraph_with_obs_map, plan_to_pos_v2
 from typing import Tuple, List, Dict
 import cv2
-
+import os
 class Navigator:
     def __init__(self):
         pass
@@ -53,7 +53,12 @@ class Navigator:
         # cv2.waitKey(1)
         
         cv2.imwrite(save_path, obs_map_vis)
-        cv2.imwrite('/ssd/xiaxinyuan/code/w61-grutopia/tmp/planned_path.jpg', obs_map_vis)
+        new_save_path = os.path.join(
+            os.path.dirname(os.path.dirname(save_path)),  # 上级目录
+                'planned_path.jpg'
+            )
+        cv2.imwrite(new_save_path, obs_map_vis)
+        # cv2.imwrite('/ssd/xiaxinyuan/code/w61-grutopia/tmp/planned_path.jpg', obs_map_vis)
 
 
     def shift_path(self, paths: List[List[float]], row_shift: int, col_shift: int) -> List[List[float]]:
