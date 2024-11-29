@@ -1,8 +1,8 @@
 # Developer only. User read-only.
 robots:
 - type: "HumanoidRobot"
-  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
   gains: [0.0, 0.0]
   controllers:
@@ -197,14 +197,14 @@ robots:
     type: "MoveToPointBySpeedController"
     forward_speed: 1.5
     rotation_speed: 1.0
-    threshold: 0.02
+    threshold: 0.05
     sub_controllers:
     - name: move_by_speed
   - name: "move_along_path"
     type: MoveAlongPathPointsController
     forward_speed: 1.5
     rotation_speed: 2.0
-    threshold: 0.02
+    threshold: 0.05
     sub_controllers:
     - name: move_to_point
   - name: "rotate"

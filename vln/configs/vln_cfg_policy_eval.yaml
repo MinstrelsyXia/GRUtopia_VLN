@@ -20,6 +20,7 @@ settings:
 
   camera_list:
     - pano_camera_0
+    - topdown_camera_500
   
   max_step: 25000
   per_action_max_step: 3000
@@ -29,6 +30,8 @@ robots:
     z_offset: 0.7 # !!!
   - name: "HumanoidRobotVLNEval"
     z_offset: 1.05 # !!!
+  - name: "HumanoidRobot"
+    z_offset: 1.05
   
 maps:
   robot_z: [0.15, 1.7]  # Robot's height range on the Z-axis

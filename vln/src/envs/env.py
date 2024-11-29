@@ -30,7 +30,7 @@ class TaskEnv(VLNDataLoader):
         self.finish_splits = []
         
         # warm up
-        self.warm_up_steps = 240 if self.args.headless else 2500
+        self.warm_up_steps = 240 if self.args.headless else 1200
         self.max_step = self.args.settings.max_step
         self.per_action_max_step = self.args.settings.per_action_max_step
 
@@ -154,11 +154,14 @@ class TaskEnv(VLNDataLoader):
 
         # wait for the agent to be ready.
         warm_up_step = 0
-        env_actions = [{'h1':{self.action_name:[[item["start_position"]]]}}]
+        # env_actions = [{'h1':{self.action_name:[[item["start_position"]]]}}]
+        env_actions = [{'h1': {'stand_still': []}}]
         start_time = time.time()
         while self.env.simulation_app.is_running() and warm_up_step < warm_up_steps:
             self.env.step(actions=env_actions)
             warm_up_step += 1
+            if self.config.show_topdown_window and warm_up_step % self.config.EVAL.step_interval == 0:
+                self.save_topdown_map()
         end_time = time.time()
         fps = warm_up_step / (end_time - start_time)
         self.eval_logger.info(f"Warm up for {warm_up_step} steps. FPS: {fps:.2f}")
@@ -229,6 +232,8 @@ class TaskEnv(VLNDataLoader):
                     if camera == self.config.IL.camera_name:
                         obs_data['rgb'] = rgb_info
                         obs_data['depth'] = depth_info[..., np.newaxis]
+                    elif 'topdown' in camera:
+                        obs_data['topdown_rgb'] = rgb_info
 
                 pos, quat = robot_pose_dict[env_idx][0], robot_pose_dict[env_idx][1]
                 _,_, yaw = self.quat_to_euler_angles(quat)
@@ -240,17 +245,11 @@ class TaskEnv(VLNDataLoader):
     
         return [obs_data] # 批量大小为1
     
-    def step(self, actions, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose=False, check_fall_and_stuck=True):
+    def step(self, actions, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, rot_action=None, verbose=False, check_fall_and_stuck=True):
         '''step in isaac-sim until the action has finished'''
-        # TODO: This actually depends on the eval strategy:
-        # 1. predict the next action until the action has finished. (now)
-        # 2. predict the next action every interval
-        finish_state = False
-        start_step = 0
         dones = [False]
-        infos = [] # TODO: compute the metrics!
-        action_name = list(actions[0]['h1'].keys())[0]
         reason = ''
+        action_name = list(actions[0]['h1'].keys())[0]
         
         current_position = self.get_robot_poses()[self.env_idx][0]
         self.eval_logger.info(f"========== Current position: {current_position}")
@@ -258,68 +257,95 @@ class TaskEnv(VLNDataLoader):
         if action_name == 'stop':
             dones = [True]
         else:
-            while not finish_state:
-                obs = self.env.step(actions=actions, add_rgb_subframes=False, render=False)
-                # update the path length
-                current_position = self.get_robot_poses()[self.env_idx][0]
-                self.current_path_length = self.current_path_length + np.linalg.norm(current_position - self.prev_position)
-                self.prev_position = current_position
+            dones, reason = self._execute_action(actions, action_name, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose, check_fall_and_stuck)
+            
+            if rot_action is not None:
+                dones, reason = self._execute_action(rot_action, action_name, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose, check_fall_and_stuck)
 
-                for env_idx, (task_name, task) in enumerate(obs.items()):
-                    for robot_name, robot in task.items():
-                        action_state = robot[action_name]
-                        finish_state = action_state['finished']
-                start_step += 1
-                self.current_step_list[env_idx] += 1
-
-                if self.current_step_list[env_idx] > self.max_step:
-                    finish_state = False
-                    self.eval_logger.error(f"Step has surpass the maximum steps. Break!")
-                    dones[env_idx] = True
-                    reason = 'exceed_max_step'
-                    break
-
-                if start_step > self.per_action_max_step:
-                    finish_state = False
-                    self.eval_logger.warning(f"Current action has exceeded the maximum steps ({self.per_action_max_step}) for each action. Breaking...")
-                    reason = 'single_action_exceed_max_step'
-                    break
-
-                if start_step % self.config.EVAL.step_interval == 0:
-                    # self.eval_logger.info(f"Step {start_step} for the action {actions}.")
-                    self.eval_logger.info(f"Current position: {current_position}")
-                    
-                    # Update the states
-                    outputs_dict = self.get_obs()
-                    for idx in range(len(outputs_dict)):
-                        stack_rgb[idx].push(outputs_dict[idx]["rgb"])
-                        stack_depth[idx].push(outputs_dict[idx]["depth"])
-                        
-                        prev_globalgps[idx].push(outputs_dict[idx]["globalgps"])
-                        prev_globalyaw[idx].push(outputs_dict[idx]["global_rotation"][-1])
-
-                        if self.config.VIDEO_OPTION != -1:
-                            total_rgb_list.append(outputs_dict[idx]["rgb"])
-                
-                if check_fall_and_stuck and start_step % 20 == 0:
-                    status_abnormal_list, fall_list, stuck_list = self.check_and_reset_robot(cur_iter=self.current_step_list[self.env_idx], update_freemap=False, verbose=verbose)
-                    for status_idx, status in enumerate(status_abnormal_list):
-                        if self.warm_up_list[status_idx] == 0:
-                            if status:
-                                if fall_list[status_idx]:
-                                    reason = 'fall'
-                                elif stuck_list[status_idx]:
-                                    reason = 'stuck'
-                                self.episode_end_setting(self.current_split, self.current_scan, status_idx, reason)
-                                self.eval_logger.warning(f"Current action has been interrupted by {reason}.")
-                            dones[env_idx] = True
-        
         outputs_dict = self.get_obs()
         if action_name == 'move_to_point':
             self.pred_traj_list[self.env_idx].extend(actions[0]['h1'][action_name])
         infos = self.compute_metrics(fail_reason=reason)
         
         return outputs_dict, dones, infos, self.current_step_list, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list
+    
+    def _execute_action(self, action, action_name, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose, check_fall_and_stuck):
+        finish_state = False
+        start_step = 0
+        dones = [False]
+        reason = ''
+        
+        while not finish_state:
+            obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
+            current_position = self.get_robot_poses()[self.env_idx][0]
+            self.current_path_length += np.linalg.norm(current_position - self.prev_position)
+            self.prev_position = current_position
+
+            finish_state = self._update_action_state(obs, action_name)
+            start_step += 1
+            self.current_step_list[self.env_idx] += 1
+
+            if self._check_max_steps(start_step):
+                dones[self.env_idx] = True
+                reason = 'exceed_max_step' if self.current_step_list[self.env_idx] > self.max_step else 'single_action_exceed_max_step'
+                break
+
+            if start_step % self.config.EVAL.step_interval == 0:
+                self._update_states(current_position, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list)
+                if self.config.show_topdown_window:
+                    self.save_topdown_map()
+            
+            if check_fall_and_stuck and start_step % 20 == 0:
+                dones, reason = self._check_fall_and_stuck(verbose)
+                if dones[self.env_idx]:
+                    break
+
+        return dones, reason
+    
+    def save_topdown_map(self):
+        # 获取俯视相机的观察结果
+        obs = self.get_obs()
+        topdown_rgb = obs[0]['topdown_rgb']
+        save_path = os.path.join(self.config.GT_PATH_DIR, f'topdown_{self.current_step_list[self.env_idx]}.png')
+        plt.imsave(save_path, topdown_rgb)
+        self.eval_logger.info(f"Saved topdown view to {save_path}")
+    
+    def _update_action_state(self, obs, action_name):
+        for env_idx, (task_name, task) in enumerate(obs.items()):
+            for robot_name, robot in task.items():
+                action_state = robot[action_name]
+                return action_state['finished']
+        return False
+
+    def _check_max_steps(self, start_step):
+        if self.current_step_list[self.env_idx] > self.max_step:
+            self.eval_logger.error(f"Step has surpass the maximum steps. Break!")
+            return True
+        if start_step > self.per_action_max_step:
+            self.eval_logger.warning(f"Current action has exceeded the maximum steps ({self.per_action_max_step}) for each action. Breaking...")
+            return True
+        return False
+
+    def _update_states(self, current_position, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list):
+        self.eval_logger.info(f"Current position: {current_position}")
+        outputs_dict = self.get_obs()
+        for idx in range(len(outputs_dict)):
+            stack_rgb[idx].push(outputs_dict[idx]["rgb"])
+            stack_depth[idx].push(outputs_dict[idx]["depth"])
+            prev_globalgps[idx].push(outputs_dict[idx]["globalgps"])
+            prev_globalyaw[idx].push(outputs_dict[idx]["global_rotation"][-1])
+            if self.config.VIDEO_OPTION != -1:
+                total_rgb_list.append(outputs_dict[idx]["rgb"])
+
+    def _check_fall_and_stuck(self, verbose):
+        status_abnormal_list, fall_list, stuck_list = self.check_and_reset_robot(cur_iter=self.current_step_list[self.env_idx], update_freemap=False, verbose=verbose)
+        for status_idx, status in enumerate(status_abnormal_list):
+            if self.warm_up_list[status_idx] == 0 and status:
+                reason = 'fall' if fall_list[status_idx] else 'stuck'
+                self.episode_end_setting(self.current_split, self.current_scan, status_idx, reason)
+                self.eval_logger.warning(f"Current action has been interrupted by {reason}.")
+                return [True], reason
+        return [False], ''
     
     def predicted_action_to_global(self, predicted_action, step_i,verbose=False):
         """
@@ -358,22 +384,21 @@ class TaskEnv(VLNDataLoader):
         return global_positions, global_quats
     
     def draw_prediction(self, un_actions, step_i):
-        cussum_actions = np.cumsum(un_actions, axis=1)
         plt.clf()
         plt.figure(figsize=(10, 5))
         plt.subplot(1, 2, 1)
         
         # Plot predicted actions with arrows
-        plt.scatter(cussum_actions[:, 0], cussum_actions[:, 1], label='pred_actions', color='blue', alpha=0.5)
-        for i in range(cussum_actions.shape[0]):
+        plt.scatter(un_actions[:, 0], un_actions[:, 1], label='pred_actions', color='blue', alpha=0.5)
+        for i in range(un_actions.shape[0]):
             # Calculate arrow direction components using yaw angle
             arrow_length = 0.2  # Adjust this value to change arrow length
-            dx = arrow_length * np.cos(cussum_actions[i, 2])
-            dy = arrow_length * np.sin(cussum_actions[i, 2])
+            dx = arrow_length * np.cos(un_actions[i, 2])
+            dy = arrow_length * np.sin(un_actions[i, 2])
             
             # Draw arrow
-            plt.arrow(cussum_actions[i, 0], 
-                    cussum_actions[i, 1], 
+            plt.arrow(un_actions[i, 0], 
+                    un_actions[i, 1], 
                     dx, dy, 
                     head_width=0.05, 
                     head_length=0.1, 
@@ -382,11 +407,12 @@ class TaskEnv(VLNDataLoader):
                     alpha=0.5)
             
             # Add point index
-            plt.text(cussum_actions[i, 0], cussum_actions[i, 1], 
+            plt.text(un_actions[i, 0], un_actions[i, 1], 
                     i, fontsize=9, color='blue', ha='left')
         
-        plt.savefig(os.path.join(self.config.GT_PATH_DIR, f'predicted_actions_{self.current_step_list[self.env_idx]}_step{step_i}.png'))
-        self.eval_logger.info(f"Saved predicted actions to {os.path.join(self.config.GT_PATH_DIR, f'predicted_actions_{self.current_step_list[self.env_idx]}_step{step_i}.png')}")
+        save_path = os.path.join(self.config.GT_PATH_DIR, f'env_predicted_actions_{self.current_step_list[self.env_idx]}_step{step_i}.png') 
+        plt.savefig(save_path)
+        self.eval_logger.info(f"Saved predicted actions to {save_path}")
         
     def compute_metrics(self, fail_reason=''):
         """计算VLN任务的评估指标

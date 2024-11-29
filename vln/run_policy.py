@@ -50,6 +50,11 @@ def main():
         default=False,
         action='store_true',
     )
+    parser.add_argument(
+        "--show_topdown_window",
+        default=False,
+        action='store_true',
+    )
     args = parser.parse_args()
     run_exp(**vars(args))
 
@@ -72,6 +77,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     """
     config = get_config(exp_config, opts)
     config.test_verbose = kwargs.get('test_verbose', False)
+    config.show_topdown_window = kwargs.get('show_topdown_window', False)
     # logger.info(f"config: {config}")
     
     # Process the log dir

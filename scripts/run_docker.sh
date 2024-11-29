@@ -15,7 +15,7 @@ sudo docker run -d --name ${NAME} -it --rm --gpus='"device=4,5"' --network host 
      -v ${CACHE_ROOT}/isaac-sim/documents:/root/Documents:rw \
      -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:rw \
      -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
-     w61_grutopia:v0.1
+     w61_grutopia:v0.2
 
 # enter the docker
 docker exec -it ${NAME} /bin/bash

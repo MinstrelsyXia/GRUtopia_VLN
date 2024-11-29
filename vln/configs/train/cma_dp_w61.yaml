@@ -53,7 +53,7 @@ EVAL:
   num_sample: 1
   auto_remove: false
 
-  start_eval_epoch: 20
+  start_eval_epoch: -1
   
   # stop settings
   stop_mode: progress # progress / distance
@@ -64,6 +64,9 @@ EVAL:
   sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
   vln_cfg_file: vln/configs/vln_cfg_policy_eval.yaml
   step_interval: 80 # the same in data sampling
+
+  # len_traj_act
+  len_traj_act: 2
 
 IL:
   epochs: 60
