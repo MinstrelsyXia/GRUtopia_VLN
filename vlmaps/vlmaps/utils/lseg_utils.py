@@ -10,7 +10,7 @@ from vlmaps.vlmaps.utils.mapping_utils import *
 
 from vlmaps.vlmaps.lseg.modules.models.lseg_net import LSegEncNet
 from vlmaps.vlmaps.lseg.additional_utils.models import resize_image, pad_image, crop_image
-
+import os
 
 def  get_lseg_feat(
     model: LSegEncNet,
@@ -113,7 +113,12 @@ def  get_lseg_feat(
         axes[1].axis("off")
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches='tight')
-        plt.savefig('/ssd/xiaxinyuan/code/w61-grutopia/tmp/segmentation.png',bbox_inches='tight')
+        new_save_path = os.path.join(
+        os.path.dirname(os.path.dirname(save_path)),  # 上级目录
+            'segmentation.png'
+        )
+        # plt.savefig('/ssd/xiaxinyuan/code/w61-grutopia/tmp/segmentation.png',bbox_inches='tight')
+        plt.savefig(new_save_path,bbox_inches='tight')
         plt.close(fig)
         print(f'rgb image saved to {save_path}')
     else:

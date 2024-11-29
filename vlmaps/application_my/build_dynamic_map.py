@@ -814,7 +814,7 @@ class TMP(VLMap):
         if np.sum(mask)>50 and verbose:
             mask_2d = pool_3d_label_to_2d(mask, self.grid_pos, self.gs)
             rgb_2d = pool_3d_rgb_to_2d(self.grid_rgb, self.grid_pos, self.gs)
-            save_path = Path(self.map_save_path) / f"{language_desc}_masked_2d.jpg"
+            save_path = os.path.join(os.path.dirname(self.map_save_path), f"{language_desc.replace(' ', '_')}_masked_2d.jpg")
             visualize_masked_map_2d(rgb_2d, mask_2d,save_path=save_path)
         return mask
     

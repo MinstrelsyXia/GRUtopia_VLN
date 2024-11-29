@@ -52,7 +52,7 @@ from vln.src.local_nav.BEVmap import BEVMap
 
 from vlmaps.vlmaps.map.map import Map
 
-from vlmaps.application_my.utils import NotFound, EarlyFound, extract_parameters, extract_self_methods, visualize_subgoal_images
+from vlmaps.application_my.utils import NotFound, EarlyFound, TooManySteps,extract_parameters, extract_self_methods, visualize_subgoal_images
 
 import logging
 import argparse
@@ -428,7 +428,12 @@ class IsaacSimLanguageRobot(LangRobot):
             verbose=self.vln_config.test_verbose,
             step = self.step
             )
-    
+        
+    def too_many_steps(self,max_step = 15000):
+        if self.step > max_step:
+            log.info(f"Too many steps: {self.step}, exiting.")
+            raise TooManySteps("Too many steps")
+        
     def get_frontier(self,action=None,verbose=True):
         '''
         return pos in obstacle map coord.
@@ -542,6 +547,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 log.warning(f"Failed to move to the frontier point {frontier_point}")
                 return False
             return False
+        
 
     def get_angle(self, frontier_point, coord = 'xy'):
         """
@@ -608,6 +614,9 @@ class IsaacSimLanguageRobot(LangRobot):
             except NameError as e:
                 print(f"Instruction GPT parsed {action_name} doesn't exist: {e}, following next instruction")
                 break
+            except TooManySteps as e:
+                log.warning(f"{e}. Too many steps, stopping exploration.")
+                break
 
 
             # except Exception as e:
@@ -621,6 +630,7 @@ class IsaacSimLanguageRobot(LangRobot):
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
         return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+    
     def move_to_object(self, name: str):
         self._set_nav_curr_pose()
         pos = self.map.get_nearest_pos(self.curr_pos_on_map, name)
@@ -839,8 +849,8 @@ class IsaacSimLanguageRobot(LangRobot):
                     eval()
                     raise EarlyFound(f"Goal {goal} is reached early")
             if ((self.step-init_step) % 10000 == 0):
-                log.warning("Failed to reach the subgoal after 1000 steps")
-                return False
+                log.warning("Failed to reach the subgoal after 10000 steps")
+                raise TooManySteps("Too many steps")
 
 
         return True
@@ -1270,7 +1280,7 @@ def main(config: DictConfig) -> None:
     # change the episode_trajectory_pairs to be a list of tuples
     try:
         with open(config.episode_file, 'r') as f:
-            episode_trajectory_pairs = [line.strip().split(',') for line in f.readlines()]
+            scan_trajectory_episode_pairs = [line.strip().split(',') for line in f.readlines()]
     except PermissionError:
         log.error(f"Permission denied when trying to read file: {config.episode_file}")
         log.error("Please check file permissions and ownership")
@@ -1287,13 +1297,13 @@ def main(config: DictConfig) -> None:
         sys.exit(1)
 
     
-    episode_trajectory_pairs = [(int(episode_id), int(trajectory_id)) for episode_id, trajectory_id in episode_trajectory_pairs]
+    scan_trajectory_episode_pairs = [((scene_id), int(trajectory_id), int(episode_id)) for scene_id, trajectory_id, episode_id in scan_trajectory_episode_pairs]
 
     # record last trajectory id
     if config.resume_scan is not None:
         # 找到resume_scan对应的行号
         start_idx = None
-        for idx, (episode_id,_) in enumerate(episode_trajectory_pairs):
+        for idx, (scene_id,trajectory_id, episode_id) in enumerate(scan_trajectory_episode_pairs):
             if episode_id == config.resume_scan:
                 start_idx = idx
                 break
@@ -1308,13 +1318,13 @@ def main(config: DictConfig) -> None:
     log.info(f'Is in container: {is_in_container()}')
     init_omni_scene = True
     reset_scene = False
-
     for split in vln_config.datasets.splits:
         robot = IsaacSimLanguageRobot(config, sim_config, vln_config=vln_config, split=split)
-        last_trajectory_id = episode_trajectory_pairs[start_idx][1]
-        for episode_id, trajectory_id in episode_trajectory_pairs[start_idx:]: 
-            # if the first episode: open the scene
-            reset_scene = trajectory_id != last_trajectory_id
+        last_scene_name = scan_trajectory_episode_pairs[start_idx][0]
+        for scene_name, trajectory_id, episode_id in scan_trajectory_episode_pairs[start_idx:]: 
+            ''' if the first episode: open the scene '''
+            reset_scene =  (scene_name!= last_scene_name)
+            print("scene_name", scene_name, "last_scene_name", last_scene_name)
             if reset_scene:
                 # with open(config.last_scan_file, 'w') as f:
                 #     f.write(str(episode_id))
@@ -1329,7 +1339,8 @@ def main(config: DictConfig) -> None:
                 except Exception as e:
                     log.error(f"Unexpected error while writing file: {e}")
                 # sys.exit(1)
-                robot.env.simulation_app.close()
+                if robot.env is not None and robot.env.simulation_app.is_running():
+                    robot.env.simulation_app.close()
             robot.setup_scene(episode_id, trajectory_id,reset_scene=reset_scene,init_omni_scene=init_omni_scene)
             init_omni_scene = False
             # for the following episodes: if the new trajectory id is different from the last one, then use reset_scene()
@@ -1337,23 +1348,23 @@ def main(config: DictConfig) -> None:
             print('not moving for debug')
             # ! remember to align with isaac_robot.py
             # else: only set the task and robot position
-            # robot.map.init_categories(mp3dcat.copy())
-            # gpt_ans = parse_spatial_instruction(robot.instruction)
-            # parsed_instructions = extract_self_methods(gpt_ans)
-            # log.info(f"instruction: {robot.instruction}")
-            # log.info(f"parsed instructions: {parsed_instructions}")
+            robot.map.init_categories(mp3dcat.copy())
+            gpt_ans = parse_spatial_instruction(robot.instruction)
+            parsed_instructions = extract_self_methods(gpt_ans)
+            log.info(f"instruction: {robot.instruction}")
+            log.info(f"parsed instructions: {parsed_instructions}")
 
-            # for idx in range(len(parsed_instructions) - 1, -1, -1):
-            #     subgoal = parsed_instructions[idx]
-            #     if not (('move_forward' in subgoal) or ('turn' in subgoal)):
-            #         fin_obj = extract_parameters(subgoal)
-            #         robot.set_ultimate_goal(fin_obj)
-            #         skipped_i = idx
-            #         break
-            # skip_flag = 0
+            for idx in range(len(parsed_instructions) - 1, -1, -1):
+                subgoal = parsed_instructions[idx]
+                if not (('move_forward' in subgoal) or ('turn' in subgoal)):
+                    fin_obj = extract_parameters(subgoal)
+                    robot.set_ultimate_goal(fin_obj)
+                    skipped_i = idx
+                    break
+            skip_flag = 0
             while robot.env.simulation_app.is_running():
                 robot.warm_up(200)
-                break
+                # robot.look_around()
                 for cat_i, subgoal in enumerate(parsed_instructions):
                     if cat_i >= skip_flag:
                         log.info(f"Executing {subgoal}")
@@ -1366,12 +1377,12 @@ def main(config: DictConfig) -> None:
 
                 break
             ''' execute the last spatial instruction'''
-            # for subgoal in parsed_instructions[skip_flag:]:
-            #     log.info(f"Executing {subgoal}")
-            #     robot.test_movement(subgoal)
+            for subgoal in parsed_instructions[skip_flag:]:
+                log.info(f"Executing {subgoal}")
+                robot.test_movement(subgoal)
             robot.save_metric()
             # robot.env.simulation_app.close()
-            last_trajectory_id = trajectory_id
+            last_scene_name = scene_name
             robot.clear_maps()
             # if (episode_id > 100):
             #     break

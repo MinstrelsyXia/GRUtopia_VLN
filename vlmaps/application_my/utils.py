@@ -11,7 +11,13 @@ class EarlyFound(Exception):
     def __init__(self, message="Subgoal not reached but ultimate goal is found."):
         self.message = message
         super().__init__(self.message)
-
+class TooManySteps(Exception):
+    '''
+    Exception raised when the robot has taken too many steps.
+    '''
+    def __init__(self, message="Robot has taken too many steps."):
+        self.message = message
+        super().__init__(self.message)
 
 import numpy as np
 import matplotlib.pyplot as plt
