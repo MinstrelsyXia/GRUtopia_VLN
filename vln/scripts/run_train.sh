@@ -13,7 +13,7 @@ flags_cma_raw_train="
 
 if [ "$1" == "--train" ]; then
   flags="
-    --exp-config vln/configs/train/cma_dp_w61.yaml
+    --exp-config vln/configs/train/cma_dp_train.yaml
     --run-type train
   "
 elif [ "$1" == "--train_crossGRU" ]; then

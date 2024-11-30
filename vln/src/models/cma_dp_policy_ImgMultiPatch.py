@@ -79,7 +79,9 @@ class CMA_DP_Net(nn.Module):
         # self.cross_modal_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         # self.his_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         if self.model_config.CROSS_MODAL_ENCODER.txt_to_img:
-            self.txt_img_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
+            txt_to_img_cross_modal_config = copy.copy(cross_modal_config)
+            txt_to_img_cross_modal_config.num_x_layers = 1
+            self.txt_img_cross_encoder = encoders.VisionLanguageEncoder(txt_to_img_cross_modal_config)
         self.img_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         
         # Init the prev action embedding
