@@ -642,28 +642,30 @@ class CMA_DP_Net(nn.Module):
 
         un_actions = un_actions.detach().cpu().numpy()
 
-        if self.config.EVAL.ACTION == 'xyyaw':
+        if self.config.EVAL.ACTION == 'xyyaw' or self.config.EVAL.ACTION == 'speed':
             actions = []
             # un_actions = un_actions_nocumsum.detach().cpu().numpy()
-            for idx in range(un_actions_nocumsum.shape[0]):
+            for idx in range(un_actions_nocumsum[0].shape[0]):
                 if stop_mode == 'progress':
                     stop_flag = False
                     # Check if 4 consecutive steps are stop actions
-                    if idx + 3 < len(un_actions_nocumsum):  # Make sure we have enough steps ahead
+                    if idx + 3 < len(un_actions_nocumsum[0]):  # Make sure we have enough steps ahead
                         consecutive_stops = True
-                        for i in range(4):  # Check current and next 3 steps
-                            curr_action = un_actions_nocumsum[idx+i][0]
-                            if not (abs(curr_action[0]) < self.config.EVAL.stop_x_threshold and \
-                                  abs(curr_action[1]) < self.config.EVAL.stop_y_threshold and \
-                                  abs(curr_action[2]) < self.config.EVAL.stop_yaw_threshold):
+                        for i in range(3):  # Check current and next 2 steps
+                            curr_action = un_actions_nocumsum[0][idx+i]
+                            if not (abs(curr_action[0]) < float(self.config.EVAL.stop_x_threshold) and \
+                                  abs(curr_action[1]) < float(self.config.EVAL.stop_y_threshold) and \
+                                  abs(curr_action[2]) < float(self.config.EVAL.stop_yaw_threshold)):
                                 consecutive_stops = False
                                 break
                         
-                        if consecutive_stops and pm_pred[idx].item() > self.config.EVAL.pm_threshold:
+                        if consecutive_stops or pm_pred[0].item() > self.config.EVAL.pm_threshold:
                             # Only stop if we have 4 consecutive stop actions and progress monitor threshold is met
                             actions.append("STOP")
                             continue
-                actions.append(un_actions[idx]) 
+                actions.append(un_actions[0][idx]) 
+            
+            actions = [actions]
         elif self.config.EVAL.ACTION == 'descrete':
             # 0: stop, 1: move forward, 2: turn left, 3: turn right
             actions = [[] for _ in range(un_actions.shape[0])]

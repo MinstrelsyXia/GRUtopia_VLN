@@ -31,6 +31,8 @@ tasks:
     - name: "oracle_move_to_point"
     - name: "oracle_move_along_path"
     - name: "move_to_point_by_pid"
+    - name: "move_by_speed_vln"
+    - name: "move_along_speeds"
     sensor_params:
     - name: "camera"
       enable: false
