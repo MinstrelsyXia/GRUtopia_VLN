@@ -143,13 +143,58 @@ robots:
 
 
 - type: "HumanoidRobotVLNEval"
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
   gains: [0.0, 0.0]
   controllers:
   - name: "move_by_speed"
     type: HumanoidMoveBySpeedController
+    policy_weights_path: assets/policy/weights/h1_loco_jit_policy.pt
+    joint_names:
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - torso_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_ankle_joint
+    - right_ankle_joint
+    - left_elbow_joint
+    - right_elbow_joint
+  - name: "joint_controller"
+    type: JointController
+    joint_names:
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - torso_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_ankle_joint
+    - right_ankle_joint
+    - left_elbow_joint
+    - right_elbow_joint
+  - name: "move_by_speed_vln"
+    type: VLNHumanoidMoveBySpeedController
     policy_weights_path: assets/policy/weights/h1_loco_jit_policy.pt
     joint_names:
     - left_hip_yaw_joint
@@ -244,6 +289,11 @@ robots:
     max_forward_speed: 1.5
     max_rotation_speed: 2.0
     threshold: 0.10
+    sub_controllers:
+    - name: move_by_speed
+  - name: "move_along_speeds"
+    type: MoveAlongSpeedsController
+    steps_per_speed: 100
     sub_controllers:
     - name: move_by_speed
 
