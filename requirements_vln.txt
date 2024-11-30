@@ -1,4 +1,4 @@
-open3d
+# open3d # try conda install open3d
 shapely
 pandas
 ftfy
