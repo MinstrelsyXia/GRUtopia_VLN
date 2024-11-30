@@ -302,14 +302,17 @@ class VLNCE_DP_Dataset(IterableDataset):
                 #     item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
                     
                 if self.config.MODEL.IMU_ENCODER.use:
-                    item_obs["imu"] = torch.zeros((total_steps, 2))
+                    item_obs["imu"] = torch.zeros((total_steps, self.config.IMU_ENCODER.input_size))
                 
                 start_pos = item_obs["globalgps"][0][[0, 1]]
+                start_yaw = item_obs["globalyaw"][0]
                 for step_idx in range(total_steps):
                     # compute imu
                     if self.config.MODEL.IMU_ENCODER.use:
                         current_pos = item_obs["globalgps"][step_idx][[0,1]]
-                        item_obs["imu"][step_idx] = current_pos - start_pos
+                        item_obs["imu"][step_idx][:2] = to_local_coords(current_pos, start_pos, start_yaw)
+                        if self.config.MODEL.IMU_ENCODER.input_size == 3:
+                            item_obs["imu"][step_idx][2] = item_obs["globalyaw"][step_idx] - start_yaw
                     
                 #     # stack multiple images and depths
                 #     if step_idx == 0:
