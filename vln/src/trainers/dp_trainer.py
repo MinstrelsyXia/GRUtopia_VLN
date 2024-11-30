@@ -944,6 +944,23 @@ class DaggerDiffusonPolicyTrainer:
                         steps[0] += adaptive_len
                         total_actions.append(exe_action)
 
+            elif self.config.EVAL.ACTION == 'speed':
+                for a_i, a in enumerate(actions):
+                    if isinstance(a[0], str) and a[0] == 'STOP':
+                        action = [
+                            {'h1': {'stop': ['stop']}}
+                        ]
+                    else:
+                        speed_actions = self.eval_env.get_speed_actions(a, len_traj_act=len_traj_act,verbose=self.config.test_verbose)
+                        exe_action = speed_actions
+                        action = [
+                            {'h1': {'move_along_speeds': [exe_action]}}
+                        ]
+
+                outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list) 
+                steps[0] += len(speed_actions)
+                total_actions.append(speed_actions)
+
             if len(outputs) > 0:
                 outputs_dict, dones, infos, sim_steps, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list = outputs
             else:
@@ -1165,7 +1182,7 @@ class DaggerDiffusonPolicyTrainer:
                     # )
                 spl_dict[ep_id] = float(stats_episodes[ep_id]["spl"])
                 mean_spl = np.mean(list(spl_dict.values()))
-                self.eval_logger.info('Average SPL: ', mean_spl) # !!!
+                self.eval_logger.info(f"Average SPL: {mean_spl}") # !!!
 
             observations = extract_instruction_tokens(
                 observations, 
