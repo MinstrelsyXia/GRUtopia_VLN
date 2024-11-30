@@ -173,21 +173,51 @@ def get_delta(actions):
     return delta
 
 
-def map_action_to_2d(delta_actions):
+# def map_action_to_2d(delta_actions):
+#     actions_2d = torch.zeros((delta_actions.shape[0], 2))
+#     for a_idx, action in enumerate(delta_actions):
+#         if action[2] > 0:
+#             # turn right
+#             actions_2d[a_idx] = [0, 1]
+#         elif action[2] < 0:
+#             # turn left
+#             actions_2d[a_idx] = [0, -1]
+#         elif action[0] == action[1] == action [2] == 0:
+#             # stop
+#             actions_2d[a_idx] = [0, 0]
+#         else:
+#             # forward
+#             actions_2d[a_idx] = [1,0]
+#     return actions_2d
+
+def map_action_to_2d(delta_actions, max_distance=0.5):
+    """将笛卡尔坐标系下的动作 [delta_x, delta_y, delta_yaw] 转换为归一化的极坐标系 [r, theta]
+    Args:
+        delta_actions: 形状为 (N, 3) 的张量,包含 [delta_x, delta_y, delta_yaw]
+        max_distance: 用于归一化 r 的最大距离值
+    Returns:
+        actions_2d: 形状为 (N, 2) 的张量,包含归一化的 [r, theta]
+        其中 r 和 theta 都在 [-1, 1] 范围内
+    """
     actions_2d = torch.zeros((delta_actions.shape[0], 2))
+    
     for a_idx, action in enumerate(delta_actions):
-        if action[2] > 0:
-            # turn right
-            actions_2d[a_idx] = [0, 1]
-        elif action[2] < 0:
-            # turn left
-            actions_2d[a_idx] = [0, -1]
-        elif action[0] == action[1] == action [2] == 0:
-            # stop
-            actions_2d[a_idx] = [0, 0]
-        else:
-            # forward
-            actions_2d[a_idx] = [1,0]
+        dx, dy = action[0], action[1]
+        
+        # 计算移动距离 r (欧几里得距离)
+        r = torch.sqrt(dx*dx + dy*dy)
+        
+        # 计算旋转角度 theta (弧度)
+        theta = torch.atan2(dy, dx)
+        
+        # 如果是原地不动,则 r 和 theta 都为 0
+        if dx == dy == action[2] == 0:
+            r = 0
+            theta = 0
+        
+        ## TODO: 现在没有做归一化
+        actions_2d[a_idx] = torch.tensor([r, theta])
+        
     return actions_2d
 
 def get_action(diffusion_output, action_stats, cumsum=True):
