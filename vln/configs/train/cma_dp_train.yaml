@@ -12,14 +12,16 @@ NUM_ENVIRONMENTS: 4
 TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
 EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
+# EVAL_CKPT_PATH_DIR: data/checkpoints/20241120-vlnce-rp-dp-cond0Dec3_dpIter20_bs4_fullInstr/ckpts/ckpt.38.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
-VIDEO_OPTION: -1
+VIDEO_OPTION: true # -1 / true
+VIDEO_DIR: data/checkpoints/*name/videos
 
 SEED: 0
 DDP:
-  use: True
+  use: true
   seed: 0
   fp16: False
   n_workers: 8
@@ -32,24 +34,32 @@ DDP:
 EVAL:
   USE_CKPT_CONFIG: False
   SAVE_RESULTS: True
-  SPLIT: [val_seen, val_unseen]
+  # SPLIT: [val_seen, val_unseen]
+  SPLIT: [train]
   EPISODE_COUNT: -1
   MAX_STEPS: 195
   train_eval_interval: 100
   ACTION: xyyaw # descrete or xyyaw
 
   # for xyyaw
-  stop_x_threshold: 1e-1
-  stop_y_threshold: 1e-1
-  stop_yaw_threshold: 1e-1
+  success_distance: 3.0
+  stop_x_threshold: 1e-2
+  stop_y_threshold: 1e-2
+  stop_yaw_threshold: 1e-2
 
-  rotation_threshold: 1e-1
+  rotation_threshold: 1e-2
+
+  # for dynamic len_traj_act
+  use_dynamic_len_traj_act: true
+  min_len_traj_act: 3
+  max_len_traj_act: 8
+  min_displacement: 0.15
 
   distance_threshold: 1.5
   num_sample: 1
   auto_remove: false
 
-  start_eval_epoch: 20
+  start_eval_epoch: -1
   
   # stop settings
   stop_mode: progress # progress / distance
@@ -59,6 +69,10 @@ EVAL:
   # for isaac-sim envs
   sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
   vln_cfg_file: vln/configs/vln_cfg_policy_eval.yaml
+  step_interval: 80 # the same in data sampling
+
+  # len_traj_act
+  len_traj_act: 3
 
 IL:
   epochs: 60
@@ -87,7 +101,7 @@ IL:
     lmdb_features_dir: data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb
     lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb
     pre_extract_img_features: true
-    denoise_action: false
+    denoise_action: false # For debug!!!
     lmdb_save_episode_id: true
     save_img_raw: false
     sample_action_mode: policy # gt / policy / negative_sampling
@@ -98,7 +112,7 @@ MODEL:
   policy_name: CMA_DP_ImgMultiPatch_Policy # CMA_DP_Policy
 
   # training settings
-  learn_angle: true
+  learn_angle: false # true: [delta_x, delta_y, delta_yaw] / false: [r, theta]
   use_iw: false
   len_traj_act: 4
 
@@ -214,7 +228,7 @@ MODEL:
     transformer_n_layers: 3
     transformer_encoding_size: 512
     # transformer_n_head: 8
-    transformer_p_drop_emb: 0.1
+    transformer_p_drop_emb: 0.2
     cond: 'v2_instr' # rnn_instr / rnn_instr_vis / rnn_Fullinstr_vis / rnn_Fullinstr / v2_instr / v2_Fullinstr
 
     # action output params
