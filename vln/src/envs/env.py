@@ -59,7 +59,7 @@ class TaskEnv(VLNDataLoader):
             self.eval_logger.info(f"Start to evaluate on {self.current_split} split")
             
             self.finish_scans = []
-            self.current_episode_idx = 2 # this is not episode_id in data. but the location in data. # !!! DEBUG. should be -1
+            self.current_episode_idx = -1 # this is not episode_id in data. but the location in data. # !!! DEBUG. should be -1
             self.current_scan_data = self.data[self.current_split]
             self.number_of_episodes = [len(self.current_scan_data[scan]) for scan in self.current_scan_data.keys()]
             self.current_scan_list = list(self.current_scan_data.keys())
@@ -184,7 +184,7 @@ class TaskEnv(VLNDataLoader):
         self.eval_logger.info(f"The shortest path has been initialized for Scan {scan}, Path_id {self.data_item['trajectory_id']}")  
 
         # Compute the shortest path
-        exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=False, save_dir=self.config.GT_PATH_DIR)
+        exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=True, save_dir=self.config.GT_PATH_DIR)
         # exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=True, save_dir=self.config.GT_PATH_DIR, all_paths=self.data_item['reference_path']) # DEBUG 
 
         # compute the length
@@ -266,6 +266,9 @@ class TaskEnv(VLNDataLoader):
         if action_name == 'move_to_point':
             self.pred_traj_list[self.env_idx].extend(actions[0]['h1'][action_name])
         infos = self.compute_metrics(fail_reason=reason)
+
+        current_position = self.get_robot_poses()[self.env_idx][0]
+        self._update_states(current_position, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list)
         
         return outputs_dict, dones, infos, self.current_step_list, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list
     
@@ -296,8 +299,10 @@ class TaskEnv(VLNDataLoader):
                     self.save_topdown_map()
             
             if check_fall_and_stuck and start_step % 20 == 0:
-                dones, reason = self._check_fall_and_stuck(verbose)
-                if dones[self.env_idx]:
+                fall_or_stuck, reason = self._check_fall_and_stuck(verbose)
+                if fall_or_stuck[self.env_idx]:
+                    dones[self.env_idx] = True
+                    self.eval_logger.warning(f"Current action has been interrupted by {reason}.")
                     break
 
         return dones, reason
@@ -383,6 +388,122 @@ class TaskEnv(VLNDataLoader):
             self.draw_prediction(predicted_action, step_i)
     
         return global_positions, global_quats
+
+    def get_speed_actions(self, predicted_actions, len_traj_act, verbose=False):
+        """将预测的位置变化序列转换为速度控制指令序列
+        
+        Args:
+            predicted_actions: 预测的动作序列,每个动作包含(delta_x, delta_y, delta_yaw)
+            
+        Returns:
+            speed_actions: 包含多个[forward_speed, lateral_speed, rotation_speed]的速度控制指令序列
+        """
+        speed_actions = []
+        not_stop_idx = 0
+        for action in predicted_actions:
+            if isinstance(action, str) and action == 'STOP':
+                break
+            else:
+                not_stop_idx += 1
+        predicted_actions = predicted_actions[:not_stop_idx]
+        
+        ''' v1: step-by-step '''
+        # convert cumsum to delta
+        # delta_predicted_actions = np.diff(predicted_actions, axis=0)
+        # predicted_actions = np.concatenate([predicted_actions[0:1], delta_predicted_actions], axis=0)
+
+        # predicted_actions = predicted_actions[:len_traj_act]
+        # max_distance = 0.5
+        # for idx, action in enumerate(predicted_actions):
+        #     [forward_speed, lateral_speed, rotation_speed], only_rotation = self.action_to_speed(action, max_distance)
+        #     speed_actions.append([forward_speed, lateral_speed, rotation_speed])
+
+        # add the final rotation action
+        # if not only_rotation:
+        #     if abs(action[2]) > self.yaw_threshold:
+        #         rotation_speed = self.max_rotation_speed * action[2]
+        #     speed_actions.append([0.0, 0.0, rotation_speed])
+        
+        ''' v2: go to the middle point '''
+        len_traj_act = len(predicted_actions)
+        max_distance = 0.3
+        middle_point = predicted_actions[len_traj_act//2]
+        speed_actions, only_rotation = self.action_to_speed(middle_point, max_distance, speed_actions)
+        
+        if verbose:
+            for i, action in enumerate(speed_actions):
+                self.eval_logger.info(f"Action {i}: forward={action[0]:.3f}, lateral={action[1]:.3f}, rotation={action[2]:.3f}")
+        
+        return speed_actions
+
+    def action_to_speed(self, action, max_distance=0.5, speed_actions=[]):
+        # 设置阈值参数
+        position_threshold = float(self.config.EVAL.rotation_threshold)  # 位置变化阈值,小于此值认为不需要移动
+        self.yaw_threshold = 0.1  # 朝向变化阈值,小于此值认为不需要转向
+        max_forward_speed = 1.5  # 最大前进速度
+        max_lateral_speed = 1.0  # 最大横向速度
+        self.max_rotation_speed = 2.0  # 最大旋转速度
+        
+        # 速度映射参数
+        min_distance = 0  # 最小距离阈值
+        max_distance = max_distance  # 最大距离阈值
+        max_distance_per_forward = 0.15  # 每步前进的最大距离
+        min_speed = 0.5  # 最小速度
+
+        delta_x, delta_y, delta_yaw = action[0], action[1], action[2]
+
+        only_rotation = False
+        
+        # 计算位置变化的距离
+        distance = np.sqrt(delta_x**2 + delta_y**2)
+        
+        # 初始化速度指令
+        forward_speed = 0.0
+        lateral_speed = 0.0
+        rotation_speed = self.max_rotation_speed
+        
+        if distance < position_threshold:
+            # 如果位置变化很小,只进行旋转
+            only_rotation = True
+            if abs(delta_yaw) > self.yaw_threshold:
+                # 根据旋转角度大小动态调整旋转速度
+                rotation_speed *= delta_yaw
+        else:
+            forward_speed = max_forward_speed
+            xy_delta_yaw = np.arctan2(delta_y, delta_x)
+            delta_degree = np.degrees(xy_delta_yaw)
+
+            angle_factor = (1 - (abs(xy_delta_yaw) * 2 / np.pi))**3
+            distance_factor = min(1.0, distance / max_distance + min_speed)
+            forward_speed *= angle_factor * distance_factor
+
+            # 旋转速度
+            if abs(xy_delta_yaw) > self.yaw_threshold:
+                rotation_speed *= xy_delta_yaw
+            else:
+                rotation_speed = 0.0 
+        
+        # limit the rotation speed to max_rotation_speed (considered the sign)
+        rotation_speed = np.clip(rotation_speed, -self.max_rotation_speed, self.max_rotation_speed)
+
+        speed_actions.append([forward_speed, lateral_speed, rotation_speed])
+        left_distance = distance - max_distance_per_forward
+
+        while left_distance > 0:
+            per_dis = min(left_distance, max_distance_per_forward)
+            left_distance -= per_dis
+            distance_factor = min(1.0, per_dis / max_distance_per_forward + min_speed)
+            forward_speed *= distance_factor
+            speed_actions.append([forward_speed, lateral_speed, 0.0])
+        
+        # rotate to the predicted_yaw action at the terminal
+        last_rotation_delta = delta_yaw - xy_delta_yaw
+        if abs(last_rotation_delta) > self.yaw_threshold:
+            rotation_speed *= last_rotation_delta
+            speed_actions.append([0, 0, rotation_speed])
+
+        return speed_actions, only_rotation
+
     
     def draw_prediction(self, un_actions, step_i):
         plt.clf()

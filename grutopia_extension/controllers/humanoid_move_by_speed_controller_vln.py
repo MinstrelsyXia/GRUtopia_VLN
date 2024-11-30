@@ -190,8 +190,8 @@ class RLPolicy:
         return self.policy
 
 
-@BaseController.register('HumanoidMoveBySpeedController')
-class HumanoidMoveBySpeedController(BaseController):
+@BaseController.register('VLNHumanoidMoveBySpeedController')
+class VLNHumanoidMoveBySpeedController(BaseController):
     """Controller class converting locomotion speed control action to joint positions for H1 robot."""
     """
     joint_names_sim and joint_names_gym define default joint orders in isaac-sim and isaac-gym.
@@ -329,7 +329,7 @@ class HumanoidMoveBySpeedController(BaseController):
             joint_positions = self.gym_adapter.gym2sim(joint_positions)
             self._old_joint_positions = joint_positions * 4
             self.applied_joint_positions = joint_positions + default_dof_pos
-            self._apply_times_left = 3
+            self._apply_times_left = 3 # !!! debug
 
         if self.joint_subset is None:
             return ArticulationAction(joint_positions=self.applied_joint_positions)
@@ -353,6 +353,7 @@ class HumanoidMoveBySpeedController(BaseController):
         return self.forward(forward_speed=action[0], lateral_speed=action[1], rotation_speed=action[2])
 
     def get_obs(self):
+        finished = self._apply_times_left <= 0
         return {
-            'finished': True,
+            'finished': finished,
         }
