@@ -346,7 +346,8 @@ class TaskEnv(VLNDataLoader):
     def _check_fall_and_stuck(self, verbose):
         status_abnormal_list, fall_list, stuck_list = self.check_and_reset_robot(cur_iter=self.current_step_list[self.env_idx], update_freemap=False, verbose=verbose)
         for status_idx, status in enumerate(status_abnormal_list):
-            if self.warm_up_list[status_idx] == 0 and status:
+            # if self.warm_up_list[status_idx] == 0 and status:
+            if status:
                 reason = 'fall' if fall_list[status_idx] else 'stuck'
                 self.episode_end_setting(self.current_split, self.current_scan, status_idx, reason)
                 self.eval_logger.warning(f"Current action has been interrupted by {reason}.")
@@ -385,7 +386,7 @@ class TaskEnv(VLNDataLoader):
         if verbose:
             self.topdown_map.draw_point(predicted_world_poses=global_positions, color=[1,0,0], current_world_pose=current_position, target_world_pose=self.data_item['reference_path'][-1], img_save_path=self.config.GT_PATH_DIR, step=self.current_step_list[self.env_idx], logger=self.eval_logger)
             
-            self.draw_prediction(predicted_action, step_i)
+            self.draw_prediction(current_yaw, predicted_action, global_yaws, step_i)
     
         return global_positions, global_quats
 
@@ -503,38 +504,81 @@ class TaskEnv(VLNDataLoader):
             speed_actions.append([0, 0, rotation_speed])
 
         return speed_actions, only_rotation
-
     
-    def draw_prediction(self, un_actions, step_i):
+    def draw_prediction(self, current_yaw, un_actions, global_yaws, step_i):
         plt.clf()
-        plt.figure(figsize=(10, 5))
-        plt.subplot(1, 2, 1)
+        fig, ax = plt.subplots(figsize=(8, 8))
+        current_position = np.array([0,0])
         
-        # Plot predicted actions with arrows
-        plt.scatter(un_actions[:, 0], un_actions[:, 1], label='pred_actions', color='blue', alpha=0.5)
+        # Set axes through origin
+        ax.spines['left'].set_position('center')
+        ax.spines['bottom'].set_position('center')
+        ax.spines['right'].set_color('none')
+        ax.spines['top'].set_color('none')
+        
+        # Plot predicted actions points and arrows
+        ax.scatter(un_actions[:, 0], un_actions[:, 1], 
+                label='Predicted Actions', color='blue', alpha=0.5)
+    
+        # Plot current position
+        ax.scatter(current_position[0], current_position[1], 
+        label='Current Position', color='red', marker='*', s=200)
+
+        # Add current orientation arrow
+        arrow_length = 0.3  # 使当前朝向箭头稍长一些以便区分
+        dx = -arrow_length * np.sin(current_yaw)
+        dy = arrow_length * np.cos(current_yaw)
+        ax.arrow(current_position[0], current_position[1],
+                dx, dy,
+                head_width=0.08,  # 使当前朝向箭头稍粗一些
+                head_length=0.15,
+                fc='red',
+                ec='red',
+                label='Current Orientation')
+        
+        # Add arrows to show orientation
+        arrow_length = 0.2
         for i in range(un_actions.shape[0]):
-            # Calculate arrow direction components using yaw angle
-            arrow_length = 0.2  # Adjust this value to change arrow length
-            dx = arrow_length * np.cos(un_actions[i, 2])
-            dy = arrow_length * np.sin(un_actions[i, 2])
+            dx = -arrow_length * np.sin(global_yaws[i])  # Swap sin/cos to match coordinate system
+            dy = arrow_length * np.cos(global_yaws[i])
             
-            # Draw arrow
-            plt.arrow(un_actions[i, 0], 
-                    un_actions[i, 1], 
-                    dx, dy, 
-                    head_width=0.05, 
-                    head_length=0.1, 
-                    fc='blue', 
+            ax.arrow(un_actions[i, 0], un_actions[i, 1],
+                    dx, dy,
+                    head_width=0.05,
+                    head_length=0.1,
+                    fc='blue',
                     ec='blue',
                     alpha=0.5)
             
-            # Add point index
-            plt.text(un_actions[i, 0], un_actions[i, 1], 
-                    i, fontsize=9, color='blue', ha='left')
+            # Add index labels
+            ax.text(un_actions[i, 0], un_actions[i, 1],
+                    f' {i}', fontsize=9, color='blue')
         
-        save_path = os.path.join(self.config.GT_PATH_DIR, f'env_predicted_actions_{self.current_step_list[self.env_idx]}_step{step_i}.png') 
-        plt.savefig(save_path)
-        self.eval_logger.info(f"Saved predicted actions to {save_path}")
+        # Set axis labels
+        ax.set_xlabel('Y-axis (meters)', x=1, ha='left')
+        ax.set_ylabel('X-axis (meters)', y=1, ha='left')
+        
+        # Add grid
+        ax.grid(True, linestyle='--', alpha=0.3)
+        
+        # Set equal axis ratio
+        ax.set_aspect('equal')
+        
+        # Auto-adjust display range and ensure origin at center
+        max_range = max(abs(un_actions[:, :2]).max() * 1.2, 1.0)  # Add 20% margin, minimum range 1m
+        ax.set_xlim(-max_range, max_range)
+        ax.set_ylim(-max_range, max_range)
+        
+        # Add legend
+        ax.legend(loc='upper right')
+        
+        # Save figure
+        save_path = os.path.join(self.config.GT_PATH_DIR, 
+                                f'env_predicted_actions_{self.current_step_list[self.env_idx]}_step{step_i}.png')
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        plt.close()
+        
+        self.eval_logger.info(f"Saved predicted actions plot to {save_path}")
         
     def compute_metrics(self, fail_reason=''):
         """计算VLN任务的评估指标
