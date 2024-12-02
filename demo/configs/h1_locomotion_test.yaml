@@ -1,0 +1,34 @@
+simulator:
+  physics_dt: 1/200
+  rendering_dt: 1/200
+
+tasks:
+- type: "SingleInferenceTask"
+  name: "h1_locomotion"
+  env_num: 1
+  offset_size: 1.0
+  scene_asset_path: assets/scenes/empty.usd
+  light_on: true
+  robots:
+  - name: h1
+    prim_path: "/World/h1"
+    type: "HumanoidRobot"
+    position: [.0, .0, 1.05]
+    scale: [1, 1, 1]
+    controller_params:
+    - name: "move_by_speed"
+    - name: "joint_controller"
+    - name: "move_to_point"
+    - name: "move_along_path"
+    - name: "rotate"
+    sensor_params:
+    - name: "camera"
+      enable: True
+    - name: "tp_camera"
+      enable: False
+    - name: "tp_pointcloud"
+      enable: True
+      size: [64, 64]
+      camera_config:
+        - no_rgb
+        - point_cloud

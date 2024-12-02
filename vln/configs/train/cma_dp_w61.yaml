@@ -243,6 +243,8 @@ MODEL:
     input_size: 2
     encoding_size: 64
     use: true
+
+    to_local_coords: false # !!!
   
   PREV_ACTION_ENCODER:
     encoding_size: 64
