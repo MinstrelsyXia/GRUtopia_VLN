@@ -18,18 +18,18 @@ class PIDSpeedController(BaseController):
         self.last_threshold = None
         
         # 速度限制
-        self.max_forward_speed = config.max_forward_speed if hasattr(config, 'max_forward_speed') else 1.0
+        self.max_forward_speed = config.max_forward_speed if hasattr(config, 'max_forward_speed') else 2.0
         self.max_rotation_speed = config.max_rotation_speed if hasattr(config, 'max_rotation_speed') else 8.0
         self.threshold = config.threshold if hasattr(config, 'threshold') else 0.02
         
         # PID 参数
-        self.Kp_linear = config.Kp_linear if hasattr(config, 'Kp_linear') else 1.0
-        self.Ki_linear = config.Ki_linear if hasattr(config, 'Ki_linear') else 0.0
-        self.Kd_linear = config.Kd_linear if hasattr(config, 'Kd_linear') else 0.1
+        self.Kp_linear = config.Kp_linear if hasattr(config, 'Kp_linear') else 1.5
+        self.Ki_linear = config.Ki_linear if hasattr(config, 'Ki_linear') else 0.01
+        self.Kd_linear = config.Kd_linear if hasattr(config, 'Kd_linear') else 0.01
         
-        self.Kp_angular = config.Kp_angular if hasattr(config, 'Kp_angular') else 1.0
-        self.Ki_angular = config.Ki_angular if hasattr(config, 'Ki_angular') else 0.1
-        self.Kd_angular = config.Kd_angular if hasattr(config, 'Kd_angular') else 0.2
+        self.Kp_angular = config.Kp_angular if hasattr(config, 'Kp_angular') else 2.5
+        self.Ki_angular = config.Ki_angular if hasattr(config, 'Ki_angular') else 0.0
+        self.Kd_angular = config.Kd_angular if hasattr(config, 'Kd_angular') else 0.01
         
         # PID 状态变量
         self.linear_error_integral = 0.0
@@ -65,7 +65,7 @@ class PIDSpeedController(BaseController):
                start_position: np.ndarray,
                start_orientation: np.ndarray,
                goal_position: np.ndarray,
-               dt: float = 0.01,
+               dt: float = 4/200,
                forward_speed = None,
                rotation_speed = None,
                threshold = None,
@@ -81,13 +81,17 @@ class PIDSpeedController(BaseController):
         dist_error = np.linalg.norm(start_position - goal_position)
         angle_error = self.get_angle(start_position, start_orientation, goal_position)
         
-        # 线速度 PID 控制
-        self.linear_error_integral += dist_error * dt
-        linear_error_derivative = (dist_error - self.prev_linear_error) / dt
-        
-        forward_speed = (self.Kp_linear * dist_error + 
-                        self.Ki_linear * self.linear_error_integral +
-                        self.Kd_linear * linear_error_derivative)
+        # 当朝向错误较大时（大于90度），停止前进
+        if abs(angle_error) > np.pi / 3:
+            forward_speed = 0
+        else:
+            # 线速度 PID 控制
+            self.linear_error_integral += dist_error * dt
+            linear_error_derivative = (dist_error - self.prev_linear_error) / dt
+            
+            forward_speed = (self.Kp_linear * dist_error + 
+                            self.Ki_linear * self.linear_error_integral +
+                            self.Kd_linear * linear_error_derivative)
         
         # 角速度 PID 控制
         self.angular_error_integral += angle_error * dt
@@ -105,12 +109,12 @@ class PIDSpeedController(BaseController):
         forward_speed = np.clip(forward_speed, -self.max_forward_speed, self.max_forward_speed)
         rotation_speed = np.clip(rotation_speed, -self.max_rotation_speed, self.max_rotation_speed)
         
-        # 当角度误差较大时降低前进速度
-        forward_speed *= (1 - (abs(angle_error) * 2 / np.pi))**2
+        # 当角度误差较大时降低前进速度（使用三次方使效果更明显）
+        forward_speed *= (1 - (abs(angle_error) * 2 / np.pi))**3
         
-        # 接近目标时降低速度
+        # 接近目标时降低速度（使用三次方使减速更平滑）
         if dist_error < self.threshold * 2:
-            forward_speed *= (dist_error / (self.threshold * 2))**2
+            forward_speed *= (dist_error / (self.threshold * 2))**3
         
         # 到达目标点时停止
         if dist_error < self.threshold:
