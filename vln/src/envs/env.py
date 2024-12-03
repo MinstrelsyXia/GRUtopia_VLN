@@ -500,6 +500,7 @@ class TaskEnv(VLNDataLoader):
         last_rotation_delta = delta_yaw - xy_delta_yaw
         if abs(last_rotation_delta) > self.yaw_threshold:
             rotation_speed *= last_rotation_delta
+            rotation_speed = np.clip(rotation_speed, -self.max_rotation_speed, self.max_rotation_speed)
             speed_actions.append([0, 0, rotation_speed])
 
         return speed_actions, only_rotation
