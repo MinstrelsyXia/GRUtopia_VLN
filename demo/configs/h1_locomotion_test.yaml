@@ -12,7 +12,7 @@ tasks:
   robots:
   - name: h1
     prim_path: "/World/h1"
-    type: "HumanoidRobot"
+    type: "HumanoidRobotVLNEval"
     position: [.0, .0, 1.05]
     scale: [1, 1, 1]
     controller_params:
@@ -21,6 +21,8 @@ tasks:
     - name: "move_to_point"
     - name: "move_along_path"
     - name: "rotate"
+    - name: "move_to_point_by_pid"
+    - name: "move_by_speed_vln"
     sensor_params:
     - name: "camera"
       enable: True
