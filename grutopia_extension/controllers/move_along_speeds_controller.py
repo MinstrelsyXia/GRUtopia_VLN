@@ -21,7 +21,7 @@ class MoveAlongSpeedsController(BaseController):
         self.current_speed: np.ndarray | None = None
         
         # 每个速度执行的时间步数
-        self.steps_per_speed = config.steps_per_speed if config.steps_per_speed is not None else 60
+        self.steps_per_speed = config.steps_per_speed if config.steps_per_speed is not None else 200
         self.current_steps = 0
 
         super().__init__(config=config, robot=robot, scene=scene)

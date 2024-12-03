@@ -23,7 +23,7 @@ import json
 from vln.src.models.LongCLIP.model import longclip
 from vln.src.models.utils.bert_token import BertTokenizer
 from vln.src.utils.logger import MyLogger, logger
-from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce, get_checkpoint_id, poll_checkpoint_folder, is_slurm_batch_job, batch_obs, FixedLengthStack, _compute_actions, get_delta, normalize_data, map_action_to_2d, save_video, get_action
+from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce, get_checkpoint_id, poll_checkpoint_folder, is_slurm_batch_job, batch_obs, FixedLengthStack, _compute_actions, get_delta, normalize_data, map_action_to_2d, save_video, get_action, to_local_coords
 from vln.src.utils.tensorboard_utils import TensorboardWriter
 from vln.src.dataset.vlnce_dp_dataset import VLNCE_DP_Dataset, collate_fn
 from vln.src.models.init_policy import initialize_policy
@@ -774,7 +774,7 @@ class DaggerDiffusonPolicyTrainer:
 
         # IMU
         if self.config.MODEL.IMU_ENCODER.use:
-            imu = torch.zeros(self.eval_env.env_nums, 2, device=self.device)
+            imu = torch.zeros(self.eval_env.env_nums, self.config.MODEL.IMU_ENCODER.input_size, device=self.device)
             batch["imu"] = imu.float()
 
         stats_episodes = {}
@@ -951,6 +951,7 @@ class DaggerDiffusonPolicyTrainer:
                             {'h1': {'stop': ['stop']}}
                         ]
                     else:
+                        target_poses, target_quats = self.eval_env.predicted_action_to_global(np.array(a), step_i=-1, verbose=self.config.test_verbose) # for debug. drawing the predicted actions
                         speed_actions = self.eval_env.get_speed_actions(a, len_traj_act=len_traj_act,verbose=self.config.test_verbose)
                         exe_action = speed_actions
                         action = [
@@ -1231,8 +1232,15 @@ class DaggerDiffusonPolicyTrainer:
             
             # IMU
             if self.config.MODEL.IMU_ENCODER.use:
+                # initialize_imu
+                batch["imu"] = torch.zeros(batch["globalgps"].shape[0], self.config.MODEL.IMU_ENCODER.input_size).to(self.device)
                 delta_pos = batch["globalgps"][:, [0,1]] - start_positions
-                batch["imu"] = delta_pos.float()
+                if self.config.MODEL.IMU_ENCODER.to_local_coords:
+                    batch["imu"][:, :2] = to_local_coords(delta_pos.float(), start_positions, start_yaws)
+                else:
+                    batch["imu"][:, :2] = delta_pos
+                if self.config.MODEL.IMU_ENCODER.input_size == 3:
+                    batch["imu"][:, 2] = batch["globalyaw"] - start_yaws
 
         if config.use_pbar:
             pbar.close()
