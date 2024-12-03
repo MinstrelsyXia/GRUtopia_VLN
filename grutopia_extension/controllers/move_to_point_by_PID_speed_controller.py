@@ -23,11 +23,11 @@ class PIDSpeedController(BaseController):
         self.threshold = config.threshold if hasattr(config, 'threshold') else 0.02
         
         # PID 参数
-        self.Kp_linear = config.Kp_linear if hasattr(config, 'Kp_linear') else 3.0
+        self.Kp_linear = config.Kp_linear if hasattr(config, 'Kp_linear') else 1.0
         self.Ki_linear = config.Ki_linear if hasattr(config, 'Ki_linear') else 0.0
         self.Kd_linear = config.Kd_linear if hasattr(config, 'Kd_linear') else 0.1
         
-        self.Kp_angular = config.Kp_angular if hasattr(config, 'Kp_angular') else 3.0
+        self.Kp_angular = config.Kp_angular if hasattr(config, 'Kp_angular') else 1.0
         self.Ki_angular = config.Ki_angular if hasattr(config, 'Ki_angular') else 0.1
         self.Kd_angular = config.Kd_angular if hasattr(config, 'Kd_angular') else 0.2
         
