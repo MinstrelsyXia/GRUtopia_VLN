@@ -1,0 +1,217 @@
+from typing import Any, Dict, List
+import numpy as np
+import torch
+from omni.isaac.core.scenes import Scene
+from omni.isaac.core.utils.rotations import quat_to_euler_angles
+from omni.isaac.core.utils.types import ArticulationAction
+
+from grutopia.core.robot.controller import BaseController
+from grutopia.core.robot.robot import BaseRobot
+import grutopia.core.util.math as math_utils
+from grutopia.core.robot.robot_model import ControllerModel
+
+@BaseController.register('PIDSpeedController')
+class PIDSpeedController(BaseController):
+    def __init__(self, config: ControllerModel, robot: BaseRobot, scene: Scene) -> None:
+        # 基础参数
+        self.goal_position = None
+        
+        # 速度限制
+        self.max_linear_speed = config.max_linear_speed if hasattr(config, 'max_linear_speed') else 2.0
+        self.max_rotation_speed = config.max_rotation_speed if hasattr(config, 'max_rotation_speed') else 1.0
+        self.threshold = config.threshold if hasattr(config, 'threshold') else 0.02
+        
+        # 距离控制PID参数
+        self.Kp_distance = config.Kp_distance if hasattr(config, 'Kp_distance') else 1.0
+        self.Ki_distance = config.Ki_distance if hasattr(config, 'Ki_distance') else 0.0
+        self.Kd_distance = config.Kd_distance if hasattr(config, 'Kd_distance') else 0.1
+        
+        # 角度控制PID参数
+        self.Kp_angular = config.Kp_angular if hasattr(config, 'Kp_angular') else 1.0
+        self.Ki_angular = config.Ki_angular if hasattr(config, 'Ki_angular') else 0.0
+        self.Kd_angular = config.Kd_angular if hasattr(config, 'Kd_angular') else 0.1
+        
+        # PID状态变量
+        self.distance_error_integral = 0.0
+        self.angular_error_integral = 0.0
+        self.prev_distance_error = 0.0
+        self.prev_angular_error = 0.0
+        
+        # 积分限幅和分离阈值
+        self.max_integral_distance = config.max_integral_distance if hasattr(config, 'max_integral_distance') else 1.0
+        self.max_integral_angular = config.max_integral_angular if hasattr(config, 'max_integral_angular') else 1.0
+        self.integral_threshold_distance = config.integral_threshold_distance if hasattr(config, 'integral_threshold_distance') else 0.5
+        self.integral_threshold_angular = config.integral_threshold_angular if hasattr(config, 'integral_threshold_angular') else np.pi/6
+        
+        # 平滑控制阈值
+        self.distance_smooth_threshold = config.distance_smooth_threshold if hasattr(config, 'distance_smooth_threshold') else 1.0
+        self.angle_smooth_threshold = config.angle_smooth_threshold if hasattr(config, 'angle_smooth_threshold') else np.pi/6
+        
+        super().__init__(config=config, robot=robot, scene=scene)
+
+    
+    def get_angular_velocity(self):
+        imu_link = self.robot._imu_link
+        imu_pose_w = imu_link.get_world_pose()
+        imu_quat_w = torch.tensor(imu_pose_w[1]).reshape(1, -1)
+        imu_ang_vel_w = torch.tensor(imu_link.get_angular_velocity()[:]).reshape(1, -1)
+        imu_ang_vel = np.array(math_utils.quat_rotate_inverse(imu_quat_w, imu_ang_vel_w).reshape(-1))
+        imu_ang_vel = imu_ang_vel * np.pi / 180.0
+        return imu_ang_vel[-1]
+        
+
+    @staticmethod
+    def get_angle(start_position, start_orientation, goal_position):
+        """计算当前朝向与目标方向之间的夹角"""
+        normal_vec = np.array([0, 0, 1])
+        robot_z_rot = quat_to_euler_angles(start_orientation)[-1]
+        
+        robot_vec = np.array([np.cos(robot_z_rot), np.sin(robot_z_rot), 0])
+        robot_vec /= np.linalg.norm(robot_vec)
+        
+        target_vec = (goal_position - start_position)
+        if np.linalg.norm(target_vec) == 0:
+            return 0
+        target_vec /= np.linalg.norm(target_vec)
+        
+        dot_prod = np.clip(np.dot(robot_vec, target_vec), -1.0, 1.0)
+        cross_prod = np.cross(robot_vec, target_vec)
+        
+        angle = np.arccos(dot_prod)
+        angle_sign = np.sign(np.dot(normal_vec, cross_prod))
+        
+        return angle * angle_sign
+
+    def forward(self,
+               start_position: np.ndarray,
+               start_orientation: np.ndarray,
+               goal_position: np.ndarray,
+               dt: float = 4/200) -> ArticulationAction:
+        
+        current_position = np.array(start_position)
+        goal_position = np.array(goal_position)
+        
+        # 计算距离误差和方向
+        position_error = goal_position - current_position
+        distance_error = np.linalg.norm(position_error)
+        
+        # 计算目标角度和当前角度
+        angle_error = self.get_angle(start_position, start_orientation, goal_position)
+
+        # 距离PID控制
+        if distance_error < self.integral_threshold_distance:
+            self.distance_error_integral += distance_error * dt
+        else:
+            self.distance_error_integral = 0
+            
+        self.distance_error_integral = np.clip(
+            self.distance_error_integral,
+            -self.max_integral_distance,
+            self.max_integral_distance
+        )
+        
+        if distance_error * self.prev_distance_error < 0:
+            self.distance_error_integral = 0
+            
+        distance_error_derivative = (distance_error - self.prev_distance_error) / dt
+        
+        linear_speed = (self.Kp_distance * distance_error +
+                       self.Ki_distance * self.distance_error_integral +
+                       self.Kd_distance * distance_error_derivative)
+        
+        # 角度PID控制
+        if abs(angle_error) < self.integral_threshold_angular:
+            self.angular_error_integral += angle_error * dt
+        else:
+            self.angular_error_integral = 0
+            
+        self.angular_error_integral = np.clip(
+            self.angular_error_integral,
+            -self.max_integral_angular,
+            self.max_integral_angular
+        )
+        
+        if angle_error * self.prev_angular_error < 0:
+            self.angular_error_integral = 0
+            
+        angular_error_derivative = (angle_error - self.prev_angular_error) / dt
+        
+        rotation_speed = (self.Kp_angular * angle_error +
+                         self.Ki_angular * self.angular_error_integral +
+                         self.Kd_angular * angular_error_derivative)
+        
+        # 更新误差记录
+        self.prev_distance_error = distance_error
+        self.prev_angular_error = angle_error
+        
+        # 将线性速度分解为forward和lateral方向
+        forward_speed = linear_speed * np.cos(angle_error)
+        lateral_speed = linear_speed * np.sin(angle_error)
+        
+        # 速度限制
+        linear_speed_magnitude = np.sqrt(forward_speed**2 + lateral_speed**2)
+        if linear_speed_magnitude > self.max_linear_speed:
+            scale = self.max_linear_speed / linear_speed_magnitude
+            forward_speed *= scale
+            lateral_speed *= scale
+            
+        rotation_speed = np.clip(rotation_speed, 
+                                -self.max_rotation_speed, 
+                                self.max_rotation_speed)
+        
+        # 平滑处理：当接近目标时降低速度
+        distance_threshold = 1.0
+        angle_threshold = np.pi / 6
+        
+        if distance_error < distance_threshold:
+            scale = (distance_error / distance_threshold) ** 2
+            forward_speed *= scale
+            lateral_speed *= scale
+            
+        if abs(angle_error) < angle_threshold:
+            rotation_speed *= (abs(angle_error) / angle_threshold) ** 2
+
+        # 到达目标点时停止
+        if distance_error < self.threshold:
+            self.reset_pid_states()
+            return self.sub_controllers[0].forward(
+                forward_speed=0.0,
+                rotation_speed=0.0,
+                lateral_speed=0.0,
+            )
+        
+        return self.sub_controllers[0].forward(
+            forward_speed=forward_speed,
+            rotation_speed=rotation_speed,
+            lateral_speed=lateral_speed,
+        )
+
+    def reset_pid_states(self):
+        """重置PID控制器状态"""
+        self.distance_error_integral = 0.0
+        self.angular_error_integral = 0.0
+        self.prev_distance_error = 0.0
+        self.prev_angular_error = 0.0
+
+    def action_to_control(self, action: List | np.ndarray) -> ArticulationAction:
+        """转换输入动作为关节控制信号"""
+        assert len(action) == 1, 'action must contain 1 elements'
+        start_position, start_orientation = self.robot.get_world_pose()
+        return self.forward(
+            start_position=start_position,
+            start_orientation=start_orientation,
+            goal_position=np.array(action[0])
+        )
+
+    def get_obs(self) -> Dict[str, Any]:
+        """获取控制器状态信息"""
+        if self.goal_position is None:
+            return {}
+        start_position = self.robot.get_world_pose()[0]
+        start_position[-1] = 0
+        dist_from_goal = np.linalg.norm(start_position - self.goal_position)
+        finished = dist_from_goal < self.threshold
+        return {
+            'finished': finished,
+            'distance_to_goal': dist_from_goal
+        }

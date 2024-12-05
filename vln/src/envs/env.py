@@ -9,6 +9,7 @@ import numpy as np
 import copy
 import torch
 import matplotlib.pyplot as plt
+import json
 
 from vln.src.dataset.data_utils_multi_env import VLNDataLoader, load_scene_usd
 from vln.src.utils.utils import to_global_coords
@@ -47,7 +48,7 @@ class TaskEnv(VLNDataLoader):
 
         self.is_app_up = False
     
-    def manage_eval_data(self, reset_split=False, step_time=0):
+    def manage_eval_data(self, reset_split=False, step_time=0, result_json_path=None):
         ''' Manage the data for eval process
         '''
         if reset_split:
@@ -60,6 +61,15 @@ class TaskEnv(VLNDataLoader):
             
             self.finish_scans = []
             self.current_episode_idx = -1 # this is not episode_id in data. but the location in data. # !!! DEBUG. should be -1
+            if result_json_path is not None:
+                self.result_json_path = result_json_path
+                # jump the existing episode_id in result_json_path
+                with open(self.result_json_path, 'r') as f:
+                    loaded_results = json.load(f)
+                    if len(loaded_results) > 0:
+                        loaded_results = loaded_results[self.current_split]
+                        self.current_episode_idx = len(loaded_results) - 1
+            
             self.current_scan_data = self.data[self.current_split]
             self.number_of_episodes = [len(self.current_scan_data[scan]) for scan in self.current_scan_data.keys()]
             self.current_scan_list = list(self.current_scan_data.keys())
@@ -106,11 +116,11 @@ class TaskEnv(VLNDataLoader):
         
         return self.current_scan, self.data_item, reset_scene
     
-    def construct_env(self, init_omni_env=False, split=None, path_id_list=None, step_time=0):
+    def construct_env(self, init_omni_env=False, split=None, path_id_list=None, step_time=0, result_json_path=None):
         reset_split = True if len(self.current_split) == 0 else False
-        scan, item, reset_scene = self.manage_eval_data(reset_split, step_time)
+        scan, item, reset_scene = self.manage_eval_data(reset_split, step_time, result_json_path=result_json_path)
         if scan is None:
-            scan, item, reset_scene = self.manage_eval_data(reset_split=True, step_time=step_time)
+            scan, item, reset_scene = self.manage_eval_data(reset_split=True, step_time=step_time, result_json_path=result_json_path)
             if scan is None:
                 # two splits have been evaluated.
                 return None
@@ -257,7 +267,8 @@ class TaskEnv(VLNDataLoader):
         if action_name == 'stop':
             dones = [True]
         else:
-            dones, reason = self._execute_action(actions, action_name, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose, check_fall_and_stuck)
+            if len(actions) > 0:
+                dones, reason = self._execute_action(actions, action_name, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose, check_fall_and_stuck)
             
             if rot_action is not None:
                 dones, reason = self._execute_action(rot_action, action_name, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose, check_fall_and_stuck)
@@ -349,12 +360,12 @@ class TaskEnv(VLNDataLoader):
             # if self.warm_up_list[status_idx] == 0 and status:
             if status:
                 reason = 'fall' if fall_list[status_idx] else 'stuck'
-                self.episode_end_setting(self.current_split, self.current_scan, status_idx, reason)
+                # self.episode_end_setting(self.current_split, self.current_scan, status_idx, reason)
                 self.eval_logger.warning(f"Current action has been interrupted by {reason}.")
                 return [True], reason
         return [False], ''
     
-    def predicted_action_to_global(self, predicted_action, step_i,verbose=False):
+    def predicted_action_to_global(self, predicted_action, step_i, len_traj_act=None, verbose=False):
         """
         将预测的单个动作转换为全局坐标系下的位置
         
@@ -374,6 +385,8 @@ class TaskEnv(VLNDataLoader):
         original_yaw = copy.copy(current_yaw)
         current_yaw = np.arctan2(np.sin(current_yaw), np.cos(current_yaw))
         
+        if isinstance(predicted_action, list):
+            predicted_action = np.array(predicted_action)
         global_positions, global_yaws = to_global_coords(predicted_action, current_position, current_yaw)
         N = len(global_yaws)
         euler_angles = np.zeros((N, 3))  # [N, 3] array of [roll, pitch, yaw]
@@ -387,8 +400,51 @@ class TaskEnv(VLNDataLoader):
             self.topdown_map.draw_point(predicted_world_poses=global_positions, color=[1,0,0], current_world_pose=current_position, target_world_pose=self.data_item['reference_path'][-1], img_save_path=self.config.GT_PATH_DIR, step=self.current_step_list[self.env_idx], logger=self.eval_logger)
             
             self.draw_prediction(current_yaw, predicted_action, global_yaws, step_i)
+        
+        exe_actions = self.convert_xyyaw_actions(global_positions, global_quats, len_traj_act)
     
-        return global_positions, global_quats
+        return global_positions, global_quats, exe_actions
+
+    def convert_xyyaw_actions(self, global_positions, global_quats, len_traj_act):
+        '''Further adjust target points and orientations based on distance thresholds
+        
+        Args:
+            global_positions (np.ndarray): Array of global position coordinates [[x,y,z], ...]
+            global_quats (list): List of quaternion orientations [[w,x,y,z], ...]
+            
+        Returns:
+            exe_actions (list): List of selected positions and orientations based on distance threshold
+        '''
+        # Initialize variables
+        exe_actions = []
+        cumulative_distance = 0
+        distance_threshold = 0.25  # Threshold for adding new waypoint (in meters)
+        last_pos = global_positions[0]
+        
+        if len_traj_act is None:
+            len_traj_act = len(global_positions)
+        
+        # Iterate through positions to find waypoints based on cumulative distance
+        for i in range(1, len(global_positions)):
+            current_pos = global_positions[i]
+            # Calculate distance from last added position
+            distance = np.linalg.norm(current_pos - last_pos)
+            cumulative_distance += distance
+            
+            # If cumulative distance exceeds threshold, add new waypoint
+            if cumulative_distance >= distance_threshold:
+                exe_actions.append(current_pos)
+                # Reset cumulative distance and update last position
+                cumulative_distance = 0
+                last_pos = current_pos
+                
+                if len(exe_actions) == len_traj_act:
+                    break
+        
+        # Always add final orientation in exe_actions
+        exe_actions.append(global_quats[i])
+        
+        return exe_actions
 
     def get_speed_actions(self, predicted_actions, len_traj_act, verbose=False):
         """将预测的位置变化序列转换为速度控制指令序列
@@ -441,15 +497,15 @@ class TaskEnv(VLNDataLoader):
         # 设置阈值参数
         position_threshold = float(self.config.EVAL.rotation_threshold)  # 位置变化阈值,小于此值认为不需要移动
         self.yaw_threshold = 0.1  # 朝向变化阈值,小于此值认为不需要转向
-        max_forward_speed = 1.5  # 最大前进速度
+        max_forward_speed = 1.0  # 最大前进速度
         max_lateral_speed = 1.0  # 最大横向速度
         self.max_rotation_speed = 2.0  # 最大旋转速度
         
         # 速度映射参数
         min_distance = 0  # 最小距离阈值
         max_distance = max_distance  # 最大距离阈值
-        max_distance_per_forward = 0.15  # 每步前进的最大距离
-        min_speed = 0.5  # 最小速度
+        max_distance_per_forward = 0.5  # 每步前进的最大距离
+        min_speed = 0.2  # 最小速度
 
         delta_x, delta_y, delta_yaw = action[0], action[1], action[2]
 
@@ -493,7 +549,7 @@ class TaskEnv(VLNDataLoader):
         while left_distance > 0:
             per_dis = min(left_distance, max_distance_per_forward)
             left_distance -= per_dis
-            distance_factor = min(1.0, per_dis / max_distance_per_forward + min_speed)
+            distance_factor = min(1.0, left_distance / max_distance_per_forward + min_speed)
             forward_speed *= distance_factor
             speed_actions.append([forward_speed, lateral_speed, 0.0])
         

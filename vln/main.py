@@ -76,6 +76,8 @@ def vis_one_path(args, vln_envs):
     # get the specific path
     vln_envs = vln_envs[args.split]
     data_item = vln_envs.init_one_path(args.path_id)
+    if data_item is None:
+        return # not found the path
     env = vln_envs.env
     
     paths = data_item['reference_path']

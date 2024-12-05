@@ -35,11 +35,13 @@ EVAL:
   USE_CKPT_CONFIG: False
   SAVE_RESULTS: True
   # SPLIT: [val_seen, val_unseen]
-  SPLIT: [val_seen]
+  SPLIT: [train]
   EPISODE_COUNT: -1
   MAX_STEPS: 195
   train_eval_interval: 100
   ACTION: speed # descrete or xyyaw or speed
+
+  re_eval: false # if true, will re-evaluate the episodes in the result_json_path
 
   # for xyyaw
   success_distance: 3.0

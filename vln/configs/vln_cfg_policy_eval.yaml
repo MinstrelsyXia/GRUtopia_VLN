@@ -23,7 +23,7 @@ settings:
     - topdown_camera_500
   
   max_step: 25000
-  per_action_max_step: 3000
+  per_action_max_step: 1500
 
 robots:
   - name: "CylinderRobot"
