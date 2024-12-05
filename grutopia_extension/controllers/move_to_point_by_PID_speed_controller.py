@@ -37,6 +37,10 @@ class PIDSpeedController(BaseController):
         self.prev_linear_error = 0.0
         self.prev_angular_error = 0.0
         
+        # 添加积分限幅
+        self.max_integral_angular = 1.0  # 积分项最大值
+        self.integral_threshold = np.pi / 6  # 积分分离阈值
+        
         super().__init__(config=config, robot=robot, scene=scene)
 
     @staticmethod
@@ -70,7 +74,7 @@ class PIDSpeedController(BaseController):
                rotation_speed = None,
                threshold = None,
                ) -> ArticulationAction:
-        """使用 PID 控制计算前进和旋转速度"""
+        """使用 PID 控制计算前进旋转速度"""
         # 忽略 z 轴分量
         start_position[-1] = 0
         goal_position[-1] = 0
@@ -94,9 +98,24 @@ class PIDSpeedController(BaseController):
                             self.Kd_linear * linear_error_derivative)
         
         # 角速度 PID 控制
-        self.angular_error_integral += angle_error * dt
-        angular_error_derivative = (angle_error - self.prev_angular_error) / dt
+        # 积分分离：误差太大时不积分
+        if abs(angle_error) < self.integral_threshold:
+            self.angular_error_integral += angle_error * dt
+        else:
+            self.angular_error_integral = 0
+            
+        # 积分限幅
+        self.angular_error_integral = np.clip(
+            self.angular_error_integral, 
+            -self.max_integral_angular, 
+            self.max_integral_angular
+        )
         
+        # 如果误差改变方向，重置积分
+        if angle_error * self.prev_angular_error < 0:
+            self.angular_error_integral = 0
+            
+        angular_error_derivative = (angle_error - self.prev_angular_error) / dt
         rotation_speed = (self.Kp_angular * angle_error +
                          self.Ki_angular * self.angular_error_integral +
                          self.Kd_angular * angular_error_derivative)
@@ -108,6 +127,11 @@ class PIDSpeedController(BaseController):
         # 速度限制和调整
         forward_speed = np.clip(forward_speed, -self.max_forward_speed, self.max_forward_speed)
         rotation_speed = np.clip(rotation_speed, -self.max_rotation_speed, self.max_rotation_speed)
+        
+        # 当角度误差较小时降低旋转速度（新增）
+        # angle_threshold = np.pi / 6  # 30度
+        # if abs(angle_error) < angle_threshold:
+        #     rotation_speed *= (abs(angle_error) / angle_threshold) ** 3
         
         # 当角度误差较大时降低前进速度（使用三次方使效果更明显）
         forward_speed *= (1 - (abs(angle_error) * 2 / np.pi))**3

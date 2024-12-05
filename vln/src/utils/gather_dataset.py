@@ -7,8 +7,8 @@ from vln.src.dataset.data_utils import load_data
 class datasetGather:
     def __init__(self, args):
         self.args = args
-        # self.splits = ['train', 'val_seen', 'val_unseen', 'test']
-        self.splits = ['envdrop']
+        self.splits = ['train', 'val_seen', 'val_unseen', 'test']
+        # self.splits = ['envdrop']
         self.data = {split: [] for split in self.splits}
         self.scan = {}
         for split in self.splits:
@@ -39,8 +39,15 @@ class datasetGather:
         
         return scan2data
 
+def read_gather_data(gather_data_path):
+    with open(gather_data_path, 'r') as f:
+        gather_data = json.load(f)
+    return gather_data
+
 
 if __name__ == "__main__":
     args, _ = process_args()
     dataset_gather = datasetGather(args)
-    scan2data = dataset_gather.gatherSameScanData(save_gather_data=True, save_dir='gather_data/')
+    # scan2data = dataset_gather.gatherSameScanData(save_gather_data=True, save_dir='gather_data/')
+    
+    read_gather_data('gather_data/train_gather_data.json')

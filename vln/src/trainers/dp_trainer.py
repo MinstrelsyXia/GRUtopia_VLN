@@ -127,8 +127,8 @@ class DaggerDiffusonPolicyTrainer:
             eval_logger_filename = os.path.join(log_dir, f"{self.split_names}_eval.log")
             if self.config.EVAL.start_eval_epoch != -1:
                 eval_logger_filename = os.path.join(log_dir, f"{self.config.EVAL.SPLIT}_eval_{self.config.EVAL.start_eval_epoch}.log")
-            # if os.path.exists(eval_logger_filename):
-            #     os.remove(eval_logger_filename)
+            if os.path.exists(eval_logger_filename):
+                os.remove(eval_logger_filename)
             self.eval_logger = MyLogger(
                 name="eval", level=logging.INFO, format_str="%(asctime)-15s %(message)s",
                 filename=eval_logger_filename
@@ -139,6 +139,13 @@ class DaggerDiffusonPolicyTrainer:
                     lines = f.readlines()
                     if len(lines) > 0:
                         last_line = lines[-1]
+            
+            # create result jsons
+            self.result_json_path = os.path.join(log_dir, f"{self.split_names}_results.json")
+            if not os.path.exists(self.result_json_path) or self.config.EVAL.re_eval:
+                with open(self.result_json_path, 'w') as f:
+                    json.dump({}, f)
+                self.eval_logger.info(f"Create new result json: {self.result_json_path}")
 
             self.eval_results = extract_best_eval_results(log_file=eval_logger_filename, split=self.config.EVAL.SPLIT)
             self.eval_logger.info(f"Start Eval! Good Luck!!!")
@@ -702,7 +709,7 @@ class DaggerDiffusonPolicyTrainer:
                 return 0, 0
 
         '''Init the task env'''
-        self.eval_env.construct_env(init_omni_env=True)
+        self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
 
         self.policy, _ = initialize_policy(
             self.config,
@@ -910,39 +917,20 @@ class DaggerDiffusonPolicyTrainer:
                             {'h1': {'stop': ['stop']}}
                         ]
                     else:
-                        target_poses, target_quats = self.eval_env.predicted_action_to_global(a, step_i=-1, verbose=self.config.test_verbose)
-                            
-                        if self.config.EVAL.use_dynamic_len_traj_act:
-                            # 计算自适应的len_traj_act
-                            adaptive_len = self.config.EVAL.min_len_traj_act
-                            min_displacement = self.config.EVAL.min_displacement 
-                            max_len = min(len(target_poses), self.config.EVAL.max_len_traj_act)  # 配置文件中添加最大长度限制
-                            
-                            while adaptive_len < max_len:
-                                # 计算当前长度下的总位移
-                                current_poses = target_poses[:adaptive_len]
-                                total_displacement = np.linalg.norm(current_poses[-1] - current_poses[0])
-                                
-                                if total_displacement >= min_displacement:
-                                    break
-                                
-                                adaptive_len += 1
-                        else:
-                            adaptive_len = len_traj_act
+                        target_poses, target_quats, exe_actions = self.eval_env.predicted_action_to_global(a, step_i=-1, verbose=self.config.test_verbose, len_traj_act=len_traj_act)
                         
                         # TODO: check if all nodes are valid on the map?
-                        
-                        exe_action = target_poses[:adaptive_len]
-                        action = [
-                            {'h1': {'move_along_path': [exe_action]}}
-                        ]
+                        action = []
+                        if len(exe_actions) > 1:
+                            action = [
+                                {'h1': {'move_along_path': [exe_actions[:-1]]}}
+                            ]
                         rot_action = [
-                            {'h1': {'rotate': [target_quats[adaptive_len-1]]}}
+                            {'h1': {'rotate': [exe_actions[-1]]}}
                         ]
-
                         outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, rot_action)
-                        steps[0] += adaptive_len
-                        total_actions.append(exe_action)
+                        steps[0] += len(exe_actions)
+                        total_actions.append(exe_actions)
 
             elif self.config.EVAL.ACTION == 'speed':
                 for a_i, a in enumerate(actions):
@@ -951,7 +939,7 @@ class DaggerDiffusonPolicyTrainer:
                             {'h1': {'stop': ['stop']}}
                         ]
                     else:
-                        target_poses, target_quats = self.eval_env.predicted_action_to_global(np.array(a), step_i=-1, verbose=self.config.test_verbose) # for debug. drawing the predicted actions
+                        # target_poses, target_quats, exe_actions = self.eval_env.predicted_action_to_global(np.array(a), step_i=-1, verbose=self.config.test_verbose) # for debug. drawing the predicted actions
                         speed_actions = self.eval_env.get_speed_actions(a, len_traj_act=len_traj_act,verbose=self.config.test_verbose)
                         exe_action = speed_actions
                         action = [
@@ -1111,6 +1099,12 @@ class DaggerDiffusonPolicyTrainer:
                 
                 '''The i-th episode has done'''
                 self.eval_logger.info(f"*******Episode {current_episodes['episode_id']} has done")
+                # Log episode metrics
+                for metric_name, metric_value in infos[i].items():
+                    self.eval_logger.info(f"{metric_name}: {metric_value:.3f}")
+                
+                self.update_result_json(self.result_json_path, infos[i])
+                
                 ep_id = current_episodes['episode_id']
                 stats_episodes[ep_id] = infos[i]
 
@@ -1276,6 +1270,13 @@ class DaggerDiffusonPolicyTrainer:
         return stats_episodes
         
         # stats_episodes{ep_id} = self.compute_metric(ep)
+    
+    def update_result_json(self, result_json_path, episode_info):
+        with open(result_json_path, 'r') as f:
+            data = json.load(f)
+        data[self.eval_env.current_split].append(episode_info)
+        with open(result_json_path, 'w') as f:
+            json.dump(data, f, indent=4)
 
 def plot_spl_list(spl_list):
     # Create a figure and axis

@@ -28,8 +28,9 @@ robot_name = env.config.tasks[0].robots[0].name
 
 # path = [(1.0, 0.0, 0.0), (1.0, 1.0, 0.0), (3.0, 4.0, 0.0)]
 # path = [(1.0, 1.0, 0.0), (2.0, 1.0, 0.0), (1.0, 0.0, 0.0)]
-# path = [(1.0, 1.0, 0.0), (2.0, 0.0, 0.0), (1,-1,0), (0.0, 0.0, 0.0)]
-path = [(0.0, 0.0, 0.0), (1.0, 1.0, 0.0), (2.0, 0.0, 0.0), (3.0, 1.0, 0.0), (4.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
+path = [(1.0, 1.0, 0.0), (2.0, 0.0, 0.0), (1,-1,0), (0.0, 0.0, 0.0)]
+# path = [(0.0, 0.0, 0.0), (1.0, 1.0, 0.0), (2.0, 0.0, 0.0), (3.0, 1.0, 0.0), (4.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
+# path = [(-16.13786617, -0.057196334, 0.9983636), (-15.83261376, -0.47610778, 0.8799999), (-15.60473542, -0.23504831, 0.9733878)]
 
 i = 0
 
@@ -58,6 +59,56 @@ record_distance_errors = []
 record_yaw_errors = []
 trajectory_x = []
 trajectory_y = []
+
+# Plot the errors
+def plot_figure():
+    plt.figure(figsize=(15, 5))
+
+    # Plot trajectory with orientation arrows
+    plt.subplot(1, 3, 1)
+    path_x = [p[0] for p in path]
+    path_y = [p[1] for p in path]
+    plt.plot(path_x, path_y, 'r--o', label='Planned Path')
+    plt.plot(trajectory_x, trajectory_y, 'b-', label='Actual Trajectory')
+
+    # Add orientation arrows (plot every nth point to avoid cluttering)
+    n = 4  # Adjust this value to change arrow density
+    for i in range(0, len(trajectory_x), n):
+        if i < len(record_yaw):
+            dx = 0.2 * np.cos(record_yaw[i])  # Arrow length in x direction
+            dy = 0.2 * np.sin(record_yaw[i])  # Arrow length in y direction
+            plt.arrow(trajectory_x[i], trajectory_y[i], dx, dy,
+                    head_width=0.05, head_length=0.1, fc='g', ec='g', alpha=0.5)
+
+    plt.xlabel('X (m)')
+    plt.ylabel('Y (m)')
+    plt.title('Robot Trajectory with Orientation')
+    plt.grid(True)
+    plt.legend()
+    plt.axis('equal')  # Make the plot aspect ratio 1:1
+
+    # Plot distance error
+    plt.subplot(1, 3, 2)
+    plt.plot(record_steps, record_distance_errors)
+    plt.xlabel('Steps')
+    plt.ylabel('Distance Error (m)')
+    plt.title('Distance Error vs Steps')
+    plt.grid(True)
+
+    # Plot yaw error
+    plt.subplot(1, 3, 3)
+    plt.plot(record_steps, record_yaw_errors)
+    plt.xlabel('Steps')
+    plt.ylabel('Yaw Error (rad)')
+    plt.title('Yaw Error vs Steps')
+    plt.grid(True)
+
+    plt.tight_layout()
+    save_path = './locomotion_errors.png'
+    plt.savefig(save_path)
+    plt.show()
+
+    print(f"img has been saved to {save_path}")
 
 while env.simulation_app.is_running():
     i += 1
@@ -158,51 +209,5 @@ while env.simulation_app.is_running():
 
 # env.simulation_app.close()
 
-# Plot the errors
-plt.figure(figsize=(15, 5))
 
-# Plot trajectory with orientation arrows
-plt.subplot(1, 3, 1)
-path_x = [p[0] for p in path]
-path_y = [p[1] for p in path]
-plt.plot(path_x, path_y, 'r--o', label='Planned Path')
-plt.plot(trajectory_x, trajectory_y, 'b-', label='Actual Trajectory')
-
-# Add orientation arrows (plot every nth point to avoid cluttering)
-n = 4  # Adjust this value to change arrow density
-for i in range(0, len(trajectory_x), n):
-    if i < len(record_yaw):
-        dx = 0.2 * np.cos(record_yaw[i])  # Arrow length in x direction
-        dy = 0.2 * np.sin(record_yaw[i])  # Arrow length in y direction
-        plt.arrow(trajectory_x[i], trajectory_y[i], dx, dy,
-                 head_width=0.05, head_length=0.1, fc='g', ec='g', alpha=0.5)
-
-plt.xlabel('X (m)')
-plt.ylabel('Y (m)')
-plt.title('Robot Trajectory with Orientation')
-plt.grid(True)
-plt.legend()
-plt.axis('equal')  # Make the plot aspect ratio 1:1
-
-# Plot distance error
-plt.subplot(1, 3, 2)
-plt.plot(record_steps, record_distance_errors)
-plt.xlabel('Steps')
-plt.ylabel('Distance Error (m)')
-plt.title('Distance Error vs Steps')
-plt.grid(True)
-
-# Plot yaw error
-plt.subplot(1, 3, 3)
-plt.plot(record_steps, record_yaw_errors)
-plt.xlabel('Steps')
-plt.ylabel('Yaw Error (rad)')
-plt.title('Yaw Error vs Steps')
-plt.grid(True)
-
-plt.tight_layout()
-save_path = './locomotion_errors.png'
-plt.savefig(save_path)
-plt.show()
-
-print(f"img has been saved to {save_path}")
+plot_figure()
