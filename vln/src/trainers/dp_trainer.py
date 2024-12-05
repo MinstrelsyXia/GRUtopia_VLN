@@ -144,7 +144,7 @@ class DaggerDiffusonPolicyTrainer:
             self.result_json_path = os.path.join(log_dir, f"{self.split_names}_results.json")
             if not os.path.exists(self.result_json_path) or self.config.EVAL.re_eval:
                 with open(self.result_json_path, 'w') as f:
-                    json.dump({}, f)
+                    json.dump(defaultdict(list), f)
                 self.eval_logger.info(f"Create new result json: {self.result_json_path}")
 
             self.eval_results = extract_best_eval_results(log_file=eval_logger_filename, split=self.config.EVAL.SPLIT)
@@ -1101,7 +1101,10 @@ class DaggerDiffusonPolicyTrainer:
                 self.eval_logger.info(f"*******Episode {current_episodes['episode_id']} has done")
                 # Log episode metrics
                 for metric_name, metric_value in infos[i].items():
-                    self.eval_logger.info(f"{metric_name}: {metric_value:.3f}")
+                    if metric_name == "fail_reason":
+                        self.eval_logger.info(f"{metric_name}: {metric_value}")
+                    else:
+                        self.eval_logger.info(f"{metric_name}: {metric_value:.3f}")
                 
                 self.update_result_json(self.result_json_path, infos[i])
                 
@@ -1274,6 +1277,8 @@ class DaggerDiffusonPolicyTrainer:
     def update_result_json(self, result_json_path, episode_info):
         with open(result_json_path, 'r') as f:
             data = json.load(f)
+        if self.eval_env.current_split not in data:
+            data[self.eval_env.current_split] = []
         data[self.eval_env.current_split].append(episode_info)
         with open(result_json_path, 'w') as f:
             json.dump(data, f, indent=4)
