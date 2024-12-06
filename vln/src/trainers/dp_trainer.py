@@ -227,7 +227,7 @@ class DaggerDiffusonPolicyTrainer:
                 batch_size=self.config.IL.batch_size,
                 shuffle=False,
                 collate_fn=collate_fn,
-                pin_memory=False,
+                pin_memory=True,
                 drop_last=True,  # drop last batch if smaller
                 num_workers=4,
             )
@@ -279,15 +279,15 @@ class DaggerDiffusonPolicyTrainer:
 
                     if self.local_rank < 1:
                         losses.append(loss)
-
-                        logger.info(f"train_loss: {loss}")
-                        logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
-                        logger.info(f"train_dist_loss: {dist_loss}")
-                        logger.info(f"train_aux_loss: {aux_loss}")
-                        logger.info(f"Batches processed: {step_id}.")
-                        logger.info(
-                            f"On DAgger iter {dagger_it}, Epoch {epoch}."
-                        )
+                        if step_id % 300 == 0:
+                            logger.info(f"train_loss: {loss}")
+                            logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
+                            logger.info(f"train_dist_loss: {dist_loss}")
+                            logger.info(f"train_aux_loss: {aux_loss}")
+                            logger.info(f"Batches processed: {step_id}.")
+                            logger.info(
+                                f"On DAgger iter {dagger_it}, Epoch {epoch}."
+                            )
                         writer.add_scalar(
                             f"train_loss_iter_{dagger_it}", loss, step_id
                         )
