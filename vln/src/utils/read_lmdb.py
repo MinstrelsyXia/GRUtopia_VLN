@@ -226,6 +226,8 @@ if __name__ == '__main__':
         '''1. Load all data'''
         # all_data = data_collector.read_all_episode_data()
         # path_id_list = all_data.keys()
+        # path_id_list = [1220, 476, 531, 67, 883, 94]
+        # path_id_list = [str(x) for x in path_id_list]
         # for path_id in path_id_list:
         #     episode_data = data_collector.read_episode_data(path_id)
         #     ## save to the video
@@ -233,7 +235,7 @@ if __name__ == '__main__':
         #         data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)
 
         '''2. Load the target path_id'''
-        path_id = '94'
+        path_id = '1407'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
         if episode_data is not None:

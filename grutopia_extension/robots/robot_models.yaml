@@ -293,8 +293,8 @@ robots:
     Ki_linear: 0.0
     Kd_linear: 0.01
     Kp_angular: 2.5
-    Ki_angular: 0
-    Kd_angular: 0.01
+    Ki_angular: 0.0
+    Kd_angular: 0.05
     sub_controllers:
     - name: move_by_speed
   - name: "move_along_speeds"

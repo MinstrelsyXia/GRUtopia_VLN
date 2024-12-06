@@ -4,8 +4,9 @@ flags_sample_episodes="
     --sim_cfg_file vln/configs/sample_episodes_sim_cfg_debug.yaml
     --headless
     --save_path_planning
-    --split train
-    --scan 1LXtFkjw3qL
+    --split val_seen
+    --scan dhjEzFoUFzH
+    --path_id 5815
 "
 
 python vln/main_sample_episode.py $flags_sample_episodes
