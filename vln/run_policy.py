@@ -3,6 +3,10 @@ Author: w61
 Date: 2014/11/05
 Function: the main file to support training and evluation
 '''
+import os,sys
+current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print(f"current_dir: {current_dir}")
+sys.path.append(current_dir)
 
 import argparse
 import os

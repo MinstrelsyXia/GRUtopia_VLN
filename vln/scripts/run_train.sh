@@ -1,5 +1,6 @@
 #!/bin/bash
 export MAGNUM_LOG=quiet
+export PYTHONPATH=$PYTHONPATH:/ailab/user/wangliuyi/code/w61_grutopia
 
 flags_cma="
   --exp-config vlnce_baselines/config/r2r_baselines/cma.yaml
