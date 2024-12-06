@@ -848,7 +848,7 @@ class DaggerDiffusonPolicyTrainer:
                     'add_noise_to_action': False,
                     'denoise_action': True,
                     'num_sample': self.config.EVAL.num_sample,
-                    'vis': True,
+                    'vis': self.config.test_verbose,
                     'step': sim_steps[0],
                     'episode_ids': current_episodes['episode_id'],
                     'stop_mode': self.config.EVAL.stop_mode,
@@ -946,10 +946,10 @@ class DaggerDiffusonPolicyTrainer:
                         action = [
                             {'h1': {'move_along_speeds': [exe_action]}}
                         ]
-                        if len(exe_action) == 0:
-                            action = [
-                                {'h1': {'stop': ['stop']}}
-                            ]
+                        # if len(exe_action) == 0:
+                        #     action = [
+                        #         {'h1': {'stop': ['stop']}}
+                        #     ]
 
                 outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose=self.config.test_verbose) 
                 steps[0] += len(speed_actions)
