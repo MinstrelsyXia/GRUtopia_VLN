@@ -32,8 +32,6 @@ class LmdbReader:
             else:
                 print(f"No data found for path_id: {path_id}")
                 return None
-
-        env.close()
     
     def read_all_episode_data(self):
         """Read all episode data from the LMDB database."""
@@ -53,7 +51,7 @@ class LmdbReader:
         env.close()
         return all_data  # Return all episode data as a dictionary
     
-    def save_episode_video(self, episode_data, key, output_dir):
+    def save_episode_video(self, episode_data, key, output_dir, use_pid=False):
         """Save the episode video to a file."""
         frames = []
         
@@ -65,7 +63,10 @@ class LmdbReader:
             frames.append(np.array(pil_image))
 
         # Define output video file path
-        output_file = os.path.join(output_dir, f"episode_video_{key}.mp4")
+        if use_pid:
+            output_file = os.path.join(output_dir, f"episode_video_{key}_pid.mp4")
+        else:
+            output_file = os.path.join(output_dir, f"episode_video_{key}.mp4")
         
         # Check the dimensions of the first frame
         if len(frames) > 0:
@@ -83,11 +84,14 @@ class LmdbReader:
         else:
             print("No frames to save to video.")
     
-    def analysis_lmdb(self, dataset_root_dir, split, output_json_file='logs/scan_completion.json'):
+    def analysis_lmdb(self, dataset_root_dir, split, output_json_dir='logs'):
         # load data
         lmdb_data = self.read_all_episode_data()
         dataset_data, scans = self.load_vln_dataset(dataset_root_dir, split)
         total_results = {"success": 0, "total": 0, "failure": 0, "path planning": 0, "fall": 0, "stuck": 0, "maximum step": 0}
+
+        success_episode_data = []
+        success_lmdb_data = []
         
         # analysis
         scan_completion = defaultdict(lambda: {"success": 0, "total": 0, "failure": 0, "path planning": 0, "fall": 0, "stuck": 0, "maximum step": 0})
@@ -105,21 +109,30 @@ class LmdbReader:
                     if lmdb_data[traj_id]['finish_status'] == 'success':  # Replace 'completed' with actual status key
                         scan_completion[scan]['success'] += 1
                         total_results["success"] += 1
+                        success_episode_data.append(ep_info)
+                        success_lmdb_data.append([traj_id, lmdb_data[traj_id]])
                     else:
                         scan_completion[scan]['failure'] += 1
                         scan_completion[scan][lmdb_data[traj_id]['fail_reason']] += 1
                         total_results[lmdb_data[traj_id]['fail_reason']] += 1
 
         # Write results to a JSON file
+        output_json_file = os.path.join(output_json_dir, f'scan_completion_{split}.json')
         with open(output_json_file, 'w') as json_file:
             json.dump(scan_completion, json_file, indent=4)
         
         with open(output_json_file, 'a') as json_file:
             json.dump(total_results, json_file, indent=4)
-
+        
         print(f"Results written to {output_json_file}")
+        
+        output_success_episode_file = os.path.join(output_json_dir, f'success_episode_data_{split}.json')
+        with open(output_success_episode_file, 'w') as json_file:
+            json.dump(success_episode_data, json_file, indent=4)
+
+        print(f"Success episode data written to {output_success_episode_file}")
     
-        return scan_completion
+        return scan_completion, success_episode_data, success_lmdb_data
     
     def check_exist_scan_and_pathId(self, dataset_root_dir, split, only_recollect_path_planning_fail=False):
         """Check if the scan and path_id exist in the LMDB database."""
@@ -193,19 +206,59 @@ class LmdbReader:
 
 if __name__ == '__main__':
     mode = 'save_video'
+    use_pid = True
     
-    lmdb_path = 'data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
-    data_collector = LmdbReader(lmdb_path)
+    pid_lmdb_path = '/isaac-sim/GRUtopia/data/sample_episodes/20241206_sample_episodes_debug/sample_data.lmdb'
+    original_lmdb_path = '/isaac-sim/GRUtopia/data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
+
+    val_seen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_seen/sample_data.lmdb'
+    val_unseen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_unseen/sample_data.lmdb'
+
     if mode == 'save_video':
+        if use_pid:
+            lmdb_path = pid_lmdb_path
+            print(f"Use pid lmdb: {pid_lmdb_path}")
+        else:
+            lmdb_path = original_lmdb_path
+            print(f"Use original lmdb: {original_lmdb_path}")
+
+        data_collector = LmdbReader(lmdb_path)
         '''1. Load all data'''
-        # data_collector.read_all_episode_data()
-        
+        # all_data = data_collector.read_all_episode_data()
+        # path_id_list = all_data.keys()
+        # path_id_list = [1220, 476, 531, 67, 883, 94]
+        # path_id_list = [str(x) for x in path_id_list]
+        # for path_id in path_id_list:
+        #     episode_data = data_collector.read_episode_data(path_id)
+        #     ## save to the video
+        #     if episode_data is not None:
+        #         data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)
+
         '''2. Load the target path_id'''
-        path_id = '47'
+        path_id = '1407'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
-        data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos')
+        if episode_data is not None:
+            data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)
     
     elif mode == 'analysis':
         '''3. Analysis the LMDB data'''
-        data_collector.analysis_lmdb(dataset_root_dir='../VLN/VLNCE/R2R_VLNCE_v1-3', split='train')
+        split = 'val_unseen'
+        dataset_root_dir = '../VLN/VLNCE/R2R_VLNCE_v1-3_corrected'
+        if split == 'val_seen':
+            lmdb_path = val_seen_lmdb_path
+        elif split == 'val_unseen':
+            lmdb_path = val_unseen_lmdb_path
+        save_success_video = True
+
+        output_json_dir = os.path.join('/'.join(lmdb_path.split('/')[:-1]), 'analysis')
+        os.makedirs(output_json_dir, exist_ok=True)
+        data_collector = LmdbReader(lmdb_path)
+        scan_completion, success_episode_data, success_lmdb_data = data_collector.analysis_lmdb(dataset_root_dir=dataset_root_dir, split=split, output_json_dir=output_json_dir)
+
+        if save_success_video:
+            output_video_dir = os.path.join('/'.join(lmdb_path.split('/')[:-1]), 'success_videos')
+            os.makedirs(output_video_dir, exist_ok=True)
+            for ep_info in success_lmdb_data:
+                data_collector.save_episode_video(episode_data=ep_info[1], key=ep_info[0], output_dir=output_video_dir, use_pid=use_pid)
+

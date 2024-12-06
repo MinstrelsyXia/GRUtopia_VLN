@@ -238,9 +238,9 @@ class LmdbDataCollector:
 
                 self.episode_total_data[env_idx].append(episode_data)
 
-    def save_data(self, env_idx, path_id, success_flag, fail_reason):
+    def save_data(self, env_idx, path_id, success_flag, fail_reason, instruction):
         finish_flag = "success" if success_flag else "fail"
-        self.save_episode_data(self.episode_total_data[env_idx], path_id, finish_flag, fail_reason)
+        self.save_episode_data(self.episode_total_data[env_idx], path_id, finish_flag, instruction, fail_reason)
         self.episode_total_data[env_idx] = []
     
     def collate_data(self, episode_datas):
@@ -293,7 +293,7 @@ class LmdbDataCollector:
         
         return collate_data
         
-    def save_episode_data(self, episode_datas, path_id, finish_flag, fail_reason=None):
+    def save_episode_data(self, episode_datas, path_id, finish_flag, instruction, fail_reason=None):
         """Save finished episode into the LMDB database.
         :finish_flag: ['success', 'fail']
         :fail_reason:
@@ -309,7 +309,8 @@ class LmdbDataCollector:
             data_to_store = {
                 'episode_data': episode_datas,
                 'finish_status': finish_flag,
-                'fail_reason': fail_reason
+                'fail_reason': fail_reason,
+                'instruction': instruction
             }
             # serialized_data = pickle.dumps(data_to_store)
             # compressed_data = zlib.compress(serialized_data)

@@ -39,3 +39,8 @@ class StandStillController(BaseController):
         """
         assert len(action) == 0, 'action must be empty'
         return self.forward()
+
+    def get_obs(self):
+        return {
+            'finished': True,
+        } 
