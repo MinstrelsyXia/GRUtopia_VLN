@@ -28,7 +28,7 @@ settings:
     - depth
     - camera_params
   max_step: 25000
-  force_sample: true
+  force_sample: false
   force_sample_scan: true
   filter_stairs: true
   sample_env_flow: true # allow the env flow
