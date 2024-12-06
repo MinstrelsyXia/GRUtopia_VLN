@@ -228,8 +228,16 @@ class CorrectInstructions:
             
         return corrected_episodes
 
+def load_gather_data(dataset_root_dir, split):
+    ''' Load data based on VLN-CE
+    '''
+    with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
+        data = json.load(f)
+    print(1)
+
 if __name__ == "__main__":
     dataset_root_dir = "/isaac-sim/GRUtopia/data/datasets/R2R_VLNCE_v1-3"
+    # dataset_root_dir = "data/datasets/revised/corrected"
     statistic_data_folder = Path("/isaac-sim/GRUtopia/data/datasets/revised/statistics")
     inst_alias = "inst"
     splits = ["train", "val_seen","val_unseen"]
@@ -256,6 +264,9 @@ if __name__ == "__main__":
     output_dir = "data/datasets/revised/corrected"
     os.makedirs(output_dir, exist_ok=True)
     
+    load_gather_data(dataset_root_dir="/ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected", split="train")
+
+
     correct_instructions = CorrectInstructions(splits, dataset_root_dir, statistic_data_folder, output_dir)
     for split in splits:
         # correct_instructions.correct_heading_error(split, angle_threshold=180, Turn180_candidates=Turn180_candidates, correct_and_save=True)
