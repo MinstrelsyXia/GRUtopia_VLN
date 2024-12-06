@@ -326,7 +326,7 @@ class GlobalTopdownMap:
         
         if current_world_pose is not None:
             current_pixel = self.world_to_pixel(current_world_pose)
-            plt.scatter(current_pixel[1], current_pixel[0], color=[0,0,1], marker='*', label=f"current ({current_world_pose[0]:.2f}, {current_world_pose[1]:.2f}, {current_world_pose[2]:.2f})", s=30)
+            plt.scatter(current_pixel[1], current_pixel[0], color=[0,0,1], marker='*', label=f"current ({current_world_pose[0]:.2f}, {current_world_pose[1]:.2f}, {current_world_pose[2]:.2f})", s=15)
         
         if target_world_pose is not None:
             target_pixel = self.world_to_pixel(target_world_pose)

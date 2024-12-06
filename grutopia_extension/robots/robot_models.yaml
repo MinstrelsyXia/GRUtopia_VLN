@@ -249,7 +249,7 @@ robots:
     type: MoveAlongPathPointsController
     forward_speed: 1.5
     rotation_speed: 2.0
-    threshold: 0.10
+    threshold: 0.15
     sub_controllers:
     # - name: move_to_point
     - name: move_to_point_by_pid
@@ -286,14 +286,20 @@ robots:
     - name: oracle_move_to_point
   - name: move_to_point_by_pid
     type: PIDSpeedController
-    max_forward_speed: 1.5
-    max_rotation_speed: 2.0
-    threshold: 0.10
+    max_forward_speed: 2.0
+    max_rotation_speed: 4.0
+    threshold: 0.15
+    Kp_linear: 1.5
+    Ki_linear: 0.0
+    Kd_linear: 0.01
+    Kp_angular: 2.5
+    Ki_angular: 0.0
+    Kd_angular: 0.05
     sub_controllers:
     - name: move_by_speed
   - name: "move_along_speeds"
     type: MoveAlongSpeedsController
-    steps_per_speed: 100
+    steps_per_speed: 50
     sub_controllers:
     - name: move_by_speed
 

@@ -14,7 +14,8 @@ tasks:
   robots:
   - name: h1
     prim_path: "/World/h1"
-    type: "HumanoidRobot"
+    # type: "HumanoidRobot"
+    type: "HumanoidRobotVLNEval"
     position: [0, 0, 0]
     scale: [1, 1, 1]
     orientation: [0,0,0,0]

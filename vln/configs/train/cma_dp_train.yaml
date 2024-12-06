@@ -112,7 +112,7 @@ MODEL:
   policy_name: CMA_DP_ImgMultiPatch_Policy # CMA_DP_Policy
 
   # training settings
-  learn_angle: false # true: [delta_x, delta_y, delta_yaw] / false: [r, theta]
+  learn_angle: true # true: [delta_x, delta_y, delta_yaw] / false: [r, theta]
   use_iw: false
   len_traj_act: 4
 

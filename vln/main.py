@@ -76,6 +76,8 @@ def vis_one_path(args, vln_envs):
     # get the specific path
     vln_envs = vln_envs[args.split]
     data_item = vln_envs.init_one_path(args.path_id)
+    if data_item is None:
+        return # not found the path
     env = vln_envs.env
     
     paths = data_item['reference_path']
@@ -114,7 +116,7 @@ def vis_one_path(args, vln_envs):
             agent_action_state = {'finished': True}
             continue
         
-        if i % 10 == 0:
+        if i % 80 == 0:
             print(i)
             if vln_config.settings.check_and_reset_robot:
                 # topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) 
@@ -132,7 +134,7 @@ def vis_one_path(args, vln_envs):
                     
             if vln_config.windows_head:
                 # show the topdown camera
-                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
+                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode='save')
 
         if i % 100 == 0:
             print(i)
