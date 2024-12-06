@@ -1,5 +1,6 @@
 #!/bin/bash
 export MAGNUM_LOG=quiet
+export PYTHONPATH=$PYTHONPATH:/ailab/user/wangliuyi/code/w61_grutopia
 
 flags_cma="
   --exp-config vlnce_baselines/config/r2r_baselines/cma.yaml
@@ -13,7 +14,7 @@ flags_cma_raw_train="
 
 if [ "$1" == "--train" ]; then
   flags="
-    --exp-config vln/configs/train/cma_dp_w61.yaml
+    --exp-config vln/configs/train/cma_dp_train.yaml
     --run-type train
   "
 elif [ "$1" == "--train_crossGRU" ]; then
