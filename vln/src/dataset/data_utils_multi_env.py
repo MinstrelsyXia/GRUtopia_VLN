@@ -15,6 +15,7 @@ from copy import deepcopy
 import shutil
 import zlib
 import pickle
+import msgpack_numpy
 
 import torch
 from torch.utils.data import Dataset
@@ -352,17 +353,31 @@ class VLNDataLoader(Dataset):
         self.all_episode_finish = False
         self.scan_success_path_id_list = []
     
-    def allocate_data(self, split, scan):
+    def allocate_data(self, split, scan, path_id=None):
         self.scan_data = self.data[split][scan]
         self.sim_config.config.tasks[0].env_num = self.env_num = min(len(self.scan_data), self.env_num)
         self.init_env_manager() # update env_num according to the data length
 
         for idx in range(self.env_num):
-            find_valid = self.update_next_single_data(idx, split, scan, current_step=0, reset_robot=False)
+            find_valid = self.update_next_single_data(idx, split, scan, path_id=path_id, current_step=0, reset_robot=False)
         
         return find_valid
 
-    def get_next_single_data(self):
+    def get_next_single_data(self, path_id=None):
+        if path_id is not None:
+            find_flag = False
+            for idx, item in enumerate(self.scan_data):
+                if item['trajectory_id'] == path_id:
+                    self.data_idx = idx
+                    find_flag = True
+                    break
+            if not find_flag:
+                log.error(f"Path id {path_id} not found in the dataset")
+                return None
+            else:
+                log.info(f"Path id {path_id} found in the dataset")
+                return self.scan_data[self.data_idx]
+
         if self.data_idx < len(self.scan_data):
             item = self.scan_data[self.data_idx]
             self.data_idx += 1
@@ -389,7 +404,8 @@ class VLNDataLoader(Dataset):
                     if not recollect_failure:
                         exist_flag = True  # Data exists
                     else:
-                        value = zlib.decompress(value)
+                        # value = zlib.decompress(value)
+                        value = msgpack_numpy.unpackb(value, raw=False)
                         value = pickle.loads(value)
                         if value['finish_status'] == 'fail':
                             if self.args.sample_episodes.only_recollect_path_planning_fail:
@@ -411,18 +427,19 @@ class VLNDataLoader(Dataset):
             env.close()
         return exist_flag
 
-    def update_next_single_data(self, env_idx, split, scan, current_step=0, reset_robot=True):
+    def update_next_single_data(self, env_idx, split, scan, path_id=None, current_step=0, reset_robot=True):
         '''Get the next single data and init all settings'''
         is_data_valid = False
         while not is_data_valid:
             '''1. Get new data'''
-            new_data = self.get_next_single_data()
+            new_data = self.get_next_single_data(path_id=path_id)
             if new_data is None:
                 return False
             
             '''2. Create log path'''
             path_id = new_data['trajectory_id']
             episode_path = os.path.join(self.args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
+            os.makedirs(episode_path, exist_ok=True)
             self.args.episode_path_list[env_idx] = episode_path
             # if os.path.exists(episode_path):
             if self.args.settings.force_sample:

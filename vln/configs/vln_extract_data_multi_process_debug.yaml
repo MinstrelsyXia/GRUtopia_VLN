@@ -1,4 +1,4 @@
-name:  "20241107_sample_episodes_debug"
+name:  "20241206_sample_episodes_debug"
 
 datasets:
   base_data_dir: "../VLN/VLNCE/R2R_VLNCE_v1-3"
@@ -28,7 +28,7 @@ settings:
     - depth
     - camera_params
   max_step: 25000
-  force_sample: false
+  force_sample: true
   force_sample_scan: true
   filter_stairs: true
   sample_env_flow: true # allow the env flow
@@ -41,11 +41,15 @@ sample_episodes:
   recollect_failure: true # recollect failed episodes
   only_recollect_path_planning_fail: true
 
+  docker_nums: 1 # number of docker containers
+
 robots:
   - name: "CylinderRobot"
     z_offset: 0.7 # !!!
   - name: "HumanoidRobot"
     z_offset: 0.975 # !!! 1.05
+  - name: "HumanoidRobotVLNEval"
+    z_offset: 1.05
   
 maps:
   robot_z: [0.1, 1.7]  # Robot's height range on the Z-axis
@@ -64,7 +68,7 @@ maps:
   global_topdown_config:
     width: 500
     height: 500
-    aperture: 150
+    aperture: 300
     camera_transform_height: 0.8
     voxel_size: 0.1
     

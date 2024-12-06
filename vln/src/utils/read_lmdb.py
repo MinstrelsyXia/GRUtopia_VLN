@@ -53,7 +53,7 @@ class LmdbReader:
         env.close()
         return all_data  # Return all episode data as a dictionary
     
-    def save_episode_video(self, episode_data, key, output_dir):
+    def save_episode_video(self, episode_data, key, output_dir, use_pid=False):
         """Save the episode video to a file."""
         frames = []
         
@@ -65,7 +65,10 @@ class LmdbReader:
             frames.append(np.array(pil_image))
 
         # Define output video file path
-        output_file = os.path.join(output_dir, f"episode_video_{key}.mp4")
+        if use_pid:
+            output_file = os.path.join(output_dir, f"episode_video_{key}_pid.mp4")
+        else:
+            output_file = os.path.join(output_dir, f"episode_video_{key}.mp4")
         
         # Check the dimensions of the first frame
         if len(frames) > 0:
@@ -193,18 +196,28 @@ class LmdbReader:
 
 if __name__ == '__main__':
     mode = 'save_video'
+    use_pid = False
     
-    lmdb_path = 'data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
+    pid_lmdb_path = '/isaac-sim/GRUtopia/data/sample_episodes/20241206_sample_episodes_debug/sample_data.lmdb'
+    original_lmdb_path = '/isaac-sim/GRUtopia/data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
+
+    if use_pid:
+        lmdb_path = pid_lmdb_path
+        print(f"Use pid lmdb: {pid_lmdb_path}")
+    else:
+        lmdb_path = original_lmdb_path
+        print(f"Use original lmdb: {original_lmdb_path}")
+
     data_collector = LmdbReader(lmdb_path)
     if mode == 'save_video':
         '''1. Load all data'''
         # data_collector.read_all_episode_data()
         
         '''2. Load the target path_id'''
-        path_id = '47'
+        path_id = '67'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
-        data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos')
+        data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)
     
     elif mode == 'analysis':
         '''3. Analysis the LMDB data'''
