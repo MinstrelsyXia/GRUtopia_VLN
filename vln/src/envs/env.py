@@ -15,14 +15,14 @@ from vln.src.dataset.data_utils_multi_env import VLNDataLoader, load_scene_usd
 from vln.src.utils.utils import to_global_coords
 
 class TaskEnv(VLNDataLoader):
-    def __init__(self, config, splits, eval_logger, filter_same_trajectory=False, policy_eval=True,):
+    def __init__(self, config, splits, eval_logger, filter_same_trajectory=False, policy_eval=True):
         self.config = config
         vln_config = config.vln_config
         sim_config = config.sim_config
         self.eval_logger = eval_logger
         
         vln_config.camera_list = vln_config.settings.camera_list
-        super().__init__(vln_config, sim_config, splits, filter_same_trajectory, policy_eval=policy_eval, eval_logger=eval_logger)
+        super().__init__(vln_config, sim_config, splits, filter_same_trajectory, policy_eval=policy_eval, eval_logger=eval_logger, load_eval=self.config.EVAL.load_eval_subset)
         
         # self.args -> vln_config
         # self.config -> eval_config
@@ -79,7 +79,7 @@ class TaskEnv(VLNDataLoader):
             self.start_step_list = [0]
             self.current_step_list = [0]
 
-        if self.current_episode_idx < len(self.current_scan_data)-1:
+        if self.current_episode_idx < self.number_of_episodes[self.current_scan_idx]:
             # new episode
             reset_scene = False
             self.current_episode_idx += 1
@@ -612,6 +612,10 @@ class TaskEnv(VLNDataLoader):
                 
                 if len(speed_actions) >= len_traj_act:
                     break     
+        
+        if len(speed_actions) == 0:
+            cur_speed, only_rotation = self.action_to_speed(predicted_actions[-1], max_distance=0.3, speed_actions=[], add_final_rotation=False)
+            speed_actions.extend(cur_speed)
         
         return speed_actions
     

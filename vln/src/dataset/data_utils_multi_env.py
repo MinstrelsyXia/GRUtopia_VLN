@@ -80,10 +80,15 @@ def load_data(args, split):
     log.info(f"Loaded data with a total of {len(load_data)} items from {split}")
     return load_data, list(set(total_scans))
 
-def load_gather_data(args, split, filter_same_trajectory=False, filter_stairs=False):
+def load_gather_data(args, split, filter_same_trajectory=False, filter_stairs=False, load_eval=False):
     dataset_root_dir = args.datasets.base_data_dir
-    with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
-        data = json.load(f)
+    if load_eval and split != 'train':
+        # only load the eval data (collect successfully)
+        with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_PReval_gather_data.json"), 'r') as f:
+            data = json.load(f)
+    else:
+        with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
+            data = json.load(f)
     with open(os.path.join(dataset_root_dir, "gather_data", "env_scan.json"), 'r') as f:
         scan = json.load(f)
 
@@ -222,7 +227,7 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
                 log.error(f"Error in saving camera image: {e}")
 
 class VLNDataLoader(Dataset):
-    def __init__(self, args, sim_config, splits, filter_same_trajectory=False, policy_eval=False, eval_logger=None):
+    def __init__(self, args, sim_config, splits, filter_same_trajectory=False, policy_eval=False, eval_logger=None, load_eval=False):
         self.args = args
         self.sim_config = sim_config
         self.batch_size = args.settings.batch_size  
@@ -232,7 +237,7 @@ class VLNDataLoader(Dataset):
             log = eval_logger
         for split in splits:
             if "sample_episodes" in args.settings.mode or policy_eval:
-                data, _ = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs)
+                data, _ = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs, load_eval=load_eval)
             else:
                 data, _ = load_data(args, split)
             self.data[split] = data

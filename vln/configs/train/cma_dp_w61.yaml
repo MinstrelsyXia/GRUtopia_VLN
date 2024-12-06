@@ -41,7 +41,9 @@ EVAL:
   train_eval_interval: 100
   ACTION: speed # descrete or xyyaw or speed
 
+  # eval dataset settings
   re_eval: true # if true, will re-evaluate the episodes in the result_json_path
+  load_eval_subset: true # if true, will load the eval subset (collect successfully)
 
   # for xyyaw
   success_distance: 3.0
