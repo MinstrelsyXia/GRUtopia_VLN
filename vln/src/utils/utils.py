@@ -334,6 +334,7 @@ def to_local_coords(
         raise ValueError
 
     if isinstance(positions, torch.Tensor):
+        rotmat = rotmat.to(positions.device)
         return (positions - curr_pos).matmul(rotmat)
     else:
         return (positions - curr_pos).dot(rotmat)

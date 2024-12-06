@@ -744,19 +744,27 @@ class CMA_DP_Net(nn.Module):
     def save_predicted_actions(self, un_actions, gt_actions=None, N=1, save_dir=None, step=None):
         for item_idx in range(N):
             plt.clf()
-            plt.figure(figsize=(5, 5))
+            plt.figure(figsize=(8, 8))  # 增大图像尺寸以便更好地显示
+            
+            # 创建以(0,0)为中心的坐标轴
+            ax = plt.gca()
+            ax.spines['left'].set_position('center')
+            ax.spines['bottom'].set_position('center')
+            ax.spines['right'].set_color('none')
+            ax.spines['top'].set_color('none')
             
             # Plot predicted actions with arrows
-            plt.scatter(un_actions[item_idx][:, 0], un_actions[item_idx][:, 1], label='un_actions', color='blue', alpha=0.5)
+            # X is forward, positive Y is left, negative Y is right
+            plt.scatter(-un_actions[item_idx][:, 1], un_actions[item_idx][:, 0], label='un_actions', color='blue', alpha=0.5)
             for i in range(un_actions[item_idx].shape[0]):
                 # Calculate arrow direction components using yaw angle
                 arrow_length = 0.2  # Adjust this value to change arrow length
-                dx = arrow_length * np.cos(un_actions[item_idx][i, 2])
-                dy = arrow_length * np.sin(un_actions[item_idx][i, 2])
+                dx = arrow_length * np.cos(np.pi/2+un_actions[item_idx][i, 2])
+                dy = arrow_length * np.sin(np.pi/2+un_actions[item_idx][i, 2])
                 
                 # Draw arrow
-                plt.arrow(un_actions[item_idx][i, 0], 
-                        un_actions[item_idx][i, 1], 
+                plt.arrow(-un_actions[item_idx][i, 1], 
+                        un_actions[item_idx][i, 0], 
                         dx, dy, 
                         head_width=0.05, 
                         head_length=0.1, 
@@ -765,21 +773,21 @@ class CMA_DP_Net(nn.Module):
                         alpha=0.5)
                 
                 # Add point index
-                plt.text(un_actions[item_idx][i, 0], un_actions[item_idx][i, 1], 
+                plt.text(-un_actions[item_idx][i, 1], un_actions[item_idx][i, 0], 
                         str(i), fontsize=9, color='blue', ha='left')
 
             # Plot ground truth actions with arrows
             if gt_actions is not None:
-                plt.scatter(gt_actions[item_idx][:, 0], gt_actions[item_idx][:, 1], label='gt_actions', color='red', alpha=0.5)
+                plt.scatter(-gt_actions[item_idx][:, 1], gt_actions[item_idx][:, 0], label='gt_actions', color='red', alpha=0.5)
                 for i in range(gt_actions[item_idx].shape[0]):
                     # Calculate arrow direction components using yaw angle
                     arrow_length = 0.2  # Adjust this value to change arrow length
-                    dx = arrow_length * np.cos(gt_actions[item_idx][i, 2])
-                    dy = arrow_length * np.sin(gt_actions[item_idx][i, 2])
+                    dx = arrow_length * np.cos(np.pi/2+gt_actions[item_idx][i, 2])
+                    dy = arrow_length * np.sin(np.pi/2+gt_actions[item_idx][i, 2])
                     
                     # Draw arrow
-                    plt.arrow(gt_actions[item_idx][i, 0], 
-                            gt_actions[item_idx][i, 1], 
+                    plt.arrow(-gt_actions[item_idx][i, 1], 
+                            gt_actions[item_idx][i, 0], 
                             dx, dy, 
                             head_width=0.05, 
                             head_length=0.1, 
@@ -788,15 +796,31 @@ class CMA_DP_Net(nn.Module):
                             alpha=0.5)
                     
                     # Add point index
-                    plt.text(gt_actions[item_idx][i, 0], gt_actions[item_idx][i, 1], 
+                    plt.text(-gt_actions[item_idx][i, 1], gt_actions[item_idx][i, 0], 
                             str(i), fontsize=9, color='red', ha='right')
 
-            plt.legend()
+            # 设置坐标轴标签
+            plt.xlabel('y', x=1.0, ha='center')
+            plt.ylabel('x', y=1.0, ha='center')
+            
+            # 获取数据范围并设置对称的显示范围
+            max_range = max(
+                abs(plt.xlim()[0]), abs(plt.xlim()[1]),
+                abs(plt.ylim()[0]), abs(plt.ylim()[1])
+            )
+            plt.xlim(-max_range*1.2, max_range*1.2)
+            plt.ylim(-max_range*1.2, max_range*1.2)
+
+            # 在(0,0)处画一个点
+            plt.plot(0, 0, 'ko', markersize=5)  # 在原点画一个黑点
+            
+            # 移动图例到右上角
+            plt.legend(loc='upper right')
             plt.grid(True)
             plt.axis('equal')  # Make sure the aspect ratio is equal
             
             if save_dir is not None:
-                save_path = os.path.join(save_dir, f'model_output_{item_idx}_step_{step}.jpg')
+                save_path = os.path.join(save_dir, f'model_output_step_{step}.jpg')
             else:
                 save_path = f'data/images/model_output_{item_idx}_step_{step}.jpg'
             plt.savefig(save_path)

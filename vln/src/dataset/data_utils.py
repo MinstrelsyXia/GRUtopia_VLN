@@ -48,10 +48,10 @@ def transform_rotation_z_90degrees(rotation):
     ]
     return revised_rotation
     
-def load_data(args, split):
+def load_data(args, split, dataset_root_dir=None):
     ''' Load data based on VLN-CE
     '''
-    dataset_root_dir = args.datasets.base_data_dir
+    dataset_root_dir = args.datasets.base_data_dir if dataset_root_dir is None else dataset_root_dir
     total_scans = []
     load_data = []
     with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
