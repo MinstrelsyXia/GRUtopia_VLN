@@ -225,7 +225,7 @@ class VLNDataLoader(Dataset):
     def __init__(self, args, sim_config, splits, filter_same_trajectory=False, policy_eval=False, eval_logger=None):
         self.args = args
         self.sim_config = sim_config
-        self.batch_size = args.settings.batch_size
+        self.batch_size = args.settings.batch_size  
         self.splits = splits
         self.data = {}
         if eval_logger is not None:
@@ -359,7 +359,7 @@ class VLNDataLoader(Dataset):
         self.init_env_manager() # update env_num according to the data length
 
         for idx in range(self.env_num):
-            find_valid = self.update_next_single_data(idx, split, scan, path_id=path_id, current_step=0, reset_robot=False)
+            find_valid = self.update_next_single_data(idx, split, scan, assigned_path_id=path_id, current_step=0, reset_robot=False)
         
         return find_valid
 
@@ -405,8 +405,8 @@ class VLNDataLoader(Dataset):
                         exist_flag = True  # Data exists
                     else:
                         # value = zlib.decompress(value)
+                        # value = pickle.loads(value)
                         value = msgpack_numpy.unpackb(value, raw=False)
-                        value = pickle.loads(value)
                         if value['finish_status'] == 'fail':
                             if self.args.sample_episodes.only_recollect_path_planning_fail:
                                 if value['fail_reason'] == 'path planning':
@@ -427,12 +427,12 @@ class VLNDataLoader(Dataset):
             env.close()
         return exist_flag
 
-    def update_next_single_data(self, env_idx, split, scan, path_id=None, current_step=0, reset_robot=True):
+    def update_next_single_data(self, env_idx, split, scan, assigned_path_id=None, current_step=0, reset_robot=True):
         '''Get the next single data and init all settings'''
         is_data_valid = False
         while not is_data_valid:
             '''1. Get new data'''
-            new_data = self.get_next_single_data(path_id=path_id)
+            new_data = self.get_next_single_data(path_id=assigned_path_id)
             if new_data is None:
                 return False
             
@@ -484,6 +484,7 @@ class VLNDataLoader(Dataset):
             for info in status_info:
                 log.info(info)
 
+            os.makedirs(self.args.episode_path_list[env_idx], exist_ok=True)
             self.args.episode_status_info_file_list[env_idx] = os.path.join(self.args.episode_path_list[env_idx], 'status_info.txt')
             with open(self.args.episode_status_info_file_list[env_idx], 'w') as f:
                 for info in status_info:
