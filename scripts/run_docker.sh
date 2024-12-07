@@ -1,5 +1,5 @@
 NAME=w61_grutopia
-sudo docker run -d --name ${NAME} -it --rm --gpus='"device=0,1,2,3"' --network host \
+sudo docker run -d --name ${NAME} -it --rm --gpus='"device=4,5,6,7"' --network host \
      -e "ACCEPT_EULA=Y" \
      -e "PRIVACY_CONSENT=Y" \
      -e "WEBUI_HOST=${WEBUI_HOST}" \
