@@ -19,7 +19,7 @@ import numpy as np
 import torch
 
 from vln.src.utils.logger import MyLogger
-from vln.src.trainers import dp_trainer
+from vln.src.trainers import dp_trainer, cma_trainer
 from vln.src.utils.utils import dict_to_namespace
 
 from vln.parser import process_args
@@ -151,6 +151,8 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         
     if config.MODEL.policy_name == 'CMA_DP_ImgMultiPatch_Policy':
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
+    elif config.MODEL.policy_name == 'CMA_Policy':
+        trainer_init = cma_trainer.DaggerCMATrainer
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
     trainer = trainer_init(config, logger)
 

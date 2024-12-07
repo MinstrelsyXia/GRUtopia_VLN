@@ -56,7 +56,7 @@ def draw_loss_curve(N, noise_pred, noise, output_file='test.jpg'):
     plt.savefig(output_file)
     print(f"save fig to {output_file}")
 
-class DaggerDiffusonPolicyTrainer:
+class DaggerCMATrainer:
     def __init__(self, config=None, logger=None):
         self.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir
         self.config = config
