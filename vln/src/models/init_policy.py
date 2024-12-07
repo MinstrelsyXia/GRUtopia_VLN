@@ -14,6 +14,9 @@ def get_policy(policy_name):
     elif policy_name == 'CMA_DP_ImgMultiPatch_Policy':
         from vln.src.models.cma_dp_policy_ImgMultiPatch import CMA_DP_Net
         return CMA_DP_Net
+    elif policy_name == "CMA_Policy":
+        from vln.src.models.cma_policy import CMANet
+        return CMANet
 
 def initialize_policy(
         config,

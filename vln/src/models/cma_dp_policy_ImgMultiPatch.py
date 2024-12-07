@@ -79,15 +79,9 @@ class CMA_DP_Net(nn.Module):
         # self.cross_modal_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         # self.his_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         if self.model_config.CROSS_MODAL_ENCODER.txt_to_img:
-<<<<<<< HEAD
             txt_to_img_cross_encoder_config = copy.deepcopy(cross_modal_config)
             txt_to_img_cross_encoder_config.num_x_layers = self.model_config.CROSS_MODAL_ENCODER.txt_to_img_layer
             self.txt_img_cross_encoder = encoders.VisionLanguageEncoder(txt_to_img_cross_encoder_config)
-=======
-            txt_to_img_cross_modal_config = copy.copy(cross_modal_config)
-            txt_to_img_cross_modal_config.num_x_layers = 1
-            self.txt_img_cross_encoder = encoders.VisionLanguageEncoder(txt_to_img_cross_modal_config)
->>>>>>> 95b70f98d8d59b1bafcf757ad5ee32ca61b17e90
         self.img_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         
         # Init the prev action embedding
@@ -281,6 +275,46 @@ class CMA_DP_Net(nn.Module):
         attn = F.softmax(logits * self._scale, dim=1)
 
         return torch.einsum("ni, nci -> nc", attn, v)
+
+    def denoise_actions(self, noisy_diffusion_output, lv_state, type_embeds, device):
+        noise = deepcopy(noisy_diffusion_output)
+        diffusion_output = noisy_diffusion_output
+
+        for k in self.noise_scheduler.timesteps[:]:
+            if self.dp_type == 'transformer':
+                noise_pred = self.action_dp_pred_net(
+                    sample=diffusion_output, 
+                    timestep=k.unsqueeze(-1).repeat(diffusion_output.shape[0]).to(device),
+                    cond=lv_state.float(),
+                    type_embeds=type_embeds)
+                
+            elif self.dp_type == 'resnet_unet':
+                if self.use_local_cond:
+                    # use image rnn as local_condition
+                    local_cond = state.unsqueeze(1).expand(-1, self.model_config.Diffusion_Policy.len_traj_pred, -1).float()
+                    # use text features as global_condition
+                    # Here I use the image-text cross-attention to get the global_condition
+                    global_cond = torch.mul(text_embeds, attention_probs.unsqueeze(-1)).sum(1)
+                    global_cond = self.global_cond_linear(global_cond)
+
+                    noise_pred = self.action_dp_pred_net(
+                        sample=diffusion_output, 
+                        timestep=k.unsqueeze(-1).repeat(diffusion_output.shape[0]).to(device),
+                        local_cond=local_cond,
+                        global_cond=global_cond)
+                else:
+                    noise_pred = self.action_dp_pred_net(
+                        sample=diffusion_output, 
+                        timestep=k.unsqueeze(-1).repeat(diffusion_output.shape[0]).to(device),
+                        global_cond=state.float())
+
+            # inverse diffusion step (remove noise)
+            diffusion_output = self.noise_scheduler.step(
+                model_output=noise_pred,
+                timestep=k,
+                sample=diffusion_output
+            ).prev_sample
+        return diffusion_output
     
     def pred_actions(
         self,
@@ -289,7 +323,8 @@ class CMA_DP_Net(nn.Module):
         prev_actions: Tensor,
         masks: Tensor,
         add_noise_to_action=True,
-        denoise_action=False
+        denoise_action=False,
+        num_sample=1
     ):
         # Note: stack images have not been adaptive yet.
         device = observations['instruction'].device
@@ -391,12 +426,7 @@ class CMA_DP_Net(nn.Module):
         
         noise = noise_pred = diffusion_output = None
         if denoise_action:
-            # initialize action from Gaussian noise
-            noisy_diffusion_output = torch.randn(
-                (batch_size, self.model_config.Diffusion_Policy.len_traj_pred, self.num_actions), device=device)
-            noise = deepcopy(noisy_diffusion_output)
-            diffusion_output = noisy_diffusion_output
-            # predict noise
+            # Initialize lv_state and type_embeds
             if self.dp_type == 'transformer':
                 if self.model_config.Diffusion_Policy.cond == 'rnn_instr_vis':
                     lv_state = torch.cat((state.unsqueeze(1), text_cls_embeds.unsqueeze(1), rgb_depth_embeds), dim=1)
@@ -438,40 +468,18 @@ class CMA_DP_Net(nn.Module):
                 type_embeds = torch.from_numpy(np.array(type_embeds)).to(device)
                 type_embeds = self.action_type_embeds(type_embeds).repeat(batch_size, 1, 1)
 
-            for k in self.noise_scheduler.timesteps[:]:
-                if self.dp_type == 'transformer':
-                    noise_pred = self.action_dp_pred_net(
-                        sample=diffusion_output, 
-                        timestep=k.unsqueeze(-1).repeat(diffusion_output.shape[0]).to(device),
-                        cond=lv_state.float(),
-                        type_embeds=type_embeds)
-                    
-                elif self.dp_type == 'resnet_unet':
-                    if self.use_local_cond:
-                        # use image rnn as local_condition
-                        local_cond = state.unsqueeze(1).expand(-1, self.model_config.Diffusion_Policy.len_traj_pred, -1).float()
-                        # use text features as global_condition
-                        # Here I use the image-text cross-attention to get the global_condition
-                        global_cond = torch.mul(text_embeds, attention_probs.unsqueeze(-1)).sum(1)
-                        global_cond = self.global_cond_linear(global_cond)
-
-                        noise_pred = self.action_dp_pred_net(
-                            sample=diffusion_output, 
-                            timestep=k.unsqueeze(-1).repeat(diffusion_output.shape[0]).to(device),
-                            local_cond=local_cond,
-                            global_cond=global_cond)
-                    else:
-                        noise_pred = self.action_dp_pred_net(
-                            sample=diffusion_output, 
-                            timestep=k.unsqueeze(-1).repeat(diffusion_output.shape[0]).to(device),
-                            global_cond=state.float())
-
-                # inverse diffusion step (remove noise)
-                diffusion_output = self.noise_scheduler.step(
-                    model_output=noise_pred,
-                    timestep=k,
-                    sample=diffusion_output
-                ).prev_sample
+            denoise_action_list = []
+            if num_sample > 1:
+                for sample_idx in range(num_sample):
+                    noisy_diffusion_output = torch.randn(
+                        (batch_size, self.model_config.Diffusion_Policy.len_traj_pred, self.num_actions), device=device)
+                    diffusion_output = self.denoise_actions(noisy_diffusion_output, lv_state, type_embeds, device)
+                    denoise_action_list.append(diffusion_output)
+            else:
+                # initialize action from Gaussian noise
+                noisy_diffusion_output = torch.randn(
+                    (batch_size, self.model_config.Diffusion_Policy.len_traj_pred, self.num_actions), device=device)
+                diffusion_output = self.denoise_actions(noisy_diffusion_output, lv_state, type_embeds, device)
             
         else:
             if add_noise_to_action:
@@ -566,7 +574,7 @@ class CMA_DP_Net(nn.Module):
             # progress_pred = torch.tanh(self.progress_monitor(state)) # pm_pred 
             progress_pred = self.progress_monitor(state.squeeze(1))
 
-        return noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred
+        return noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list
 
     def update_rnn_states(
         self,
@@ -849,51 +857,85 @@ class CMA_DP_Net(nn.Module):
         step = batch['step']
         episode_ids = batch['episode_ids']
 
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'])
-        
-        if vis:
-            un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
-            self.save_predicted_actions(un_actions, gt_actions=None, N=1, save_dir=predicted_actions_save_dir, step=step)
+        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         
-            diffusion_output_split = torch.split(diffusion_output, batch['num_sample'], dim=0)
-            if dist_pred is not None:
-                dist_pred_split = torch.split(dist_pred, batch['num_sample'], dim=0)
-            else:
-                dist_pred_split = None
-            rnn_states_split = torch.split(rnn_states_out, batch['num_sample'], dim=0)
             actions = []
             un_actions_nocumsum = []
             rnn_states_list = []
-            for i in range(batch_size):
-                dp_output = diffusion_output_split[i]
-                fix, ax = plt.subplots(1, 1)
+
+            # 创建图像（只创建一次）
+            fix, ax = plt.subplots(1, 1, figsize=(8, 8))
+
+            # 设置坐标轴
+            ax.spines['right'].set_color('none')
+            ax.spines['top'].set_color('none')
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+
+            # 存储所有轨迹的数据范围
+            all_x = []
+            all_y = []
+
+            for i in range(batch['num_sample']):
+                dp_output = denoise_action_list[i]
                 actions_list = []
                 un_actions_nocumsum_list = []
-                for traj_id, traj in enumerate(dp_output):
-                    traj = traj.unsqueeze(0)
-                    cand_actions, cand_actions_cumsum, cand_un_actions_nocumsum = self.parse_action(traj, dist_pred_split[i][traj_id], pm_pred=progress_pred[i][traj_id], stop_mode=batch['stop_mode'], steps=batch['steps'])
-                    actions_list.append(cand_actions)
-                    un_actions_nocumsum_list.append(cand_un_actions_nocumsum)
-                    if vis:
-                        ax.plot(cand_actions_cumsum[:, 0].detach().cpu(), cand_un_actions_nocumsum[:, 1].detach().cpu(), alpha=0.1, marker='o')
+                
+                # 获取动作并转换为numpy数组
+                un_actions = get_action(dp_output, self.action_stats).cpu().detach().numpy()
                 
                 if vis:
-                    # save images
-                    save_file = f'data/images/num_samples/EpisodeId_{episode_ids[i]}_step_{step}.png'
-                    plt.savefig(save_file)
-                    print(f"Save image to {save_file}")
-                    
-                    plt.close()
+                    # 收集数据范围
+                    all_x.extend(un_actions[0][:, 0])
+                    all_y.extend(un_actions[0][:, 1])
+                    # 绘制轨迹
+                    ax.plot(un_actions[0][:, 0], un_actions[0][:, 1], 
+                        alpha=0.5, marker='o', label=f'Sample {i+1}')
                 
-                # randomly sample one from list
-                actions.append(actions_list[np.random.randint(0, len(actions_list))][0])
-                un_actions_nocumsum.append(un_actions_nocumsum_list[np.random.randint(0, len(un_actions_nocumsum_list))])
+                actions_list.append(un_actions)
+                un_actions_nocumsum_list.append(un_actions)
+                
+                # 保存到总列表
+                actions.append(actions_list)
+                un_actions_nocumsum.append(un_actions_nocumsum_list)
             
-            rnn_states_out = torch.stack([x[0] for x in rnn_states_split], dim=0)
+            if vis:
+                # 设置对称的显示范围
+                max_range = max(
+                    abs(max(all_x)), abs(min(all_x)),
+                    abs(max(all_y)), abs(min(all_y))
+                )
+                ax.set_xlim(-max_range*1.2, max_range*1.2)
+                ax.set_ylim(-max_range*1.2, max_range*1.2)
+                
+                # 添加原点和网格
+                ax.plot(0, 0, 'ko', markersize=5)
+                ax.grid(True)
+                ax.axis('equal')
+                
+                # 添加图例
+                ax.legend(loc='upper right')
+                
+                # 保存图像
+                save_dir = 'logs/images/num_samples'
+                os.makedirs(save_dir, exist_ok=True)
+                save_file = f'logs/images/num_samples/EpisodeId_{episode_ids}_step_{step}.png'
+                plt.savefig(save_file)
+                print(f"Save image to {save_file}")
+                
+                plt.close()
+            
+            # randomly sample one from list
+            # actions.append(actions_list[np.random.randint(0, len(actions_list))][0])
+            # un_actions_nocumsum.append(un_actions_nocumsum_list[np.random.randint(0, len(un_actions_nocumsum_list))])
             
         else:
+            if vis:
+                un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
+                self.save_predicted_actions(un_actions, gt_actions=None, N=1, save_dir=predicted_actions_save_dir, step=step)
+        
             actions, actions_cumsum, un_actions_nocumsum = self.parse_action(diffusion_output, dist_pred, pm_pred=progress_pred, stop_mode=batch['stop_mode'], steps=batch['steps'])
         
         return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred
@@ -907,8 +949,10 @@ class CMA_DP_Net(nn.Module):
                 batch['depth_return_x_before_fc'] = False
             return self.img_embedding(batch['rgb_inputs'], batch['depth_inputs'], batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'])
         
-        elif mode == "pred_actions":   
-            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'])
+        elif mode == "pred_actions":
+            if 'num_sample' not in batch:
+                batch['num_sample'] = 1
+            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
         
         elif mode == "update_rnn":
             return self.update_rnn_states(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
