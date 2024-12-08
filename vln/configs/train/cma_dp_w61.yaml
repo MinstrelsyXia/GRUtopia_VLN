@@ -11,8 +11,8 @@ NUM_ENVIRONMENTS: 4
 # TENSORBOARD_DIR: data/tensorboard_dirs/*name
 TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
-EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
-# EVAL_CKPT_PATH_DIR: data/checkpoints/20241120-vlnce-rp-dp-cond0Dec3_dpIter20_bs4_fullInstr/ckpts/ckpt.38.pth
+# EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
+EVAL_CKPT_PATH_DIR: data/checkpoints/20241202-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint/ckpts/ckpt.58.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
@@ -35,21 +35,21 @@ EVAL:
   USE_CKPT_CONFIG: False
   SAVE_RESULTS: True
   # SPLIT: [val_seen, val_unseen]
-  SPLIT: [train]
+  SPLIT: [val_seen]
   EPISODE_COUNT: -1
   MAX_STEPS: 195
   train_eval_interval: 100
   ACTION: speed # descrete or xyyaw or speed
 
   # eval dataset settings
-  re_eval: true # if true, will re-evaluate the episodes in the result_json_path
+  re_eval: false # if true, will re-evaluate the episodes in the result_json_path
   load_eval_subset: true # if true, will load the eval subset (collect successfully)
 
   # for xyyaw
   success_distance: 3.0
   stop_x_threshold: 1.5e-2
   stop_y_threshold: 1.5e-2
-  stop_yaw_threshold: 1e-1
+  stop_yaw_threshold: 5e-2
 
   rotation_threshold: 1e-2
 
@@ -86,7 +86,7 @@ IL:
   save_interval_epochs: 2
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: true
-  ckpt_to_load: /isaac-sim/GRUtopia/data/checkpoints/20241202-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint/ckpts/ckpt.44.pth
+  ckpt_to_load: /isaac-sim/GRUtopia/data/checkpoints/20241202-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint/ckpts/ckpt.58.pth
   load_from_pretrain: false
 
   camera_name: 'pano_camera_0'

@@ -578,9 +578,12 @@ def batch_obs(
 
     return batch_t.map(lambda v: v.to(device))
 
-def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl):
+def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl, is_topdown=False):
     # 保存视频
-    video_path = os.path.join(VIDEO_DIR, f"{split}_episode_{ep_id}_ckpt_{checkpoint_index}_spl_{spl}.mp4")
+    if is_topdown:
+        video_path = os.path.join(VIDEO_DIR, f"{split}_episode_{ep_id}_ckpt_{checkpoint_index}_spl_{spl}_topdown.mp4")
+    else:
+        video_path = os.path.join(VIDEO_DIR, f"{split}_episode_{ep_id}_ckpt_{checkpoint_index}_spl_{spl}.mp4")
     video_writer = cv2.VideoWriter(
         video_path,
         cv2.VideoWriter_fourcc(*'mp4v'),
