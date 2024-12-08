@@ -29,7 +29,7 @@ DDP:
 
   node_rank: 0
   world_size: 4
-  cuda_first_device: 4
+  cuda_first_device: 0
 
 EVAL:
   USE_CKPT_CONFIG: False
@@ -88,8 +88,6 @@ IL:
   load_from_ckpt: true
   ckpt_to_load: /isaac-sim/GRUtopia/data/checkpoints/20241202-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint/ckpts/ckpt.44.pth
   load_from_pretrain: false
-
-  dataset_root_dir: data/datasets/R2R_VLNCE_v1-3
 
   camera_name: 'pano_camera_0'
   Filter_failure: 
@@ -249,7 +247,7 @@ MODEL:
     encoding_size: 64
     use: true
 
-    to_local_coords: true # !!!
+    to_local_coords: true 
   
   PREV_ACTION_ENCODER:
     encoding_size: 64
