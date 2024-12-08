@@ -717,6 +717,7 @@ class DaggerDiffusonPolicyTrainer:
                 self.eval_logger.info(f"All data in {self.eval_env.current_split} and {split} have been evaluated.")
                 return 0, 0
 
+        '''Init the policy'''
         self.policy, _ = initialize_policy(
             self.config,
             self.eval_logger,
@@ -855,7 +856,8 @@ class DaggerDiffusonPolicyTrainer:
                     'add_noise_to_action': False,
                     'denoise_action': True,
                     'num_sample': self.config.EVAL.num_sample,
-                    'vis': self.config.test_verbose,
+                    # 'vis': self.config.test_verbose,
+                    'vis': False,
                     'step': sim_steps[0],
                     'episode_ids': current_episodes['episode_id'],
                     'stop_mode': self.config.EVAL.stop_mode,
@@ -1275,8 +1277,10 @@ class DaggerDiffusonPolicyTrainer:
         if self.eval_env.current_split not in data:
             data[self.eval_env.current_split] = {}
             data[self.eval_env.current_split]["finished_scans"] = []
-            data[self.eval_env.current_split]["episodes"] = []
-        data[self.eval_env.current_split]["episodes"].append(episode_info)
+            data[self.eval_env.current_split]["episodes"] = defaultdict(list)
+        if self.eval_env.current_scan not in data[self.eval_env.current_split]["episodes"]:
+            data[self.eval_env.current_split]["episodes"][self.eval_env.current_scan] = []
+        data[self.eval_env.current_split]["episodes"][self.eval_env.current_scan].append(episode_info)
         with open(result_json_path, 'w') as f:
             json.dump(data, f, indent=4)
 

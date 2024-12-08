@@ -118,6 +118,8 @@ MODEL:
   ablate_instruction: False
   ablate_depth: False
   ablate_rgb: false
+
+  normalize_rgb: False
   
   INSTRUCTION_ENCODER:
     sensor_uuid: "instruction"

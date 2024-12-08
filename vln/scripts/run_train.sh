@@ -42,9 +42,10 @@ elif [ "$1" == "--collect_dataset" ]; then
   "
 elif [ "$1" == "--eval" ]; then
   flags="
-    --exp-config vln/configs/train/cma_dp_w61.yaml
     --run-type eval
+    --exp-config vln/configs/train/cma_dp_w61.yaml
     --headless
+    --test_verbose
   "
 fi
 python vln/run_policy.py $flags

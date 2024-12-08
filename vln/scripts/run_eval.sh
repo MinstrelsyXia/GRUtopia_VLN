@@ -6,11 +6,26 @@ max_attempts=90  # 最大重试次数
 attempt=1
 
 while [ $attempt -le $max_attempts ]; do
-    if [ "$1" == "--eval" ]; then
+    if [ "$1" == "--val_seen" ]; then
         flags="
-            --exp-config vln/configs/train/cma_dp_w61.yaml
+            --exp-config vln/configs/train/cma_dp_eval_val_seen.yaml
             --run-type eval
             --headless
+            --test_verbose
+        "
+    elif [ "$1" == "--val_unseen" ]; then
+        flags="
+            --exp-config vln/configs/train/cma_dp_eval_val_unseen.yaml
+            --run-type eval
+            --headless
+            --test_verbose
+        "
+    elif [ "$1" == "--train" ]; then
+        flags="
+            --exp-config vln/configs/train/cma_dp_eval_train.yaml
+            --run-type eval
+            --headless
+            --test_verbose
         "
     fi
 
