@@ -664,10 +664,11 @@ class CMA_DP_Net(nn.Module):
             for idx in range(un_actions_nocumsum[0].shape[0]):
                 if stop_mode == 'progress':
                     stop_flag = False
-                    # Check if 4 consecutive steps are stop actions
-                    if idx + 3 < len(un_actions_nocumsum[0]):  # Make sure we have enough steps ahead
+                    M_stops = 4
+                    # Check if M consecutive steps are stop actions
+                    if idx + M_stops < len(un_actions_nocumsum[0]):  # Make sure we have enough steps ahead
                         consecutive_stops = True
-                        for i in range(3):  # Check current and next 2 steps
+                        for i in range(M_stops):  # Check current and next M steps
                             curr_action = un_actions_nocumsum[0][idx+i]
                             if not (abs(curr_action[0]) < float(self.config.EVAL.stop_x_threshold) and \
                                   abs(curr_action[1]) < float(self.config.EVAL.stop_y_threshold) and \
@@ -861,71 +862,7 @@ class CMA_DP_Net(nn.Module):
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         
-            actions = []
-            un_actions_nocumsum = []
-            rnn_states_list = []
-
-            # 创建图像（只创建一次）
-            fix, ax = plt.subplots(1, 1, figsize=(8, 8))
-
-            # 设置坐标轴
-            ax.spines['right'].set_color('none')
-            ax.spines['top'].set_color('none')
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
-
-            # 存储所有轨迹的数据范围
-            all_x = []
-            all_y = []
-
-            for i in range(batch['num_sample']):
-                dp_output = denoise_action_list[i]
-                actions_list = []
-                un_actions_nocumsum_list = []
-                
-                # 获取动作并转换为numpy数组
-                un_actions = get_action(dp_output, self.action_stats).cpu().detach().numpy()
-                
-                if vis:
-                    # 收集数据范围
-                    all_x.extend(un_actions[0][:, 0])
-                    all_y.extend(un_actions[0][:, 1])
-                    # 绘制轨迹
-                    ax.plot(un_actions[0][:, 0], un_actions[0][:, 1], 
-                        alpha=0.5, marker='o', label=f'Sample {i+1}')
-                
-                actions_list.append(un_actions)
-                un_actions_nocumsum_list.append(un_actions)
-                
-                # 保存到总列表
-                actions.append(actions_list)
-                un_actions_nocumsum.append(un_actions_nocumsum_list)
-            
-            if vis:
-                # 设置对称的显示范围
-                max_range = max(
-                    abs(max(all_x)), abs(min(all_x)),
-                    abs(max(all_y)), abs(min(all_y))
-                )
-                ax.set_xlim(-max_range*1.2, max_range*1.2)
-                ax.set_ylim(-max_range*1.2, max_range*1.2)
-                
-                # 添加原点和网格
-                ax.plot(0, 0, 'ko', markersize=5)
-                ax.grid(True)
-                ax.axis('equal')
-                
-                # 添加图例
-                ax.legend(loc='upper right')
-                
-                # 保存图像
-                save_dir = 'logs/images/num_samples'
-                os.makedirs(save_dir, exist_ok=True)
-                save_file = f'logs/images/num_samples/EpisodeId_{episode_ids}_step_{step}.png'
-                plt.savefig(save_file)
-                print(f"Save image to {save_file}")
-                
-                plt.close()
+            self.draw_multiple_actions(denoise_action_list, batch, episode_ids, predicted_actions_save_dir, step)
             
             # randomly sample one from list
             # actions.append(actions_list[np.random.randint(0, len(actions_list))][0])
@@ -939,6 +876,71 @@ class CMA_DP_Net(nn.Module):
             actions, actions_cumsum, un_actions_nocumsum = self.parse_action(diffusion_output, dist_pred, pm_pred=progress_pred, stop_mode=batch['stop_mode'], steps=batch['steps'])
         
         return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred
+    
+    def draw_multiple_actions(self, denoise_action_list, batch, episode_ids, save_dir=None, step=0):
+        actions = []
+        un_actions_nocumsum = []
+        rnn_states_list = []
+
+        # 创建图像（只创建一次）
+        fix, ax = plt.subplots(1, 1, figsize=(8, 8))
+
+        # 设置坐标轴
+        ax.spines['right'].set_color('none')
+        ax.spines['top'].set_color('none')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+
+        # 存储所有轨迹的数据范围
+        all_x = []
+        all_y = []
+
+        for i in range(batch['num_sample']):
+            dp_output = denoise_action_list[i]
+            actions_list = []
+            un_actions_nocumsum_list = []
+            
+            # 获取动作并转换为numpy数组
+            un_actions = get_action(dp_output, self.action_stats).cpu().detach().numpy()
+            
+            # 收集数据范围
+            all_x.extend(un_actions[0][:, 0])
+            all_y.extend(un_actions[0][:, 1])
+            # 绘制轨迹
+            ax.plot(un_actions[0][:, 0], un_actions[0][:, 1], 
+                alpha=0.5, marker='o', label=f'Sample {i+1}')
+            
+            actions_list.append(un_actions)
+            un_actions_nocumsum_list.append(un_actions)
+            
+            # 保存到总列表
+            actions.append(actions_list)
+            un_actions_nocumsum.append(un_actions_nocumsum_list)
+
+        # 设置对称的显示范围
+        max_range = max(
+            abs(max(all_x)), abs(min(all_x)),
+            abs(max(all_y)), abs(min(all_y))
+        )
+        ax.set_xlim(-max_range*1.2, max_range*1.2)
+        ax.set_ylim(-max_range*1.2, max_range*1.2)
+        
+        # 添加原点和网格
+        ax.plot(0, 0, 'ko', markersize=5)
+        ax.grid(True)
+        ax.axis('equal')
+        
+        # 添加图例
+        ax.legend(loc='upper right')
+        
+        # 保存图像
+        save_dir = 'logs/images/num_samples'
+        os.makedirs(save_dir, exist_ok=True)
+        save_file = f'logs/images/num_samples/EpisodeId_{episode_ids}_step_{step}.png'
+        plt.savefig(save_file)
+        print(f"Save image to {save_file}")
+        
+        plt.close()
 
     def forward(
         self, batch

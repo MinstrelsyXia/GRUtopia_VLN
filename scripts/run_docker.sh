@@ -14,8 +14,8 @@ sudo docker run -d --name ${NAME} -it --rm --gpus='"device=4"' --network host \
      -v ${CACHE_ROOT}/isaac-sim/data:/root/.local/share/ov/data:rw \
      -v ${CACHE_ROOT}/isaac-sim/documents:/root/Documents:rw \
      -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:rw \
-     -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
-     -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:rw \
+     -v /ssd/share/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
+     -v /ssd/share/VLNCE/R2R_VLNCE_v1-3_corrected:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:rw \
      w61_grutopia:v0.2
 
 # enter the docker

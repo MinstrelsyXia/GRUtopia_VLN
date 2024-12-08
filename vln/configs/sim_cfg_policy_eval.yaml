@@ -44,7 +44,7 @@ tasks:
       enable: true
       size: [256, 256]
     - name: "topdown_camera_50"
-      enable: false
+      enable: true
       size: [500, 500]
     - name: "topdown_camera_500"
       enable: true

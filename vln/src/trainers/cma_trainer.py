@@ -696,6 +696,7 @@ class DaggerCMATrainer:
             # TODO
             # config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP_VLNCE")
             total_rgb_list = []
+            total_topdown_rgb_list = []
 
         if config.EVAL.SAVE_RESULTS:
             fname = os.path.join(
@@ -707,7 +708,14 @@ class DaggerCMATrainer:
                 return 0, 0
 
         '''Init the task env'''
-        self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
+        obs = self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
+        if isinstance(obs, str):
+            if obs == 'shortest_path_planning_failed':
+                while isinstance(obs, str) and obs == 'shortest_path_planning_failed':
+                    obs = self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
+            elif obs == 'all_data_evaluated':
+                self.eval_logger.info(f"All data in {self.eval_env.current_split} and {split} have been evaluated.")
+                return 0, 0
 
         self.policy, _ = initialize_policy(
             self.config,
@@ -823,6 +831,7 @@ class DaggerCMATrainer:
 
             if config.VIDEO_OPTION != -1:
                 total_rgb_list.append(observations[env_idx]["rgb"])
+                total_topdown_rgb_list.append(observations[env_idx]["topdown_rgb"])
         
         spl_dict = {}
         total_actions = []
@@ -916,7 +925,7 @@ class DaggerCMATrainer:
                         rot_action = [
                             {'h1': {'rotate': [exe_actions[-1]]}}
                         ]
-                        outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, rot_action)
+                        outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, rot_action)
                         steps[0] += len(exe_actions)
                         total_actions.append(exe_actions)
 
@@ -939,12 +948,12 @@ class DaggerCMATrainer:
                         #         {'h1': {'stop': ['stop']}}
                         #     ]
 
-                outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, verbose=self.config.test_verbose) 
+                outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=self.config.test_verbose) 
                 steps[0] += len(speed_actions)
                 total_actions.append(speed_actions)
 
             if len(outputs) > 0:
-                outputs_dict, dones, infos, sim_steps, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list = outputs
+                outputs_dict, dones, infos, sim_steps, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list = outputs
             else:
                 outputs_dict, dones, infos, sim_steps = [], [], [], []
 
@@ -1100,6 +1109,7 @@ class DaggerCMATrainer:
                         self.eval_logger.info(f"{metric_name}: {metric_value:.3f}")
                 
                 self.update_result_json(self.result_json_path, infos[i])
+                self.eval_env.draw_visited_map()
                 
                 ep_id = current_episodes['episode_id']
                 stats_episodes[ep_id] = infos[i]
@@ -1108,6 +1118,14 @@ class DaggerCMATrainer:
                 self.eval_logger.info(f"Episode {ep_id} time: {ep_time:.2f}s")
 
                 observations[i] = self.eval_env.construct_env(step_time=steps[i])[0]
+                if isinstance(observations[i], str):
+                    if observations[i] == 'shortest_path_planning_failed':
+                        while isinstance(observations[i], str) and observations[i] == 'shortest_path_planning_failed':
+                            observations[i] = self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
+                    elif observations[i] == 'all_data_evaluated':
+                        self.eval_logger.info(f"All data in {self.eval_env.current_split} and {self.eval_env.current_split} have been evaluated.")
+                        break
+
                 current_episode_start_time = time.time()
                 
                 # Initialize parameters
@@ -1152,9 +1170,13 @@ class DaggerCMATrainer:
                     init_width, init_height = total_rgb_list[0].shape[:2]
                     for j in range(len(total_rgb_list)):
                         total_rgb_list[j] = cv2.resize(total_rgb_list[j], (init_height, init_width))
+                    
+                    init_width, init_height = total_topdown_rgb_list[0].shape[:2]
+                    for j in range(len(total_topdown_rgb_list)):
+                        total_topdown_rgb_list[j] = cv2.resize(total_topdown_rgb_list[j], (init_height, init_width))
                     # save rgbs as videos
                     save_video(config.VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, stats_episodes[ep_id]["spl"])
-
+                    save_video(config.VIDEO_DIR, total_topdown_rgb_list, split, ep_id, checkpoint_index, stats_episodes[ep_id]["spl"], is_topdown=True)
                     # generate_video(
                     #     video_option=config.VIDEO_OPTION,
                     #     video_dir=config.VIDEO_DIR,
@@ -1166,6 +1188,7 @@ class DaggerCMATrainer:
                     # )
                     # del stats_episodes[ep_id]["top_down_map_vlnce"]
                     total_rgb_list = []
+                    total_topdown_rgb_list = []
                 # else:
                     # print stats_episodes[ep_id]["spl"]
                     # self.eval_logger.info(
@@ -1258,13 +1281,6 @@ class DaggerCMATrainer:
             writer.add_scalar(f"eval_{split}_{k}", v, checkpoint_num)
 
         return aggregated_stats['spl'], aggregated_stats['success']
-
-    def process_stop_episode(self, stats_episodes):
-        # TODO
-        self.eval_env.construct_env()
-        return stats_episodes
-        
-        # stats_episodes{ep_id} = self.compute_metric(ep)
     
     def update_result_json(self, result_json_path, episode_info):
         with open(result_json_path, 'r') as f:
