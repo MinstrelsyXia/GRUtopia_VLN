@@ -31,7 +31,7 @@ class TaskEnv(VLNDataLoader):
         self.finish_splits = []
         
         # warm up
-        self.warm_up_steps = 240 if self.args.headless else 1200
+        self.warm_up_steps = 160 if self.args.headless else 1200
         self.max_step = self.args.settings.max_step
         self.per_action_max_step = self.args.settings.per_action_max_step
 
