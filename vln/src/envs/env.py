@@ -31,7 +31,7 @@ class TaskEnv(VLNDataLoader):
         self.finish_splits = []
         
         # warm up
-        self.warm_up_steps = 240 if self.args.headless else 1200
+        self.warm_up_steps = 160 if self.args.headless else 1200
         self.max_step = self.args.settings.max_step
         self.per_action_max_step = self.args.settings.per_action_max_step
 
@@ -82,7 +82,7 @@ class TaskEnv(VLNDataLoader):
             self.current_scan = self.current_scan_list[self.current_scan_idx]
 
             if len(loaded_results) > 0:
-                self.current_episode_idx = len(loaded_results[self.current_scan]["episodes"]) - 1 if self.current_scan in loaded_results['finished_scans'] else -1
+                self.current_episode_idx = len(loaded_results[self.current_scan]["episodes"][self.current_scan]) - 1 if self.current_scan in loaded_results['finished_scans'] else -1
             
             self.start_step_list = [0]
             self.current_step_list = [0]
