@@ -113,8 +113,6 @@ class DaggerCMATrainer:
                 filename=train_logger_filename
             )
             self.train_logger.info(f"Start Training! Good Luck!!!")
-            
-            self.train_dataset_data = load_dataset(config.IL.dataset_root_dir, 'train', logger=self.train_logger)
         
         elif self.config.run_type == 'eval':
             if isinstance(self.config.EVAL.SPLIT, list):

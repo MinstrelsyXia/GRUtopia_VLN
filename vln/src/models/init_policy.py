@@ -26,7 +26,7 @@ def initialize_policy(
         load_from_pretrain: bool = False,
         action_stats = None,
     ) -> None:
-        default_gpu, n_gpu, device = set_cuda(config)
+        default_gpu, n_gpu, device = set_cuda(config, device)
         if default_gpu:
             logger.info(
                 'device: {} n_gpu: {}, distributed training: {}, 16-bits training: {}'.format(
