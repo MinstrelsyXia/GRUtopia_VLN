@@ -1273,8 +1273,9 @@ class DaggerDiffusonPolicyTrainer:
         with open(result_json_path, 'r') as f:
             data = json.load(f)
         if self.eval_env.current_split not in data:
-            data[self.eval_env.current_split] = []
-        data[self.eval_env.current_split].append(episode_info)
+            data[self.eval_env.current_split] = {}
+            data[self.eval_env.current_split][self.eval_env.current_scan] = []
+        data[self.eval_env.current_split][self.eval_env.current_scan].append(episode_info)
         with open(result_json_path, 'w') as f:
             json.dump(data, f, indent=4)
 

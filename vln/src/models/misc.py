@@ -27,7 +27,7 @@ def set_dropout(model, drop_p):
                 module.p = drop_p
                 logger.info(f'{name} set to {drop_p}')
 
-def set_cuda(opts) -> Tuple[bool, int, torch.device]:
+def set_cuda(opts, device=None) -> Tuple[bool, int, torch.device]:
     """
     Initialize CUDA for distributed computing
     """
@@ -46,7 +46,7 @@ def set_cuda(opts) -> Tuple[bool, int, torch.device]:
             logger.info(f"Found {dist.get_world_size()} GPUs")
     else:
         default_gpu = True
-        device = torch.device("cuda")
+        device = torch.device("cuda") if device is None else device
         # n_gpu = torch.cuda.device_count()
         n_gpu = len(opts.TORCH_GPU_IDS)
 
