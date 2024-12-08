@@ -61,6 +61,7 @@ class TaskEnv(VLNDataLoader):
             
             self.finish_scans = []
             self.current_episode_idx = -1 # this is not episode_id in data. but the location in data. # !!! DEBUG. should be -1
+            loaded_finished_scans = False
             if result_json_path is not None:
                 self.result_json_path = result_json_path
                 # jump the existing episode_id in result_json_path
@@ -68,13 +69,20 @@ class TaskEnv(VLNDataLoader):
                     loaded_results = json.load(f)
                     if len(loaded_results) > 0:
                         loaded_results = loaded_results[self.current_split]
-                        self.current_episode_idx = len(loaded_results) - 1
+                        if "finished_scans" in loaded_results:
+                            # jump the existing finished scans
+                            self.finished_scans = loaded_results["finished_scans"]
+                            self.current_scan_idx = len(self.finished_scans)
+                            loaded_finished_scans = True
             
             self.current_scan_data = self.data[self.current_split]
             self.number_of_episodes = [len(self.current_scan_data[scan]) for scan in self.current_scan_data.keys()]
             self.current_scan_list = list(self.current_scan_data.keys())
-            self.current_scan_idx = 0
+            self.current_scan_idx = 0 if not loaded_finished_scans else self.current_scan_idx
             self.current_scan = self.current_scan_list[self.current_scan_idx]
+
+            if len(loaded_results) > 0:
+                self.current_episode_idx = len(loaded_results[self.current_split][self.current_scan]) - 1 if self.current_scan in loaded_results[self.current_split] else -1
             
             self.start_step_list = [0]
             self.current_step_list = [0]
@@ -95,6 +103,18 @@ class TaskEnv(VLNDataLoader):
             # finish this scan
             self.finish_scans.append(self.current_scan)
             self.eval_logger.info(f"Finish the scan {self.current_scan}")
+
+            if result_json_path is not None:
+                # record the finished scan in result_json_path
+                self.result_json_path = result_json_path
+                with open(self.result_json_path, 'r') as f:
+                    loaded_results = json.load(f)
+
+                if "finished_scans" not in loaded_results[self.current_split]:
+                    loaded_results[self.current_split]["finished_scans"] = []
+                loaded_results[self.current_split]["finished_scans"].append(self.current_scan)
+                with open(self.result_json_path, 'w') as f:
+                    json.dump(loaded_results, f, indent=2)
             
             # check weather all data in this split has been evaluated
             if len(self.finish_scans) == len(self.current_scan_list):

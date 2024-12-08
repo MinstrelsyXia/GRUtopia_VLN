@@ -35,15 +35,16 @@ elif [ "$1" == "--debug" ]; then
     --run-type train
   "
 
-elif [ "$1" == "--eval" ]; then
-  flags="
-    --exp-config vlnce_baselines/config/r2r_baselines/dp/cma_dp_eval.yaml
-    --run-type eval
-  "
 elif [ "$1" == "--collect_dataset" ]; then
   flags="
     --exp-config vlnce_baselines/config/r2r_baselines/dp/dp_collect_data.yaml
     --run-type collect_dataset
+  "
+elif [ "$1" == "--eval" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_w61.yaml
+    --run-type eval
+    --headless
   "
 fi
 python vln/run_policy.py $flags
