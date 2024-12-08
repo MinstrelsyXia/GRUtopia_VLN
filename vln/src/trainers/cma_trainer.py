@@ -66,26 +66,24 @@ class DaggerCMATrainer:
         self.use_bert = False
         self.bert_tokenizer = None
         self.is_clip_long = False
-        if config.MODEL.TEXT_ENCODER.type == 'roberta':
-            self.bert_tokenizer = BertTokenizer(
-                max_length=config.MODEL.INSTRUCTION_ENCODER.max_length,
-                load_model=config.MODEL.INSTRUCTION_ENCODER.load_model,
-                device=self.device
-            )
-            self.use_bert = True
-        elif config.MODEL.TEXT_ENCODER.type == 'clip-long':
-            self.bert_tokenizer = longclip.tokenize
-            self.use_bert = True
-            self.is_clip_long = True
+        if hasattr(config.MODEL, 'TEXT_ENCODER'):
+            if config.MODEL.TEXT_ENCODER.type == 'roberta':
+                self.bert_tokenizer = BertTokenizer(
+                    max_length=config.MODEL.INSTRUCTION_ENCODER.max_length,
+                    load_model=config.MODEL.INSTRUCTION_ENCODER.load_model,
+                        device=self.device
+                    )
+                self.use_bert = True
+            elif config.MODEL.TEXT_ENCODER.type == 'clip-long':
+                self.bert_tokenizer = longclip.tokenize
+                self.use_bert = True
+                self.is_clip_long = True
         
         self.world_size = self.config.GPU_NUMBERS
         self.local_rank = self.config.local_rank
         self.batch_size = self.config.IL.batch_size
-        
-        if self.config.MODEL.learn_angle:
-            self.action_dim = 3
-        else:
-            self.action_dim = 2
+    
+        self.action_dim = 4
 
         torch.cuda.set_device(self.device)
 
@@ -96,12 +94,7 @@ class DaggerCMATrainer:
 
         # Init the action stats
         self.action_stats = None
-        if hasattr(self.config.MODEL, 'Diffusion_Policy'):
-            self.action_stats = {}
-            self.action_stats = self.config.MODEL.Diffusion_Policy.action_stats
-            self.action_stats.min = torch.from_numpy(np.array(self.action_stats.min)).to(self.device)
-            self.action_stats.max = torch.from_numpy(np.array(self.action_stats.max)).to(self.device)
-        
+
         # Init the file_logger
         if self.config.run_type == 'train':
             train_logger_filename = os.path.join(log_dir, "train.log")
@@ -708,9 +701,7 @@ class DaggerCMATrainer:
                 logger.info("skipping -- evaluation exists.")
                 return 0, 0
 
-        '''Init the task env'''
-        self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
-
+        '''Init the policy'''
         self.policy, _ = initialize_policy(
             self.config,
             self.eval_logger,
@@ -720,6 +711,9 @@ class DaggerCMATrainer:
             action_stats=self.action_stats
         )
         self.policy.eval()
+
+        '''Init the task env'''
+        self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
 
         observations = self.eval_env.get_obs()
         start_positions = [x['globalgps'][[0,1]] for x in observations]

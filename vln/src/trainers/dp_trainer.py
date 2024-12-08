@@ -708,9 +708,7 @@ class DaggerDiffusonPolicyTrainer:
                 logger.info("skipping -- evaluation exists.")
                 return 0, 0
 
-        '''Init the task env'''
-        self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
-
+        '''Init the policy'''
         self.policy, _ = initialize_policy(
             self.config,
             self.eval_logger,
@@ -720,6 +718,9 @@ class DaggerDiffusonPolicyTrainer:
             action_stats=self.action_stats
         )
         self.policy.eval()
+
+        '''Init the task env'''
+        self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
 
         observations = self.eval_env.get_obs()
         start_positions = [x['globalgps'][[0,1]] for x in observations]
