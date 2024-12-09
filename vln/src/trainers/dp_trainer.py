@@ -61,7 +61,14 @@ class DaggerDiffusonPolicyTrainer:
         self.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir
         self.config = config
         self.logger = logger
-        self.device = torch.device("cuda", config.TORCH_GPU_IDS[0])
+        self.world_size = self.config.world_size
+        self.local_rank = self.config.local_rank
+        self.is_distributed = self.world_size > 1 and (not self.config.DDP.use_dp)
+        
+        if self.is_distributed:
+            self.device = torch.device("cuda", self.local_rank)
+        else:
+            self.device = torch.device("cuda", config.TORCH_GPU_IDS[0])
         
         self.use_bert = False
         self.bert_tokenizer = None
@@ -78,8 +85,6 @@ class DaggerDiffusonPolicyTrainer:
             self.use_bert = True
             self.is_clip_long = True
         
-        self.world_size = self.config.GPU_NUMBERS
-        self.local_rank = self.config.local_rank
         self.batch_size = self.config.IL.batch_size
         
         if self.config.MODEL.learn_angle:
@@ -113,6 +118,8 @@ class DaggerDiffusonPolicyTrainer:
                 filename=train_logger_filename
             )
             self.train_logger.info(f"Start Training! Good Luck!!!")
+
+            self.train_dataset_data = load_dataset(config.IL.dataset_root_dir, 'train', logger=self.train_logger)
         
         elif self.config.run_type == 'eval':
             if isinstance(self.config.EVAL.SPLIT, list):
@@ -197,15 +204,15 @@ class DaggerDiffusonPolicyTrainer:
             action_stats=self.action_stats
         )
         
-        is_distributed = False
-        rank = 0
-        world_size = 1
+        is_distributed = self.is_distributed
+        rank = self.local_rank if self.is_distributed else 0
+        world_size = self.world_size
         start_epoch = 0
         
         with TensorboardWriter(self.config.TENSORBOARD_DIR, flush_secs=30, purge_step=0) as writer:        
             if self.world_size > 1:
                 img_encoder = self.policy.module.image_encoder
-                if self.local_rank != -1: # use DDP
+                if not self.config.DDP.use_dp: # use DDP
                     is_distributed = True
                     rank = self.local_rank
                     world_size = self.world_size
@@ -254,11 +261,16 @@ class DaggerDiffusonPolicyTrainer:
                     leave=False,
                     dynamic_ncols=True,
                 ):
+                    if self.config.IL.analysis_time:
+                        start_time = time.time()
                     (
                         observations_batch,
                         prev_actions_batch,
                         not_done_masks,
                     ) = batch
+                    if self.config.IL.analysis_time:
+                        end_time = time.time()
+                        self.train_logger.info(f"Time taken for loading batch: {end_time - start_time:.2f} seconds")
 
                     observations_batch = {
                         k: v.to(
@@ -271,7 +283,7 @@ class DaggerDiffusonPolicyTrainer:
                     
                     if step_id % 100 == 0:
                         torch.cuda.empty_cache()
-                    loss, diffusion_loss, dist_loss, aux_loss = self._update_agent(
+                    loss, diffusion_loss, dist_loss, pm_loss, stop_pm_loss = self._update_agent(
                         observations_batch,
                         prev_actions_batch.to(
                             device=self.device, non_blocking=True
@@ -288,7 +300,8 @@ class DaggerDiffusonPolicyTrainer:
                             logger.info(f"train_loss: {loss}")
                             logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
                             logger.info(f"train_dist_loss: {dist_loss}")
-                            logger.info(f"train_aux_loss: {aux_loss}")
+                            logger.info(f"train_pm_loss: {pm_loss}")
+                            logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
                             logger.info(f"Batches processed: {step_id}.")
                             logger.info(
                                 f"On DAgger iter {dagger_it}, Epoch {epoch}."
@@ -307,8 +320,13 @@ class DaggerDiffusonPolicyTrainer:
                             step_id,
                         )
                         writer.add_scalar(
-                            f"train_aux_loss_iter_{dagger_it}",
-                            aux_loss,
+                            f"train_pm_loss_iter_{dagger_it}",
+                            pm_loss,
+                            step_id,
+                        )
+                        writer.add_scalar(
+                            f"train_stop_pm_loss_iter_{dagger_it}",
+                            stop_pm_loss,
                             step_id,
                         )
                         step_id += 1  # noqa: SIM113
@@ -457,24 +475,38 @@ class DaggerDiffusonPolicyTrainer:
                 or self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder\
                     or self.config.MODEL.LORA.add_for_rgb_encoder \
                         or self.config.MODEL.LORA.add_for_depth_encoder:
-            depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
-            batch = {
-                'mode': 'img_embedding',
-                'rgb_inputs': observations['rgb'],
-                'depth_inputs': observations['depth'],
-                'depth_return_x_before_fc': depth_return_x_before_fc,
-                'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
-                'img_mod': self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-                'process_images': True # not process in dataLoader. Process now.
-            }
-            stack_rgb, stack_depth = self.policy(batch)
-            if len(stack_rgb.shape) == 2:
-                observations['stack_rgb'] = stack_rgb.unsqueeze(1)
-                observations['stack_depth'] = stack_depth.unsqueeze(1)
-            else:
-                observations['stack_rgb'] = stack_rgb
-                observations['stack_depth'] = stack_depth
-            
+            need_img_extraction = True
+        else:
+            need_img_extraction = False
+        
+        depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
+
+        # if self.config.IL.analysis_time:
+        #     start_time = time.time()
+        # depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
+        # batch = {
+        #     'mode': 'img_embedding',
+        #     'rgb_inputs': observations['rgb'],
+        #     'depth_inputs': observations['depth'],
+        #     'depth_return_x_before_fc': depth_return_x_before_fc,
+        #     'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+        #     'img_mod': self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
+        #     'process_images': False # has processed in dataLoader
+        # }
+        # stack_rgb, stack_depth = self.policy(batch)
+        # if len(stack_rgb.shape) == 2:
+        #     observations['stack_rgb'] = stack_rgb.unsqueeze(1)
+        #     observations['stack_depth'] = stack_depth.unsqueeze(1)
+        # else:
+        #     observations['stack_rgb'] = stack_rgb
+        #     observations['stack_depth'] = stack_depth
+        
+        # if self.config.IL.analysis_time:
+        #     end_time = time.time()
+        #     self.train_logger.info(f"Time taken for image embedding: {end_time - start_time:.2f} seconds")
+        
+        if self.config.IL.analysis_time:
+            start_time = time.time()
         batch = {
             'mode': 'pred_actions',
             'observations': observations,
@@ -483,12 +515,20 @@ class DaggerDiffusonPolicyTrainer:
             'masks': not_done_masks,
             'add_noise_to_action': True,
             'denoise_action': denoise_action,
+            'need_img_extraction': need_img_extraction, # need img embedding in model
+            'depth_return_x_before_fc': depth_return_x_before_fc,
+            'img_mod': self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
+            'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+            'process_images': False # has processed in dataLoader
         }
-        if observations['stack_depth'].shape[1] == 1:
-            observations['stack_depth'] = observations['stack_depth'].squeeze(1)
-        if observations['stack_rgb'].shape[1] == 1:
-            observations['stack_rgb'] = observations['stack_rgb'].squeeze(1)
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_hat = self.policy(batch)
+        # if observations['stack_depth'].shape[1] == 1:
+        #     observations['stack_depth'] = observations['stack_depth'].squeeze(1)
+        # if observations['stack_rgb'].shape[1] == 1:
+        #     observations['stack_rgb'] = observations['stack_rgb'].squeeze(1)
+        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_hat, denoise_action_list, stop_progress_pred = self.policy(batch)
+        if self.config.IL.analysis_time:
+            end_time = time.time()
+            self.train_logger.info(f"Time taken for pred_actions: {end_time - start_time:.2f} seconds")
         
         # !!!
         # draw_loss_curve(N, noise_pred, noise, output_file='test.jpg')
@@ -513,17 +553,26 @@ class DaggerDiffusonPolicyTrainer:
             diffusion_loss = action_reduce(masks.squeeze(), F.mse_loss(noise_pred, observations['actions'], reduction="none"))
 
         # Aux loss
-        aux_loss = 0
+        pm_loss = 0
         if self.config.MODEL.PROGRESS_MONITOR.use:
             progress_loss = F.mse_loss(
                 progress_hat.squeeze(),
                 observations["progress"],
                 reduction="none",
             )
-            aux_loss = action_reduce(masks.squeeze(), progress_loss)
+            pm_loss = action_reduce(masks.squeeze(), progress_loss)
+        
+        stop_pm_loss = 0
+        if self.config.MODEL.STOP_PROGRESS_PREDICTOR.use:
+            stop_pm_loss = F.mse_loss(
+                stop_progress_pred.squeeze(),
+                observations["stop_progress"],
+                reduction="none",
+            )
+            stop_pm_loss = action_reduce(masks.squeeze(), stop_pm_loss)
         
         # Total loss
-        loss = self.config.MODEL.LOSS.alpha * self.config.MODEL.LOSS.dist_scale * dist_loss + (1-self.config.MODEL.LOSS.alpha) * diffusion_loss + aux_loss
+        loss = self.config.MODEL.LOSS.alpha * self.config.MODEL.LOSS.dist_scale * dist_loss + (1-self.config.MODEL.LOSS.alpha) * diffusion_loss + pm_loss + stop_pm_loss
         
         loss = loss / loss_accumulation_scalar
         loss.backward()
@@ -536,7 +585,7 @@ class DaggerDiffusonPolicyTrainer:
         # if isinstance(aux_loss, torch.Tensor):
         #     aux_loss = aux_loss.item()
         return_dist_loss = dist_loss.item() if dist_pred is not None else 0
-        return loss.item(), diffusion_loss.item(), return_dist_loss, aux_loss
+        return loss.item(), diffusion_loss.item(), return_dist_loss, pm_loss.item(), stop_pm_loss.item()
       
     def eval(self, use_gt=False) -> None:
         r"""Main method of trainer evaluation. Calls _eval_checkpoint() that
@@ -866,7 +915,7 @@ class DaggerDiffusonPolicyTrainer:
                     'num_sample': self.config.EVAL.num_sample,
                 }
                 
-                actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred = net(batch_settings)
+                actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred, stop_progress_pred = net(batch_settings)
                 # print(steps[0])
             
             prev_actions = [[] for _ in range(self.eval_env.env_nums)]
@@ -1021,7 +1070,7 @@ class DaggerDiffusonPolicyTrainer:
                     depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
                     stack_rgb = batch_stack_rgb,
                     stack_depth = batch_stack_depth,
-                    batch_stack_rgb_length=batch_stack_rgb_length,
+                    batch_stack_rgb_length = batch_stack_rgb_length,
                     proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj
                     )
 
@@ -1117,7 +1166,7 @@ class DaggerDiffusonPolicyTrainer:
                 stats_episodes[ep_id] = infos[i]
 
                 ep_time = time.time() - current_episode_start_time
-                self.eval_logger.info(f"Episode {ep_id} time: {ep_time:.2f}s")
+                self.eval_logger.info(f"Episode {ep_id} time: {ep_time//60:.0f}min {ep_time%60:.0f}s")
 
                 if config.use_pbar:
                     pbar.update()

@@ -54,26 +54,32 @@ def set_cuda(opts, device=None) -> Tuple[bool, int, torch.device]:
 
 
 def wrap_model(
-    model: torch.nn.Module, device: torch.device, local_rank: int, logger, world_size=1
+    model: torch.nn.Module, device: torch.device, local_rank: int, logger, world_size=1, use_dp=False
 ) -> torch.nn.Module:
-    if isinstance(device, int):
-        model.to(device)
-
-    if local_rank != -1:
-        model = DDP(model, device_ids=[local_rank], find_unused_parameters=True)
-        # At the time of DDP wrapping, parameters and buffers (i.e., model.state_dict()) 
-        # on rank0 are broadcasted to all other ranks.
-    elif torch.cuda.device_count() > 1 and world_size > 1:
-        logger.info(f"Using data parallel on GPUS: {device}")
-        print(f"Using data parallel on GPUS: {device}")
+    if world_size > 1 and use_dp:  # DP模式
         if isinstance(device, list):
             model = torch.nn.DataParallel(model, device_ids=device)
+            model = model.to(device[0])
         else:
             model = torch.nn.DataParallel(model)
+            model = model.to(device)
+    elif world_size > 1:  # DDP模式
+        # 确保模型在正确的GPU上
+        device = torch.device(f"cuda:{local_rank}")
+        model = model.to(device)
+        print(f"Process {local_rank} using device: {device}")
         
-        model = model.to(device[0])
-    else:
-        model = model.to(device[0])
+        model = DDP(
+            model,
+            device_ids=[local_rank],  # 使用local_rank对应的GPU
+            output_device=local_rank,
+            find_unused_parameters=True
+        )
+    else:  # 单GPU模式
+        if isinstance(device, list):
+            model = model.to(device[0])
+        else:
+            model = model.to(device)
 
     return model
 
@@ -130,9 +136,7 @@ def load_init_param(opts):
         # WARNING: this assumes that each node has the same number of GPUs
         n_gpus = torch.cuda.device_count()
         rank = local_rank + node_rank * n_gpus
-    opts.defrost()
     opts.rank = rank
-    opts.freeze()
 
     return {
         "backend": "nccl",

@@ -82,7 +82,7 @@ class TaskEnv(VLNDataLoader):
             self.current_scan = self.current_scan_list[self.current_scan_idx]
 
             if len(loaded_results) > 0:
-                self.current_episode_idx = len(loaded_results[self.current_scan]["episodes"][self.current_scan]) - 1 if self.current_scan in loaded_results['finished_scans'] else -1
+                self.current_episode_idx = len(loaded_results[self.current_scan]["episodes"][self.current_scan]) - 1 if self.current_scan in loaded_results['finished_scans'] else self.current_episode_idx
             
             self.start_step_list = [0]
             self.current_step_list = [0]
@@ -203,6 +203,7 @@ class TaskEnv(VLNDataLoader):
         # get_shortest_path
         self.prev_position = self.get_robot_poses()[self.env_idx][0]
         self.gt_exe_path, self.shortest_path_length = self.get_shortest_path(self.current_scan)
+        # np.save(os.path.join(self.EP_DIR, 'gt_exe_path.npy'), self.gt_exe_path) # !!!
         self.eval_logger.info(f"The shortest path length is {self.shortest_path_length:.2f}")
         if self.shortest_path_length == 0:
             self.eval_logger.error(f"The shortest path planning for {self.current_scan} has failed. Please check the data.")
