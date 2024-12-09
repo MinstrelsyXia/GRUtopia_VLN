@@ -12,14 +12,24 @@ import tqdm
 import io
 import lmdb
 import random
+import time
 from collections import defaultdict
 import zlib
 import msgpack_numpy
 import matplotlib.pyplot as plt
 import copy
 import torch
+from PIL import Image
 from torch.utils.data import Dataset, IterableDataset
 import torchvision.transforms.functional as TF
+from torchvision.transforms import Resize, ToPILImage
+from transformers import CLIPImageProcessor, CLIPVisionModel, CLIPVisionConfig
+from torchvision.transforms import Compose, CenterCrop, ToTensor, Normalize
+try:
+    from torchvision.transforms import InterpolationMode
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = Image.BICUBIC
 
 from vln.src.models.utils.feature_extract import extract_image_features, extract_instruction_tokens
 
@@ -34,6 +44,18 @@ def _block_shuffle(lst, block_size):
     random.shuffle(blocks)
 
     return [ele for block in blocks for ele in block]
+
+def _convert_image_to_rgb(image):
+    return image.convert("RGB")
+
+def _transform(n_px):
+    return Compose([
+        Resize(n_px, interpolation=BICUBIC),
+        CenterCrop(n_px),
+        _convert_image_to_rgb,
+        ToTensor(),
+        Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+    ])
 
 class ObservationsDict(dict):
     def pin_memory(self):
@@ -77,7 +99,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.camera_name = self.config.IL.camera_name
         self.lmdb_features_dir = lmdb_features_dir
         self.lmdb_map_size = lmdb_map_size
-        self.preload_size = batch_size * 100
+        self.preload_size = batch_size * 25
         self._preload = []
         self.batch_size = batch_size
         
@@ -98,7 +120,13 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.img_mod = self.config.MODEL.IMAGE_ENCODER.RGB.img_mod
         self.is_clip_long = (self.config.MODEL.TEXT_ENCODER.type == 'clip-long')
         self.policy = policy
-                    
+
+        # preprocess images
+        self.to_pil = ToPILImage()
+        self.image_processor = _transform(n_px=224) # copy fron clip-long
+        
+        if self.config.IL.analysis_time:
+            start_time = time.time()
         with lmdb.open(
             self.lmdb_features_dir,
             map_size=int(self.lmdb_map_size),
@@ -110,8 +138,11 @@ class VLNCE_DP_Dataset(IterableDataset):
             with lmdb_env.begin() as txn:
                 cursor = txn.cursor()
                 self.lmdb_keys = []
-                for key, _ in cursor:
-                    self.lmdb_keys.append(key.decode())
+                while cursor.next():
+                    self.lmdb_keys.append(cursor.key().decode())
+        if self.config.IL.analysis_time:
+            end_time = time.time()
+            print(f"Time taken to load LMDB: {end_time - start_time:.2f} seconds")
 
         self.start = 0
         self.end = self.length
@@ -211,22 +242,22 @@ class VLNCE_DP_Dataset(IterableDataset):
                             yaw -= 2*np.pi
                         yaws[yaw_i] = yaw
                             
-                    for ep_idx in range(len(self.dataset_data[key])):
-                        instr = self.dataset_data[key][ep_idx]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
+                    # for ep_idx in range(len(self.dataset_data[key])):
+                        # instr = self.dataset_data[key][ep_idx]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
                             
-                        new_data = {
-                            'instruction': instr,
-                            'progress': data['progress'],
-                            'globalgps': data['robot_info']['position'],
-                            'global_rotation': data['robot_info']['orientation'],
-                            'globalyaw': yaws,
-                            'rgb': data['camera_info'][self.camera_name]['rgb'],
-                            'depth': np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1),
-                        }
-                        new_preload.append(new_data)
-                        finish_status_list.append(finish_status)
-                        fail_reasons_list.append(fail_reason)
-                        lengths.append(len(new_preload[-1]))
+                    new_data = {
+                        'instruction': data_to_load['instruction'],
+                        'progress': data['progress'],
+                        'globalgps': data['robot_info']['position'],
+                        'global_rotation': data['robot_info']['orientation'],
+                        'globalyaw': yaws,
+                        'rgb': data['camera_info'][self.camera_name]['rgb'],
+                        'depth': np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1),
+                    }
+                    new_preload.append(new_data)
+                    finish_status_list.append(finish_status)
+                    fail_reasons_list.append(fail_reason)
+                    lengths.append(len(new_preload[-1]))
 
             # compute stack images, positions, yaw, and relative actions, time_distance for each observations
             new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
@@ -234,10 +265,9 @@ class VLNCE_DP_Dataset(IterableDataset):
             # process the instruction
             for i in range(len(new_preload)):
                 new_preload[i]['instruction'] = np.tile(np.array(new_preload[i]['instruction']), (len(new_preload[i]['progress']),1))
-            
-            # compute the action_stats ranges # !!!
-            min_x, min_y, min_yaw = 999, 999, 999
-            max_x, max_y, max_yaw = -999, -999, -999
+
+            if self.config.IL.analysis_time:
+                start_time = time.time()
             
             for item_idx in range(len(new_preload)):
                 item_obs = new_preload[item_idx]
@@ -250,6 +280,9 @@ class VLNCE_DP_Dataset(IterableDataset):
                 # total_steps = min(total_steps, 200)
                 # for k,v in item_obs.items():
                 #     item_obs[k] = item_obs[k][:total_steps]
+
+                # add stop_progress
+                item_obs["stop_progress"] = np.arange(total_steps) / total_steps
                 
                 for k,v in item_obs.items():
                     item_obs[k] = torch.from_numpy(np.array(item_obs[k]))
@@ -300,6 +333,14 @@ class VLNCE_DP_Dataset(IterableDataset):
                 # elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
                 #     depth_shape = item_obs["depth_features"][0].shape
                 #     item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
+
+                # Process images
+                if self.extract_img_features:
+                    process_images = []
+                    for image in item_obs["rgb"]:
+                        image = image.permute(2,0,1) # H,W,C -> C,H,W
+                        process_images.append(self.image_processor(self.to_pil(image)))
+                    item_obs["rgb"] = torch.stack(process_images)
                     
                 if self.config.MODEL.IMU_ENCODER.use:
                     item_obs["imu"] = torch.zeros((total_steps, self.config.MODEL.IMU_ENCODER.input_size))
@@ -345,14 +386,6 @@ class VLNCE_DP_Dataset(IterableDataset):
                                                          fill_mode='constant')[:self.config.MODEL.len_traj_act]
                     
                     action_deltas = get_delta(actions)
-                    # Compute the action stats ranges # !!!
-                    for act in action_deltas:
-                        min_x = min(min_x, act[0])
-                        min_y = min(min_y, act[1])
-                        min_yaw = min(min_yaw, act[2])
-                        max_x = max(max_x, act[0])
-                        max_y = max(max_y, act[1])
-                        max_yaw = max(max_yaw, act[2])
                     
                     if self.learn_angle:                         
                         item_obs["actions"][step_idx] = normalize_data(action_deltas, self.action_stats) # convert actions to [-1, 1]
@@ -378,7 +411,11 @@ class VLNCE_DP_Dataset(IterableDataset):
                 # if self.lmdb_save_episode_id:
                 #     new_preload[item_idx].append(episode_ids[item_idx])
                 #     new_preload[item_idx].append(gt_actions[item_idx])
-                    
+
+            if self.config.IL.analysis_time:
+                end_time = time.time()
+                print(f"Time taken to process data in dataLoader: {end_time - start_time:.2f} seconds")
+
             sort_priority = list(range(len(lengths)))
             random.shuffle(sort_priority)
 

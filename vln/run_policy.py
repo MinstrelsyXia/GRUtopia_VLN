@@ -5,7 +5,6 @@ Function: the main file to support training and evluation
 '''
 import os,sys
 current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-print(f"current_dir: {current_dir}")
 sys.path.append(current_dir)
 
 import argparse
@@ -58,7 +57,16 @@ def main():
         default=False,
         action='store_true',
     )
+    parser.add_argument(
+        "--local_rank",
+        type=int,
+        default=0,
+        help="local rank for distributed training",
+    )
+    
     args = parser.parse_args()
+    
+        
     run_exp(**vars(args))
 
 def get_config(exp_config, opts):
@@ -81,6 +89,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     config = get_config(exp_config, opts)
     config.test_verbose = kwargs.get('test_verbose', False)
     config.show_topdown_window = kwargs.get('show_topdown_window', False)
+    config.local_rank = kwargs.get('local_rank', 0)
     # logger.info(f"config: {config}")
     
     # Process the log dir
@@ -98,7 +107,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
             if config.VIDEO_OPTION != -1:
                 config.VIDEO_DIR = config.VIDEO_DIR.replace("*name", name)
         
-        config.local_rank = local_rank 
+        config.local_rank = config.local_rank 
         config.world_size = config.GPU_NUMBERS = len(config.TORCH_GPU_IDS)
         
         logdir = config.LOG_DIR
@@ -116,12 +125,12 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         config.seed = config.DDP.seed
         config.fp16 = config.DDP.fp16
         config.n_workers = config.DDP.n_workers
-        config.local_rank = config.DDP.local_rank
+        config.local_rank = local_rank
         config.node_rank = config.DDP.node_rank
-        config.world_size = config.DDP.world_size
-        config.cuda_first_device = config.DDP.cuda_first_device
+        # config.world_size = config.DDP.world_size
+        config.world_size = len(config.TORCH_GPU_IDS)
         
-        if config.local_rank == -1 and config.world_size > 1:
+        if config.DDP.use_dp and config.world_size > 1:
             # Ensure the batch size must be divisible by the number of GPUs for DP
             assert config.IL.batch_size % len(config.TORCH_GPU_IDS) == 0
 

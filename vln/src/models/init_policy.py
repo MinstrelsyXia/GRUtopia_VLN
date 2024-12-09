@@ -137,10 +137,14 @@ def initialize_policy(
         if len(config.TORCH_GPU_IDS) == 1:
             config.DDP.use = False
         if config.DDP.use:
-            if config.local_rank != -1:
-                self_policy = wrap_model(self_policy, config.TORCH_GPU_IDS[0], config.local_rank, logger, config.world_size)
-            else:
-                self_policy = wrap_model(self_policy, config.TORCH_GPU_IDS, config.local_rank, logger, config.world_size)
+            self_policy = wrap_model(
+                self_policy,
+                torch.device(f"cuda:{config.local_rank}"),
+                config.local_rank,
+                logger,
+                config.world_size,
+                use_dp=config.DDP.use_dp,
+            )
         else:
             self_policy.to(device)
         

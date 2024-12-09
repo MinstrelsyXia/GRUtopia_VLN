@@ -72,7 +72,7 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
     if str(device) == "cpu":
         model.float()
 
-    return model, _transform(model.visual.input_resolution)
+    return model, _transform(model.visual.input_resolution) # default: 224
         
     
 

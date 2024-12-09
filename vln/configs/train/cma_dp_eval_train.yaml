@@ -1,4 +1,4 @@
-NAME: 20241208-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint
+NAME: 20241209-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -21,15 +21,17 @@ VIDEO_DIR: data/checkpoints/*name/videos
 
 SEED: 0
 DDP:
-  use: false
+  use: true
+  use_dp: true # true for data parallel, false for DDP
+  backend: nccl
   seed: 0
   fp16: False
   n_workers: 8
-  local_rank: -1 # -1 for use dataParallel rather than DDP. Since for now, the process communication is not supported.
+  find_unused_parameters: true
+  local_rank: 0 
 
   node_rank: 0
   world_size: 4
-  cuda_first_device: 0
 
 EVAL:
   USE_CKPT_CONFIG: False
@@ -94,14 +96,16 @@ IL:
     use: true # drop the failure cases
     min_rgb_nums: 15 # the item that is fewer than this number would be dropped.
 
+  analysis_time: false # analysis the processing time for each module
+
   DAGGER:
     iterations: 5
     full_size: 10819
     update_size: 5000
     p: 0.9
     preload_lmdb_features: true # !IMPORTANT!
-    lmdb_features_dir: data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb
-    lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20241207_sample_episodes/sample_data.lmdb
+    lmdb_features_dagger_update_dir: data/sample_episodes/20241207_sample_episodes/sample_data.lmdb
     pre_extract_img_features: true
     denoise_action: false # For debug!!!
     lmdb_save_episode_id: true
@@ -228,7 +232,7 @@ MODEL:
 
     # for transformer
     transformer_n_cond_layers: 0
-    transformer_n_layers: 3
+    transformer_n_layers: 2
     transformer_encoding_size: 512
     # transformer_n_head: 8
     transformer_p_drop_emb: 0.2
