@@ -44,6 +44,11 @@ class CMA_DP_noRNN_Net(nn.Module):
             self.num_actions = 2
         self.action_stats = action_stats
         
+        self.use_stack = self.model_config.IMAGE_ENCODER.use_stack
+        self.stack_num = self.model_config.IMAGE_ENCODER.img_stack_nums
+        self.patch_num = self.model_config.IMAGE_ENCODER.RGB.multi_patches_num
+        
+        
         self.model_config.TEXT_ENCODER.final_state_only = False
         # Note that I use TEXT_ENCODER to represent the instruction encoder rather than the original INSTRUCTION_ENCODER
         
@@ -86,7 +91,7 @@ class CMA_DP_noRNN_Net(nn.Module):
         
         # Init the prev action embedding
         if self.model_config.IMAGE_ENCODER.use_stack:
-            prev_action_encoder_size = self.model_config.IMAGE_ENCODER.RGB.feature_dim
+            prev_action_encoder_size = self.model_config.IMAGE_ENCODER.RGB.projection_dim
         else:
             prev_action_encoder_size = self.model_config.PREV_ACTION_ENCODER.encoding_size
         self.prev_action_embedding = nn.Linear(self.num_actions, prev_action_encoder_size)
@@ -95,7 +100,7 @@ class CMA_DP_noRNN_Net(nn.Module):
         
         # Init the step embedding
         if self.model_config.STEP_ENCODER.use:
-            self.step_embeddings = nn.Linear(self.model_config.STEP_ENCODER.max_steps, self.model_config.STEP_ENCODER.encoding_size)
+            self.step_embeddings = nn.Embedding(self.model_config.STEP_ENCODER.max_steps, self.model_config.STEP_ENCODER.encoding_size)
                 
         # Init the IMU encoder
         if self.model_config.IMU_ENCODER.use:
@@ -290,7 +295,6 @@ class CMA_DP_noRNN_Net(nn.Module):
         
         '''3. Encoding images'''
         rgb_depth_embeds = self.image_encoder(observations['stack_rgb'], observations['stack_depth'], prev_action_embeds=prev_action_embeds, use_stack=self.model_config.IMAGE_ENCODER.use_stack, img_mod=self.model_config.IMAGE_ENCODER.RGB.img_mod)
-        rgb_patch_num = observations['stack_rgb'].shape[1]
         
         '''6. Encoding vision-and-language''' 
         if not self.model_config.IMAGE_ENCODER.use_stack and self.model_config.IMAGE_ENCODER.RGB.img_mod != 'multi_patches_avg_pooling':
@@ -299,12 +303,17 @@ class CMA_DP_noRNN_Net(nn.Module):
             do_self_attn = True
 
         # 6.1 Current img features combine with the text features
-        img_txt_embeds, img_txt_attn_probs = self.img_txt_cross_encoder(rgb_depth_embeds, text_embeds, q_masks=masks, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
+        rgb_depth_embeds = rgb_depth_embeds.reshape(batch_size, -1, rgb_depth_embeds.shape[-1])
+        img_txt_embeds, img_txt_attn_probs = self.img_txt_cross_encoder(rgb_depth_embeds, text_embeds, q_masks=masks, kv_masks=None, output_attentions=True,do_self_attn=do_self_attn)
         img_txt_attn_probs = img_txt_attn_probs[:,0,:]
+        if self.use_stack:
+            img_txt_embeds = img_txt_embeds[:, ::self.patch_num, :]
+        else:
+            img_txt_embeds = img_txt_embeds
 
         # 6.2 Current text features combine with the current img features
         if self.model_config.CROSS_MODAL_ENCODER.txt_to_img:
-            txt_img_embeds, txt_img_attn_probs = self.txt_img_cross_encoder(text_embeds, rgb_depth_embeds, q_masks=txt_masks, kv_masks=None, output_attentions=True,do_self_attn=do_self_attn) # kv_masks set to be None since there is no mask for imgs
+            txt_img_embeds, txt_img_attn_probs = self.txt_img_cross_encoder(text_embeds, rgb_depth_embeds, q_masks=None, kv_masks=None, output_attentions=True,do_self_attn=do_self_attn) # kv_masks set to be None since there is no mask for imgs
             fused_update_txt_embeds = txt_img_embeds
         else:
             fused_update_txt_embeds = text_embeds
@@ -317,11 +326,13 @@ class CMA_DP_noRNN_Net(nn.Module):
         ).long()
         
         noise = noise_pred = diffusion_output = None
+        denoise_action_list = []
+        
         if denoise_action:
             # Initialize lv_state and type_embeds
             if self.dp_type == 'transformer':
                 # Conditions: [cur_obs, his_obs, txt, prev_act, step, imu]
-                lv_state = torch.cat([rgb_depth_embeds[:,0,:],
+                lv_state = torch.cat([rgb_depth_embeds[:,0,:].unsqueeze(1),
                                       img_txt_embeds,
                                       fused_update_txt_embeds,
                                       prev_action_embeds], dim=1)
@@ -343,7 +354,6 @@ class CMA_DP_noRNN_Net(nn.Module):
                 type_embeds = torch.from_numpy(np.array(type_embeds)).to(device)
                 type_embeds = self.action_type_embeds(type_embeds).repeat(batch_size, 1, 1)
 
-            denoise_action_list = []
             if num_sample > 1:
                 for sample_idx in range(num_sample):
                     noisy_diffusion_output = torch.randn(
@@ -372,7 +382,7 @@ class CMA_DP_noRNN_Net(nn.Module):
             
             if self.dp_type == 'transformer':
                 # Conditions: [cur_obs, his_obs, txt, prev_act, step, imu]
-                lv_state = torch.cat([rgb_depth_embeds[:,0,:],
+                lv_state = torch.cat([rgb_depth_embeds[:,0,:].unsqueeze(1),
                                       img_txt_embeds,
                                       fused_update_txt_embeds,
                                       prev_action_embeds], dim=1)
@@ -404,7 +414,8 @@ class CMA_DP_noRNN_Net(nn.Module):
         '''9. Predict auxiliary'''
         dist_pred = None
         aux_embeds = lv_state + type_embeds
-        aux_embeds = self.self_attn_net(aux_embeds)
+        aux_embeds = torch.cat([torch.zeros_like(aux_embeds[:,0,:]).unsqueeze(1), aux_embeds], dim=1)
+        aux_embeds = self.self_attn_net(aux_embeds)[0][:,0,:] # get the first token after fusion
         
         if self.model_config.DISTANCE_PREDICTOR.use:
             dist_pred = self.distance_pred_net(aux_embeds.squeeze(1))

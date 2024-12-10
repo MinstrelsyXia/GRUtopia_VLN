@@ -103,7 +103,10 @@ class ImageEncoder(torch.nn.Module):
             )
         
         # position embedding
-        self.pos_embedding = PositionalEncoding(config.RGB.projection_dim, max_seq_len=config.img_stack_nums)
+        if config.RGB.img_mod == 'multi_patches_avg_pooling':
+            self.pos_embedding = PositionalEncoding(config.RGB.projection_dim*config.RGB.multi_patches_num, max_seq_len=config.img_stack_nums)
+        else:
+            self.pos_embedding = PositionalEncoding(config.RGB.projection_dim, max_seq_len=config.img_stack_nums)
         
         self.layernorm = nn.LayerNorm(config.RGB.projection_dim)
 
@@ -220,8 +223,11 @@ class ImageEncoder(torch.nn.Module):
             image_batch = image_batch.unsqueeze(0)
         
         BS = image_batch.shape[0]
+        reshape_flag = False
         if len(image_batch.shape) == 5:
+            stack_num = image_batch.shape[1]
             image_batch = image_batch.reshape(-1, 3, image_batch.shape[3], image_batch.shape[4]) # [BS, T, 224, 224, 3] -> [BS*T, 3, 224, 224]
+            reshape_flag = True
         
         embeddings = []
         # Process in chunks if the batch size exceeds the limit
@@ -246,6 +252,8 @@ class ImageEncoder(torch.nn.Module):
 
         if fc:
             outputs = self.image_fc(outputs)
+        if reshape_flag:
+            outputs = outputs.reshape(BS, stack_num, *outputs.shape[1:])
         return outputs
     
     def embed_depth(self, input, return_x_before_fc=False):
@@ -352,7 +360,7 @@ class ImageEncoder(torch.nn.Module):
         if self.config.DEPTH.bottleneck == 'resnet':
             if use_stack:
                 stack_lens = depth_embeddings.shape[1]
-                depth_embeddings = depth_embeddings.reshape(-1, 128, 4, 4)
+                depth_embeddings = depth_embeddings.reshape(-1, *depth_embeddings.shape[2:])
             depth_resnet_inputs = {'depth_features': depth_embeddings}
             depth_embeds = self.depth_encoder(depth_resnet_inputs) # [bs,128,4,4]
             depth_embeds = torch.flatten(depth_embeds, 2) # [bs, 192, 16]
@@ -380,7 +388,10 @@ class ImageEncoder(torch.nn.Module):
             img_depth_embeds = image_embeddings     
         
         if use_stack:
+            stack_num, patch_num = img_depth_embeds.shape[1], img_depth_embeds.shape[2]
+            img_depth_embeds = torch.flatten(img_depth_embeds, 2, 3)
             img_depth_pos_embeds = self.pos_embedding(img_depth_embeds)
+            img_depth_pos_embeds = img_depth_pos_embeds.reshape(batch_size, stack_num, patch_num, image_embeddings.shape[-1])
             return img_depth_pos_embeds
         else:
             if img_mod == 'cls':
