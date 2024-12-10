@@ -221,7 +221,7 @@ class ImageEncoder(torch.nn.Module):
         
         BS = image_batch.shape[0]
         if len(image_batch.shape) == 5:
-            image_batch = image_batch.reshape(-1, 3, image_batch.shape[3], image_batch.shape[4])
+            image_batch = image_batch.reshape(-1, 3, image_batch.shape[3], image_batch.shape[4]) # [BS, T, 224, 224, 3] -> [BS*T, 3, 224, 224]
         
         embeddings = []
         # Process in chunks if the batch size exceeds the limit
@@ -259,8 +259,19 @@ class ImageEncoder(torch.nn.Module):
     
     def embed_depth_resnet(self, depth, return_x_before_fc=False):
         # set return_x_before_fc to be True when collect dataset (the same as CMA)
+        BS = depth.shape[0]
+        reshape_flag = False
+        if len(depth.shape) == 5:
+            # stack depth: [BS, T, 224, 224, 1]
+            depth = depth.flatten(0,1)
+            reshape_flag = True
         batch = {'depth': depth}
         outputs = self.depth_encoder(batch, return_x_before_fc=return_x_before_fc)
+        if reshape_flag:
+            new_outputs = []
+            for output in outputs:
+                new_outputs.append(output.reshape(BS, -1, *output.shape[1:]))
+            outputs = new_outputs
         return outputs
 
     def embed_depth_TAC(self, depth_batch, fc=False, max_batch_size=500):
@@ -332,7 +343,6 @@ class ImageEncoder(torch.nn.Module):
             # This will meet at the update_dataset time
             image_embeddings = image_embeddings[:,0,:]
             depth_embeddings = depth_embeddings[:,0,:]
-        
         
         if self.config.use_env_drop:
             # directly use dropout on the raw features

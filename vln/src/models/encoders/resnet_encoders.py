@@ -111,7 +111,7 @@ class VlnResnetDepthEncoder(nn.Module):
                 return torch.cat([x, spatial_features], dim=1)
         else:
             if return_x_before_fc:
-                return x, self.visual_fc(x)
+                return [x, self.visual_fc(x)]
             else:
                 return self.visual_fc(x)
 

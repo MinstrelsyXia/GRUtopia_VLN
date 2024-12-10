@@ -78,7 +78,7 @@ EVAL:
 
 IL:
   epochs: 60
-  batch_size: 4
+  batch_size: 16
   lr: 2.5e-4
   
   save_interval_epochs: 2
@@ -113,7 +113,7 @@ IL:
     recollect_first: false
 
 MODEL:
-  policy_name: CMA_DP_ImgMultiPatch_Policy # CMA_DP_Policy
+  policy_name: DP_noRNN_Policy # CMA_DP_Policy / CMA_DP_ImgMultiPatch_Policy / DP_noRNN_Policy
 
   # training settings
   learn_angle: true # true: [delta_x, delta_y, delta_yaw] / false: [r, theta]
@@ -134,9 +134,13 @@ MODEL:
     vocab_size: 50265
     embedding_size: 512
 
+    # text Q-former
+    use_qformer: True
+    q_former_length: 20
+
   IMAGE_ENCODER:
-    img_stack_nums: 4 # the history images for inputs
-    use_stack: false
+    img_stack_nums: 8 # the history images for inputs
+    use_stack: true 
     dropout: 0.1
     use_env_drop: true
     env_drop: 0.3
@@ -198,6 +202,11 @@ MODEL:
 
     # pred_type
     pred_type: epsilon # epsilon / sample
+
+    # classifier-free guidance
+    use_cls_free_guidance: true
+    cls_free_guidance_scale: 4.0
+    cls_mask_ratio: 0.5
 
     # distance bounds for distance and action and distance predictions 
     distance:

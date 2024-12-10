@@ -11,10 +11,11 @@ from torchvision.transforms import Resize
 from copy import deepcopy
 
 from .lora import LinearWithLoRA, MultiheadAttnWithLoRA
+from transformers import PretrainedConfig
 from vln.src.models.LongCLIP.model import longclip
 from functools import partial
 
-from .bert_backbone import extend_neg_masks
+from .bert_backbone import extend_neg_masks, BertAttention
 
 class InstructionLongCLIPEncoder(nn.Module):
     def __init__(self, config, lora_config=None):
@@ -30,6 +31,16 @@ class InstructionLongCLIPEncoder(nn.Module):
         if not self.update_lang_bert:
             for name, param in self.text_transformer.named_parameters():
                 param.requires_grad = False
+        
+        self.use_qformer = config.use_qformer
+        if self.use_qformer:
+            bert_config = PretrainedConfig.from_pretrained('bert-base-uncased')
+            bert_config.num_attention_heads = 8
+            bert_config.hidden_size = config.hidden_size
+            bert_config.intermediate_size = config.hidden_size
+            bert_config.num_hidden_layers = 1
+            self.q_param = nn.Parameter(torch.randn(config.q_former_length, config.hidden_size))
+            self.q_former = BertAttention(bert_config)
         
         if lora_config is not None and lora_config.add_for_instruction_encoder:
             assign_lora = partial(LinearWithLoRA, rank=lora_config.lora_r, alpha=lora_config.lora_alpha)
@@ -55,4 +66,9 @@ class InstructionLongCLIPEncoder(nn.Module):
         txt_cls_embeds, txt_full_embeds = self.text_transformer.encode_text(txt_inputs, return_full=True)
         txt_cls_embeds = txt_cls_embeds.type(torch.float32)
         txt_full_embeds = txt_full_embeds.type(torch.float32)
-        return txt_full_embeds, txt_masks, txt_cls_embeds
+
+        if self.use_qformer:
+            q_former_outputs = self.q_former(self.q_param, txt_masks, txt_full_embeds)
+            return q_former_outputs, txt_masks, txt_cls_embeds
+        else:
+            return txt_full_embeds, txt_masks, txt_cls_embeds
