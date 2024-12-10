@@ -530,10 +530,10 @@ class DaggerDiffusonPolicyTrainer:
         # L2 loss
         if self.config.MODEL.Diffusion_Policy.pred_type == 'epsilon':
             # pred noise
-            diffusion_loss = action_reduce(masks.squeeze(), F.mse_loss(noise_pred, noise, reduction="none"))
+            diffusion_loss = action_reduce(masks, F.mse_loss(noise_pred, noise, reduction="none"))
         elif self.config.MODEL.Diffusion_Policy.pred_type == 'sample':
             # pred x_0
-            diffusion_loss = action_reduce(masks.squeeze(), F.mse_loss(noise_pred, observations['actions'], reduction="none"))
+            diffusion_loss = action_reduce(masks, F.mse_loss(noise_pred, observations['actions'], reduction="none"))
 
         # Aux loss
         pm_loss = 0
@@ -543,7 +543,7 @@ class DaggerDiffusonPolicyTrainer:
                 observations["progress"],
                 reduction="none",
             )
-            pm_loss = action_reduce(masks.squeeze(), progress_loss)
+            pm_loss = action_reduce(masks, progress_loss)
         
         stop_pm_loss = 0
         if self.config.MODEL.STOP_PROGRESS_PREDICTOR.use:
@@ -552,7 +552,7 @@ class DaggerDiffusonPolicyTrainer:
                 observations["stop_progress"],
                 reduction="none",
             )
-            stop_pm_loss = action_reduce(masks.squeeze(), stop_pm_loss)
+            stop_pm_loss = action_reduce(masks, stop_pm_loss)
         
         # Total loss
         loss = self.config.MODEL.LOSS.alpha * self.config.MODEL.LOSS.dist_scale * dist_loss + (1-self.config.MODEL.LOSS.alpha) * diffusion_loss + pm_loss + stop_pm_loss

@@ -289,10 +289,15 @@ def unnormalize_data(ndata, stats):
 
 def action_reduce(action_mask, unreduced_loss: torch.Tensor):
     # Reduce over non-batch dimensions to get loss per batch element
-    while unreduced_loss.dim() > 1:
-        unreduced_loss = unreduced_loss.mean(dim=-1)
-    assert unreduced_loss.shape == action_mask.shape, f"{unreduced_loss.shape} != {action_mask.shape}"
-    return (unreduced_loss * action_mask).mean() / (action_mask.float().mean() + 1e-2)
+    if action_mask is None:
+        while unreduced_loss.dim() > 1:
+            unreduced_loss = unreduced_loss.mean(dim=-1)
+        return unreduced_loss.mean()
+    else:
+        while unreduced_loss.dim() > 1:
+            unreduced_loss = unreduced_loss.mean(dim=-1)
+        assert unreduced_loss.shape == action_mask.shape, f"{unreduced_loss.shape} != {action_mask.shape}"
+        return (unreduced_loss * action_mask).mean() / (action_mask.float().mean() + 1e-2)
 
 def yaw_rotmat(yaw: float):
     try:
