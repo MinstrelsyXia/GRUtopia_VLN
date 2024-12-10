@@ -205,7 +205,7 @@ MODEL:
 
     # classifier-free guidance
     use_cls_free_guidance: true
-    cls_free_guidance_scale: 4.0
+    cls_free_guidance_scale: 0.8
     cls_mask_ratio: 0.25
 
     # distance bounds for distance and action and distance predictions 
