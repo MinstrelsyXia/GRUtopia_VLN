@@ -63,6 +63,11 @@ def main():
         default=0,
         help="local rank for distributed training",
     )
+    parser.add_argument(
+        "--debug",
+        default=False,
+        action='store_true',
+    )
     
     args = parser.parse_args()
     
@@ -90,6 +95,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     config.test_verbose = kwargs.get('test_verbose', False)
     config.show_topdown_window = kwargs.get('show_topdown_window', False)
     config.local_rank = kwargs.get('local_rank', 0)
+    config.debug = kwargs.get('debug', False)
     # logger.info(f"config: {config}")
     
     # Process the log dir
@@ -157,7 +163,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         if not os.path.exists(config.VIDEO_DIR):
             os.makedirs(config.VIDEO_DIR)
         
-    if config.MODEL.policy_name == 'CMA_DP_ImgMultiPatch_Policy':
+    if config.MODEL.policy_name in ['CMA_DP_ImgMultiPatch_Policy', 'DP_noRNN_Policy']:
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
     elif config.MODEL.policy_name == 'CMA_Policy':
         trainer_init = cma_trainer.DaggerCMATrainer

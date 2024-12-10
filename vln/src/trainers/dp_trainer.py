@@ -107,6 +107,9 @@ class DaggerDiffusonPolicyTrainer:
             self.action_stats.min = torch.from_numpy(np.array(self.action_stats.min)).to(self.device)
             self.action_stats.max = torch.from_numpy(np.array(self.action_stats.max)).to(self.device)
         
+        # use rnn or not
+        self.use_rnn = 'noRNN' not in self.config.MODEL.policy_name
+        
         # Init the file_logger
         if self.config.run_type == 'train':
             train_logger_filename = os.path.join(log_dir, "train.log")
@@ -234,6 +237,7 @@ class DaggerDiffusonPolicyTrainer:
                 use_stack=self.config.MODEL.IMAGE_ENCODER.use_stack
             )
             
+            num_workers = 4 if not self.config.debug else 0
             diter = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=self.config.IL.batch_size,
@@ -241,7 +245,7 @@ class DaggerDiffusonPolicyTrainer:
                 collate_fn=collate_fn,
                 pin_memory=True,
                 drop_last=True,  # drop last batch if smaller
-                num_workers=4,
+                num_workers=num_workers,
             )
 
             step_id = 0
@@ -283,14 +287,13 @@ class DaggerDiffusonPolicyTrainer:
                     
                     if step_id % 100 == 0:
                         torch.cuda.empty_cache()
+                    
+                    prev_actions_batch = prev_actions_batch.to(device=self.device, non_blocking=True)
+                    not_done_masks = not_done_masks.to(device=self.device, non_blocking=True) if not_done_masks is not None else None  
                     loss, diffusion_loss, dist_loss, pm_loss, stop_pm_loss = self._update_agent(
                         observations_batch,
-                        prev_actions_batch.to(
-                            device=self.device, non_blocking=True
-                        ),
-                        not_done_masks.to(
-                            device=self.device, non_blocking=True
-                        ),
+                        prev_actions_batch,
+                        not_done_masks,
                         denoise_action=self.config.IL.DAGGER.denoise_action,
                     )
 
@@ -462,13 +465,16 @@ class DaggerDiffusonPolicyTrainer:
             net = self.policy.module
         else:
             net = self.policy
-            
-        recurrent_hidden_states = torch.zeros(
-            N,
-            net.num_recurrent_layers,
-            self.config.MODEL.STATE_ENCODER.hidden_size,
-            device=self.device,
-        ) 
+        
+        if self.use_rnn:
+            recurrent_hidden_states = torch.zeros(
+                N,
+                net.num_recurrent_layers,
+                self.config.MODEL.STATE_ENCODER.hidden_size,
+                device=self.device,
+            ) 
+        else:
+            recurrent_hidden_states = None
         
         if 'rgb_features' not in observations \
             or self.config.MODEL.IMAGE_ENCODER.RGB.update_rgb_encoder \
@@ -480,30 +486,6 @@ class DaggerDiffusonPolicyTrainer:
             need_img_extraction = False
         
         depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
-
-        # if self.config.IL.analysis_time:
-        #     start_time = time.time()
-        # depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
-        # batch = {
-        #     'mode': 'img_embedding',
-        #     'rgb_inputs': observations['rgb'],
-        #     'depth_inputs': observations['depth'],
-        #     'depth_return_x_before_fc': depth_return_x_before_fc,
-        #     'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
-        #     'img_mod': self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-        #     'process_images': False # has processed in dataLoader
-        # }
-        # stack_rgb, stack_depth = self.policy(batch)
-        # if len(stack_rgb.shape) == 2:
-        #     observations['stack_rgb'] = stack_rgb.unsqueeze(1)
-        #     observations['stack_depth'] = stack_depth.unsqueeze(1)
-        # else:
-        #     observations['stack_rgb'] = stack_rgb
-        #     observations['stack_depth'] = stack_depth
-        
-        # if self.config.IL.analysis_time:
-        #     end_time = time.time()
-        #     self.train_logger.info(f"Time taken for image embedding: {end_time - start_time:.2f} seconds")
         
         if self.config.IL.analysis_time:
             start_time = time.time()
