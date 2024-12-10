@@ -64,7 +64,7 @@ class VlnResnetDepthEncoder(nn.Module):
                 nn.Linear(
                     np.prod(self.visual_encoder.output_shape), output_size
                 ),
-                nn.ReLU(True),
+                nn.ReLU(),
             )
         else:
             self.spatial_embeddings = nn.Embedding(

@@ -364,15 +364,15 @@ class ImageEncoder(torch.nn.Module):
             depth_resnet_inputs = {'depth_features': depth_embeddings}
             depth_embeds = self.depth_encoder(depth_resnet_inputs) # [bs,128,4,4]
             depth_embeds = torch.flatten(depth_embeds, 2) # [bs, 192, 16]
-            depth_embeddings = self.depth_linear(depth_embeds)
+            depth_embeds = self.depth_linear(depth_embeds)
             if use_stack:
-                depth_embeddings = depth_embeddings.reshape(batch_size, stack_lens, -1)
+                depth_embeds = depth_embeds.reshape(batch_size, stack_lens, -1)
 
-        image_embeddings = self.dropout(self.img_learnable_linear(image_embeddings))
-        depth_embeddings = self.dropout(self.depth_learnable_linear(depth_embeddings))
+        image_map_embeds = self.dropout(self.img_learnable_linear(image_embeddings))
+        depth_map_embeds = self.dropout(self.depth_learnable_linear(depth_embeds))
         
         if img_mod == 'cls':
-            img_depth_embeds = image_embeddings + depth_embeddings
+            img_depth_embeds = image_map_embeds + depth_map_embeds
             if prev_action_embeds is not None and use_stack:
                 img_depth_embeds = img_depth_embeds + prev_action_embeds
                             
@@ -382,16 +382,16 @@ class ImageEncoder(torch.nn.Module):
             # 20241025: combine the depth with the full rgb embeds at the 0-pth location.
             ## 0-th location: full depth+img. 2~5: semantic rgb.
             if use_stack:
-                image_embeddings[:,:,0,:] = image_embeddings[:,:,0,:] + depth_embeddings[:,:,]
+                image_map_embeds[:,:,0,:] = image_map_embeds[:,:,0,:] + depth_map_embeds[:,:,]
             else:
-                image_embeddings[:,0,:] = image_embeddings[:,0,:] + depth_embeddings
-            img_depth_embeds = image_embeddings     
+                image_map_embeds[:,0,:] = image_map_embeds[:,0,:] + depth_map_embeds
+            img_depth_embeds = image_map_embeds     
         
         if use_stack:
             stack_num, patch_num = img_depth_embeds.shape[1], img_depth_embeds.shape[2]
             img_depth_embeds = torch.flatten(img_depth_embeds, 2, 3)
             img_depth_pos_embeds = self.pos_embedding(img_depth_embeds)
-            img_depth_pos_embeds = img_depth_pos_embeds.reshape(batch_size, stack_num, patch_num, image_embeddings.shape[-1])
+            img_depth_pos_embeds = img_depth_pos_embeds.reshape(batch_size, stack_num, patch_num, image_map_embeds.shape[-1])
             return img_depth_pos_embeds
         else:
             if img_mod == 'cls':

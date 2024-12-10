@@ -284,14 +284,10 @@ class CMA_DP_noRNN_Net(nn.Module):
             cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
             cls_free_mask = cls_free_mask.to(device)
             observations['instruction'][cls_free_mask, :] = torch.zeros_like(observations['instruction'][cls_free_mask, :])
-            observations['stack_rgb'][cls_free_mask, :] = torch.zeros_like(observations['stack_rgb'][cls_free_mask, :])
-            observations['stack_depth'][cls_free_mask, :] = torch.zeros_like(observations['stack_depth'][cls_free_mask, :])
         if sample_classifier_free_guidance:
             # copy condition to null for sampling
             obs_null = copy.deepcopy(observations)
             obs_null['instruction'] = torch.zeros_like(obs_null['instruction'])
-            obs_null['stack_rgb'] = torch.zeros_like(obs_null['stack_rgb'])
-            obs_null['stack_depth'] = torch.zeros_like(obs_null['stack_depth'])
             for k,v in obs_null.items():
                 observations[k] = torch.cat([observations[k], obs_null[k]], dim=0)
             prev_actions = torch.cat([prev_actions, prev_actions], dim=0)
@@ -434,7 +430,7 @@ class CMA_DP_noRNN_Net(nn.Module):
                     timestep=timesteps,
                     cond=lv_state.float(),
                     type_embeds=type_embeds,
-                    use_classifier_free_guidance=self.model_config.Diffusion_Policy.use_cls_free_guidance)
+                    )
                 
         '''9. Predict auxiliary'''
         dist_pred = None
@@ -767,6 +763,9 @@ class CMA_DP_noRNN_Net(nn.Module):
         self, batch
     ) -> Tuple[Tensor, Tensor]:
         mode = batch['mode']
+        device = batch['observations']['instruction'].device
+        batch_size = batch['observations']['instruction'].shape[0]
+        
         if mode == "img_embedding":
             if 'depth_return_x_before_fc' not in batch:
                 batch['depth_return_x_before_fc'] = False
@@ -782,6 +781,13 @@ class CMA_DP_noRNN_Net(nn.Module):
                 else:
                     input_rgb = batch['observations']['rgb']
                     input_depth = batch['observations']['depth']
+                
+                if batch['train_cls_free_guidance']:
+                    cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
+                    cls_free_mask = cls_free_mask.to(device)
+                    input_rgb[cls_free_mask] = torch.zeros_like(input_rgb[cls_free_mask])
+                    input_depth[cls_free_mask] = torch.zeros_like(input_depth[cls_free_mask])
+                    
                 stack_rgb, stack_depth = self.img_embedding(input_rgb, input_depth, batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'])
                 if len(stack_rgb.shape) == 2:
                     batch['observations']['stack_rgb'] = stack_rgb.unsqueeze(1)

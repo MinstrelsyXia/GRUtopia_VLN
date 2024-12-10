@@ -502,8 +502,8 @@ class DaggerDiffusonPolicyTrainer:
             'img_mod': self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
             'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
             'process_images': False, # has processed in dataLoader
-            'train_cls_free_guidance': self.config.MODEL.Diffusion_Policy.train_cls_free_guidance,
-            'sample_cls_free_guidance': self.config.MODEL.Diffusion_Policy.sample_cls_free_guidance,
+            'train_cls_free_guidance': self.config.MODEL.Diffusion_Policy.use_cls_free_guidance,
+            'sample_cls_free_guidance': False,
         }
         # if observations['stack_depth'].shape[1] == 1:
         #     observations['stack_depth'] = observations['stack_depth'].squeeze(1)
@@ -897,8 +897,8 @@ class DaggerDiffusonPolicyTrainer:
                     'steps': steps,
                     'predicted_actions_save_dir': self.eval_env.EP_DIR,
                     'num_sample': self.config.EVAL.num_sample,
-                    'train_cls_free_guidance': self.config.MODEL.Diffusion_Policy.train_classifier_free_guidance,
-                    'sample_cls_free_guidance': self.config.MODEL.Diffusion_Policy.sample_classifier_free_guidance,
+                    'train_cls_free_guidance': False,
+                    'sample_cls_free_guidance': self.config.MODEL.Diffusion_Policy.use_cls_free_guidance,
                 }
                 
                 actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred, stop_progress_pred = net(batch_settings)

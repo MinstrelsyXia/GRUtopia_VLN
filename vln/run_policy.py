@@ -16,6 +16,8 @@ import shutil
 
 import numpy as np
 import torch
+torch.autograd.set_detect_anomaly(True)
+
 from vln.src.utils.logger import MyLogger
 from vln.src.trainers import dp_trainer, cma_trainer
 from vln.src.utils.utils import dict_to_namespace
