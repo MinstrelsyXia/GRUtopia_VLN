@@ -235,8 +235,9 @@ class CMA_DP_noRNN_Net(nn.Module):
 
         return torch.einsum("ni, nci -> nc", attn, v)
 
-    def denoise_actions(self, noisy_diffusion_output, lv_state, type_embeds, device):
+    def denoise_actions(self, noisy_diffusion_output, lv_state, type_embeds, device, sample_classifier_free_guidance=False, cls_free_guidance_scale=4):
         noise = deepcopy(noisy_diffusion_output)
+        batch_size = noisy_diffusion_output.shape[0]
         diffusion_output = noisy_diffusion_output
 
         for k in self.noise_scheduler.timesteps[:]:
@@ -253,6 +254,12 @@ class CMA_DP_noRNN_Net(nn.Module):
                 timestep=k,
                 sample=diffusion_output
             ).prev_sample
+            
+            if sample_classifier_free_guidance:
+                diff_out, diff_out_null = diffusion_output[:batch_size//2], diffusion_output[batch_size//2:]
+                diff_out = diff_out_null + cls_free_guidance_scale * (diff_out - diff_out_null) # TODO: check the scale of cls_free_guidance_scale
+                diffusion_output = torch.cat([diff_out, diff_out], dim=0)
+            
         return diffusion_output
     
     def pred_actions(
@@ -264,21 +271,32 @@ class CMA_DP_noRNN_Net(nn.Module):
         add_noise_to_action=True,
         denoise_action=False,
         num_sample=1,
-        use_classifier_free_guidance=False
+        train_classifier_free_guidance=False,
+        sample_classifier_free_guidance=False
     ):
         # Note: stack images have not been adaptive yet.
         device = observations['instruction'].device
         batch_size = observations['instruction'].shape[0]
         
         # classifier-free guidance
-        if use_classifier_free_guidance:
+        if train_classifier_free_guidance:
             # randomly mask the condition tokens for classifier-free guidance during training
             cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
             cls_free_mask = cls_free_mask.to(device)
             observations['instruction'][cls_free_mask, :] = torch.zeros_like(observations['instruction'][cls_free_mask, :])
             observations['stack_rgb'][cls_free_mask, :] = torch.zeros_like(observations['stack_rgb'][cls_free_mask, :])
             observations['stack_depth'][cls_free_mask, :] = torch.zeros_like(observations['stack_depth'][cls_free_mask, :])
-        
+        if sample_classifier_free_guidance:
+            # copy condition to null for sampling
+            obs_null = copy.deepcopy(observations)
+            obs_null['instruction'] = torch.zeros_like(obs_null['instruction'])
+            obs_null['stack_rgb'] = torch.zeros_like(obs_null['stack_rgb'])
+            obs_null['stack_depth'] = torch.zeros_like(obs_null['stack_depth'])
+            for k,v in obs_null.items():
+                observations[k] = torch.cat([observations[k], obs_null[k]], dim=0)
+            prev_actions = torch.cat([prev_actions, prev_actions], dim=0)
+            batch_size = observations['instruction'].shape[0]
+            
         '''1. Encoding text'''
         text_embeds, txt_masks, text_cls_embeds = self.instruction_encoder(
             observations['instruction']
@@ -358,13 +376,20 @@ class CMA_DP_noRNN_Net(nn.Module):
                 for sample_idx in range(num_sample):
                     noisy_diffusion_output = torch.randn(
                         (batch_size, self.model_config.Diffusion_Policy.len_traj_pred, self.num_actions), device=device)
-                    diffusion_output = self.denoise_actions(noisy_diffusion_output, lv_state, type_embeds, device)
+                    diffusion_output = self.denoise_actions(noisy_diffusion_output, lv_state, type_embeds, device, sample_classifier_free_guidance, cls_free_guidance_scale=self.model_config.Diffusion_Policy.cls_free_guidance_scale)
                     denoise_action_list.append(diffusion_output)
             else:
                 # initialize action from Gaussian noise
-                noisy_diffusion_output = torch.randn(
-                    (batch_size, self.model_config.Diffusion_Policy.len_traj_pred, self.num_actions), device=device)
-                diffusion_output = self.denoise_actions(noisy_diffusion_output, lv_state, type_embeds, device)
+                if sample_classifier_free_guidance:
+                    noise_bs = batch_size // 2
+                    noisy_diffusion_output = torch.randn(
+                        (noise_bs, self.model_config.Diffusion_Policy.len_traj_pred, self.num_actions), device=device)
+                    noisy_diffusion_output = torch.cat([noisy_diffusion_output, noisy_diffusion_output], dim=0)
+                else:
+                    noise_bs = batch_size
+                    noisy_diffusion_output = torch.randn(
+                        (noise_bs, self.model_config.Diffusion_Policy.len_traj_pred, self.num_actions), device=device)
+                diffusion_output = self.denoise_actions(noisy_diffusion_output, lv_state, type_embeds, device, sample_classifier_free_guidance, cls_free_guidance_scale=self.model_config.Diffusion_Policy.cls_free_guidance_scale)
             
         else:
             if add_noise_to_action:
@@ -653,7 +678,7 @@ class CMA_DP_noRNN_Net(nn.Module):
         vis = batch['vis']
         step = batch['step']
         episode_ids = batch['episode_ids']
-
+        
         noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
@@ -765,7 +790,7 @@ class CMA_DP_noRNN_Net(nn.Module):
                     batch['observations']['stack_rgb'] = stack_rgb
                     batch['observations']['stack_depth'] = stack_depth
 
-            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
+            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'])
         
         elif mode == "act":
             return self.act(batch)
