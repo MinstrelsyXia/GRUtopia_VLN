@@ -122,7 +122,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.policy = policy
         
         self.use_rnn = 'noRNN' not in self.config.MODEL.policy_name
-        self.preload_size = batch_size * 10 if self.use_rnn else batch_size * 2
+        self.preload_size = batch_size * 10 if self.use_rnn else 8
 
         # preprocess images
         self.to_pil = ToPILImage()
