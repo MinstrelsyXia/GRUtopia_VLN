@@ -501,7 +501,8 @@ class DaggerDiffusonPolicyTrainer:
             'depth_return_x_before_fc': depth_return_x_before_fc,
             'img_mod': self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
             'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
-            'process_images': False # has processed in dataLoader
+            'process_images': False, # has processed in dataLoader
+            'use_classifier_free_guidance': self.config.MODEL.Diffusion_Policy.use_cls_free_guidance
         }
         # if observations['stack_depth'].shape[1] == 1:
         #     observations['stack_depth'] = observations['stack_depth'].squeeze(1)

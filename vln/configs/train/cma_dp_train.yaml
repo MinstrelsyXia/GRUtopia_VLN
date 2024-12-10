@@ -269,7 +269,6 @@ MODEL:
   STOP_PROGRESS_PREDICTOR:
     use: True
 
-  
   STEP_ENCODER:
     encoding_size: 64
     use: true
