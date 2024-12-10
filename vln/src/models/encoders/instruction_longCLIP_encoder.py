@@ -39,7 +39,7 @@ class InstructionLongCLIPEncoder(nn.Module):
             bert_config.hidden_size = config.hidden_size
             bert_config.intermediate_size = config.hidden_size
             bert_config.num_hidden_layers = 1
-            self.q_param = nn.Parameter(torch.randn(config.q_former_length, config.hidden_size))
+            self.q_param = nn.Parameter(torch.randn(1, config.q_former_length, config.hidden_size))
             self.q_former = BertAttention(bert_config)
         
         if lora_config is not None and lora_config.add_for_instruction_encoder:
@@ -68,7 +68,7 @@ class InstructionLongCLIPEncoder(nn.Module):
         txt_full_embeds = txt_full_embeds.type(torch.float32)
 
         if self.use_qformer:
-            q_former_outputs = self.q_former(self.q_param, txt_masks, txt_full_embeds)
+            q_former_outputs = self.q_former(self.q_param.repeat(txt_full_embeds.size(0), 1, 1), encoder_hidden_states=txt_full_embeds)[0]
             return q_former_outputs, txt_masks, txt_cls_embeds
         else:
             return txt_full_embeds, txt_masks, txt_cls_embeds

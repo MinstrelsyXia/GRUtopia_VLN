@@ -95,7 +95,7 @@ class CMA_DP_noRNN_Net(nn.Module):
         
         # Init the step embedding
         if self.model_config.STEP_ENCODER.use:
-            self.step_embeddings = nn.Embedding(self.model_config.STEP_ENCODER.max_steps, self.model_config.STEP_ENCODER.encoding_size)
+            self.step_embeddings = nn.Linear(self.model_config.STEP_ENCODER.max_steps, self.model_config.STEP_ENCODER.encoding_size)
                 
         # Init the IMU encoder
         if self.model_config.IMU_ENCODER.use:
@@ -268,11 +268,11 @@ class CMA_DP_noRNN_Net(nn.Module):
         # classifier-free guidance
         if use_classifier_free_guidance:
             # randomly mask the condition tokens for classifier-free guidance during training
-            mask = torch.rand(batch_size, self.model_config.Diffusion_Policy.n_obs_steps) < self.model_config.Diffusion_Policy.cls_mask_ratio
-            mask = mask.to(device)
-            observations['instruction'][mask, :] = torch.zeros_like(observations['instruction'][mask, :])
-            observations['stack_rgb'][mask, :] = torch.zeros_like(observations['stack_rgb'][mask, :])
-            observations['stack_depth'][mask, :] = torch.zeros_like(observations['stack_depth'][mask, :])
+            cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
+            cls_free_mask = cls_free_mask.to(device)
+            observations['instruction'][cls_free_mask, :] = torch.zeros_like(observations['instruction'][cls_free_mask, :])
+            observations['stack_rgb'][cls_free_mask, :] = torch.zeros_like(observations['stack_rgb'][cls_free_mask, :])
+            observations['stack_depth'][cls_free_mask, :] = torch.zeros_like(observations['stack_depth'][cls_free_mask, :])
         
         '''1. Encoding text'''
         text_embeds, txt_masks, text_cls_embeds = self.instruction_encoder(
@@ -284,7 +284,7 @@ class CMA_DP_noRNN_Net(nn.Module):
         prev_action_embeds = self.prev_action_embedding(prev_actions)
 
         if self.model_config.STEP_ENCODER.use:
-            steps_embeds = self.step_embeddings(observations['steps']).unsqueeze(1)
+            steps_embeds = self.step_embeddings(observations['steps'].type(torch.int)).unsqueeze(1)
         if self.model_config.IMU_ENCODER.use:
             imu_embeds = self.imu_linear(observations['imu']).unsqueeze(1)
         
