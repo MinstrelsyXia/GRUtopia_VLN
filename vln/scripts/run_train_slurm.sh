@@ -2,8 +2,8 @@
 #SBATCH --job-name=train_depth         # 作业名称
 #SBATCH --output=logs/%x_%j.out          # 标准输出文件路径 (%j 会被替换为作业ID)
 #SBATCH --error=logs/%x_%j.err           # 标准错误文件路径
-#SBATCH --gres=gpu:4                  # GPU请求
-#SBATCH --cpus-per-task=24             # 每个任务的CPU核心数
+#SBATCH --gres=gpu:2                  # GPU请求
+#SBATCH --cpus-per-task=12             # 每个任务的CPU核心数
 #SBATCH --partition=smartbot              # 使用GPU分区
 
 # 创建日志目录
@@ -56,6 +56,11 @@ elif [ "$1" == "--collect_dataset" ]; then
   flags="
     --exp-config vlnce_baselines/config/r2r_baselines/dp/dp_collect_data.yaml
     --run-type collect_dataset
+  "
+elif [ "$1" == "--train_noRNN" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
+    --run-type train
   "
 fi
 python vln/run_policy.py $flags

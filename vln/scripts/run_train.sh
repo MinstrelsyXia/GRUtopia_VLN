@@ -47,5 +47,10 @@ elif [ "$1" == "--eval" ]; then
     --headless
     --test_verbose
   "
+elif [ "$1" == "--train_noRNN" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
+    --run-type train
+  "
 fi
 python vln/run_policy.py $flags
