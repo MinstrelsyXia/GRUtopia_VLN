@@ -96,7 +96,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     config = get_config(exp_config, opts)
     config.test_verbose = kwargs.get('test_verbose', False)
     config.show_topdown_window = kwargs.get('show_topdown_window', False)
-    config.local_rank = kwargs.get('local_rank', 0)
+    config.local_rank = local_rank if local_rank is not None else kwargs.get('local_rank', 0)
     config.debug = kwargs.get('debug', False)
     # logger.info(f"config: {config}")
     
@@ -115,7 +115,6 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
             if config.VIDEO_OPTION != -1:
                 config.VIDEO_DIR = config.VIDEO_DIR.replace("*name", name)
         
-        config.local_rank = config.local_rank 
         config.world_size = config.GPU_NUMBERS = len(config.TORCH_GPU_IDS)
         
         logdir = config.LOG_DIR
@@ -127,19 +126,15 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
             name="w61_grutopia", level=logging.INFO, filename=config.LOG_FILE, format_str="%(asctime)-15s %(message)s"
         )   
     
-    # DDP
-    # if hasattr(config, 'DDP') and config.DDP.use:
+    # Move DDP setup earlier and consolidate local_rank handling
     if hasattr(config, 'DDP'):
         config.seed = config.DDP.seed
         config.fp16 = config.DDP.fp16
         config.n_workers = config.DDP.n_workers
-        config.local_rank = local_rank
         config.node_rank = config.DDP.node_rank
-        # config.world_size = config.DDP.world_size
         config.world_size = len(config.TORCH_GPU_IDS)
         
         if config.DDP.use_dp and config.world_size > 1:
-            # Ensure the batch size must be divisible by the number of GPUs for DP
             assert config.IL.batch_size % len(config.TORCH_GPU_IDS) == 0
 
     random.seed(config.SEED)

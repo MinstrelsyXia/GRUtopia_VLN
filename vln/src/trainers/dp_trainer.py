@@ -243,7 +243,7 @@ class DaggerDiffusonPolicyTrainer:
                 batch_size=self.config.IL.batch_size,
                 shuffle=False,
                 collate_fn=collate_fn,
-                pin_memory=True,
+                pin_memory=False,
                 drop_last=True,  # drop last batch if smaller
                 num_workers=num_workers,
             )

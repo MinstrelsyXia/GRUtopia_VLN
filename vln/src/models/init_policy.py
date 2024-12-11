@@ -142,14 +142,26 @@ def initialize_policy(
         if len(config.TORCH_GPU_IDS) == 1:
             config.DDP.use = False
         if config.DDP.use:
-            self_policy = wrap_model(
-                self_policy,
-                torch.device(f"cuda:{config.local_rank}"),
-                config.local_rank,
-                logger,
-                config.world_size,
-                use_dp=config.DDP.use_dp,
-            )
+            if config.DDP.use_dp:
+                # Data parallel
+                self_policy = wrap_model(
+                    self_policy,
+                    config.TORCH_GPU_IDS,
+                    config.local_rank,
+                    logger,
+                    config.world_size,
+                    use_dp=config.DDP.use_dp,
+                ) 
+            else:
+                # Distributed data parallel
+                self_policy = wrap_model(
+                    self_policy,
+                    torch.device(f"cuda:{config.local_rank}"),
+                    config.local_rank,
+                    logger,
+                    config.world_size,
+                    use_dp=config.DDP.use_dp,
+                )
         else:
             self_policy.to(device)
         
