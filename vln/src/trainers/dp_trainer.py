@@ -333,6 +333,13 @@ class DaggerDiffusonPolicyTrainer:
                             step_id,
                         )
                         step_id += 1  # noqa: SIM113
+                        
+                        # save the ckpt according to the steps
+                        if self.use_rnn and step_id % self.config.IL.save_interval_steps == 0:
+                            self.save_checkpoint(
+                                f"ckpt-epoch-{epoch}-step-{step_id}.pth",
+                                filter_frozen_weights=self.config.IL.save_filter_frozen_weights
+                            )
                 
                 # save the log
                 self.train_logger.info(f"*******Epoch {epoch}*********")
