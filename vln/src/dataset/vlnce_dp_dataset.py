@@ -128,6 +128,8 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.to_pil = ToPILImage()
         self.image_processor = _transform(n_px=224) # copy fron clip-long
         
+        self.need_extract_instr_features = False if not self.config.MODEL.TEXT_ENCODER.update_text_encoder else True # has preprocessed the instruction
+        
         if self.config.IL.analysis_time:
             start_time = time.time()
         with lmdb.open(
@@ -202,6 +204,29 @@ class VLNCE_DP_Dataset(IterableDataset):
         else:
             self.num_action_params = 2
 
+    def _create_new_data(self, data, yaws, instruction, finish_status, fail_reason):
+        """Helper function to create new data entry"""
+        new_data = {
+            'instruction': instruction,
+            'progress': data['progress'],
+            'globalgps': data['robot_info']['position'],
+            'global_rotation': data['robot_info']['orientation'],
+            'globalyaw': yaws,
+        }
+
+        # Handle RGB and depth features/data
+        if 'rgb_features' in data:
+            new_data['rgb_features'] = data['rgb_features']
+            if self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder:
+                new_data['depth'] = np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1)
+            else:
+                new_data['depth_features'] = data['depth_features']
+        else:
+            new_data['rgb'] = data['camera_info'][self.camera_name]['rgb']
+            new_data['depth'] = np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1)
+        
+        return new_data
+
     def _load_next(self):
         if len(self._preload) == 0:
             if len(self.load_ordering) == 0:
@@ -234,8 +259,12 @@ class VLNCE_DP_Dataset(IterableDataset):
                     fail_reason = data_to_load['fail_reason']
                     if self.config.IL.Filter_failure.use:
                         if finish_status != 'success':
-                            if len(data['camera_info']) == 0 or len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
-                                continue
+                            if 'rgb' in data['camera_info'][self.camera_name].keys():
+                                if len(data['camera_info']) == 0 or len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
+                                    continue
+                            else:
+                                if len(data['camera_info']) == 0 or len(data['rgb_features']) < self.config.IL.Filter_failure.min_rgb_nums:
+                                    continue
                     
                     # convert yaw from [-2pi,2pi] to [-pi, pi]
                     yaws = np.array(data['robot_info']['yaw']).copy()
@@ -244,31 +273,37 @@ class VLNCE_DP_Dataset(IterableDataset):
                         if yaw > np.pi:
                             yaw -= 2*np.pi
                         yaws[yaw_i] = yaw
-                            
-                    for ep_idx in range(len(self.dataset_data[key])):
-                        instr = self.dataset_data[key][ep_idx]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
-                            
-                        new_data = {
-                            # 'instruction': data_to_load['instruction'],
-                            'instruction': instr,
-                            'progress': data['progress'],
-                            'globalgps': data['robot_info']['position'],
-                            'global_rotation': data['robot_info']['orientation'],
-                            'globalyaw': yaws,
-                            'rgb': data['camera_info'][self.camera_name]['rgb'],
-                            'depth': np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1),
-                        }
+
+                    if 'instr_features' in data and not self.config.MODEL.TEXT_ENCODER.update_text_encoder:
+                        instructions = data['instr_features']
+                        self.need_extract_instr_features = False
+                    else:
+                        instructions = [
+                            self.dataset_data[key][ep_idx]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
+                            for ep_idx in range(len(self.dataset_data[key]))
+                        ]
+                        self.need_extract_instr_features = True
+
+                    for instruction in instructions:
+                        new_data = self._create_new_data(data, yaws, instruction, finish_status, fail_reason)
                         new_preload.append(new_data)
                         finish_status_list.append(finish_status)
                         fail_reasons_list.append(fail_reason)
-                        lengths.append(len(new_preload[-1]))
+                        lengths.append(len(new_data))
 
-            # compute stack images, positions, yaw, and relative actions, time_distance for each observations
-            new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
+                    if self.need_extract_instr_features:
+                        # compute stack images, positions, yaw, and relative actions, time_distance for each observations
+                        new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
             
             # process the instruction
-            for i in range(len(new_preload)):
-                new_preload[i]['instruction'] = np.tile(np.array(new_preload[i]['instruction']), (len(new_preload[i]['progress']),1))
+            # copy the instruction to each step
+            if self.need_extract_instr_features:
+                for i in range(len(new_preload)):
+                    new_preload[i]['instruction'] = np.tile(np.array(new_preload[i]['instruction']), (len(new_preload[i]['progress']),1))
+            else:
+                for i in range(len(new_preload)):
+                    new_preload[i]['instruction'] = np.expand_dims(new_preload[i]['instruction'], axis=0)
+                    new_preload[i]['instruction'] = np.tile(new_preload[i]['instruction'], (len(new_preload[i]['progress']), 1, 1))
 
             if self.config.IL.analysis_time:
                 start_time = time.time()
@@ -319,11 +354,16 @@ class VLNCE_DP_Dataset(IterableDataset):
                     item_obs["rgb"] = torch.stack(process_images) # [T, 3, 224, 224]
                     
                     img_shape = item_obs["rgb"][0].shape
+                else:
+                    img_shape = item_obs["rgb_features"][0].shape
+                
+                if "depth" in item_obs.keys():
                     depth_shape = item_obs["depth"][0].shape
                     if len(depth_shape) == 2:
                         # [256, 256] -> [256, 256, 1]
                         item_obs["depth"] = torch.unsqueeze(item_obs["depth"], dim=-1)
 
+                if self.use_stack:
                     item_obs["stack_rgb"] = torch.zeros((total_steps, img_stack_nums, *img_shape))
                     item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, *depth_shape))
                     
@@ -342,15 +382,22 @@ class VLNCE_DP_Dataset(IterableDataset):
                     
                     # stack multiple images and depths
                     if self.use_stack:
+                        if self.extract_img_features:
+                            rgb_key_name = "rgb"
+                            depth_key_name = "depth"
+                        else:
+                            rgb_key_name = "rgb_features"
+                            depth_key_name = "depth" if self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder else "depth_features" 
+                            
                         if step_idx == 0:
-                            item_obs["stack_rgb"][step_idx][0] = item_obs["rgb"][step_idx]
-                            item_obs["stack_depth"][step_idx][0] = item_obs["depth"][step_idx]
+                            item_obs["stack_rgb"][step_idx][0] = item_obs[rgb_key_name][step_idx]
+                            item_obs["stack_depth"][step_idx][0] = item_obs[depth_key_name][step_idx]
                         else:
                             prev_step_idx = min(img_stack_nums, step_idx+1)     
                             # use torch.flip to make the latest image in the first token
-                            flip_images = torch.flip(item_obs["rgb"][step_idx+1-prev_step_idx: step_idx+1], dims=[0])
+                            flip_images = torch.flip(item_obs[rgb_key_name][step_idx+1-prev_step_idx: step_idx+1], dims=[0])
                             item_obs["stack_rgb"][step_idx][:prev_step_idx] = flip_images
-                            item_obs["stack_depth"][step_idx][:prev_step_idx] = torch.flip(item_obs["depth"][step_idx+1-prev_step_idx: step_idx+1], dims=[0])
+                            item_obs["stack_depth"][step_idx][:prev_step_idx] = torch.flip(item_obs[depth_key_name][step_idx+1-prev_step_idx: step_idx+1], dims=[0])
                 
                 for step_idx in range(total_steps):
                     # compute actions
@@ -538,7 +585,7 @@ class VLNCE_DP_Dataset(IterableDataset):
 
 
     def __len__(self) -> int:
-        return len(self.index_to_data)
+        return self.length * 200
     
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()

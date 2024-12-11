@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--run-type",
-        choices=["train", "eval", "inference"],
+        choices=["train", "eval", "inference", "preprocess_features"],
         required=True,
         help="run type of the experiment (train, eval, inference, collect_dataset)",
     )
@@ -180,6 +180,8 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         trainer.train()
     elif run_type == "eval":
         trainer.eval()
+    elif run_type == "preprocess_features":
+        trainer._preprocess_features()
     # elif run_type == "inference":
     #     trainer.inference()
     # elif run_type == 'collect_dataset':
