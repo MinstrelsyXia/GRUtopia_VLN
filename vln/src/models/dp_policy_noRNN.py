@@ -272,7 +272,8 @@ class CMA_DP_noRNN_Net(nn.Module):
         denoise_action=False,
         num_sample=1,
         train_classifier_free_guidance=False,
-        sample_classifier_free_guidance=False
+        sample_classifier_free_guidance=False,
+        need_txt_extraction=True
     ):
         # Note: stack images have not been adaptive yet.
         device = observations['instruction'].device
@@ -295,7 +296,7 @@ class CMA_DP_noRNN_Net(nn.Module):
             
         '''1. Encoding text'''
         text_embeds, txt_masks, text_cls_embeds = self.instruction_encoder(
-            observations['instruction']
+            observations['instruction'], need_txt_extraction=need_txt_extraction
         ) 
                 
         '''2. Encoding previous actions, steps and imu'''
@@ -454,13 +455,18 @@ class CMA_DP_noRNN_Net(nn.Module):
         rnn_states_out = None
         return noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred
 
-    def img_embedding(self, rgb_inputs, depth_inputs, img_mod, depth_return_x_before_fc=False, proj=True, process_images=False):
+    def img_embedding(self, rgb_inputs, depth_inputs, img_mod, depth_return_x_before_fc=False, proj=True, process_images=False, need_img_extraction=True):
         if process_images:
             rgb_inputs = self.image_encoder.process_image(rgb_inputs)
             if self.model_config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
                 depth_inputs = self.image_encoder.process_depth(depth_inputs)
-        rgb_embeds = self.image_encoder.embed_image(rgb_inputs,img_mod=img_mod, proj=proj).squeeze(1)
+        if need_img_extraction:
+            rgb_embeds = self.image_encoder.embed_image(rgb_inputs,img_mod=img_mod, proj=proj).squeeze(1)
+        else:
+            rgb_embeds = rgb_inputs
+
         depth_embeds = self.image_encoder.embed_depth(depth_inputs, return_x_before_fc=depth_return_x_before_fc).squeeze(1)
+ 
         return rgb_embeds, depth_embeds
         
     def parse_action(self, diffusion_output, dist_pred, pm_pred=None, stop_mode='distance', steps=None):
@@ -763,15 +769,24 @@ class CMA_DP_noRNN_Net(nn.Module):
         self, batch
     ) -> Tuple[Tensor, Tensor]:
         mode = batch['mode']
-        device = batch['observations']['instruction'].device
-        batch_size = batch['observations']['instruction'].shape[0]
         
         if mode == "img_embedding":
             if 'depth_return_x_before_fc' not in batch:
                 batch['depth_return_x_before_fc'] = False
-            return self.img_embedding(batch['rgb_inputs'], batch['depth_inputs'], batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'])
+            if 'need_img_extraction' not in batch:
+                batch['need_img_extraction'] = True
+            return self.img_embedding(batch['rgb_inputs'], batch['depth_inputs'], batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'], batch['need_img_extraction'])
+
+        elif mode == "txt_embedding":
+            text_embeds, txt_masks, text_cls_embeds = self.instruction_encoder(
+                batch['instr_inputs'],
+                use_qformer=False
+            )
+            return text_embeds
         
         elif mode == "pred_actions":
+            device = batch['observations']['instruction'].device
+            batch_size = batch['observations']['instruction'].shape[0]
             if 'num_sample' not in batch:
                 batch['num_sample'] = 1
             if batch['need_img_extraction']:
@@ -782,13 +797,18 @@ class CMA_DP_noRNN_Net(nn.Module):
                     input_rgb = batch['observations']['rgb']
                     input_depth = batch['observations']['depth']
                 
+                if 'rgb_features' in batch['observations'].keys():
+                    need_img_extraction = False
+                else:
+                    need_img_extraction = True
+                
                 if batch['train_cls_free_guidance']:
                     cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
                     cls_free_mask = cls_free_mask.to(device)
                     input_rgb[cls_free_mask] = torch.zeros_like(input_rgb[cls_free_mask])
                     input_depth[cls_free_mask] = torch.zeros_like(input_depth[cls_free_mask])
                     
-                stack_rgb, stack_depth = self.img_embedding(input_rgb, input_depth, batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'])
+                stack_rgb, stack_depth = self.img_embedding(input_rgb, input_depth, batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'], need_img_extraction)
                 if len(stack_rgb.shape) == 2:
                     batch['observations']['stack_rgb'] = stack_rgb.unsqueeze(1)
                     batch['observations']['stack_depth'] = stack_depth.unsqueeze(1)
@@ -796,7 +816,7 @@ class CMA_DP_noRNN_Net(nn.Module):
                     batch['observations']['stack_rgb'] = stack_rgb
                     batch['observations']['stack_depth'] = stack_depth
 
-            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'])
+            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'], batch['need_txt_extraction'])
         
         elif mode == "act":
             return self.act(batch)

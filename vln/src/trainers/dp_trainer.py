@@ -111,7 +111,7 @@ class DaggerDiffusonPolicyTrainer:
         self.use_rnn = 'noRNN' not in self.config.MODEL.policy_name
         
         # Init the file_logger
-        if self.config.run_type == 'train':
+        if self.config.run_type in ['train', 'preprocess_features']:
             train_logger_filename = os.path.join(log_dir, "train.log")
             ## remove the existing logger first
             # if os.path.exists(train_logger_filename):
@@ -120,7 +120,10 @@ class DaggerDiffusonPolicyTrainer:
                 name="train", level=logging.INFO, format_str="%(asctime)-15s %(message)s",
                 filename=train_logger_filename
             )
-            self.train_logger.info(f"Start Training! Good Luck!!!")
+            if self.config.run_type == 'train':
+                self.train_logger.info(f"Start Training! Good Luck!!!")
+            elif self.config.run_type == 'preprocess_features':
+                self.train_logger.info(f"Start Preprocessing Features! Good Luck!!!")
 
             self.train_dataset_data = load_dataset(config.IL.dataset_root_dir, 'train', logger=self.train_logger)
         
@@ -261,7 +264,7 @@ class DaggerDiffusonPolicyTrainer:
 
                 for batch in tqdm.tqdm(
                     diter,
-                    total=dataset.length // dataset.batch_size,
+                    total=len(diter),
                     leave=False,
                     dynamic_ncols=True,
                 ):
@@ -295,6 +298,7 @@ class DaggerDiffusonPolicyTrainer:
                         prev_actions_batch,
                         not_done_masks,
                         denoise_action=self.config.IL.DAGGER.denoise_action,
+                        need_instr_extraction=dataset.need_extract_instr_features
                     )
 
                     if self.local_rank < 1:
@@ -335,7 +339,7 @@ class DaggerDiffusonPolicyTrainer:
                         step_id += 1  # noqa: SIM113
                         
                         # save the ckpt according to the steps
-                        if self.use_rnn and step_id % self.config.IL.save_interval_steps == 0:
+                        if not self.use_rnn and step_id % self.config.IL.save_interval_steps == 0:
                             self.save_checkpoint(
                                 f"ckpt-epoch-{epoch}-step-{step_id}.pth",
                                 filter_frozen_weights=self.config.IL.save_filter_frozen_weights
@@ -462,7 +466,8 @@ class DaggerDiffusonPolicyTrainer:
         not_done_masks,
         step_grad: bool = True,
         loss_accumulation_scalar: int = 1,
-        denoise_action=False
+        denoise_action=False,
+        need_instr_extraction=True
     ):
         # T, N = prev_actions.size()
         N = self.config.IL.batch_size
@@ -492,6 +497,9 @@ class DaggerDiffusonPolicyTrainer:
         else:
             need_img_extraction = False
         
+        if self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder:
+            need_img_extraction = True
+        
         depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
         
         if self.config.IL.analysis_time:
@@ -511,6 +519,7 @@ class DaggerDiffusonPolicyTrainer:
             'process_images': False, # has processed in dataLoader
             'train_cls_free_guidance': self.config.MODEL.Diffusion_Policy.use_cls_free_guidance,
             'sample_cls_free_guidance': False,
+            'need_txt_extraction': need_instr_extraction
         }
         # if observations['stack_depth'].shape[1] == 1:
         #     observations['stack_depth'] = observations['stack_depth'].squeeze(1)
@@ -1325,6 +1334,32 @@ class DaggerDiffusonPolicyTrainer:
         data[self.eval_env.current_split]["episodes"][self.eval_env.current_scan].append(episode_info)
         with open(result_json_path, 'w') as f:
             json.dump(data, f, indent=4)
+    
+    def _preprocess_features(self):
+        from vln.src.trainers.preprocess_features import FeaturePreprocessor
+        
+        '''Init the model and load the pretrained weights'''
+        self.policy, _ = initialize_policy(
+            self.config,
+            self.train_logger,
+            self.config.IL.load_from_ckpt,
+            self.device,
+            load_from_pretrain=self.config.IL.load_from_pretrain,
+            action_stats=self.action_stats
+        )
+        
+        feature_preprocessor = FeaturePreprocessor(
+            model=self.policy,
+            config=self.config,
+            train_dataset=self.train_dataset_data,
+            bert_tokenizer=self.bert_tokenizer,
+            input_lmdb_dir=self.config.IL.DAGGER.lmdb_features_dir,
+            output_lmdb_dir=self.config.IL.DAGGER.lmdb_features_dagger_update_dir,
+            device=self.device,
+            del_original_rgb=True
+        )
+
+        feature_preprocessor.preprocess_features()
 
 def plot_spl_list(spl_list):
     # Create a figure and axis
