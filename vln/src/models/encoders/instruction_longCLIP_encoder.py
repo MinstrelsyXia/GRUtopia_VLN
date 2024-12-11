@@ -56,18 +56,24 @@ class InstructionLongCLIPEncoder(nn.Module):
             
             print("Add LoRA for instruction encoder")
 
-    def forward(self, txt_inputs, txt_masks=None):
-        txt_inputs = txt_inputs.long()
-        # padding the length of text to 248
-        if txt_inputs.size(1) < 248:
-            txt_inputs = F.pad(txt_inputs, (0, 248 - txt_inputs.size(1)), value=0)
-        if txt_masks is None:
-            txt_masks = (txt_inputs != 0).to(txt_inputs.device)
-        txt_cls_embeds, txt_full_embeds = self.text_transformer.encode_text(txt_inputs, return_full=True)
-        txt_cls_embeds = txt_cls_embeds.type(torch.float32)
-        txt_full_embeds = txt_full_embeds.type(torch.float32)
-
-        if self.use_qformer:
+    def forward(self, txt_inputs, txt_masks=None, use_qformer=True, need_txt_extraction=True):
+        if need_txt_extraction:
+            txt_inputs = txt_inputs.long()
+            # padding the length of text to 248
+            if txt_inputs.size(1) < 248:
+                txt_inputs = F.pad(txt_inputs, (0, 248 - txt_inputs.size(1)), value=0)
+            if txt_masks is None:
+                txt_masks = (txt_inputs != 0).to(txt_inputs.device)
+                
+            txt_cls_embeds, txt_full_embeds = self.text_transformer.encode_text(txt_inputs, return_full=True)
+            txt_cls_embeds = txt_cls_embeds.type(torch.float32)
+            txt_full_embeds = txt_full_embeds.type(torch.float32)
+        else:
+            txt_full_embeds = txt_inputs
+            txt_masks = None
+            txt_cls_embeds = None
+            
+        if self.use_qformer and use_qformer:
             q_former_outputs = self.q_former(self.q_param.repeat(txt_full_embeds.size(0), 1, 1), encoder_hidden_states=txt_full_embeds)[0]
             return q_former_outputs, txt_masks, txt_cls_embeds
         else:
