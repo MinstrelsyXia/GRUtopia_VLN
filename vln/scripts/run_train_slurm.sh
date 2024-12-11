@@ -5,6 +5,7 @@
 #SBATCH --gres=gpu:2                  # GPU请求
 #SBATCH --cpus-per-task=12             # 每个任务的CPU核心数
 #SBATCH --partition=smartbot              # 使用GPU分区
+#SBATCH --mem=100G                     # 总内存分配
 
 # 创建日志目录
 mkdir -p logs

@@ -1,4 +1,4 @@
-NAME: 20241210-vlnce-rp-npRNN-txtLayer12-txtQformer-stackRGB8-clsFree4-p0.25-bs128-lr2e-4
+NAME: 20241210-vlnce-rp-noRNN-DPDec8-txtLayer12-txtQformer-stackRGB16-clsFreeP0.25-bs128-lr2e-4
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -139,7 +139,7 @@ MODEL:
     q_former_length: 20
 
   IMAGE_ENCODER:
-    img_stack_nums: 8 # the history images for inputs
+    img_stack_nums: 16 # the history images for inputs
     use_stack: true 
     dropout: 0.1
     use_env_drop: true
@@ -239,7 +239,7 @@ MODEL:
 
     # for transformer
     transformer_n_cond_layers: 0
-    transformer_n_layers: 3
+    transformer_n_layers: 8
     transformer_encoding_size: 512
     # transformer_n_head: 8
     transformer_p_drop_emb: 0
