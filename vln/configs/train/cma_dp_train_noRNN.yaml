@@ -1,4 +1,4 @@
-NAME: 20241210-vlnce-rp-noRNN-DPDec8-txtLayer12-txtQformer-stackRGB16-clsFreeP0.25-bs128-lr2e-4
+NAME: 20241211-vlnce-rp-noRNN-DPDec8-txtLayer12-txtQformer-stackRGB8-clsFreeP0.25-bs64-lr2e-4
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -94,7 +94,7 @@ IL:
     use: true # drop the failure cases
     min_rgb_nums: 15 # the item that is fewer than this number would be dropped.
 
-  analysis_time: true # analysis the processing time for each module
+  analysis_time: false # analysis the processing time for each module
 
   DAGGER:
     iterations: 5

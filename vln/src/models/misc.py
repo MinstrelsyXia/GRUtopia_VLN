@@ -37,13 +37,17 @@ def set_cuda(opts, device=None) -> Tuple[bool, int, torch.device]:
 
     # get device settings
     if opts.local_rank != -1:
-        init_distributed(opts)
+        init_param = init_distributed(opts)
+        opts.local_rank = dist.get_rank()
         torch.cuda.set_device(opts.local_rank)
         device = torch.device("cuda", opts.local_rank)
         n_gpu = 1
         default_gpu = dist.get_rank() == 0
         if default_gpu:
             logger.info(f"Found {dist.get_world_size()} GPUs")
+        logger.info(f"Process rank: {dist.get_rank()}, "
+                   f"Local rank: {opts.local_rank}, "
+                   f"Device: {device}")
     else:
         default_gpu = True
         device = torch.device("cuda") if device is None else device
@@ -153,6 +157,7 @@ def init_distributed(opts):
     print(f"Init distributed {init_param['rank']} - {init_param['world_size']}")
 
     dist.init_process_group(**init_param)
+    return init_param
 
 
 def is_default_gpu(opts) -> bool:
