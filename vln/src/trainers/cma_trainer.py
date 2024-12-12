@@ -601,6 +601,8 @@ class DaggerCMATrainer:
                         time.sleep(2)  # sleep for 2 secs before polling again
                     prev_ckpt_ind += 1
                     ckpt_file_ind = current_ckpt.split('/')[-1].split('.')[1]
+                    if '_' in ckpt_file_ind:
+                        ckpt_file_ind = ckpt_file_ind.split('_')[0]
                     if use_gt:
                         self.gt_eval(
                             checkpoint_path=current_ckpt,
@@ -699,7 +701,7 @@ class DaggerCMATrainer:
             if os.path.exists(fname):
                 logger.info("skipping -- evaluation exists.")
                 return 0, 0
-
+        
         '''Init the task env'''
         obs = self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
         if isinstance(obs, str):
@@ -719,9 +721,6 @@ class DaggerCMATrainer:
             action_stats=self.action_stats
         )
         self.policy.eval()
-
-        '''Init the task env'''
-        self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
 
         observations = self.eval_env.get_obs()
         start_positions = [x['globalgps'][[0,1]] for x in observations]

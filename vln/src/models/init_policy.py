@@ -111,7 +111,10 @@ def initialize_policy(
         if load_from_ckpt:
             ckpt_path = config.IL.ckpt_to_load
             ckpt_dict = load_checkpoint(ckpt_path, map_location="cpu")
-            state_dict = ckpt_dict['state_dict']
+            if 'state_dict' in ckpt_dict:
+                state_dict = ckpt_dict['state_dict']
+            else:
+                state_dict = ckpt_dict
             new_state_dict = {}
             # Iterate through the state dictionary items
             for k, v in state_dict.items():
@@ -120,6 +123,11 @@ def initialize_policy(
                     # Handle the key by stripping 'module.' if necessary or perform any required operation
                     new_key = k.replace('module.', '')
                     new_state_dict[new_key] = v
+                if 'net.' in k: # this is for loading the cma policy from habitat
+                    new_key = k.replace('net.', '')
+                    new_state_dict[new_key] = v
+                else:
+                    new_state_dict[k] = v
             del state_dict[k]  # Remove the old key with 'module.'
                     
             incompatible_keys, _= self_policy.load_state_dict(new_state_dict,
