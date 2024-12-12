@@ -1,4 +1,4 @@
-gs: 200
+gs: 500
 cs: 0.1 # from maps.voxel_size
 camera_height: 1.7
 camera_fov: 90

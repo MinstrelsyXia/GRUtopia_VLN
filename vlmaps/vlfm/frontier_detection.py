@@ -13,53 +13,109 @@ from vlmaps.vlfm.utils import closest_line_segment
 
 VISUALIZE = False
 DEBUG = False
+my_visualize = True
 def detect_frontier_waypoints(
     full_map: np.ndarray,
     explored_mask: np.ndarray,
     area_thresh: Optional[int] = -1,
     xy: Optional[np.ndarray] = None,
+    get_grad: bool = False,
 ):
-    if DEBUG:
-        import time
+    if get_grad == False:
+        if DEBUG:
+            import time
 
-        os.makedirs("map_debug", exist_ok=True)
-        cv2.imwrite(
-            f"map_debug/{int(time.time())}_debug_full_map_{area_thresh}.png", full_map
-        )
-        cv2.imwrite(
-            f"map_debug/{int(time.time())}_debug_explored_mask_{area_thresh}.png",
-            explored_mask,
-        )
+            os.makedirs("map_debug", exist_ok=True)
+            cv2.imwrite(
+                f"map_debug/{int(time.time())}_debug_full_map_{area_thresh}.png", full_map
+            )
+            cv2.imwrite(
+                f"map_debug/{int(time.time())}_debug_explored_mask_{area_thresh}.png",
+                explored_mask,
+            )
 
-    if VISUALIZE:
+        if VISUALIZE:
+            img = cv2.cvtColor(full_map * 255, cv2.COLOR_GRAY2BGR)
+            img[explored_mask > 0] = (127, 127, 127)
+
+            cv2.imshow("inputs", img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+        explored_mask[full_map == 0] = 0
+        frontiers = detect_frontiers(full_map, explored_mask, area_thresh)
+        if VISUALIZE:
+            img = cv2.cvtColor(full_map * 255, cv2.COLOR_GRAY2BGR)
+            img[explored_mask > 0] = (127, 127, 127)
+            # Draw a dot at each point on each frontier
+            for idx, frontier in enumerate(frontiers):
+                # Uniformly sample colors from the COLORMAP_RAINBOW
+                color = cv2.applyColorMap(
+                    np.uint8([255 * (idx + 1) / len(frontiers)]), cv2.COLORMAP_RAINBOW
+                )[0][0]
+                color = tuple(int(i) for i in color)
+                for idx2, p in enumerate(frontier):
+                    if idx2 < len(frontier) - 1:
+                        cv2.line(img, p[0], frontier[idx2 + 1][0], color, 2)
+            cv2.imshow("frontiers", img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+        waypoints = frontier_waypoints(frontiers, xy)
+        return waypoints
+    else:
+        explored_mask[full_map == 0] = 0
+        frontiers = detect_frontiers(full_map, explored_mask, area_thresh)
+        waypoints = frontier_waypoints(frontiers, xy)
+
+        frontier_angles = []
+        kernel_size = 3
+        
+        # 创建可视化图像
         img = cv2.cvtColor(full_map * 255, cv2.COLOR_GRAY2BGR)
-        img[explored_mask > 0] = (127, 127, 127)
+        img[explored_mask > 0] = (127, 127, 127)  # 将已探索区域标记为灰色
+        for idx, waypoint in enumerate(waypoints):
+            mid_x, mid_y = int(waypoint[0]), int(waypoint[1])
+            # 计算法向量方向
+            nx, ny = 0, 0  # 初始化法向量
+            # 检查周围的像素以确定法向量方向
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx == 0 and dy == 0:
+                        continue
+                    check_x = mid_x + dx
+                    check_y = mid_y + dy
+                    if (0 <= check_x < explored_mask.shape[1] and 
+                        0 <= check_y < explored_mask.shape[0]):
+                        if explored_mask[check_y, check_x] > 0:
+                            nx += dx
+                            ny += dy
+            
+            # 归一化法向量
+            length = np.sqrt(nx * nx + ny * ny)
+            if length > 0:
+                nx, ny = nx / length, ny / length
+            
+            # 绘制箭头从explored指向not_explored
+            arrow_length = 20
+            end_x = int(mid_x + nx * arrow_length)
+            end_y = int(mid_y + ny * arrow_length)
+            cv2.arrowedLine(img, (mid_x, mid_y), (end_x, end_y), 
+                            (255, 0, 0), 2, tipLength=0.3)  # 使用蓝色箭头表示法向量
+            
+            # 使用cv.circle标出frontier点
+            cv2.circle(img, (mid_x, mid_y), 5, (0, 0, 255), -1)  # 使用红色圆圈标出frontier点
 
-        cv2.imshow("inputs", img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+            angle = np.arctan2(ny, nx)
+            if angle > np.pi:
+                angle -= np.pi
+        
+            frontier_angles.append(angle)
+    
+    if my_visualize:
+        cv2.imwrite("tmp2/frontiers_with_grad_and_points.png", img)
 
-    explored_mask[full_map == 0] = 0
-    frontiers = detect_frontiers(full_map, explored_mask, area_thresh)
-    if VISUALIZE:
-        img = cv2.cvtColor(full_map * 255, cv2.COLOR_GRAY2BGR)
-        img[explored_mask > 0] = (127, 127, 127)
-        # Draw a dot at each point on each frontier
-        for idx, frontier in enumerate(frontiers):
-            # Uniformly sample colors from the COLORMAP_RAINBOW
-            color = cv2.applyColorMap(
-                np.uint8([255 * (idx + 1) / len(frontiers)]), cv2.COLORMAP_RAINBOW
-            )[0][0]
-            color = tuple(int(i) for i in color)
-            for idx2, p in enumerate(frontier):
-                if idx2 < len(frontier) - 1:
-                    cv2.line(img, p[0], frontier[idx2 + 1][0], color, 3)
-        cv2.imshow("frontiers", img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-    waypoints = frontier_waypoints(frontiers, xy)
-    return waypoints
+    return waypoints, frontier_angles
 
 
 def detect_frontiers(

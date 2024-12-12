@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # 配置参数
-NUM_GPUS=7
+
 DATA_DIR="/ssd/xiaxinyuan/code/VLN/VLNCE/R2R_VLNCE_v1-3"
 # add date+hour+minute
-OUTPUT_DIR="multi_gpu_list_$NUM_GPUS"  # 相对路径，例如: multi_gpu_list_1128_1430
+
 CACHE_ROOT="/ssd/xiaxinyuan/docker"
 WEBUI_HOST="127.0.0.1"
 NAME="xxy_v3.3"
@@ -17,17 +17,20 @@ mkdir -p ${LOG_DIR}
 
 
 # GPU ID 列表
+# GPU_LIST=( "1" "2" "3" "4" "5" "6" "7")
+NUM_GPUS=7
 GPU_LIST=( "1" "2" "3" "4" "5" "6" "7")
+OUTPUT_DIR="multi_gpu_list_$NUM_GPUS"  # 相对路径，例如: multi_gpu_list_1128_1430
 EXPERIMENTS_PER_GPU=1
 BASE_CONTAINER_NAME="isaac-sim-xxy"
 IMAGE_NAME="xxy_new:3.4"
-
+FILE_NAME="valid_paths/sub_success_paths_id_1211.txt"
 
 
 # 数据集拆分
 # python split_dataset.py --num_gpus $NUM_GPUS --data_dir $DATA_DIR --output_dir $OUTPUT_DIR
 cd vlmaps/docker/
-python split_dataset.py --gpu_list "${GPU_LIST[@]}" --data_dir $DATA_DIR --output_dir $OUTPUT_DIR
+python split_dataset.py --gpu_list "${GPU_LIST[@]}" --data_dir $DATA_DIR --output_dir $OUTPUT_DIR --file_name $FILE_NAME
 
 cd ../..
 # 实验命令
@@ -72,7 +75,7 @@ for GPU in "${GPU_LIST[@]}"; do
             -v /ssd/xiaxinyuan/checkpoints/ViT-B-32.pt:/root/.cache/clip/ViT-B-32.pt:ro \
             -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:ro \
             -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
-            -v /ssd/xiaxinyuan/code/w61-grutopia/logs_docker:/isaac-sim/GRUtopia/logs:rw \
+            -v /ssd/xiaxinyuan/code/w61-grutopia/logs_docker_1211:/isaac-sim/GRUtopia/logs:rw \
             -v /ssd/xiaxinyuan/code/w61-grutopia:/isaac-sim/GRUtopia:rw \
             -v /ssd/xiaxinyuan/assets:/isaac-sim/GRUtopia/assets:ro \
             -v ${CACHE_ROOT}/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \

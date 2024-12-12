@@ -1,0 +1,17 @@
+7y3sRwLe3Va 6 7 Exit the bedroom and turn right.Walk past the staircase and to the door on the right in front of an entryway. Go through the door and you'll be in an office area.  
+// cannot exit bedroom; stair down, cannot see from view
+EDJbREhghzL 19 28 Go to the stairs
+Go to the glass doors
+Go to the light switch
+Go to the settee.
+//success
+EDJbREhghzL 19 30 Turn around and go down the hall way.  Turn left at the doorway and you'll see a setting room.  Go to the left side of the chair, near the window and stand there.  Wait. 
+mJXqzFtmKg4 22 31 Go into the kitchen and through the doorway on the left. Wait inside the dining room. 
+mJXqzFtmKg4 22 32 Enter the kitchen, then follow the left wall until you find a door. Go through the door, and stop when you reach the dining room entrance. 
+8WUmhLawc2A 48 67 Walk into the hallway and through the entrance to the kitchen area. Walk  Passed the sink and stove area and stop between the refrigerator and dining table. 
+8WUmhLawc2A 48 68 Walk through the kitchen. Go past the sink and stove stand in front of the dining table on the bench side. 
+8WUmhLawc2A 48 69 Walk into the kitchen.  Walk past the refrigerator.  Stop directly in front of the wooden table. 
+Turn around and walk into the bedroom.  Turn right and go past the bed and then turn right again.  You will see a bathroom.  Wait right at the entrance of that room. 
+Vvot9Ly1tCj 120 180 Exit the bedroom and turn left. Wait on the welcome mat. 
+8WUmhLawc2A 164 252 Exit the living room. Turn right. Walk into the bedroom and wait by the table. 
+Vvot9Ly1tCj 206 310 Walk towards the hallway with a blue painting. Turn left and wait by the entrance of the empty room. 

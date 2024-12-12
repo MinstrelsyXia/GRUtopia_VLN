@@ -14,6 +14,8 @@ images/
 results/
 logs/
 logs_docker/
+logs_docker_1211/
+.auto-run-docker/
 GRUtopia/logs/
 .vscode/
 test/

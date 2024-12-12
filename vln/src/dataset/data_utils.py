@@ -37,6 +37,20 @@ def is_in_container():
     """检查是否在容器中运行"""
     return os.path.exists('/.dockerenv')
 
+def transform_rotation_z_90degrees(rotation):
+    ''' 沿着z轴旋转90度
+    '''
+    z_rot_90 = [np.cos(np.pi/4), 0, 0, np.sin(np.pi/4)]  # 90 degrees = pi/2 radians
+    w1, x1, y1, z1 = rotation
+    w2, x2, y2, z2 = z_rot_90
+    revised_rotation = [
+        w1*w2 - x1*x2 - y1*y2 - z1*z2,  # w
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,  # x
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,  # y
+        w1*z2 + x1*y2 - y1*x2 + z1*w2   # z
+    ]
+    return revised_rotation
+    
 def load_data(args, split):
     ''' Load data based on VLN-CE
     '''
@@ -50,6 +64,7 @@ def load_data(args, split):
             item["original_start_rotation"] = copy.copy(item["start_rotation"])
             item["start_position"] = [item["original_start_position"][0], -item["original_start_position"][2], item["original_start_position"][1]]
             item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][2], -item["original_start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
+            item["start_rotation"] = transform_rotation_z_90degrees(item["start_rotation"])
             item["scan"] = item["scene_id"].split("/")[1]
             item["c_reference_path"] = []
             if "reference_path" in item.keys():

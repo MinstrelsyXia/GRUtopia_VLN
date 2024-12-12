@@ -135,8 +135,8 @@ def plan_to_pos_v2(start, goal, obstacles, G: vg.VisGraph = None, vis=False, vis
     Start and goal are tuples of (row, col) in the map.
     """
 
-    print("start: ", start)
-    print("goal: ", goal)
+    # print("start: ", start)
+    # print("goal: ", goal)
     # if vis:
     #     if vis_map is None:
     #         obs_map_vis = (obstacles[:, :, None] * 255).astype(np.uint8)

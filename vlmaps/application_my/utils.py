@@ -1,4 +1,3 @@
-
 class NotFound(Exception):
     """Exception raised when a specific object is not found on the map."""
     def __init__(self, message="Object not found or insufficient data in pc_mask."):
@@ -21,7 +20,6 @@ class TooManySteps(Exception):
 
 import numpy as np
 import matplotlib.pyplot as plt
-import open3d as o3d
 
 import re
 
@@ -54,6 +52,69 @@ def extract_self_methods(input_string):
 
 # # 打印结果
 # print(extracted_methods)
+
+def check_valid_parsed_instruction(parsed_instruction):
+    '''
+    检查解析后的指令是否有效
+    有效函数格式如下:
+    self.move_to_left(object_name:str), self.move_to_right(object_name:str), 
+    self.get_pos(object_name), self.get_contour(object_name), 
+    self.with_object_on_left(object_name), self.with_object_on_right(object_name),
+    self.move_in_between(object_a, object_b), self.face(object_name), 
+    self.turn_absolute(angle:float), self.move_forward(distance:float), 
+    self.turn(angle:float), self.move_to_object(object_name)
+    '''
+    # 定义有效函数及其参数要求
+    valid_functions = {
+        'move_to_left': {'params': 1, 'types': [str]},
+        'move_to_right': {'params': 1, 'types': [str]},
+        'get_pos': {'params': 1, 'types': [str]},
+        'get_contour': {'params': 1, 'types': [str]},
+        'with_object_on_left': {'params': 1, 'types': [str]},
+        'with_object_on_right': {'params': 1, 'types': [str]},
+        'move_in_between': {'params': 2, 'types': [str, str]},
+        'face': {'params': 1, 'types': [str]},
+        'turn_absolute': {'params': 1, 'types': [float]},
+        'move_forward': {'params': 1, 'types': [float]},
+        'turn': {'params': 1, 'types': [float]},
+        'move_to_object': {'params': 1, 'types': [str]}
+    }
+    
+    # 提取函数名和参数
+    try:
+        func_name = parsed_instruction.split('self.')[1].split('(')[0]
+        params_str = parsed_instruction.split('(')[1].split(')')[0]
+        
+        # 分割参数
+        if params_str:
+            params = [p.strip().strip("'").strip('"') for p in params_str.split(',')]
+        else:
+            params = []
+        
+        # 检查函数名是否有效
+        if func_name not in valid_functions:
+            raise ValueError(f"无效的函数名: {func_name}")
+        
+        # 检查参数数量是否正确
+        expected_params = valid_functions[func_name]['params']
+        if len(params) != expected_params:
+            raise ValueError(f"函数 {func_name} 需要 {expected_params} 个参数，但收到了 {len(params)} 个")
+        
+        # 检查参数类型
+        expected_types = valid_functions[func_name]['types']
+        for param, expected_type in zip(params, expected_types):
+            if expected_type == float:
+                try:
+                    float(param)  # 尝试将参数转换为浮点数
+                except ValueError:
+                    raise ValueError(f"参数 {param} 应该是数字类型")
+            elif expected_type == str and param.replace('.','',1).isdigit():  # 检查是否为数字字符串
+                raise ValueError(f"参数 {param} 应该是字符串类型，不应该是数字")
+            
+        return True
+        
+    except Exception as e:
+        raise ValueError(f"指令解析错误: {str(e)}")
 
 ################### angle utils ########################
 
@@ -206,12 +267,13 @@ def visualize_visgraph_and_path(G, path_vg, save_path='visgraph_with_path.png'):
     # visualize_visgraph_and_path(G, path_vg, save_path='tmp/visgraph_with_path_output.png')
 
 def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
+    import open3d as o3d
     # 设置无头渲染
     vis = o3d.visualization.Visualizer()
     vis.create_window()  # 创建一个不可见的窗口
     ctr = vis.get_view_control()
 
-    # 设定特定的视角
+    # 设定特定的��角
     ctr.set_front([0, 0, -1])  # 设置相机朝向正面
     ctr.set_lookat([0, 0, 0])  # 设置相机目标点为原点
     ctr.set_up([0, 0, 1])   
@@ -232,6 +294,7 @@ def visualize_pc(pcd,headless=False,save_path = 'pc.jpg'):
     pcd:     after:    pcd_global = o3d.geometry.PointCloud()
     pcd_global.points = o3d.utility.Vector3dVector(points_3d)
     '''
+    import open3d as o3d
     if headless==True:
         save_point_cloud_image(pcd,save_path=save_path)
         return
@@ -270,6 +333,7 @@ def downsample_pc(pc, depth_sample_rate):
 
 
 def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
+    import open3d as o3d
     # 设置无头渲染
     vis = o3d.visualization.Visualizer()
     vis.create_window()  # 创建一个不可见的窗口
