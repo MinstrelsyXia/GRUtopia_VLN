@@ -46,15 +46,18 @@ def read_gather_data(gather_data_path):
     return gather_data
 
 
-def gather_eval_data(dataset_file, split, save_dir='gather_data/'):
-    with open(dataset_file, 'r') as f:
+def gather_eval_data(ori_dataset, sample_dataset_file, split, save_dir='gather_data/'):
+    with open(sample_dataset_file, 'r') as f:
         dataset = json.load(f)
     
     scan_data = defaultdict(list)
     
     for item in dataset:
         scan = item['scan']
-        scan_data[scan].append(item)
+        trajectory_id = item['trajectory_id']
+        for ori_data in ori_dataset:
+            if ori_data['trajectory_id'] == trajectory_id:
+                scan_data[scan].append(ori_data)
     
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -67,16 +70,18 @@ def gather_eval_data(dataset_file, split, save_dir='gather_data/'):
 
 if __name__ == "__main__":
     '''1. Gather standard dataset'''
-    # dataset_root_dir = "/isaac-sim/GRUtopia/data/datasets/revised/corrected"
+    # dataset_root_dir = "data/datasets/revised/processed_corrected"
+    dataset_root_dir = "data/datasets/R2R_VLNCE_v1-3_preprocessed"
 
-    # args, _ = process_args()
-    # dataset_gather = datasetGather(args, dataset_root_dir=dataset_root_dir)
+    args, _ = process_args()
+    dataset_gather = datasetGather(args, dataset_root_dir=dataset_root_dir)
     # scan2data = dataset_gather.gatherSameScanData(save_gather_data=True, save_dir='gather_data/')
     
     # read_gather_data('gather_data/train_gather_data.json')
 
     '''2. Gather eval data'''
-    val_seen_dataset_file = "/ssd/wangliuyi/code/GRUtopia/data/sample_episodes/20241115_sample_episodes_val_seen/analysis/success_episode_data_val_seen.json"
-    val_unseen_dataset_file = "/ssd/wangliuyi/code/GRUtopia/data/sample_episodes/20241115_sample_episodes_val_unseen/analysis/success_episode_data_val_unseen.json"
-
-    gather_eval_data(val_unseen_dataset_file, 'val_unseen')
+    val_seen_sample_dataset_file = "data/sample_episodes/20241115_sample_episodes_val_seen/analysis/success_episode_data_val_seen.json"
+    val_unseen_sample_dataset_file = "data/sample_episodes/20241115_sample_episodes_val_unseen/analysis/success_episode_data_val_unseen.json"
+    
+    gather_eval_data(dataset_gather.data['val_unseen'], val_unseen_sample_dataset_file, 'val_unseen')
+    gather_eval_data(dataset_gather.data['val_seen'], val_seen_sample_dataset_file, 'val_seen')

@@ -36,7 +36,8 @@ def set_cuda(opts, device=None) -> Tuple[bool, int, torch.device]:
         return True, 0, torch.device("cpu")
 
     # get device settings
-    if opts.local_rank != -1:
+    # if opts.local_rank != -1:
+    if opts.DDP.use:
         init_param = init_distributed(opts)
         opts.local_rank = dist.get_rank()
         torch.cuda.set_device(opts.local_rank)

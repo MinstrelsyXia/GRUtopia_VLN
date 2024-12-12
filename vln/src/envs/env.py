@@ -259,6 +259,10 @@ class TaskEnv(VLNDataLoader):
                 obs_data['rgb'] = None
                 obs_data['depth'] = None
                 obs_data['instruction'] = self.data_item['instruction']['instruction_text']
+                if "instruction_tokens" in self.data_item['instruction']:
+                    # This is for cma from habitat.
+                    # It seems that vlnce-cma uses the Glove to encode the instruction.
+                    obs_data['instruction_tokens'] = self.data_item['instruction']['instruction_tokens']
                 obs_data['step'] = self.current_step_list[env_idx] - self.start_step_list[env_idx]
                 
                 for camera in self.camera_list:
@@ -286,7 +290,7 @@ class TaskEnv(VLNDataLoader):
     
         return [obs_data] # 批量大小为1
     
-    def step(self, actions, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, rot_action=None, verbose=False, check_fall_and_stuck=True):
+    def step(self, actions, stack_rgb=None, stack_depth=None, prev_globalgps=None, prev_globalyaw=None, total_rgb_list=None, total_topdown_rgb_list=None, rot_action=None, verbose=False, check_fall_and_stuck=True):
         '''step in isaac-sim until the action has finished'''
         dones = [False]
         reason = ''
@@ -313,7 +317,17 @@ class TaskEnv(VLNDataLoader):
         current_position = self.get_robot_poses()[self.env_idx][0]
         stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list = self._update_states(current_position, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=verbose)
         
-        return outputs_dict, dones, infos, self.current_step_list, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list
+        return {"outputs_dict": outputs_dict,
+                "dones": dones,
+                "infos": infos,
+                "current_step_list": self.current_step_list,
+                "stack_rgb": stack_rgb,
+                "stack_depth": stack_depth,
+                "prev_globalgps": prev_globalgps,
+                "prev_globalyaw": prev_globalyaw,
+                "total_rgb_list": total_rgb_list,
+                "total_topdown_rgb_list": total_topdown_rgb_list
+                }
     
     def _execute_action(self, action, action_name, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose, check_fall_and_stuck):
         finish_state = False
@@ -380,10 +394,11 @@ class TaskEnv(VLNDataLoader):
             self.eval_logger.info(f"Current position: {current_position}")
         outputs_dict = self.get_obs()
         for idx in range(len(outputs_dict)):
-            stack_rgb[idx].push(outputs_dict[idx]["rgb"])
-            stack_depth[idx].push(outputs_dict[idx]["depth"])
-            prev_globalgps[idx].push(outputs_dict[idx]["globalgps"])
-            prev_globalyaw[idx].push(outputs_dict[idx]["global_rotation"][-1])
+            if stack_rgb is not None:
+                stack_rgb[idx].push(outputs_dict[idx]["rgb"])
+                stack_depth[idx].push(outputs_dict[idx]["depth"])
+                prev_globalgps[idx].push(outputs_dict[idx]["globalgps"])
+                prev_globalyaw[idx].push(outputs_dict[idx]["global_rotation"][-1])
             if self.config.VIDEO_OPTION != -1:
                 total_rgb_list.append(outputs_dict[idx]["rgb"])
                 total_topdown_rgb_list.append(outputs_dict[idx]["topdown_rgb"])
