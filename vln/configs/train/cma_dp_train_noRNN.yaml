@@ -103,8 +103,8 @@ IL:
     update_size: 5000
     p: 0.9
     preload_lmdb_features: true # !IMPORTANT!
-    # lmdb_features_dir: data/sample_episodes/20241207_sample_episodes/sample_data.lmdb
-    lmdb_features_dir: data/sample_episodes/20241207_sample_episodes_processed/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20241207_sample_episodes/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/20241207_sample_episodes_processed/sample_data.lmdb
     lmdb_features_dagger_update_dir: data/sample_episodes/20241207_sample_episodes_processed/sample_data.lmdb
     pre_extract_img_features: true
     denoise_action: false # For debug!!!
