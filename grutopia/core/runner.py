@@ -110,8 +110,10 @@ class SimulatorRunner:
             except Exception as e:
                 log.error(f'fail to feed npc {npc.name} with obs: {e}')
 
-        if render:
-            return obs
+        # if render:
+            # return obs
+        
+        return obs
 
     def get_obs(self, add_rgb_subframes=False):
         obs = {}

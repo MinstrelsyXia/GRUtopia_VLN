@@ -304,13 +304,13 @@ class DaggerDiffusonPolicyTrainer:
                     if self.local_rank < 1:
                         losses.append(loss)
                         if step_id % 300 == 0:
-                            logger.info(f"train_loss: {loss}")
-                            logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
-                            logger.info(f"train_dist_loss: {dist_loss}")
-                            logger.info(f"train_pm_loss: {pm_loss}")
-                            logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
-                            logger.info(f"Batches processed: {step_id}.")
-                            logger.info(
+                            self.train_logger.info(f"train_loss: {loss}")
+                            self.train_logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
+                            self.train_logger.info(f"train_dist_loss: {dist_loss}")
+                            self.train_logger.info(f"train_pm_loss: {pm_loss}")
+                            self.train_logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
+                            self.train_logger.info(f"Batches processed: {step_id}.")
+                            self.train_logger.info(
                                 f"On DAgger iter {dagger_it}, Epoch {epoch}."
                             )
                         writer.add_scalar(
@@ -1006,7 +1006,17 @@ class DaggerDiffusonPolicyTrainer:
                 total_actions.append(speed_actions)
 
             if len(outputs) > 0:
-                outputs_dict, dones, infos, sim_steps, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list = outputs
+                outputs_dict = outputs['outputs_dict']
+                dones = outputs['dones']
+                infos = outputs['infos']
+                sim_steps = outputs['current_step_list']
+                stack_rgb = outputs['stack_rgb']
+                stack_depth = outputs['stack_depth']
+                prev_globalgps = outputs['prev_globalgps']
+                prev_globalyaw = outputs['prev_globalyaw']
+                total_rgb_list = outputs['total_rgb_list']
+                total_topdown_rgb_list = outputs['total_topdown_rgb_list']
+                
             else:
                 outputs_dict, dones, infos, sim_steps = [], [], [], []
 

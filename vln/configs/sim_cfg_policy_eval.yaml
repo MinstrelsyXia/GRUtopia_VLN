@@ -33,6 +33,7 @@ tasks:
     - name: "move_to_point_by_pid"
     - name: "move_by_speed_vln"
     - name: "move_along_speeds"
+    - name: "move_by_descrete"
     sensor_params:
     - name: "camera"
       enable: false

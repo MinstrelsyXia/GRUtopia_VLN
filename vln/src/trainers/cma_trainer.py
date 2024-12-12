@@ -723,10 +723,6 @@ class DaggerCMATrainer:
         self.policy.eval()
 
         observations = self.eval_env.get_obs()
-        start_positions = [x['globalgps'][[0,1]] for x in observations]
-        start_positions = torch.from_numpy(np.stack(start_positions, axis=0)).to(self.device)
-        start_yaws = [x['globalyaw'] for x in observations]
-        start_yaws = torch.from_numpy(np.stack(start_yaws, axis=0)).to(self.device)
 
         observations = extract_instruction_tokens(
             observations, 
@@ -734,31 +730,6 @@ class DaggerCMATrainer:
             is_clip_long=self.is_clip_long
         )
         batch = batch_obs(observations, self.device)
-
-        if self.config.MODEL.IMAGE_ENCODER.use_stack:
-            batch_stack_rgb_length = [1 for _ in range(len(observations))]
-            h, w, c = batch['rgb'].shape[1:]
-            batch_stack_rgb = torch.zeros(len(observations), self.config.MODEL.len_traj_act, h, w, c, device=self.device)
-            batch_stack_rgb[:, 0, :, :, :] = batch['rgb']
-
-            h, w, c = batch['depth'].shape[1:]
-            batch_stack_depth = torch.zeros(len(observations), self.config.MODEL.len_traj_act, h, w, c, device=self.device)
-            batch_stack_depth[:, 0, :, :, :] = batch['depth']
-
-        else:
-            batch_stack_rgb, batch_stack_depth, batch_stack_rgb_length = None, None, None
-
-        batch = extract_image_features(
-            self.policy, batch, 
-            img_mod=self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-            len_traj_act=self.config.MODEL.len_traj_act,
-            world_size=self.world_size,
-            depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
-            stack_rgb = batch_stack_rgb,
-            stack_depth = batch_stack_depth,
-            batch_stack_rgb_length = batch_stack_rgb_length,
-            proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj
-            )
         
         batch_size = batch['instruction'].shape[0]
 
@@ -769,21 +740,16 @@ class DaggerCMATrainer:
 
         rnn_states = torch.zeros(
             self.eval_env.env_nums,
-            net.num_recurrent_layers,
+            self.policy.num_recurrent_layers,
             config.MODEL.STATE_ENCODER.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
-            self.eval_env.env_nums, config.MODEL.len_traj_act, self.action_dim, device=self.device, dtype=torch.long
+            self.eval_env.env_nums, 1, device=self.device, dtype=torch.long
         )
         not_done_masks = torch.zeros(
             self.eval_env.env_nums, 1, dtype=torch.uint8, device=self.device
         )
-
-        # IMU
-        if self.config.MODEL.IMU_ENCODER.use:
-            imu = torch.zeros(self.eval_env.env_nums, self.config.MODEL.IMU_ENCODER.input_size, device=self.device)
-            batch["imu"] = imu.float()
 
         stats_episodes = {}
 
@@ -808,22 +774,8 @@ class DaggerCMATrainer:
         sim_steps = [0] * batch_size
         steps_batch = torch.from_numpy(np.array(steps)).to(self.device)
         batch["steps"] = steps_batch
-        
-        # init fix_length_stack
-        stack_rgb_length = self.config.MODEL.len_traj_act if config.MODEL.IMAGE_ENCODER.use_stack else 1
-        # stack_rgb_length = self.config.MODEL.len_traj_act
-        stack_rgb = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_num)]
-        stack_depth = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_nums)]
-        prev_globalgps = [FixedLengthStack(self.config.MODEL.len_traj_act+1) for _ in range(self.eval_env.env_nums)] # TODO !!! act length
-        prev_globalyaw = [FixedLengthStack(self.config.MODEL.len_traj_act+1) for _ in range(self.eval_env.env_nums)]
-        
-        for env_idx in range(self.eval_env.env_nums):
-            # record the current position before action
-            stack_rgb[env_idx].push(observations[env_idx]["rgb"])
-            stack_depth[env_idx].push(observations[env_idx]["depth"])
-            prev_globalgps[env_idx].push(batch[env_idx]['globalgps'].detach().cpu().numpy())
-            prev_globalyaw[env_idx].push(batch[env_idx]['global_rotation'][-1].detach().cpu().item())
 
+        for env_idx in range(self.eval_env.env_nums):
             if config.VIDEO_OPTION != -1:
                 total_rgb_list.append(observations[env_idx]["rgb"])
                 total_topdown_rgb_list.append(observations[env_idx]["topdown_rgb"])
@@ -841,231 +793,36 @@ class DaggerCMATrainer:
                 break
 
             with torch.no_grad():
-                batch_settings = {
-                    'mode': 'act',
-                    'observations': batch,
-                    'rnn_states': rnn_states,
-                    'prev_actions': prev_actions,
-                    'masks': not_done_masks,
-                    'add_noise_to_action': False,
-                    'denoise_action': True,
-                    'num_sample': self.config.EVAL.num_sample,
-                    'vis': self.config.test_verbose,
-                    'step': sim_steps[0],
-                    'episode_ids': current_episodes['episode_id'],
-                    'stop_mode': self.config.EVAL.stop_mode,
-                    'steps': steps,
-                    'predicted_actions_save_dir': config.GT_PATH_DIR,
-                    'num_sample': self.config.EVAL.num_sample,
-                }
-                
-                actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred = net(batch_settings)
-                # print(steps[0])
-            
-            prev_actions = [[] for _ in range(self.eval_env.env_nums)]
-            
-            # len_traj_act = self.config.MODEL.len_traj_act
-            len_traj_act = self.config.EVAL.len_traj_act
-            # len_traj_act = 1 # !!!
-            stop_envs = [False] * len(actions)
-            first_stop_envs = [False] * len(actions)
+                actions, rnn_states = self.policy(
+                    batch,
+                    rnn_states,
+                    prev_actions,
+                    not_done_masks,
+                    deterministic=not config.EVAL.SAMPLE,
+                )
+                prev_actions.copy_(actions)
 
             # for step_i in range(len_traj_act):
             #     tmp_a = []
             if self.config.EVAL.ACTION == 'descrete':
-                for bs_i, action in enumerate(actions):
-                    a = action[step_i]
-                    if a != action_spaces['stop']:
-                        if a == action_spaces['wait']:
-                            a = [{'action':{
-                                'action': 'GO_TOWARD_XYYAW',
-                                'action_args': {
-                                    'actions': np.zeros(self.action_dim)
-                                }
-                            }}]
-                        tmp_a.append(a)
-                    else:
-                        if not stop_envs[bs_i]:
-                            first_stop_envs[bs_i] = True
-                        tmp_a.append(a)
-
-                exe_list = []
-                for a_idx, a in enumerate(tmp_a):
-                    if stop_envs[a_idx]:
-                        continue
-                    exe_list.append(a[0])
-                    steps[a_idx] += 1
-
-                # outputs = envs.step([a[0] for a in tmp_a])
-                outputs = envs.step(exe_list)
-                for b_idx in range(len(actions)):
-                    if first_stop_envs[b_idx] and not stop_envs[b_idx]:
-                        envs.pause_at(b_idx, working_thread_names=working_thread_names, global_env_threads_paused=global_env_threads_paused)
-                        
-            elif self.config.EVAL.ACTION == 'xyyaw':
-                for a_i, a in enumerate(actions):
-                    if isinstance(a, str) and a == 'STOP':
+                for bs_i, a in enumerate(actions):
+                    if a == 0:
                         action = [
                             {'h1': {'stop': ['stop']}}
                         ]
                     else:
-                        target_poses, target_quats, exe_actions = self.eval_env.predicted_action_to_global(a, step_i=-1, verbose=self.config.test_verbose, len_traj_act=len_traj_act)
+                        action = [
+                            {'h1': {'move_by_descrete': [a.item()]}}
+                        ] 
                         
-                        # TODO: check if all nodes are valid on the map?
-                        action = []
-                        if len(exe_actions) > 1:
-                            action = [
-                                {'h1': {'move_along_path': [exe_actions[:-1]]}}
-                            ]
-                        rot_action = [
-                            {'h1': {'rotate': [exe_actions[-1]]}}
-                        ]
-                        outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, rot_action)
-                        steps[0] += len(exe_actions)
-                        total_actions.append(exe_actions)
-
-            elif self.config.EVAL.ACTION == 'speed':
-                for a_i, a in enumerate(actions):
-                    if isinstance(a[0], str) and a[0] == 'STOP':
-                        action = [
-                            {'h1': {'stop': ['stop']}}
-                        ]
-                    else:
-                        if self.config.test_verbose:
-                            target_poses, target_quats, exe_actions = self.eval_env.predicted_action_to_global(np.array(a), step_i=-1, verbose=self.config.test_verbose) # for debug. drawing the predicted actions
-                        speed_actions = self.eval_env.get_speed_actions(a, len_traj_act=len_traj_act,verbose=self.config.test_verbose)
-                        exe_action = speed_actions
-                        action = [
-                            {'h1': {'move_along_speeds': [exe_action]}}
-                        ]
-                        # if len(exe_action) == 0:
-                        #     action = [
-                        #         {'h1': {'stop': ['stop']}}
-                        #     ]
-
-                outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=self.config.test_verbose) 
-                steps[0] += len(speed_actions)
-                total_actions.append(speed_actions)
-
-            if len(outputs) > 0:
-                outputs_dict, dones, infos, sim_steps, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list = outputs
-            else:
-                outputs_dict, dones, infos, sim_steps = [], [], [], []
-
-            # for idx in range(len(outputs_dict)):
-            #     stack_rgb[idx].push(outputs_dict[idx]["rgb"])
-            #     stack_depth[idx].push(outputs_dict[idx]["depth"])
-                
-            #     prev_globalgps[idx].push(outputs_dict[idx]["globalgps"])
-            #     prev_globalyaw[idx].push(outputs_dict[idx]["global_rotation"][-1])
-
-            #     if config.VIDEO_OPTION != -1:
-            #         total_rgb_list.append(outputs_dict[idx]["rgb"])
-                
-            # update RNN states
-            ## Update prev_actions
-            if len_traj_act > 1:
-                for idx in range(len(actions)):
-                    # reverse to make the latest frame to be 0 position
-                    prev_globalgps_numpy = np.array(prev_globalgps[idx].get_stack(reverse=True))
-                    prev_globalyaw_numpy = np.array(prev_globalyaw[idx].get_stack(reverse=True))
-                    prev_act = _compute_actions( 
-                        prev_globalgps_numpy, prev_globalyaw_numpy,
-                        curr_time=0, fill_mode="constant",
-                        len_traj_pred=self.config.MODEL.len_traj_act,
-                        waypoint_spacing=self.config.MODEL.Diffusion_Policy.waypoint_spacing,
-                        learn_angle=self.config.MODEL.learn_angle,
-                        metric_waypoint_spacing=self.config.MODEL.Diffusion_Policy.metric_waypoint_spacing,
-                        num_action_params=self.action_dim,
-                        normalize=False)
-                    prev_act_delta = torch.from_numpy(get_delta(prev_act)).to(self.device)
-                    prev_act_delta_norm = normalize_data(prev_act_delta, self.action_stats)
-                    prev_actions[idx] = prev_act_delta_norm
-                
-                ## Update image features in batch
-                # if self.config.MODEL.IMAGE_ENCODER.use_stack:
-                batch_stack_rgb, batch_stack_depth, batch_stack_rgb_length = [], [], []
-                for env_idx in range(len(stack_rgb)):
-                    cur_rgb = np.array(stack_rgb[env_idx].get_stack(reverse=True))
-                    cur_depth = np.array(stack_depth[env_idx].get_stack(reverse=True))
-                    batch_stack_rgb_length.append(len(cur_rgb))
-                    if len(cur_rgb) < stack_rgb_length:
-                        cur_rgb = np.concatenate([cur_rgb, np.zeros((stack_rgb_length-len(cur_rgb), *cur_rgb.shape[1:]))], axis=0)
-                        cur_depth = np.concatenate([cur_depth, np.zeros((stack_rgb_length-len(cur_depth), *cur_depth.shape[1:]))], axis=0)
-                    batch_stack_rgb.append(cur_rgb)
-                    batch_stack_depth.append(cur_depth) 
-                batch_stack_rgb = torch.from_numpy(np.array(batch_stack_rgb).astype(np.uint8)).to(self.device)
-                batch_stack_depth = torch.from_numpy(np.array(batch_stack_depth)).to(self.device)
-
-                # else:
-                #     batch_stack_rgb, batch_stack_depth = None, None
-
-                # if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'multi_patches_avg_pooling' and not self.config.MODEL.IMAGE_ENCODER.use_stack:
-                if not self.config.MODEL.IMAGE_ENCODER.use_stack:
-                    batch['rgb'] = batch_stack_rgb.squeeze(1)
-                    batch['depth'] = batch_stack_depth.squeeze(1)
-                    batch_stack_rgb, batch_stack_depth = None, None  
-
-                batch = extract_image_features(
-                    self.policy, batch, 
-                    img_mod=self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-                    len_traj_act=self.config.MODEL.len_traj_act,
-                    world_size=self.world_size,
-                    depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
-                    stack_rgb = batch_stack_rgb,
-                    stack_depth = batch_stack_depth,
-                    batch_stack_rgb_length=batch_stack_rgb_length,
-                    proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj
-                    )
-
-                batch["steps"] = torch.from_numpy(np.array(steps)).to(self.device)
-                
-                with torch.no_grad():
-                    prev_actions_batch = torch.stack(prev_actions, axis=0).to(self.device)
-                    batch_settings = {
-                        'mode': 'update_rnn',
-                        'observations': batch,
-                        'rnn_states': rnn_states,
-                        'prev_actions': prev_actions_batch,
-                        'masks': not_done_masks,
-                    }
-                    
-                    _, update_rnn_states= net(batch_settings)
-                    rnn_states = update_rnn_states
-
-            for idx in range(len(actions)):
-                # reverse to make the latest frame to be 0 position
-                prev_globalgps_numpy = np.array(prev_globalgps[idx].get_stack(reverse=True))
-                prev_globalyaw_numpy = np.array(prev_globalyaw[idx].get_stack(reverse=True))
-                prev_act = _compute_actions( 
-                    prev_globalgps_numpy, prev_globalyaw_numpy,
-                    curr_time=0, fill_mode="constant",
-                    len_traj_pred=self.config.MODEL.len_traj_act,
-                    waypoint_spacing=self.config.MODEL.Diffusion_Policy.waypoint_spacing,
-                    learn_angle=self.config.MODEL.learn_angle,
-                    metric_waypoint_spacing=self.config.MODEL.Diffusion_Policy.metric_waypoint_spacing,
-                    num_action_params=self.action_dim,
-                    normalize=False)
-                action_deltas = get_delta(prev_act)
-                if self.config.MODEL.learn_angle: 
-                    # [x,y,yaw]
-                    prev_act_delta = torch.from_numpy(action_deltas).to(self.device)
-                    prev_act_delta_norm = normalize_data(prev_act_delta, self.action_stats)
-                    prev_actions[idx] = prev_act_delta_norm
-                else:
-                    # [forward, rotation]
-                    prev_act_delta = torch.from_numpy(map_action_to_2d(action_deltas)).to(self.device)
-                    prev_actions[idx] = prev_act_delta
-            
-            # convert list to tensor
-            current_stack_rgb_list = [x.get_stack(reverse=True) for x in stack_rgb]
-            current_stack_depth_list = [x.get_stack(reverse=True) for x in stack_depth]
-            
-            stack_rgb_tensor = torch.from_numpy(np.stack(current_stack_rgb_list, axis=1)).to(self.device)
-            stack_depth_tensor = torch.from_numpy(np.stack(current_stack_depth_list, axis=1)).to(self.device)
-            prev_actions = torch.stack(prev_actions, axis=0).to(self.device)
-
-            # outputs_dict, _, dones, infos = [list(x) for x in zip(*outputs)]
+            outputs = self.eval_env.step(action,total_rgb_list=total_rgb_list, total_topdown_rgb_list=total_topdown_rgb_list,verbose=self.config.test_verbose)
+                        
+            outputs_dict = outputs['outputs_dict']
+            dones = outputs['dones']
+            infos = outputs['infos']
+            sim_steps = outputs['current_step_list']
+            total_rgb_list = outputs['total_rgb_list']
+            total_topdown_rgb_list = outputs['total_topdown_rgb_list']
 
             observations = outputs_dict
 
@@ -1077,19 +834,6 @@ class DaggerCMATrainer:
 
             # reset envs and observations if necessary
             for i in range(self.eval_env.env_nums):
-                # if config.VIDEO_OPTION != -1:
-                    # for stack_id in range(stack_rgb_length):
-                    #     frame = observations_to_image(observations[i], infos[i],stack_rgb=stack_rgb_for_video[i][stack_id], stack_depth=stack_depth_for_video[i][stack_id])
-                    #     frame = append_text_to_image(
-                    #         frame, current_episodes[i].instruction.instruction_text
-                    #     )
-
-                    #     # resize the image
-                    #     new_width = (frame.shape[1] // 16) * 16
-                    #     new_height = (frame.shape[0] // 16) * 16
-                    #     resized_image = cv2.resize(frame, (new_width, new_height))
-                    #     rgb_frames[i].append(resized_image)
-
                 if not dones[i] and steps[i] < self.config.EVAL.MAX_STEPS:
                     # continue if not done
                     continue
@@ -1104,7 +848,7 @@ class DaggerCMATrainer:
                         self.eval_logger.info(f"{metric_name}: {metric_value:.3f}")
                 
                 self.update_result_json(self.result_json_path, infos[i])
-                self.eval_env.draw_visited_map()
+                # self.eval_env.draw_visited_map()
                 
                 ep_id = current_episodes['episode_id']
                 stats_episodes[ep_id] = infos[i]
@@ -1130,19 +874,7 @@ class DaggerCMATrainer:
                     config.MODEL.STATE_ENCODER.hidden_size,
                     device=self.device,
                 )
-                start_positions[i] = torch.from_numpy(observations[i]['globalgps'][[0,1]]).to(self.device)
-                start_yaws[i] = torch.from_numpy(np.array(observations[i]['globalyaw'])).to(self.device)
                 steps[i] = 0
-                stack_rgb[i] = FixedLengthStack(stack_rgb_length)
-                stack_depth[i] = FixedLengthStack(stack_rgb_length)
-                prev_globalgps[i] = FixedLengthStack(self.config.MODEL.len_traj_act+1) # TODO !!! act length
-                prev_globalyaw[i] = FixedLengthStack(self.config.MODEL.len_traj_act+1)
-
-                stack_rgb[i].push(observations[i]['rgb'])
-                stack_depth[i].push(observations[i]['depth'])
-                prev_globalgps[i].push(observations[i]['globalgps'])
-                prev_globalyaw[i].push(observations[i]['global_rotation'][-1])
-
                 dones[i] = False
                 not_done_masks[i] = 1
 
@@ -1200,54 +932,7 @@ class DaggerCMATrainer:
             )
             batch = batch_obs(observations, self.device)
 
-            ## Update image features in batch
-            # if self.config.MODEL.IMAGE_ENCODER.use_stack:
-            batch_stack_rgb, batch_stack_depth, batch_stack_rgb_length = [], [], []
-            for env_idx in range(len(stack_rgb)):
-                cur_rgb = np.array(stack_rgb[env_idx].get_stack(reverse=True))
-                cur_depth = np.array(stack_depth[env_idx].get_stack(reverse=True))
-                batch_stack_rgb_length.append(len(cur_rgb))
-                if len(cur_rgb) < stack_rgb_length:
-                    cur_rgb = np.concatenate([cur_rgb, np.zeros((stack_rgb_length-len(cur_rgb), *cur_rgb.shape[1:]))], axis=0)
-                    cur_depth = np.concatenate([cur_depth, np.zeros((stack_rgb_length-len(cur_depth), *cur_depth.shape[1:]))], axis=0)
-                batch_stack_rgb.append(cur_rgb)
-                batch_stack_depth.append(cur_depth) 
-            batch_stack_rgb = torch.from_numpy(np.array(batch_stack_rgb).astype(np.uint8)).to(self.device)
-            batch_stack_depth = torch.from_numpy(np.array(batch_stack_depth)).to(self.device)
-
-            # else:
-            #     batch_stack_rgb, batch_stack_depth = None, None
-
-            # if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'multi_patches_avg_pooling' and not self.config.MODEL.IMAGE_ENCODER.use_stack:
-            if not self.config.MODEL.IMAGE_ENCODER.use_stack:
-                batch['rgb'] = batch_stack_rgb.squeeze(1)
-                batch['depth'] = batch_stack_depth.squeeze(1)
-                batch_stack_rgb, batch_stack_depth = None, None 
-
-            batch = extract_image_features(
-                self.policy, batch, 
-                img_mod=self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-                len_traj_act=self.config.MODEL.len_traj_act,
-                world_size=self.world_size,
-                depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
-                stack_rgb = batch_stack_rgb,
-                stack_depth = batch_stack_depth,
-                batch_stack_rgb_length=batch_stack_rgb_length,
-                proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj
-                )
-
             batch["steps"] = torch.from_numpy(np.array(steps)).to(self.device)
-            
-            # IMU
-            if self.config.MODEL.IMU_ENCODER.use:
-                # initialize_imu
-                batch["imu"] = torch.zeros(batch["globalgps"].shape[0], self.config.MODEL.IMU_ENCODER.input_size).to(self.device)
-                if self.config.MODEL.IMU_ENCODER.to_local_coords:
-                    batch["imu"][:, :2] = to_local_coords(batch["globalgps"][:, [0,1]].float(), start_positions, start_yaws)
-                else:
-                    batch["imu"][:, :2] = batch["globalgps"][:, [0,1]] - start_positions
-                if self.config.MODEL.IMU_ENCODER.input_size == 3:
-                    batch["imu"][:, 2] = batch["globalyaw"] - start_yaws
 
         if config.use_pbar:
             pbar.close()

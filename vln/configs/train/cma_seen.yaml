@@ -1,4 +1,4 @@
-NAME: 20241207_cma
+NAME: 20241213_cma
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [4]
 TORCH_GPU_ID: 4

@@ -11,8 +11,13 @@ def extract_instruction_tokens(
     exist and are in a dict structure.
     """
     for i in range(len(observations)):
-        if bert_tokenizer is None:# TODO
-            observations[i]['instruction'] = observations[i]['instruction']["tokens"]
+        if bert_tokenizer is None:
+            # For habitat-cma
+            # observations[i]['instruction'] = observations[i]['instruction']["tokens"]
+            observations[i]['instruction'] = observations[i]['instruction_tokens']
+            # pad to 200
+            instr = torch.tensor(observations[i]['instruction'])
+            observations[i]['instruction'] = torch.nn.functional.pad(instr, (0, 200 - instr.shape[0]), "constant", 0)
         else:
             # use bert tokenizer
             if is_clip_long:
