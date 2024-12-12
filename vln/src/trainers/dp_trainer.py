@@ -303,14 +303,14 @@ class DaggerDiffusonPolicyTrainer:
 
                     if self.local_rank < 1:
                         losses.append(loss)
-                        if step_id % 300 == 0:
-                            logger.info(f"train_loss: {loss}")
-                            logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
-                            logger.info(f"train_dist_loss: {dist_loss}")
-                            logger.info(f"train_pm_loss: {pm_loss}")
-                            logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
-                            logger.info(f"Batches processed: {step_id}.")
-                            logger.info(
+                        if step_id % 100 == 0:
+                            self.train_logger.info(f"train_loss: {loss}")
+                            self.train_logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
+                            self.train_logger.info(f"train_dist_loss: {dist_loss}")
+                            self.train_logger.info(f"train_pm_loss: {pm_loss}")
+                            self.train_logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
+                            self.train_logger.info(f"Batches processed: {step_id}.")
+                            self.train_logger.info(
                                 f"On DAgger iter {dagger_it}, Epoch {epoch}."
                             )
                         writer.add_scalar(
