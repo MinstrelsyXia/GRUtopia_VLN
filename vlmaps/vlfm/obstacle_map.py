@@ -115,7 +115,8 @@ class ObstacleMap(BaseMap):
         explore: bool = True,
         update_obstacles: bool = True,
         verbose: bool = False,
-        step: int = 0
+        step: int = 0,
+        get_grad: bool = False
     ) -> None:
         """
         Adds all obstacles from the current view to the map. Also updates the area
@@ -223,7 +224,7 @@ class ObstacleMap(BaseMap):
 
         
         # Compute frontier locations
-        self._frontiers_px = self._get_frontiers()
+        self._frontiers_px, self._frontiers_angles_obs = self._get_frontiers(get_grad=get_grad)
         # if verbose:
         #     explored_area_uint8 = self.explored_area.astype(np.uint8)
         #     for frontier in self._frontiers_px:
@@ -245,9 +246,14 @@ class ObstacleMap(BaseMap):
             # 创建 explored_area 的三通道灰色图像 (灰色为 [128,128,128])
             navigable_map_visual[self.explored_area > 0] = (128, 128, 128)  # 灰色 (BGR) 表示 explored_area
             # 在 visual_map 上圈出 frontiers，用红色标记
-            for frontier in self._frontiers_px:
-                cv2.circle(navigable_map_visual, tuple([int(i) for i in frontier]), 3, (0, 0, 255), -1)  # 红色 (BGR) 表示 frontiers
-
+            for idx, frontier in enumerate(self._frontiers_px):
+                cv2.circle(navigable_map_visual, tuple(map(int,frontier)), 3, (0, 0, 255), -1)  # 红色 (BGR) 表示 frontiers
+                # 在frontier上画箭头,方向为_frontiers_angles_obs
+                length = 20
+                cv2.arrowedLine(navigable_map_visual, 
+                                tuple([int(i) for i in frontier]), 
+                                tuple([int(i) for i in frontier - length * np.array([np.cos(self._frontiers_angles_obs[idx]), np.sin(self._frontiers_angles_obs[idx])])]), 
+                                (0, 255, 0), 1, tipLength=0.3)
             # 创建自己此时位置：
             cv2.circle(navigable_map_visual, tuple(agent_pixel_location), 3, (255, 192, 15), -1)  # 蓝色 (BGR) 表示 frontiers
             # 保存最终结果
@@ -267,10 +273,55 @@ class ObstacleMap(BaseMap):
 
         if len(self._frontiers_px) == 0:
             self.frontiers = np.array([])
+            self.frontiers_angles = np.array([])
         else:
             self.frontiers = self._px_to_xy(self._frontiers_px)
+            
         self.nav_map_visual = navigable_map_visual
 
+    def _p_angle_to_xyz(self, angle):
+        '''
+        将obstacle map坐标系中的角度转换为xyz世界坐标系中的角度
+        
+        Input: 
+            angle: float, obstacle map坐标系中的角度（度数）
+                   原点在左上角，x向右为正，y向下为正
+                   角度从x轴开始逆时针为正
+        Output: 
+            xyz_angle: float, xyz世界坐标系中的角度（度数）
+                      原点在左下角，x向右为正，y向上为正
+                      角度从x轴开始逆时针为正
+        
+        转换关系：
+        - obstacle map的y轴方向与xyz坐标系相反
+        - 因此需要将角度取反
+        '''
+        xyz_angle = angle-90
+        # 确保角度在[-180, 180]范围内
+        xyz_angle = (xyz_angle + 180) % 360 - 180
+        return xyz_angle
+
+    def _angle_p_to_xyz(self, angle):
+        '''
+        将xyz世界坐标系中的角度转换为obstacle map坐标系中的角度
+        
+        Input: 
+            angle: float, xyz世界坐标系中的角度（度数）
+                   原点在左下角，x向右为正，y向上为正
+                   角度从x轴开始逆时针为正
+        Output: 
+            p_angle: float, obstacle map坐标系中的角度（度数）
+                    原点在左上角，x向右为正，y向下为正
+                    角度从x轴开始逆时针为正
+        
+        转换关系：
+        - xyz坐标系的y轴方向与obstacle map相反
+        - 因此需要将角度取反
+        '''
+        p_angle = angle+ 90
+        # 确保角度在[-180, 180]范围内
+        p_angle = (p_angle + 180) % 360 - 180
+        return p_angle
 
     def update_map(
         self,
@@ -386,7 +437,7 @@ class ObstacleMap(BaseMap):
         else:
             self.frontiers = self._px_to_xy(self._frontiers_px)
 
-    def _get_frontiers(self) -> np.ndarray:
+    def _get_frontiers(self, get_grad: bool = False) -> np.ndarray:
         """Returns the frontiers of the map."""
         # Dilate the explored area slightly to prevent small gaps between the explored
         # area and the unnavigable area from being detected as frontiers.
@@ -395,12 +446,13 @@ class ObstacleMap(BaseMap):
             np.ones((5, 5), np.uint8),
             iterations=1,
         )
-        frontiers = detect_frontier_waypoints(
+        frontiers, frontiers_angles = detect_frontier_waypoints(
             self._navigable_map.astype(np.uint8),
             explored_area,
             self._area_thresh_in_pixels,
+            get_grad=get_grad
         )
-        return frontiers
+        return frontiers, frontiers_angles
 
     def _path_is_blocked(self, path):
         '''

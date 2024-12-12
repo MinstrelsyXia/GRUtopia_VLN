@@ -1530,7 +1530,7 @@ class IsaacSimLanguageRobot(LangRobot):
         self.ultimate_goal = goal
     
     def save_metric(self):
-        self.eval_helper.calculate_metric()
+        self.eval_helper.calculate_metric(self.step)
         self.eval_helper.save_single_task_metric(save_path = self.test_file_save_dir + '/metric.json')
 
 
@@ -1674,15 +1674,13 @@ def main(config: DictConfig) -> None:
                         log.info(f"{e}. Found object early, stopping exploration.")
                         
                         skip_flag = skipped_i
-                    
-
-                #! already moved, missing goal achieved parameter
+            #! already moved, missing goal achieved parameter
             break
         ''' execute the last spatial instruction'''
         for subgoal in parsed_instructions[skip_flag:]:
             print(f"Executing {subgoal}")
             robot.test_movement(subgoal)
-        
+        robot.eval_helper.add_pos(robot.agents.get_world_pose()[0])
         robot.save_metric()
         robot.env.simulation_app.close()
 

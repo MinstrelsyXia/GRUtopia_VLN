@@ -237,7 +237,7 @@ class CamOccupancyMap:
         depth = np.array(data_info["depth"])
 
         # Generate mask for depth that are obstacles
-        depth_mask =((depth >= min_height) & (depth < max_height)) | (depth > max_height + 0.2)
+        depth_mask =((depth >= min_height) & (depth < max_height)) | (depth > max_height + 0.5)
 
         # robot_mask
         robot_mask = self.create_robot_mask()

@@ -1,11 +1,12 @@
-NAME="xxy_test"
+NAME="xxy_test_2"
 
 export CACHE_ROOT=/ssd/xiaxinyuan/docker  # 设置缓存路径
 export WEBUI_HOST=127.0.0.1  # 设置 Web UI 监听地址，默认为 127.0.0.1
-
+# --gpus="device=${GPU}"
+export GPU=4
 sudo docker run -it --network host \
   --name ${NAME} \
-  --gpus '"device=0"' \
+  --gpus="device=${GPU}"  \
   -e ACCEPT_EULA=Y \
   -e PRIVACY_CONSENT=Y \
   -e WEBUI_HOST=127.0.0.1 \

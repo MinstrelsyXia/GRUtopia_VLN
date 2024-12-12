@@ -245,10 +245,43 @@ def wrap_heading(heading):
     """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
     return (heading + np.pi) % (2 * np.pi) - np.pi
 
+def get_angle(pose, frontier_point, coord = 'xy'):
+        """
+        Get the angle between the robot and the frontier point in degree
+        frontier_point: in Obs coord
+        Output: turn right xxx angle in degree
+        """
+        # Get the robot's current position on vlmap
+        # self._set_nav_curr_pose()
+        # curr_pose_on_full_map = self.get_agent_pose_on_map()
+        # roboo_pos = self.
+        # robot_angle = curr_pose_on_full_map[2]
+        # get robot's position on obsmap
+        position, orientation = pose[:3], pose[3:]
+
+        orientation_yaw = quat_to_euler_angles(orientation)[2] # indeed in [-pi,pi]
+        xy = position[:2]
+        if coord == 'uv':
+            current_pos = my_map._xy_to_px(np.array([[xy[0],xy[1]]]))[0]
+            current_angle = my_map._get_current_angle_on_map(orientation_yaw + np.pi / 2) 
+            target_rotation = np.arctan2(frontier_point[1] - current_pos[1], frontier_point[0] - current_pos[0]) / np.pi * 180 # already in [-pi,pi]
+            print(f"current_angle: {current_angle}, target_rotation: {target_rotation}")
+            return ((current_angle -target_rotation+180) % 360-180)
+            # Calculate the angle between the robot and the frontier point
+        else:
+            current_angle = orientation_yaw/np.pi*180
+            target_rotation = np.arctan2(frontier_point[1] - xy[1], frontier_point[0] - xy[0]) / np.pi * 180 # already in [-pi,pi]
+            print(f"current_angle: {current_angle}, target_rotation: {target_rotation}")
+            return ((current_angle -target_rotation+180) % 360-180)
+
+
+
+
 from vlmaps.vlmaps.navigator.navigator import Navigator
 from vln.src.local_nav.path_planner import AStarPlanner
 import yaml
 import time
+import cv2
 # navigator_type = 'astar'
 navigator_type = 'visgraph'
 
@@ -342,6 +375,8 @@ else:
 
     goal = (pose[-1,0],pose[-1,1])
     for k in range(len(pcd_files)):
+        if k <9:
+            continue
         start_time = time.time()
         # from update obstacle map
         pcd = np.load(pcd_save_dir + '/'+pcd_files[k])
@@ -372,7 +407,8 @@ else:
             max_depth = 11,
             topdown_fov= 60.0/180.0*np.pi,
             step = k,
-            verbose=True
+            verbose=True,
+            get_grad=True
         )
         #! camera_yaw+np.pi/2
         rows, cols = np.where(my_map._navigable_map == 0)
@@ -384,42 +420,61 @@ else:
                             vis = True)
         start = my_map._xy_to_px(np.array([[camera_position[0],camera_position[1]]]))[0]
         
-        # from get_frontier:
-        frontiers = my_map.frontiers # array of waypoints
-        if len(frontiers) == 0:
-            frontiers = np.array([my_map.get_random_free_point()])[0]
-            print("error")
-        else:
-            # randomly pick a frontier:
-            # frontier in world coord
-            num = frontiers.shape[0]
-            idx = np.random.randint(0,num)
-            pos = frontiers[idx]
+        # # from get_frontier:
+        # frontiers = my_map.frontiers # array of waypoints
+        # if len(frontiers) == 0:
+        #     frontiers = np.array([my_map.get_random_free_point()])[0]
+        #     print("error")
+        # else:
+        #     # randomly pick a frontier:
+        #     # frontier in world coord
+        #     num = frontiers.shape[0]
+        #     idx = np.random.randint(0,num)
+        #     pos = frontiers[idx]
             
-            # goal = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
-            goal_xy = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+        #     # goal = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+        #     goal_xy = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
 
 
-        # goal_xy = my_map._xy_to_px(np.array([goal]))[0]
-        paths = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True,navigable_map_visual=my_map.nav_map_visual)
+        # # goal_xy = my_map._xy_to_px(np.array([goal]))[0]
+        # paths = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True,navigable_map_visual=my_map.nav_map_visual)
 
-        paths = np.array(paths)
-        paths = np.array([paths[:,1], paths[:,0]]).T
+        # paths = np.array(paths)
+        # paths = np.array([paths[:,1], paths[:,0]]).T
 
-        paths_3d = []
-        for path in paths:
-            xy = my_map._px_to_xy(np.array([[path[0], path[1]]]))[0]
-            paths_3d.append([xy[0],xy[1],1]) # fix height
-        paths_3d = np.array(paths_3d)
-        print(f"moving from {start} to {goal_xy} on {paths}")
-        print(f'moving from {camera_position} to {pos} on {paths_3d}')
-        # # test angle:
-        # target_rotation = np.arctan2(goal_xy[1] - start[1], goal_xy[0] - start[0]) / np.pi * 180
+        # paths_3d = []
+        # for path in paths:
+        #     xy = my_map._px_to_xy(np.array([[path[0], path[1]]]))[0]
+        #     paths_3d.append([xy[0],xy[1],1]) # fix height
+        # paths_3d = np.array(paths_3d)
+        # print(f"moving from {start} to {goal_xy} on {paths}")
+        # print(f'moving from {camera_position} to {pos} on {paths_3d}')
         
-        # yaw = my_map._get_current_angle_on_map(camera_yaw[2] + np.pi / 2) #! camera_yaw[2] + np.pi / 2
+                
+        pos = my_map.frontiers[0]
+        goal_uv = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+        # visualize
+        visual = my_map.nav_map_visual
+        cv2.circle(visual, (start[0], start[1]), 2, (0, 255, 0), -1)
+        cv2.circle(visual, (goal_uv[0], goal_uv[1]), 2, (0, 0, 255), -1)
+        cv2.line(visual, (start[0], start[1]), (goal_uv[0], goal_uv[1]), (255, 0, 0), 1)
+        cv2.imwrite('visual.jpg', visual)
 
-        # print("camera yaw, target rotation", yaw,target_rotation)
-        # print(((yaw -target_rotation+180) % 360-180))
+
+        # test 'xy'
+
+        angle_xy = get_angle(pose[k], pos, coord = 'xy')
+        # current_angle: 71.04363815037209, target_rotation: 54.40349958240953
+        print(f"angle_xy: {angle_xy}")
+
+        # test 'uv'
+
+        angle_uv = get_angle(pose[k], goal_uv, coord = 'uv')
+        print(f"angle_uv: {angle_uv}")
+        # current_angle: 161.0436381503721, target_rotation: 144.46232220802563
+
+        print(my_map._p_angle_to_xyz(angle_uv),angle_xy)
+        print(my_map._angle_p_to_xyz(angle_xy),angle_uv)
 
         end_time = time.time()
         elapsed_time = end_time - start_time

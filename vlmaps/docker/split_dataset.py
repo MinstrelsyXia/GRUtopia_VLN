@@ -17,8 +17,9 @@ def judge_stair_exists(path):
     path_z = [p[1] for p in path]
     return max(path_z) - min(path_z) > 1.5
 
-def get_sub_trajectory_id_list(base_path='./'):
-    file_path = os.path.join(base_path, 'valid_paths/success_paths_id_all.txt')
+def get_sub_trajectory_id_list(base_path,file_name):
+    # file_path = os.path.join(base_path, 'valid_paths/success_paths_id_all.txt')
+    file_path = os.path.join(base_path, file_name)
     with open(file_path, 'r') as f:
         sub_trajectory_id_list = [int(line.strip()) for line in f.readlines()]
         # 重新按大小排序
@@ -26,12 +27,12 @@ def get_sub_trajectory_id_list(base_path='./'):
     return sub_trajectory_id_list
 
 
-def load_and_split_data(data_dir, num_of_gpus, splits):
+def load_and_split_data(data_dir, num_of_gpus, splits,file_name):
     dataset_root_dir = data_dir
     scene_id_list = []
     split_data = [[] for _ in range(num_of_gpus)]
 
-    trajectory_id_list = get_sub_trajectory_id_list(os.path.dirname(__file__))
+    trajectory_id_list = get_sub_trajectory_id_list(os.path.dirname(__file__),file_name)
     for split in splits:
         with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
             data = json.load(f)
@@ -40,7 +41,7 @@ def load_and_split_data(data_dir, num_of_gpus, splits):
             if scene_id not in scene_id_list:
                 scene_id_list.append(scene_id)
         for item in data["episodes"]:
-            if not judge_stair_exists(item['reference_path'])  and (item['trajectory_id'] in trajectory_id_list):
+            if not judge_stair_exists(item['reference_path'])  and (item['episode_id'] in trajectory_id_list):
 
                 scene_id = item['scene_id'].split('/')[1]
                 gpu_id = find_gpu_id(scene_id, num_of_gpus, scene_id_list)
@@ -74,13 +75,14 @@ def main():
                         default=f'./multi_gpu_list_{time.strftime("%Y%m%d_%H%M%S", time.localtime())}', 
                         help='Output directory for split data.')
     parser.add_argument('--splits', type=str, default=['train'], help='Splits to process.')
+    parser.add_argument('--file_name', type=str, default='valid_paths/sub_success_paths_id_1211.txt', help='file name of the trajectory id list.')
     args = parser.parse_args()
 
     # 使用GPU列表的长度
     num_gpus = len(args.gpu_list)
     print(f"Splitting data for {num_gpus} GPUs: {args.gpu_list}")
 
-    split_data = load_and_split_data(args.data_dir, num_gpus, args.splits)
+    split_data = load_and_split_data(args.data_dir, num_gpus, args.splits,args.file_name)
     save_split_data(split_data, args.output_dir, args.gpu_list)
 
 if __name__ == "__main__":

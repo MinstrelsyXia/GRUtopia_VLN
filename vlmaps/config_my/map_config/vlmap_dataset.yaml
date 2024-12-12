@@ -113,6 +113,13 @@ obstacle_names:
   - "appliances"
   - "clothes"
   - "objects"
+room_types:
+  - "bedroom"
+  - "living_room"
+  - "kitchen"
+  - "bathroom"
+  - "hallway"
+  - "others"
 categories: "mp3d" # "mp3d" "ai2thor"
 model:
   threshold: 0.3

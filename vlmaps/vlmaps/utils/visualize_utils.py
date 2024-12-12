@@ -102,7 +102,7 @@ def visualize_rgb_map_2d(rgb: np.ndarray, save_path: str = None):
 def visualize_heatmap_2d(rgb: np.ndarray, heatmap: np.ndarray, transparency: float = 0.5,save_path = None):
     """visualize heatmap
 
-    Args:
+    Args
         rgb (np.ndarray): (gs, gs, 3) element range [0, 255] np.uint8
         heatmap (np.ndarray): (gs, gs) element range [0, 1] np.float32
     """

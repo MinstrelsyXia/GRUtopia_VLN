@@ -708,27 +708,34 @@ class TMP(VLMap):
         similarity = img_feats @ text_feats.T
         return similarity[0]
 
-    def get_score_mat_lseg(bgr,categories):
+    def get_score_mat_lseg(self, bgr,categories,save_path):
         '''
-        not in use yet
+        modified in 12/12
+        Input:
+            bgr: image
+            categories: list of categories
+            save_path: path to save the segmentation result
+        Output:
+            similarity: similarity score for each category
         '''
         # bgr = cv2.imread(img_path)
+        device = self.device
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-        text_feats = get_text_feats_multiple_templates(categories, self.clip_model, self.clip_feat_dim)
         outputs, _ = get_lseg_feat(
-            lseg_model, 
+            self.lseg_model, 
             rgb,  # 需要提供RGB图像
             categories,  # 需要提供标签列表
-            lseg_transform, 
+            self.lseg_transform, 
             device, 
-            crop_size=crop_size, 
-            base_size=base_size, 
-            norm_mean=norm_mean, 
-            norm_std=norm_std, 
+            crop_size=self.crop_size, 
+            base_size=self.base_size, 
+            norm_mean=self.norm_mean, 
+            norm_std=self.norm_std, 
             vis=False, 
-            save_path=img_path.split('/')[-1]
+            save_path=save_path
         )
         B, D, H, W = outputs.shape
+        text_feats = get_text_feats_multiple_templates(categories, self.clip_model, self.clip_feat_dim)
         # 对H,W维度进行平均池化，得到[B,D]
         if isinstance(outputs, np.ndarray):
             outputs = torch.from_numpy(outputs)
@@ -814,7 +821,7 @@ class TMP(VLMap):
         if np.sum(mask)>50 and verbose:
             mask_2d = pool_3d_label_to_2d(mask, self.grid_pos, self.gs)
             rgb_2d = pool_3d_rgb_to_2d(self.grid_rgb, self.grid_pos, self.gs)
-            save_path = os.path.join(os.path.dirname(self.map_save_path), f"{language_desc.replace(' ', '_')}_masked_2d.jpg")
+            save_path = os.path.join(os.path.dirname(self.map_save_path), f"{language_desc.replace(' ', '_')}.jpg")
             visualize_masked_map_2d(rgb_2d, mask_2d,save_path=save_path)
         return mask
     
@@ -875,11 +882,13 @@ class TMP(VLMap):
         """
         Check if an object exists in the map
         """
-        pc_mask = self.index_map(name, with_init_cat=True)
+        pc_mask = self.index_map(name[0], with_init_cat=True)
         if pc_mask is None or np.sum(pc_mask) < 10:
             return False
         return True
 
+    def get_room_pos(self, room_name: str) -> np.ndarray:
+        pass
 
 @hydra.main(
     version_base=None,
