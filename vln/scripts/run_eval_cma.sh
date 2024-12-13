@@ -12,7 +12,7 @@ while [ $attempt -le $max_attempts ]; do
             --run-type eval
             --headless
             EVAL.SPLIT ['val_seen']
-            EVAL.re_eval false
+            EVAL.re_eval False
         "
     elif [ "$1" == "--val_unseen" ]; then
         flags="
@@ -20,7 +20,7 @@ while [ $attempt -le $max_attempts ]; do
             --run-type eval
             --headless
             EVAL.SPLIT ['val_unseen']
-            EVAL.re_eval false
+            EVAL.re_eval False
         "
     elif [ "$1" == "--train" ]; then
         flags="
