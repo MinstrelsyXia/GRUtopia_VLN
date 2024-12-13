@@ -147,6 +147,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     # if torch.cuda.is_available():
     #     torch.set_num_threads(1)
 
+    sim_config = None
     if run_type == "eval":
         torch.backends.cudnn.deterministic = True
         # Read vln_config and sim_config

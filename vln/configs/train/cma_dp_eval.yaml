@@ -209,7 +209,7 @@ MODEL:
     pred_type: epsilon # epsilon / sample
 
     # classifier-free guidance
-    use_cls_free_guidance: true
+    use_cls_free_guidance: false
     cls_free_guidance_scale: 2 # 4
     cls_mask_ratio: 0.25
 
