@@ -28,7 +28,8 @@ def extract_instruction_tokens(
     return observations
 
 def extract_image_features(policy, batch, img_mod, len_traj_act=4, world_size=1, stack_rgb=None, stack_depth=None, depth_encoder_type='TAC', save_img_raw=False,
-                           batch_stack_rgb_length=None, proj=True, net_device=None):
+                           batch_stack_rgb_length=None, proj=True, net_device=None, 
+                           need_rgb_extraction=True, classifier_free_mask_depth=False):
     """Extracts image features from observations using the policy's image feature extractor."""
     device = batch['globalgps'].device
     bs = batch['globalgps'].shape[0]
@@ -58,7 +59,8 @@ def extract_image_features(policy, batch, img_mod, len_traj_act=4, world_size=1,
             'depth_return_x_before_fc': True, # For ResNet depth encoder,
             'img_mod': img_mod,
             'proj': proj,
-            'process_images': False
+            'process_images': False,
+            'need_rgb_extraction': need_rgb_extraction
         }
         rgb_features, depth_features = policy(batch_inputs)
         rgb_features = rgb_features.type(torch.float32)
@@ -88,13 +90,21 @@ def extract_image_features(policy, batch, img_mod, len_traj_act=4, world_size=1,
         elif depth_encoder_type == 'resnet':
             depth_feat = depth.type(torch.float32)
         
+        if classifier_free_mask_depth:
+            depth_null_feat = torch.zeros_like(depth_feat)
+            depth_feat = torch.cat([depth_feat, depth_null_feat], dim=0)
+            rgb_feat = torch.cat([rgb_feat, rgb_feat], dim=0)
+            bs = bs * 2
+
         batch_inputs = {
             'mode': 'img_embedding',
             'rgb_inputs': rgb_feat,
             'depth_inputs': depth_feat,
             'depth_return_x_before_fc': True, # For ResNet depth encoder
             'img_mod': img_mod,
-            'proj': proj
+            'proj': proj,
+            'process_images': False,
+            'need_rgb_extraction': need_rgb_extraction
         }
         rgb_features, depth_features = policy(batch_inputs)
         rgb_features = rgb_features.type(torch.float32)
@@ -108,31 +118,39 @@ def extract_image_features(policy, batch, img_mod, len_traj_act=4, world_size=1,
             multi_patch_num = rgb_features.shape[-2]
             rgb_features = rgb_features.reshape(bs, len_traj_act, multi_patch_num,rgb_features.shape[-1])
         depth_features = depth_features.reshape(bs, len_traj_act, depth_features.shape[-3], depth_features.shape[-2], depth_features.shape[-1])
-
-        if batch_stack_rgb_length is None:
-            batch['stack_rgb'] = rgb_features
-            if depth_encoder_type == 'TAC':
-                batch['stack_depth'] = depth_features.reshape(bs, -1, depth_features.shape[-1])
-            elif depth_encoder_type == 'resnet':
-                batch['stack_depth'] = depth_features.reshape(bs, -1, depth_features.shape[-3], depth_features.shape[-2], depth_features.shape[-1])
+        if classifier_free_mask_depth:
+            bs = bs // 2
+            rgb_features, _ = torch.split(rgb_features, bs, dim=0)
+            depth_features, null_depth_features = torch.split(depth_features, bs, dim=0)
+            batch['stack_null_depth'] = null_depth_features
         
-        else:
-            for env_idx in range(bs):
-                pad_len = len_traj_act - batch_stack_rgb_length[env_idx]
-                if img_mod == 'cls':
-                    pad_tensor = torch.zeros(pad_len, rgb_features.shape[-1]).to(device)
-                elif img_mod == 'multi_patches_avg_pooling':
-                    pad_tensor = torch.zeros(pad_len, rgb_features.shape[-2],rgb_features.shape[-1]).to(device)
-                rgb_features[env_idx, batch_stack_rgb_length[env_idx]:] = pad_tensor
+        batch['stack_rgb'] = rgb_features
+        batch['stack_depth'] = depth_features
 
-                if depth_encoder_type == 'TAC':
-                    pad_tensor = torch.zeros(pad_len, depth_features.shape[-1]).to(device)
-                    depth_features[env_idx, batch_stack_rgb_length[env_idx]:] = pad_tensor
-                elif depth_encoder_type == 'resnet':
-                    pad_tensor = torch.zeros(pad_len, depth_features.shape[-3], depth_features.shape[-2], depth_features.shape[-1]).to(device)
-                    depth_features[env_idx, batch_stack_rgb_length[env_idx]:] = pad_tensor
-            batch['stack_rgb'] = rgb_features
-            batch['stack_depth'] = depth_features   
+        # if batch_stack_rgb_length is None:
+        #     batch['stack_rgb'] = rgb_features
+        #     if depth_encoder_type == 'TAC':
+        #         batch['stack_depth'] = depth_features.reshape(bs, -1, depth_features.shape[-1])
+        #     elif depth_encoder_type == 'resnet':
+        #         batch['stack_depth'] = depth_features.reshape(bs, -1, depth_features.shape[-3], depth_features.shape[-2], depth_features.shape[-1])
+        
+        # else:
+        #     for env_idx in range(bs):
+        #         pad_len = len_traj_act - batch_stack_rgb_length[env_idx]
+        #         if img_mod == 'cls':
+        #             pad_tensor = torch.zeros(pad_len, rgb_features.shape[-1]).to(device)
+        #         elif img_mod == 'multi_patches_avg_pooling':
+        #             pad_tensor = torch.zeros(pad_len, rgb_features.shape[-2],rgb_features.shape[-1]).to(device)
+        #         rgb_features[env_idx, batch_stack_rgb_length[env_idx]:] = pad_tensor
+
+        #         if depth_encoder_type == 'TAC':
+        #             pad_tensor = torch.zeros(pad_len, depth_features.shape[-1]).to(device)
+        #             depth_features[env_idx, batch_stack_rgb_length[env_idx]:] = pad_tensor
+        #         elif depth_encoder_type == 'resnet':
+        #             pad_tensor = torch.zeros(pad_len, depth_features.shape[-3], depth_features.shape[-2], depth_features.shape[-1]).to(device)
+        #             depth_features[env_idx, batch_stack_rgb_length[env_idx]:] = pad_tensor
+        #     batch['stack_rgb'] = rgb_features
+        #     batch['stack_depth'] = depth_features   
 
     if not save_img_raw:
         if 'rgb' in batch.keys():
