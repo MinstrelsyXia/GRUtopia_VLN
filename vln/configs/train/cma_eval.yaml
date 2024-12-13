@@ -1,4 +1,4 @@
-NAME: 20241207_cma
+NAME: 20241213_cma_pm_da_aug
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [4]
 TORCH_GPU_ID: 4
@@ -11,8 +11,8 @@ NUM_ENVIRONMENTS: 4
 # TENSORBOARD_DIR: data/tensorboard_dirs/*name
 TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/cma/ckpts
-EVAL_CKPT_PATH_DIR: data/checkpoints/cma/ckpts
-# EVAL_CKPT_PATH_DIR: data/checkpoints/20241120-vlnce-rp-dp-cond0Dec3_dpIter20_bs4_fullInstr/ckpts/ckpt.38.pth
+# EVAL_CKPT_PATH_DIR: data/checkpoints/cma/ckpts
+EVAL_CKPT_PATH_DIR: /ssd/wangliuyi/code/w61_grutopia/data/checkpoints/habitat_sotas/CMA_PM_DA_Aug_converted.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
@@ -36,11 +36,12 @@ EVAL:
   USE_CKPT_CONFIG: False
   SAVE_RESULTS: True
   # SPLIT: [val_seen, val_unseen]
-  SPLIT: [train]
+  SPLIT: [val_seen]
   EPISODE_COUNT: -1
   MAX_STEPS: 195
   train_eval_interval: 100
-  ACTION: speed # descrete or xyyaw or speed
+  ACTION: descrete # descrete or xyyaw or speed
+  SAMPLE: false
 
   # eval dataset settings
   re_eval: true # if true, will re-evaluate the episodes in the result_json_path
@@ -74,8 +75,8 @@ EVAL:
   # for isaac-sim envs
   sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
   vln_cfg_file: vln/configs/vln_cfg_policy_eval.yaml
-  step_interval: 80 # the same in data sampling
-
+  step_interval: 50 
+  
   # len_traj_act
   len_traj_act: 4
 

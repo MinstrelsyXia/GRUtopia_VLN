@@ -14,6 +14,19 @@ from vln.src.models.encoders import resnet_encoders
 from vln.src.models.encoders.instruction_encoder import (
     InstructionEncoder,
 )
+    
+class CategoricalNet(nn.Module):
+    def __init__(self, num_inputs: int, num_outputs: int) -> None:
+        super().__init__()
+
+        self.linear = nn.Linear(num_inputs, num_outputs)
+
+        nn.init.orthogonal_(self.linear.weight, gain=0.01)
+        nn.init.constant_(self.linear.bias, 0)
+
+    def forward(self, x: Tensor):
+        x = self.linear(x)
+        return CustomFixedCategorical(logits=x)
 
 class CustomFixedCategorical(torch.distributions.Categorical):
     """Same as the CustomFixedCategorical in hab-lab, but renames log_probs
@@ -47,6 +60,7 @@ class CMANet(nn.Module):
         self, config, observation_space, action_stats=None, num_actions=4
     ) -> None:
         super().__init__()
+        self.num_actions = num_actions
         self.model_config = config.MODEL
         self.model_config.INSTRUCTION_ENCODER.final_state_only = False
 
@@ -169,6 +183,11 @@ class CMANet(nn.Module):
         self._init_layers()
 
         self.train()
+        
+        # Determine
+        self.action_distribution = CategoricalNet(
+            self._output_size, self.num_actions
+        )
 
     @property
     def output_size(self) -> int:
@@ -209,6 +228,7 @@ class CMANet(nn.Module):
         rnn_states: Tensor, # [bs, 2, 512]
         prev_actions: Tensor,
         masks: Tensor,
+        deterministic: bool = False,
     ) -> Tuple[Tensor, Tensor]:
         instruction_embedding = self.instruction_encoder(observations)
         depth_embedding = self.depth_encoder(observations)
@@ -287,5 +307,11 @@ class CMANet(nn.Module):
                 observations["progress"],
                 reduction="none",
             )
+        
+        distribution = self.action_distribution(x)
+        if deterministic:
+            actions = distribution.mode()
+        else:
+            actions = distribution.sample() # TODO. lacking sample_shapoe
 
-        return x, rnn_states_out
+        return actions, rnn_states_out

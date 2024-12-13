@@ -16,11 +16,15 @@ import shutil
 
 import numpy as np
 import torch
+from typing import List, Optional, Union
+
+import yacs.config
+from yacs.config import CfgNode
 torch.autograd.set_detect_anomaly(True)
 
 from vln.src.utils.logger import MyLogger
 from vln.src.trainers import dp_trainer, cma_trainer
-from vln.src.utils.utils import dict_to_namespace
+from vln.src.utils.utils import dict_to_namespace, namespace_to_dict, Config
 
 from vln.parser import process_args
 
@@ -77,12 +81,10 @@ def main():
     run_exp(**vars(args))
 
 def get_config(exp_config, opts):
-    with open(exp_config, 'r') as f:
-        config = dict_to_namespace(yaml.load(f.read(), yaml.FullLoader))
-    if len(opts) > 0:
-        # update args into vln_config
-        for key, value in vars(opts).items():
-            setattr(config, key, value)
+    config = Config()
+    config.merge_from_file(exp_config)
+    if opts:
+        config.merge_from_list(opts)
     return config
 
 def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs) -> None:
@@ -145,13 +147,14 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     # if torch.cuda.is_available():
     #     torch.set_num_threads(1)
 
+    sim_config = None
     if run_type == "eval":
         torch.backends.cudnn.deterministic = True
         # Read vln_config and sim_config
         vln_config, sim_config = process_args(sim_cfg_file=config.EVAL.sim_cfg_file, vln_cfg_file=config.EVAL.vln_cfg_file)
         # Combine vln_config and sim_config with the config
-        config.vln_config = vln_config
-        config.sim_config = sim_config
+        vln_config_dict = namespace_to_dict(vln_config)  # Convert Namespace to dict
+        config.vln_config = Config(vln_config_dict)
 
         config.GT_PATH_DIR = os.path.join(config.LOG_DIR, "gt_paths")
         if not os.path.exists(config.GT_PATH_DIR):
@@ -165,7 +168,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     elif config.MODEL.policy_name == 'CMA_Policy':
         trainer_init = cma_trainer.DaggerCMATrainer
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
-    trainer = trainer_init(config, logger)
+    trainer = trainer_init(config, sim_config, logger)
 
     logger.info(f"config: {config}")
     

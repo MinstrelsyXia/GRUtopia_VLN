@@ -1,4 +1,4 @@
-NAME: 20241212-vlnce-rp-noRNN-DPDec12-txtLayer12-txtQformer-stackRGB8-clsFreeP0.25-bs300-lr2e-4
+NAME: 20241213-vlnce-rp-noRNN-DPDec12-txtLayer12-txtQformer-stackRGB16-bs300-lr2e-4
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -207,7 +207,7 @@ MODEL:
     pred_type: epsilon # epsilon / sample
 
     # classifier-free guidance
-    use_cls_free_guidance: true
+    use_cls_free_guidance: false
     cls_free_guidance_scale: 0.8
     cls_mask_ratio: 0.25
 
