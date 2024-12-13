@@ -78,7 +78,7 @@ class CMA_DP_noRNN_Net(nn.Module):
         # except Exception as e:
         bert_config = PretrainedConfig.from_pretrained('data/pretrained/roberta')
         cross_modal_config = copy.deepcopy(bert_config)
-        for k,v in vars(self.model_config.CROSS_MODAL_ENCODER).items():
+        for k,v in self.model_config.CROSS_MODAL_ENCODER.items():
             setattr(cross_modal_config, k, v)
 
         # self.cross_modal_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
@@ -212,10 +212,6 @@ class CMA_DP_noRNN_Net(nn.Module):
         # return self.rgb_encoder.is_blind or self.depth_encoder.is_blind
         return False
 
-    @property
-    def num_recurrent_layers(self) -> int:
-        return self.state_encoder.num_recurrent_layers
-
     def _init_pm_layers(self) -> None:
         for param in self.progress_monitor.parameters():
             if param.ndim == 2:  # Typically weights are 2D
@@ -255,11 +251,15 @@ class CMA_DP_noRNN_Net(nn.Module):
                 sample=diffusion_output
             ).prev_sample
             
-            if sample_classifier_free_guidance:
+            if k !=0 and sample_classifier_free_guidance:
                 diff_out, diff_out_null = diffusion_output[:batch_size//2], diffusion_output[batch_size//2:]
-                diff_out = diff_out_null + cls_free_guidance_scale * (diff_out - diff_out_null) # TODO: check the scale of cls_free_guidance_scale
+                # diff_out = diff_out_null + cls_free_guidance_scale * (diff_out - diff_out_null) # TODO: check the scale of cls_free_guidance_scale
+                diff_out = cls_free_guidance_scale*(diff_out - diff_out_null)
                 diffusion_output = torch.cat([diff_out, diff_out], dim=0)
-            
+        
+        if sample_classifier_free_guidance:
+            diffusion_output = diffusion_output[:batch_size//2]
+
         return diffusion_output
     
     def pred_actions(
@@ -287,8 +287,15 @@ class CMA_DP_noRNN_Net(nn.Module):
             observations['instruction'][cls_free_mask, :] = torch.zeros_like(observations['instruction'][cls_free_mask, :])
         if sample_classifier_free_guidance:
             # copy condition to null for sampling
-            obs_null = copy.deepcopy(observations)
+            obs_null = observations.copy()
             obs_null['instruction'] = torch.zeros_like(obs_null['instruction'])
+            obs_null['stack_rgb'] = torch.zeros_like(obs_null['stack_rgb'])
+            if not self.model_config.IMAGE_ENCODER.DEPTH.update_depth_encoder:
+                # if update_depth_encoder, the null depth has been masked during img feature extraction
+                obs_null['stack_depth'] = torch.zeros_like(obs_null['stack_depth'])
+            else:
+                obs_null['stack_depth'] = obs_null['stack_null_depth']
+
             for k,v in obs_null.items():
                 observations[k] = torch.cat([observations[k], obs_null[k]], dim=0)
             prev_actions = torch.cat([prev_actions, prev_actions], dim=0)
@@ -447,20 +454,26 @@ class CMA_DP_noRNN_Net(nn.Module):
         if self.model_config.PROGRESS_MONITOR.use:
             # progress_pred = torch.tanh(self.progress_monitor(state)) # pm_pred 
             progress_pred = self.progress_monitor(aux_embeds.squeeze(1))
+            if sample_classifier_free_guidance:
+                progress_pred = torch.split(progress_pred, batch_size // 2, dim=0)
+                progress_pred = progress_pred[0]
         
         stop_progress_pred = None
         if self.model_config.STOP_PROGRESS_PREDICTOR.use:
             stop_progress_pred = self.stop_progress_predictor(aux_embeds.squeeze(1))
+            if sample_classifier_free_guidance:
+                stop_progress_pred = torch.split(stop_progress_pred, batch_size // 2, dim=0)
+                stop_progress_pred = stop_progress_pred[0]
 
         rnn_states_out = None
         return noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred
 
-    def img_embedding(self, rgb_inputs, depth_inputs, img_mod, depth_return_x_before_fc=False, proj=True, process_images=False, need_img_extraction=True):
+    def img_embedding(self, rgb_inputs, depth_inputs, img_mod, depth_return_x_before_fc=False, proj=True, process_images=False, need_rgb_extraction=True):
         if process_images:
             rgb_inputs = self.image_encoder.process_image(rgb_inputs)
             if self.model_config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
                 depth_inputs = self.image_encoder.process_depth(depth_inputs)
-        if need_img_extraction:
+        if need_rgb_extraction:
             rgb_embeds = self.image_encoder.embed_image(rgb_inputs,img_mod=img_mod, proj=proj).squeeze(1)
         else:
             rgb_embeds = rgb_inputs
@@ -469,7 +482,7 @@ class CMA_DP_noRNN_Net(nn.Module):
  
         return rgb_embeds, depth_embeds
         
-    def parse_action(self, diffusion_output, dist_pred, pm_pred=None, stop_mode='distance', steps=None):
+    def parse_action(self, diffusion_output, dist_pred, pm_pred=None, stop_pm_pred=None, stop_mode='distance', steps=None):
         cumsum = False if self.config.EVAL.ACTION == 'descrete' else True
         if self.model_config.learn_angle:
             un_actions = get_action(diffusion_output, self.action_stats, cumsum=cumsum)
@@ -485,7 +498,7 @@ class CMA_DP_noRNN_Net(nn.Module):
             actions = []
             # un_actions = un_actions_nocumsum.detach().cpu().numpy()
             for idx in range(un_actions_nocumsum[0].shape[0]):
-                if stop_mode == 'progress':
+                if stop_mode in ['progress', 'stop_progress']:
                     stop_flag = False
                     M_stops = 3
                     # Check if M consecutive steps are stop actions
@@ -499,7 +512,12 @@ class CMA_DP_noRNN_Net(nn.Module):
                                 consecutive_stops = False
                                 break
                         
-                        if consecutive_stops or pm_pred[0].item() > self.config.EVAL.pm_threshold:
+                        if stop_mode == 'stop_progress':
+                            pm_stop_flag = stop_pm_pred[0].item() > self.config.EVAL.stop_pm_threshold
+                        else:
+                            pm_stop_flag = pm_pred[0].item() > self.config.EVAL.pm_threshold
+
+                        if consecutive_stops or pm_stop_flag:
                             # Only stop if we have 4 consecutive stop actions and progress monitor threshold is met
                             actions.append("STOP")
                             continue
@@ -675,13 +693,12 @@ class CMA_DP_noRNN_Net(nn.Module):
         denoise_action = batch['denoise_action']
         predicted_actions_save_dir = batch['predicted_actions_save_dir'] if 'predicted_actions_save_dir' in batch else None
         # batch['mode'] = 'pred_actions'
-        
-        batch_size = rnn_states.shape[0]
+
         vis = batch['vis']
         step = batch['step']
         episode_ids = batch['episode_ids']
         
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
+        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'], batch['need_txt_extraction'])
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         
@@ -696,7 +713,7 @@ class CMA_DP_noRNN_Net(nn.Module):
                 un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
                 self.save_predicted_actions(un_actions, gt_actions=None, N=1, save_dir=predicted_actions_save_dir, step=step)
         
-            actions, actions_cumsum, un_actions_nocumsum = self.parse_action(diffusion_output, dist_pred, pm_pred=progress_pred, stop_mode=batch['stop_mode'], steps=batch['steps'])
+            actions, actions_cumsum, un_actions_nocumsum = self.parse_action(diffusion_output, dist_pred, pm_pred=progress_pred, stop_pm_pred=stop_progress_pred, stop_mode=batch['stop_mode'], steps=batch['steps'])
         
         return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred, stop_progress_pred
     
@@ -798,9 +815,9 @@ class CMA_DP_noRNN_Net(nn.Module):
                     input_depth = batch['observations']['depth']
                 
                 if 'rgb_features' in batch['observations'].keys():
-                    need_img_extraction = False
+                    need_rgb_extraction = False
                 else:
-                    need_img_extraction = True
+                    need_rgb_extraction = True
                 
                 if batch['train_cls_free_guidance']:
                     cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
@@ -808,13 +825,19 @@ class CMA_DP_noRNN_Net(nn.Module):
                     input_rgb[cls_free_mask] = torch.zeros_like(input_rgb[cls_free_mask])
                     input_depth[cls_free_mask] = torch.zeros_like(input_depth[cls_free_mask])
                     
-                stack_rgb, stack_depth = self.img_embedding(input_rgb, input_depth, batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'], need_img_extraction)
+                stack_rgb, stack_depth = self.img_embedding(input_rgb, input_depth, batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'], need_rgb_extraction)
                 if len(stack_rgb.shape) == 2:
                     batch['observations']['stack_rgb'] = stack_rgb.unsqueeze(1)
                     batch['observations']['stack_depth'] = stack_depth.unsqueeze(1)
                 else:
                     batch['observations']['stack_rgb'] = stack_rgb
                     batch['observations']['stack_depth'] = stack_depth
+            else:
+                if batch['train_cls_free_guidance']:
+                    cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
+                    cls_free_mask = cls_free_mask.to(device)
+                    batch['observations']['stack_rgb'][cls_free_mask] = torch.zeros_like(batch['observations']['stack_rgb'][cls_free_mask])
+                    batch['observations']['stack_depth'][cls_free_mask] = torch.zeros_like(batch['observations']['stack_depth'][cls_free_mask])
 
             return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'], batch['need_txt_extraction'])
         

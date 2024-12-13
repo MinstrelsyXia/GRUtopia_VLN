@@ -40,7 +40,7 @@ def initialize_policy(
             )
         
         seed = config.seed
-        if config.local_rank != -1:
+        if config.DDP.use:
             seed += config.rank
         set_random_seed(seed)
 

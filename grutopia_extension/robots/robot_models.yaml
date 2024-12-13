@@ -302,6 +302,13 @@ robots:
     steps_per_speed: 50
     sub_controllers:
     - name: move_by_speed
+  - name: "move_by_descrete"
+    type: DescreteController
+    steps_per_action: 50
+    forward_distance: 0.25
+    rotation_angle: 15.0
+    sub_controllers:
+    - name: move_by_speed
 
   sensors:
   - name: "camera"

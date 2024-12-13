@@ -7,6 +7,7 @@ import gzip
 import copy
 import glob
 import cv2
+import yacs.config
 
 import numpy as np
 import torch
@@ -599,3 +600,26 @@ def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl, i
         video_writer.write(frame)
     video_writer.release()
     print(f"Save video to {video_path}")
+
+class Config(yacs.config.CfgNode):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, new_allowed=True)
+
+def namespace_to_dict(namespace):
+    """Recursively converts Namespace objects to dictionaries."""
+    if not isinstance(namespace, (argparse.Namespace, dict)):
+        return namespace
+    
+    if isinstance(namespace, argparse.Namespace):
+        namespace = vars(namespace)
+    
+    result = {}
+    for key, value in namespace.items():
+        if isinstance(value, (dict, argparse.Namespace)):
+            result[key] = namespace_to_dict(value)
+        elif isinstance(value, list):
+            result[key] = [namespace_to_dict(item) if isinstance(item, (dict, argparse.Namespace)) else item 
+                          for item in value]
+        else:
+            result[key] = value
+    return result
