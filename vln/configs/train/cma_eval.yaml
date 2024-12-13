@@ -1,4 +1,4 @@
-NAME: 20241213_cma
+NAME: 20241207_cma
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [4]
 TORCH_GPU_ID: 4
@@ -75,8 +75,8 @@ EVAL:
   # for isaac-sim envs
   sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
   vln_cfg_file: vln/configs/vln_cfg_policy_eval.yaml
-  step_interval: 80 # the same in data sampling
-
+  step_interval: 50 
+  
   # len_traj_act
   len_traj_act: 4
 

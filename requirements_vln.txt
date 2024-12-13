@@ -12,5 +12,6 @@ msgpack_numpy
 tensorboard
 gym
 einops
+yacs
 
 # pip install -e vln/src/models/diffusion_policy

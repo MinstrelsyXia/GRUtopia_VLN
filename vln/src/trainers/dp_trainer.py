@@ -57,7 +57,7 @@ def draw_loss_curve(N, noise_pred, noise, output_file='test.jpg'):
     print(f"save fig to {output_file}")
 
 class DaggerDiffusonPolicyTrainer:
-    def __init__(self, config=None, logger=None):
+    def __init__(self, config=None, sim_config=None, logger=None):
         self.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir
         self.config = config
         self.logger = logger
@@ -167,7 +167,7 @@ class DaggerDiffusonPolicyTrainer:
             self.splits = self.config.EVAL.SPLIT
             
             '''Init the eval env'''
-            self.eval_env = TaskEnv(self.config, self.splits, self.eval_logger, filter_same_trajectory=False, policy_eval=True)
+            self.eval_env = TaskEnv(self.config, sim_config, self.splits, self.eval_logger, filter_same_trajectory=False, policy_eval=True)
             
     def _make_dirs(self) -> None:
         self._make_ckpt_dir()

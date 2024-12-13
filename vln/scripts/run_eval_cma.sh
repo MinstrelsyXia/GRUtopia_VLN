@@ -2,30 +2,32 @@
 export MAGNUM_LOG=quiet
 export PYTHONPATH=$PYTHONPATH:/ailab/user/wangliuyi/code/w61_grutopia
 
-max_attempts=90  # 最大重试次数
+max_attempts=50  # 最大重试次数
 attempt=1
 
 while [ $attempt -le $max_attempts ]; do
     if [ "$1" == "--val_seen" ]; then
         flags="
-            --exp-config vln/configs/train/cma_seen.yaml
+            --exp-config vln/configs/train/cma_eval.yaml
             --run-type eval
             --headless
-            --test_verbose
+            EVAL.SPLIT ['val_seen']
+            EVAL.re_eval false
         "
     elif [ "$1" == "--val_unseen" ]; then
         flags="
-            --exp-config vln/configs/train/cma_unseen.yaml
+            --exp-config vln/configs/train/cma_eval.yaml
             --run-type eval
             --headless
-            --test_verbose
+            EVAL.SPLIT ['val_unseen']
+            EVAL.re_eval false
         "
     elif [ "$1" == "--train" ]; then
         flags="
-            --exp-config vln/configs/train/cma.yaml
+            --exp-config vln/configs/train/cma_eval.yaml
             --run-type eval
             --headless
-            --test_verbose
+            EVAL.SPLIT ['train']
         "
     fi
 

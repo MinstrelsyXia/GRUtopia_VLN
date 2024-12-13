@@ -15,10 +15,10 @@ from vln.src.dataset.data_utils_multi_env import VLNDataLoader, load_scene_usd
 from vln.src.utils.utils import to_global_coords
 
 class TaskEnv(VLNDataLoader):
-    def __init__(self, config, splits, eval_logger, filter_same_trajectory=False, policy_eval=True):
+    def __init__(self, config, sim_config, splits, eval_logger, filter_same_trajectory=False, policy_eval=True):
         self.config = config
         vln_config = config.vln_config
-        sim_config = config.sim_config
+        self.sim_config = sim_config
         self.eval_logger = eval_logger
         
         vln_config.camera_list = vln_config.settings.camera_list

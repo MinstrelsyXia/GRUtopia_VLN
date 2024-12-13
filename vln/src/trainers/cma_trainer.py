@@ -57,30 +57,23 @@ def draw_loss_curve(N, noise_pred, noise, output_file='test.jpg'):
     print(f"save fig to {output_file}")
 
 class DaggerCMATrainer:
-    def __init__(self, config=None, logger=None):
+    def __init__(self, config=None, sim_config=None, logger=None):
         self.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir
         self.config = config
         self.logger = logger
-        self.device = torch.device("cuda", config.TORCH_GPU_IDS[0])
+        self.world_size = self.config.world_size
+        self.local_rank = self.config.local_rank
+        self.is_distributed = self.world_size > 1 and (not self.config.DDP.use_dp)
+        
+        if self.is_distributed:
+            self.device = torch.device("cuda", self.local_rank)
+        else:
+            self.device = torch.device("cuda", config.TORCH_GPU_IDS[0])
         
         self.use_bert = False
         self.bert_tokenizer = None
         self.is_clip_long = False
-        if hasattr(config.MODEL, 'TEXT_ENCODER'):
-            if config.MODEL.TEXT_ENCODER.type == 'roberta':
-                self.bert_tokenizer = BertTokenizer(
-                    max_length=config.MODEL.INSTRUCTION_ENCODER.max_length,
-                    load_model=config.MODEL.INSTRUCTION_ENCODER.load_model,
-                        device=self.device
-                    )
-                self.use_bert = True
-            elif config.MODEL.TEXT_ENCODER.type == 'clip-long':
-                self.bert_tokenizer = longclip.tokenize
-                self.use_bert = True
-                self.is_clip_long = True
         
-        self.world_size = self.config.GPU_NUMBERS
-        self.local_rank = self.config.local_rank
         self.batch_size = self.config.IL.batch_size
     
         self.action_dim = 4
@@ -96,7 +89,7 @@ class DaggerCMATrainer:
         self.action_stats = None
 
         # Init the file_logger
-        if self.config.run_type == 'train':
+        if self.config.run_type in ['train', 'preprocess_features']:
             train_logger_filename = os.path.join(log_dir, "train.log")
             ## remove the existing logger first
             # if os.path.exists(train_logger_filename):
@@ -105,7 +98,12 @@ class DaggerCMATrainer:
                 name="train", level=logging.INFO, format_str="%(asctime)-15s %(message)s",
                 filename=train_logger_filename
             )
-            self.train_logger.info(f"Start Training! Good Luck!!!")
+            if self.config.run_type == 'train':
+                self.train_logger.info(f"Start Training! Good Luck!!!")
+            elif self.config.run_type == 'preprocess_features':
+                self.train_logger.info(f"Start Preprocessing Features! Good Luck!!!")
+
+            self.train_dataset_data = load_dataset(config.IL.dataset_root_dir, 'train', logger=self.train_logger)
         
         elif self.config.run_type == 'eval':
             if isinstance(self.config.EVAL.SPLIT, list):
@@ -147,7 +145,7 @@ class DaggerCMATrainer:
             self.splits = self.config.EVAL.SPLIT
             
             '''Init the eval env'''
-            self.eval_env = TaskEnv(self.config, self.splits, self.eval_logger, filter_same_trajectory=False, policy_eval=True)
+            self.eval_env = TaskEnv(self.config, sim_config, self.splits, self.eval_logger, filter_same_trajectory=False, policy_eval=True)
             
     def _make_dirs(self) -> None:
         self._make_ckpt_dir()
@@ -190,15 +188,15 @@ class DaggerCMATrainer:
             action_stats=self.action_stats
         )
         
-        is_distributed = False
-        rank = 0
-        world_size = 1
+        is_distributed = self.is_distributed
+        rank = self.local_rank if self.is_distributed else 0
+        world_size = self.world_size
         start_epoch = 0
         
         with TensorboardWriter(self.config.TENSORBOARD_DIR, flush_secs=30, purge_step=0) as writer:        
             if self.world_size > 1:
                 img_encoder = self.policy.module.image_encoder
-                if self.local_rank != -1: # use DDP
+                if not self.config.DDP.use_dp: # use DDP
                     is_distributed = True
                     rank = self.local_rank
                     world_size = self.world_size
@@ -220,14 +218,15 @@ class DaggerCMATrainer:
                 use_stack=self.config.MODEL.IMAGE_ENCODER.use_stack
             )
             
+            num_workers = 4 if not self.config.debug else 0
             diter = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=self.config.IL.batch_size,
                 shuffle=False,
                 collate_fn=collate_fn,
-                pin_memory=True,
+                pin_memory=False,
                 drop_last=True,  # drop last batch if smaller
-                num_workers=4,
+                num_workers=num_workers,
             )
 
             step_id = 0
@@ -243,7 +242,7 @@ class DaggerCMATrainer:
 
                 for batch in tqdm.tqdm(
                     diter,
-                    total=dataset.length // dataset.batch_size,
+                    total=len(diter),
                     leave=False,
                     dynamic_ncols=True,
                 ):
@@ -264,26 +263,27 @@ class DaggerCMATrainer:
                     
                     if step_id % 100 == 0:
                         torch.cuda.empty_cache()
-                    loss, diffusion_loss, dist_loss, aux_loss = self._update_agent(
+                    
+                    prev_actions_batch = prev_actions_batch.to(device=self.device, non_blocking=True)
+                    not_done_masks = not_done_masks.to(device=self.device, non_blocking=True) if not_done_masks is not None else None  
+                    loss, diffusion_loss, dist_loss, pm_loss, stop_pm_loss = self._update_agent(
                         observations_batch,
-                        prev_actions_batch.to(
-                            device=self.device, non_blocking=True
-                        ),
-                        not_done_masks.to(
-                            device=self.device, non_blocking=True
-                        ),
+                        prev_actions_batch,
+                        not_done_masks,
                         denoise_action=self.config.IL.DAGGER.denoise_action,
+                        need_instr_extraction=dataset.need_extract_instr_features
                     )
 
                     if self.local_rank < 1:
                         losses.append(loss)
                         if step_id % 300 == 0:
-                            logger.info(f"train_loss: {loss}")
-                            logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
-                            logger.info(f"train_dist_loss: {dist_loss}")
-                            logger.info(f"train_aux_loss: {aux_loss}")
-                            logger.info(f"Batches processed: {step_id}.")
-                            logger.info(
+                            self.train_logger.info(f"train_loss: {loss}")
+                            self.train_logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
+                            self.train_logger.info(f"train_dist_loss: {dist_loss}")
+                            self.train_logger.info(f"train_pm_loss: {pm_loss}")
+                            self.train_logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
+                            self.train_logger.info(f"Batches processed: {step_id}.")
+                            self.train_logger.info(
                                 f"On DAgger iter {dagger_it}, Epoch {epoch}."
                             )
                         writer.add_scalar(
@@ -300,11 +300,23 @@ class DaggerCMATrainer:
                             step_id,
                         )
                         writer.add_scalar(
-                            f"train_aux_loss_iter_{dagger_it}",
-                            aux_loss,
+                            f"train_pm_loss_iter_{dagger_it}",
+                            pm_loss,
+                            step_id,
+                        )
+                        writer.add_scalar(
+                            f"train_stop_pm_loss_iter_{dagger_it}",
+                            stop_pm_loss,
                             step_id,
                         )
                         step_id += 1  # noqa: SIM113
+                        
+                        # save the ckpt according to the steps
+                        if not self.use_rnn and step_id % self.config.IL.save_interval_steps == 0:
+                            self.save_checkpoint(
+                                f"ckpt-epoch-{epoch}-step-{step_id}.pth",
+                                filter_frozen_weights=self.config.IL.save_filter_frozen_weights
+                            )
                 
                 # save the log
                 self.train_logger.info(f"*******Epoch {epoch}*********")
@@ -712,6 +724,7 @@ class DaggerCMATrainer:
                 self.eval_logger.info(f"All data in {self.eval_env.current_split} and {split} have been evaluated.")
                 return 0, 0
 
+        '''Init the policy'''
         self.policy, _ = initialize_policy(
             self.config,
             self.eval_logger,
@@ -823,6 +836,7 @@ class DaggerCMATrainer:
             sim_steps = outputs['current_step_list']
             total_rgb_list = outputs['total_rgb_list']
             total_topdown_rgb_list = outputs['total_topdown_rgb_list']
+            steps[self.eval_env.env_idx] += 1
 
             observations = outputs_dict
 
@@ -868,9 +882,9 @@ class DaggerCMATrainer:
                 current_episode_start_time = time.time()
                 
                 # Initialize parameters
-                prev_actions[i] = torch.zeros(self.config.MODEL.len_traj_act, self.action_dim)
+                prev_actions[i] = torch.zeros(1, device=self.device, dtype=torch.long)
                 rnn_states[i] = torch.zeros(
-                    net.num_recurrent_layers,
+                    self.policy.num_recurrent_layers,
                     config.MODEL.STATE_ENCODER.hidden_size,
                     device=self.device,
                 )
@@ -925,6 +939,18 @@ class DaggerCMATrainer:
                 mean_spl = np.mean(list(spl_dict.values()))
                 self.eval_logger.info(f"Average SPL: {mean_spl}") # !!!
 
+                # construct the next environment
+                observations[i] = self.eval_env.construct_env(step_time=steps[i], result_json_path=self.result_json_path)[0]
+                if isinstance(observations[i], str):
+                    if observations[i] == 'shortest_path_planning_failed':
+                        while isinstance(observations[i], str) and observations[i] == 'shortest_path_planning_failed':
+                            observations[i] = self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
+                    elif observations[i] == 'all_data_evaluated':
+                        self.eval_logger.info(f"All data in {self.eval_env.current_split} and {self.eval_env.current_split} have been evaluated.")
+                        break
+
+                total_actions = []
+
             observations = extract_instruction_tokens(
                 observations, 
                 bert_tokenizer=self.bert_tokenizer,
@@ -966,10 +992,40 @@ class DaggerCMATrainer:
         with open(result_json_path, 'r') as f:
             data = json.load(f)
         if self.eval_env.current_split not in data:
-            data[self.eval_env.current_split] = []
-        data[self.eval_env.current_split].append(episode_info)
+            data[self.eval_env.current_split] = {}
+            data[self.eval_env.current_split]["finished_scans"] = []
+            data[self.eval_env.current_split]["episodes"] = defaultdict(list)
+        if self.eval_env.current_scan not in data[self.eval_env.current_split]["episodes"]:
+            data[self.eval_env.current_split]["episodes"][self.eval_env.current_scan] = []
+        data[self.eval_env.current_split]["episodes"][self.eval_env.current_scan].append(episode_info)
         with open(result_json_path, 'w') as f:
             json.dump(data, f, indent=4)
+    
+    def _preprocess_features(self):
+        from vln.src.trainers.preprocess_features import FeaturePreprocessor
+        
+        '''Init the model and load the pretrained weights'''
+        self.policy, _ = initialize_policy(
+            self.config,
+            self.train_logger,
+            self.config.IL.load_from_ckpt,
+            self.device,
+            load_from_pretrain=self.config.IL.load_from_pretrain,
+            action_stats=self.action_stats
+        )
+        
+        feature_preprocessor = FeaturePreprocessor(
+            model=self.policy,
+            config=self.config,
+            train_dataset=self.train_dataset_data,
+            bert_tokenizer=self.bert_tokenizer,
+            input_lmdb_dir=self.config.IL.DAGGER.lmdb_features_dir,
+            output_lmdb_dir=self.config.IL.DAGGER.lmdb_features_dagger_update_dir,
+            device=self.device,
+            del_original_rgb=True
+        )
+
+        feature_preprocessor.preprocess_features()
 
 def plot_spl_list(spl_list):
     # Create a figure and axis

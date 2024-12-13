@@ -22,8 +22,10 @@ class DescreteController(BaseController):
         self.forward_distance = config.forward_distance if config.forward_distance is not None else 0.25
         self.rotation_angle = config.rotation_angle if config.rotation_angle is not None else 15.0  # in degrees
         
-        self.forward_speed = config.forward_speed if config.forward_speed is not None else 0.25
-        self.rotation_speed = config.rotation_speed if config.rotation_speed is not None else 1.0
+        # self.forward_speed = config.forward_speed if config.forward_speed is not None else 0.25
+        # self.rotation_speed = config.rotation_speed if config.rotation_speed is not None else 1.0
+        self.forward_speed = self.forward_distance / self.steps_per_action * 200
+        self.rotation_speed = np.deg2rad(self.rotation_angle / self.steps_per_action * 200) # 200 is the physics_dt
         
         self.current_action = None
 
@@ -35,9 +37,6 @@ class DescreteController(BaseController):
             self.current_steps = 0
         
         self.current_steps += 1
-        
-        # Convert rotation angle to radians
-        angle_rad = np.deg2rad(self.rotation_angle)
         
         # Define actions:
         # 0: stop
@@ -57,12 +56,12 @@ class DescreteController(BaseController):
         elif action == 2:
             return self.sub_controllers[0].forward(
                 forward_speed=0.0,
-                rotation_speed=self.rotation_speed * angle_rad,
+                rotation_speed=self.rotation_speed,
             )
         elif action == 3:
             return self.sub_controllers[0].forward(
                 forward_speed=0.0,
-                rotation_speed=-self.rotation_speed * angle_rad,
+                rotation_speed=-self.rotation_speed,
             )
         else:
             raise ValueError(f"Invalid action: {action}")
