@@ -82,7 +82,12 @@ class TaskEnv(VLNDataLoader):
             self.current_scan = self.current_scan_list[self.current_scan_idx]
 
             if len(loaded_results) > 0:
-                self.current_episode_idx = len(loaded_results[self.current_scan]["episodes"][self.current_scan]) - 1 if self.current_scan in loaded_results['finished_scans'] else self.current_episode_idx
+                if self.current_scan not in loaded_results['episodes']:
+                    # case 1: the scan has not been evaluated.
+                    self.current_episode_idx = -1
+                else:
+                    # case 2: the scan has been partly evaluated.
+                    self.current_episode_idx = len(loaded_results["episodes"][self.current_scan]) - 1
             
             self.start_step_list = [0]
             self.current_step_list = [0]
@@ -104,9 +109,8 @@ class TaskEnv(VLNDataLoader):
             self.finish_scans.append(self.current_scan)
             self.eval_logger.info(f"********Finish the scan {self.current_scan}")
 
-            if result_json_path is not None:
+            if self.result_json_path is not None:
                 # record the finished scan in result_json_path
-                self.result_json_path = result_json_path
                 with open(self.result_json_path, 'r') as f:
                     loaded_results = json.load(f)
 
