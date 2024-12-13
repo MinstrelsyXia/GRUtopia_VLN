@@ -2,8 +2,8 @@
 #SBATCH --job-name=train_depth         # 作业名称
 #SBATCH --output=logs/%x_%j.out          # 标准输出文件路径 (%j 会被替换为作业ID)
 #SBATCH --error=logs/%x_%j.err           # 标准错误文件路径
-#SBATCH --gres=gpu:4                  # GPU请求
-#SBATCH --cpus-per-task=32            # 每个任务的CPU核心数
+#SBATCH --gres=gpu:6                  # GPU请求
+#SBATCH --cpus-per-task=48            # 每个任务的CPU核心数
 #SBATCH --partition=smartbot              # 使用GPU分区
 #SBATCH --mem=256G                     # 总内存分配
 
@@ -14,6 +14,8 @@ source activate grutopia_train
 
 export MAGNUM_LOG=quiet
 export PYTHONPATH=$PYTHONPATH:/ailab/user/wangliuyi/code/w61_grutopia
+
+tar -xf /ailab/user/wangliuyi/code/w61_grutopia/data/sample_episodes/20241207_sample_episodes_processed/sample_data.lmdb.tar -C /dev/shm
 
 flags_cma="
   --exp-config vlnce_baselines/config/r2r_baselines/cma.yaml
