@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import copy
+import time
 from transformers import PretrainedConfig
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
@@ -70,7 +71,7 @@ class CMA_DP_noRNN_Net(nn.Module):
             self.instruction_encoder = encoders.LanguageEncoder(text_encoder_config)
         
         # Init the RGB & depth encoder
-        self.image_encoder = encoders.ImageEncoder(self.model_config, self.model_config.IMAGE_ENCODER, observation_space, self.model_config.LORA)
+        self.image_encoder = encoders.ImageEncoder(self.model_config, self.model_config.IMAGE_ENCODER, observation_space, self.model_config.LORA, analysis_time=self.config.IL.analysis_time)
         
         # Init the cross-modal fusion network
         # try:
@@ -300,7 +301,10 @@ class CMA_DP_noRNN_Net(nn.Module):
                 observations[k] = torch.cat([observations[k], obs_null[k]], dim=0)
             prev_actions = torch.cat([prev_actions, prev_actions], dim=0)
             batch_size = observations['instruction'].shape[0]
-            
+        
+        if self.config.IL.analysis_time:
+            start_time = time.time()
+        
         '''1. Encoding text'''
         text_embeds, txt_masks, text_cls_embeds = self.instruction_encoder(
             observations['instruction'], need_txt_extraction=need_txt_extraction
@@ -340,6 +344,12 @@ class CMA_DP_noRNN_Net(nn.Module):
         else:
             fused_update_txt_embeds = text_embeds
         
+        if self.config.IL.analysis_time:
+            end_time = time.time()
+            print(f"MODEL txt_img_cross_encoder time: {end_time - start_time}")
+
+            start_time = time.time()
+
         '''7. Predict action distribution using diffusion policy'''
         # Sample a diffusion iteration for each data point
         timesteps = torch.randint(
@@ -439,7 +449,11 @@ class CMA_DP_noRNN_Net(nn.Module):
                     cond=lv_state.float(),
                     type_embeds=type_embeds,
                     )
-                
+        
+        if self.config.IL.analysis_time:
+            end_time = time.time()
+            print(f"MODEL action_dp_pred_net time: {end_time - start_time}")
+
         '''9. Predict auxiliary'''
         dist_pred = None
         aux_embeds = lv_state + type_embeds
@@ -824,8 +838,13 @@ class CMA_DP_noRNN_Net(nn.Module):
                     cls_free_mask = cls_free_mask.to(device)
                     input_rgb[cls_free_mask] = torch.zeros_like(input_rgb[cls_free_mask])
                     input_depth[cls_free_mask] = torch.zeros_like(input_depth[cls_free_mask])
-                    
+                
+                if self.config.IL.analysis_time:
+                    start_time = time.time()
                 stack_rgb, stack_depth = self.img_embedding(input_rgb, input_depth, batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'], need_rgb_extraction)
+                if self.config.IL.analysis_time:
+                    end_time = time.time()
+                    print(f"MODEL img_embedding time: {end_time - start_time}")
                 if len(stack_rgb.shape) == 2:
                     batch['observations']['stack_rgb'] = stack_rgb.unsqueeze(1)
                     batch['observations']['stack_depth'] = stack_depth.unsqueeze(1)

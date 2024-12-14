@@ -95,7 +95,7 @@ IL:
     use: true # drop the failure cases
     min_rgb_nums: 15 # the item that is fewer than this number would be dropped.
 
-  analysis_time: true # analysis the processing time for each module
+  analysis_time: False # analysis the processing time for each module
 
   DAGGER:
     iterations: 5
@@ -221,9 +221,10 @@ MODEL:
     action_stats:
       # min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
       # max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
-      min: [-0.5, -0.5, -1.0] # [min_dx, min_dy, min_dyaw]
-      max: [0.5, 0.5, 1.0] # [max_dx, max_dy, max_dyaw]
+      min: [-0.5, -0.5, -0.6] # [min_dx, min_dy, min_dyaw]
+      max: [0.5, 0.5, 0.6] # [max_dx, max_dy, max_dyaw]
 
+    waypoint_spacing: 1
     metric_waypoint_spacing: 1
     negative_mining: False
 
@@ -249,10 +250,8 @@ MODEL:
     txt_len: 20 # use for v2_Fullinstr
 
     # action output params
-    waypoint_spacing: 1
     len_traj_pred: 8
 
-  
   DISTANCE_PREDICTOR:
     use: false
     normalize: false
@@ -261,6 +260,8 @@ MODEL:
     input_size: 3
     encoding_size: 512
     use: true
+
+    to_local_coords: true
   
   PREV_ACTION_ENCODER:
     encoding_size: 512
