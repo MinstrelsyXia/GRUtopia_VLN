@@ -482,7 +482,9 @@ class VLNCE_DP_Dataset(IterableDataset):
 
             for idx in _block_shuffle(sorted_ordering, self.batch_size):
                 self._preload.append(new_preload[idx])
-
+        
+        if len(self._preload) == 0:
+            raise StopIteration
         return self._preload.pop() # pop one item each time
     
     def __next__(self):
