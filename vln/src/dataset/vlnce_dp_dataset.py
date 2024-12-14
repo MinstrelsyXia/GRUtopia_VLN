@@ -104,8 +104,8 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.batch_size = batch_size
         
         self.action_stats = {}
-        self.action_stats['min'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.min.cpu())
-        self.action_stats['max'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.max.cpu())
+        self.action_stats['min'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.min)
+        self.action_stats['max'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.max)
 
         if self.config.MODEL.use_iw:
             self.use_iw = True
