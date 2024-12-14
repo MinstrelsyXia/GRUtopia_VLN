@@ -9,6 +9,7 @@ from gym import Space, spaces
 import vln.src.models.resnet as resnet
 from vln.src.models.resnet import ResNetEncoder
 from torch import Tensor
+import time
 
 
 class VlnResnetDepthEncoder(nn.Module):
@@ -22,8 +23,11 @@ class VlnResnetDepthEncoder(nn.Module):
         normalize_visual_inputs: bool = False,
         trainable: bool = False,
         spatial_output: bool = False,
+        analysis_time: bool = False,
     ) -> None:
         super().__init__()
+
+        self.analysis_time = analysis_time
 
         self.visual_encoder = ResNetEncoder(
             spaces.Dict(
@@ -35,6 +39,7 @@ class VlnResnetDepthEncoder(nn.Module):
             ngroups=resnet_baseplanes // 2,
             make_backbone=getattr(resnet, backbone),
             normalize_visual_inputs=normalize_visual_inputs,
+            analysis_time=analysis_time,
         )
 
         for param in self.visual_encoder.parameters():
@@ -87,7 +92,12 @@ class VlnResnetDepthEncoder(nn.Module):
         if "depth_features" in observations:
             x = observations["depth_features"]
         else:
+            if self.analysis_time:
+                start_time = time.time()
             x = self.visual_encoder(observations)
+            if self.analysis_time:
+                end_time = time.time()
+                print(f"MODEL vlnResnetDepthEncoder visual_encoder time: {end_time - start_time}")
 
         if self.spatial_output:
             b, c, h, w = x.size()

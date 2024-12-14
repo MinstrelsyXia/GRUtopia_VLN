@@ -61,7 +61,7 @@ class DaggerDiffusonPolicyTrainer:
         self.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir
         self.config = config
         self.logger = logger
-        self.world_size = self.config.world_size
+        self.world_size = self.config.world_size if self.config.DDP.use else 1
         self.local_rank = self.config.local_rank
         self.is_distributed = self.world_size > 1 and (not self.config.DDP.use_dp)
         
@@ -557,7 +557,7 @@ class DaggerDiffusonPolicyTrainer:
         if self.config.MODEL.PROGRESS_MONITOR.use:
             progress_loss = F.mse_loss(
                 progress_hat.squeeze(),
-                observations["progress"],
+                observations["progress"].to(progress_hat.device),
                 reduction="none",
             )
             pm_loss = action_reduce(masks, progress_loss)
@@ -566,7 +566,7 @@ class DaggerDiffusonPolicyTrainer:
         if self.config.MODEL.STOP_PROGRESS_PREDICTOR.use:
             stop_pm_loss = F.mse_loss(
                 stop_progress_pred.squeeze(),
-                observations["stop_progress"],
+                observations["stop_progress"].to(stop_progress_pred.device),
                 reduction="none",
             )
             stop_pm_loss = action_reduce(masks, stop_pm_loss)

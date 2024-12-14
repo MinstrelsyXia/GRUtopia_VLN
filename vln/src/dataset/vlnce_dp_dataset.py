@@ -76,7 +76,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         context_type: str = "temporal",
         end_slack: int = 0,
         goals_per_obs: int = 1,
-        normalize: bool = True,
+        normalize: bool = False,
         obs_type: str = "rgbd",
         goal_type: str = "instruction",
         lmdb_map_size=1e9,
@@ -265,7 +265,20 @@ class VLNCE_DP_Dataset(IterableDataset):
                             else:
                                 if len(data['camera_info']) == 0 or len(data['rgb_features']) < self.config.IL.Filter_failure.min_rgb_nums:
                                     continue
-                    
+                        if finish_status == 'stuck':
+                            drop_last_frame_nums = 25
+                            data['camera_info'][self.camera_name]['rgb'] = data['camera_info'][self.camera_name]['rgb'][:-drop_last_frame_nums]
+                            data['camera_info'][self.camera_name]['depth'] = data['camera_info'][self.camera_name]['depth'][:-drop_last_frame_nums]
+                            data['robot_info']['yaw'] = data['robot_info']['yaw'][:-drop_last_frame_nums]
+                            data['robot_info']['position'] = data['robot_info']['position'][:-drop_last_frame_nums]
+                            data['robot_info']['orientation'] = data['robot_info']['orientation'][:-drop_last_frame_nums]
+                            data['progress'] = data['progress'][:-drop_last_frame_nums]
+                            data['step'] = data['step'][:-drop_last_frame_nums]
+                            if 'rgb_features' in data.keys():
+                                data['rgb_features'] = data['rgb_features'][:-drop_last_frame_nums]
+                            if 'depth_features' in data.keys():
+                                data['depth_features'] = data['depth_features'][:-drop_last_frame_nums]
+
                     # convert yaw from [-2pi,2pi] to [-pi, pi]
                     yaws = np.array(data['robot_info']['yaw']).copy()
                     for yaw_i, yaw in enumerate(data['robot_info']['yaw']):
@@ -291,9 +304,9 @@ class VLNCE_DP_Dataset(IterableDataset):
                         fail_reasons_list.append(fail_reason)
                         lengths.append(len(new_data))
 
-                    if self.need_extract_instr_features:
-                        # compute stack images, positions, yaw, and relative actions, time_distance for each observations
-                        new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
+                if self.need_extract_instr_features:
+                    # compute stack images, positions, yaw, and relative actions, time_distance for each observations
+                    new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
             
             # process the instruction
             # copy the instruction to each step
@@ -362,6 +375,8 @@ class VLNCE_DP_Dataset(IterableDataset):
                     if len(depth_shape) == 2:
                         # [256, 256] -> [256, 256, 1]
                         item_obs["depth"] = torch.unsqueeze(item_obs["depth"], dim=-1)
+                else:
+                    depth_shape = item_obs["depth_features"][0].shape
 
                 if self.use_stack:
                     item_obs["stack_rgb"] = torch.zeros((total_steps, img_stack_nums, *img_shape))
@@ -376,7 +391,8 @@ class VLNCE_DP_Dataset(IterableDataset):
                     # compute imu
                     if self.config.MODEL.IMU_ENCODER.use:
                         current_pos = item_obs["globalgps"][step_idx][[0,1]]
-                        item_obs["imu"][step_idx][:2] = to_local_coords(current_pos, start_pos, start_yaw)
+                        if self.config.MODEL.IMU_ENCODER.to_local_coords:
+                            item_obs["imu"][step_idx][:2] = to_local_coords(current_pos, start_pos, start_yaw)
                         if self.config.MODEL.IMU_ENCODER.input_size == 3:
                             item_obs["imu"][step_idx][2] = item_obs["globalyaw"][step_idx] - start_yaw
                     

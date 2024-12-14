@@ -16,7 +16,7 @@ from vln.src.local_nav.camera_occupancy_map import CamOccupancyMap
 from vln.src.local_nav.path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
 
 class GlobalTopdownMap:
-    def __init__(self, args, scan_name):
+    def __init__(self, args, scan_name, vis_verbose=False):
         self.args = args
         self.scan_name = scan_name
 
@@ -39,7 +39,7 @@ class GlobalTopdownMap:
                                          map_width=self.width,map_height=self.height,max_step=self.planner_config.a_star_max_iter,
                             windows_head=self.args.windows_head,
                             for_llm=self.args.settings.use_llm,
-                            verbose=self.args.save_path_planning)
+                            verbose=self.args.save_path_planning or vis_verbose)
 
         # init vis settings
         self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
