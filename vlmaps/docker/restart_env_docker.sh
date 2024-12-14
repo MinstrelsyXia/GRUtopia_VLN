@@ -50,7 +50,7 @@ do
         PID=$!
     else
         echo "GPU ${GPU_IDX}: Starting fresh run"
-        nohup python $SCRIPT_PATH episode_file=$GPU_LIST_FILE last_scan_file=$LAST_SCAN_FILE > $LOG_FILE 2>&1 &
+        nohup python $SCRIPT_PATH episode_file=$GPU_LIST_FILE last_scan_file=$LAST_SCAN_FILE> $LOG_FILE 2>&1 &
         PID=$!
     fi
 

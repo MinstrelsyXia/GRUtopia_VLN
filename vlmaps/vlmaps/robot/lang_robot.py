@@ -125,41 +125,54 @@ class LangRobot:
         return contour
 
     def with_object_on_left(self, name: str):
+        self.eval_helper.add_action_func(f"Step:{self.step}: with object on left {name}")
         self.face(name)
         self.turn(90)
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully with object on left {name}")
 
     def with_object_on_right(self, name: str):
+        self.eval_helper.add_action_func(f"Step:{self.step}: with object on right {name}")
         self.face(name)
         self.turn(-90)
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully with object on right {name}")
 
     def move_to_left(self, name: str):
         self._set_nav_curr_pose()
+        self.eval_helper.add_action_func(f"Step:{self.step}: move to left {name}")
         self.move_to_object(name)
         pos = self.map.get_left_pos(self.curr_pos_on_map, self.curr_ang_deg_on_map, name)
         self.move_to(pos)
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully move to left {name}")
 
     def move_to_right(self, name: str):
         self._set_nav_curr_pose()
+        self.eval_helper.add_action_func(f"Step:{self.step}: move to right {name}")
         self.move_to_object(name)
         pos = self.map.get_right_pos(self.curr_pos_on_map, self.curr_ang_deg_on_map, name)
         self.move_to(pos)
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully move to right {name}")
 
     def move_in_between(self, name_a: str, name_b: str):
+        self.eval_helper.add_action_func(f"Step:{self.step}: move in between {name_a} and {name_b}")
         self._set_nav_curr_pose()
         self.move_to_object(name_a)
         pos = self.map.get_pos_in_between(self.curr_pos_on_map, self.curr_ang_deg_on_map, name_a, name_b)
         self.move_to(pos)
-
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully move in between {name_a} and {name_b}")
     def turn_absolute(self, angle_deg: float):
+        self.eval_helper.add_action_func(f"Step:{self.step}: turn absolute {angle_deg}")
         self._set_nav_curr_pose()
         delta_deg = angle_deg - self.curr_ang_deg_on_map
         actions_list = self.turn(delta_deg)
         self.recorded_actions_list.extend(actions_list)
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully turn absolute {angle_deg}")
 
     def face(self, name: str):
         self._set_nav_curr_pose()
+        self.eval_helper.add_action_func(f"Step:{self.step}: face {name}")
         turn_right_angle = self.map.get_delta_angle_to(self.curr_pos_on_map, self.curr_ang_deg_on_map, name)
         self.turn(turn_right_angle)
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully face {name}")
 
     def move_north(self, name: str):
         self._set_nav_curr_pose()
@@ -188,5 +201,7 @@ class LangRobot:
 
     def move_forward(self, meters: float):
         self._set_nav_curr_pose()
+        self.eval_helper.add_action_func(f"Step:{self.step}: move forward {meters}")
         pos = self.map.get_forward_pos(self.curr_pos_on_map, self.curr_ang_deg_on_map, meters)
         self.move_to(pos)
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully move forward {meters}")

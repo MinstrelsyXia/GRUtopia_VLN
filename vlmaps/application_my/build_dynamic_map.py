@@ -825,6 +825,12 @@ class TMP(VLMap):
             visualize_masked_map_2d(rgb_2d, mask_2d,save_path=save_path)
         return mask
     
+    def judge_room(self, obs):
+        room_names = ['bedroom', 'dining', 'kitchen', 'living', 'office', 'other']
+        similarity = []
+        for room_name in room_names:
+            similarity.append(self.get_score_mat_clip(obs, [room_name]))
+        return room_names[np.argmax(similarity)]
 
 
     

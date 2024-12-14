@@ -69,13 +69,12 @@ def save_split_data(split_data, output_dir, gpu_list):
 def main():
     parser = argparse.ArgumentParser(description='Split dataset for multi-GPU processing.')
     parser.add_argument('--gpu_list', nargs='+', type=str, help='List of GPU IDs to use.')
-    parser.add_argument('--data_dir', type=str, default='/ssd/xiaxinyuan/code/VLN/VLNCE/R2R_VLNCE_v1-3', 
-                        help='Directory of the dataset.')
+    parser.add_argument('--data_dir', type=str, default='/ssd/xiaxinyuan/code/VLN/VLNCE/R2R_VLNCE_v1-3', help='Directory of the dataset.')
     parser.add_argument('--output_dir', type=str, 
                         default=f'./multi_gpu_list_{time.strftime("%Y%m%d_%H%M%S", time.localtime())}', 
                         help='Output directory for split data.')
-    parser.add_argument('--splits', type=str, default=['train'], help='Splits to process.')
-    parser.add_argument('--file_name', type=str, default='valid_paths/sub_success_paths_id_1211.txt', help='file name of the trajectory id list.')
+    parser.add_argument('--splits', nargs='+', type=str, default=['val_unseen'], help='Splits to process.')
+    parser.add_argument('--file_name', type=str, default='valid_paths/val_unseen/object_id_1213.txt', help='file name of the trajectory id list.')
     args = parser.parse_args()
 
     # 使用GPU列表的长度

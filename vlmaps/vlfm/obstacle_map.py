@@ -56,6 +56,7 @@ class ObstacleMap(BaseMap):
         if os.path.exists(self.save_dir) == False:
             os.makedirs(self.save_dir)
         self._dilate_iters = dilate_iters
+        self.nav_map_visual = None
 
 
     def reset(self) -> None:

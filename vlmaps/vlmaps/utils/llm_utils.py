@@ -423,6 +423,8 @@ def parse_spatial_instruction(language_instr):
                 {"role": "assistant", "content": "self.turn(-90)\nself.move_forward(3)"},
                 {"role": "user", "content": "go to the television"},
                 {"role": "assistant", "content": "self.move_to_object('television')"},
+                {"role": "user", "content": "WALK FORWARD TO THE CABINET PANTRY"},
+                {"role": "assistant", "content": "self.move_to_object('cabinet pantry')"},
                 {"role": "user", "content": "navigate to 3 meters right of the table"},
                 {"role": "assistant", "content": "self.move_to_right('table')\nself.face('table')\nself.turn(180)\nself.move_forward(3)"},
                 # 

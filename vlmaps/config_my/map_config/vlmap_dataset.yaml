@@ -21,7 +21,7 @@ agent_radius: 0.25 #! identical to vln/configs/vln_cfg.yaml
 dilate_iter: 3
 area_thresh: 10000 #! not in use if vlmaps.vlfm.fill_small_holes is not used in obsatcle map update
 hole_area_thresh: 10000
-map_size: 500
+map_size: 600
 
 gaussian_sigma: 1.0
 customize_obstacle_map: False # if false: use height-limited map, else index map

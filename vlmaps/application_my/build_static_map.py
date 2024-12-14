@@ -554,7 +554,7 @@ class TMP(VLMap):
             pcd_global = o3d.geometry.PointCloud()
             pcd_global.points = o3d.utility.Vector3dVector(pc_downsampled)
             global_pcd += pcd_global
-            visualize_pc(global_pcd,headless=False, save_path =f"{frame_i}.jpg")
+            # visualize_pc(global_pcd,headless=False, save_path =f"{frame_i}.jpg")
             pcs.append(pc_downsampled)
 
             pc_image = camera.get_image_coords_from_world_points(pc_downsampled) # or can rather sample from scratch(depth image)
