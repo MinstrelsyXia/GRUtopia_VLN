@@ -53,52 +53,10 @@ from vlmaps.vlmaps.utils.visualize_utils import (
 from vlmaps.vlmaps.utils.matterport3d_categories import mp3dcat
 from vlmaps.vlmaps.utils.index_utils import find_similar_category_id, get_segment_islands_pos, get_dynamic_obstacles_map_3d
 from vlmaps.vlmaps.utils.clip_utils import get_img_feats, get_text_feats_multiple_templates
-
-import isaacsim
-from omni.isaac.kit import SimulationApp
-
-
-from omni.isaac.core import World
-from omni.isaac.sensor import Camera
-import numpy as np
-# from omni.isaac.lab.app import AppLauncher
-
+from vlmaps.application_my.utils import downsample_pc, visualize_pc, get_dummy_2d_grid, visualize_naive_occupancy_map
 import clip
 
-from grutopia.core.util.log import log
-from vlmaps.application_my.utils import downsample_pc, visualize_pc, get_dummy_2d_grid, visualize_naive_occupancy_map
-class my_Camera(Camera):
-    def __init__(self, prim_path, resolution):
-        super().__init__(prim_path=prim_path, resolution=resolution)
-        
-    def get_intrinsics_matrix(self) -> np.ndarray:
-        """
-        Returns:
-            np.ndarray: the intrinsics of the camera (used for calibration)
-        """
-        # if "pinhole" not in self.get_projection_type():
-        #     raise Exception("pinhole projection type is not set to be able to use get_intrinsics_matrix method.")
-        # focal_length = self.get_focal_length()
-        # horizontal_aperture = self.get_horizontal_aperture()
-        # vertical_aperture = self.get_vertical_aperture()
-        # (width, height) = self.get_resolution()
-        # fx = width * focal_length / horizontal_aperture
-        # fy = height * focal_length / vertical_aperture
-        # cx = width * 0.5
-        # cy = height * 0.5
-        # return self._backend_utils.create_tensor_from_list(
-        #     [[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype="float32", device=self._device
-        # )
-        return self._backend_utils.create_tensor_from_list(
-           [[554.25616,   0.     , 320.     ],
-            [  0.     , 554.25616, 240.     ],
-            [  0.     ,   0.     ,   1.     ]],dtype="float32", device=self._device)
-    
 
-def load_depth_npy(depth_filepath: Union[Path, str]):
-    with open(depth_filepath, "rb") as f:
-        depth = np.load(f)
-    return depth
 
 def load_3d_map(map_path: Union[Path, str]):
     try:
@@ -151,9 +109,10 @@ class TMP(VLMap):
             self.depth_dir = self.data_dir / "depth"
             self.pose_path = self.data_dir / "poses.txt"
 
-        self.segmentation_dir = self.test_file_save_dir + "/segmentation"
-        if not os.path.exists(self.segmentation_dir):
-            os.makedirs(self.segmentation_dir)
+        self.segmentation_dir = '/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes/s8pcmisQ38h/id_37/segmentation'
+        # self.segmentation_dir = self.test_file_save_dir + "/segmentation"
+        # if not os.path.exists(self.segmentation_dir):
+        #     os.makedirs(self.segmentation_dir)
         if self.pure_dynamic_map:
             print("not loading rgb paths")
             return
@@ -367,7 +326,7 @@ class TMP(VLMap):
         # Note that the pointclouds have the world corrdinates that some values are very negative
         # We need to convert it into the map coordinates
         if len(point_cloud)==0:
-            log.error(f"The shape of point cloud is not correct. The shape is {point_cloud.shape}.")
+            # log.error(f"The shape of point cloud is not correct. The shape is {point_cloud.shape}.")
             return None
         point_cloud[...,:2] = point_cloud[..., :2] - self.init_world_pos[:2]
 
@@ -826,10 +785,11 @@ class TMP(VLMap):
         return mask
     
     def judge_room(self, obs):
-        room_names = ['bedroom', 'dining', 'kitchen', 'living', 'office', 'other']
+        room_names = ['bedroom', 'dining room', 'kitchen', 'living room', 'office', 'hallway', 'unknown']
         similarity = []
         for room_name in room_names:
             similarity.append(self.get_score_mat_clip(obs, [room_name]))
+        print(similarity)
         return room_names[np.argmax(similarity)]
 
 
@@ -895,91 +855,3 @@ class TMP(VLMap):
 
     def get_room_pos(self, room_name: str) -> np.ndarray:
         pass
-
-@hydra.main(
-    version_base=None,
-    config_path="../config_my",
-    config_name="map_indexing_cfg.yaml",
-)
-def main(config: DictConfig) -> None:
-    simulation_app = SimulationApp({'headless': True, 'anti_aliasing': 0, 'renderer': 'RayTracing'})
-    my_world = World(stage_units_in_meters=1.0)
-    camera = my_Camera(
-        prim_path="/World/camera",
-        resolution=(640, 480) # (640,480)
-    )
-    # data_dir = '/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes/s8pcmisQ38h/id_2606'
-    data_dir = config.data_paths.vlmaps_data_dir
-    data_dir = Path(config.data_paths.vlmaps_data_dir)
-    data_dirs = sorted([x for x in data_dir.iterdir() if x.is_dir()])
-    scene_ids = config.scene_id
-    if (type(scene_ids)==int):
-        scene_ids = [scene_ids]
-
-    main_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes/s8pcmisQ38h/id_37"
-
-    
-    for scene_id in scene_ids:
-        scene_dir = Path(config.data_paths.vlmaps_data_dir)
-        tmp = TMP(data_dir = main_dir,map_config=config.map_config,robot_init_pose=[5.582849979400635, -2.817889928817749, -0.5765579462051391])
-
-
-        pose = np.loadtxt(main_dir + "/poses.txt")
-        headless = False
-        i = 0
-        depth_dir = os.path.join(main_dir, "depth")
-        rgb_dir = os.path.join(main_dir, "rgb")
-
-        depth_files = sorted(os.listdir(depth_dir), key=lambda x: int(
-        x.split("_")[-1].split(".")[0]))
-        rgb_files = sorted(os.listdir(rgb_dir), key=lambda x: int(
-        x.split("_")[-1].split(".")[0]))
-        
-        # 读取第一个深度图文件以获取图像大小
-        depth_map = np.load(os.path.join(depth_dir, depth_files[0]))
-        k = 0
-        robot_bottom_z = 0.0
-        tmp.init_map()
-        while simulation_app.is_running():
-            my_world.step()
-            i+=1
-            print(i)
-            if i % 10 ==0:
-                if(k>=len(depth_files)):
-                    break
-                camera.set_world_pose(pose[k, :3], pose[k, 3:])
-                depth_map = np.load(os.path.join(depth_dir, depth_files[k]))
-                rgb = cv2.imread(os.path.join(rgb_dir, rgb_files[k]))
-                tmp._update_semantic_map(camera, rgb, depth_map, labels = mp3dcat[1:-1])
-                k+=1
-        
-        tmp.init_categories(mp3dcat[1:-1])
-        
-        for cat in mp3dcat[1:]:
-            mask = tmp.index_map(cat, with_init_cat=True)
-            t= np.sum(mask)
-            print(t)
-
-            if (t == 0):
-                continue
-            mask_2d = pool_3d_label_to_2d(mask, tmp.grid_pos, config.params.gs)
-            rgb_2d = pool_3d_rgb_to_2d(tmp.grid_rgb, tmp.grid_pos, config.params.gs)
-            save_path = tmp.map_save_dir / f"{cat}_masked_map_2d.jpg"
-            print(save_path)
-            visualize_masked_map_2d(rgb_2d, mask_2d,save_path = save_path)
-
-            heatmap = get_heatmap_from_mask_2d(mask_2d, cell_size=config.params.cs, decay_rate=config.decay_rate)
-            save_path = tmp.map_save_dir / f"{cat}_heatmap_2d.jpg"
-            visualize_heatmap_2d(rgb_2d, heatmap, save_path = save_path)
-
-            save_path = tmp.map_save_dir/ f"{cat}_masked_map_3d.pcd"
-            visualize_masked_map_3d(tmp.grid_pos, mask, tmp.grid_rgb, save_path = str(save_path))
-            heatmap = get_heatmap_from_mask_3d(
-                tmp.grid_pos, mask, cell_size=config.params.cs, decay_rate=config.decay_rate
-            )
-            save_path = tmp.map_save_dir / f"{cat}_heatmap_3d.pcd"
-            visualize_heatmap_3d(tmp.grid_pos, heatmap, tmp.grid_rgb,save_path = str(save_path))
-    simulation_app.close()
-
-if __name__ == "__main__":
-    main()

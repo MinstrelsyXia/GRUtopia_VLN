@@ -7,6 +7,8 @@ import numpy as np
 import hydra
 import matplotlib.pyplot as plt
 import cv2
+import os
+import traceback
 # from vlmaps.vlmaps.task.habitat_task import HabitatTask
 # from vlmaps.vlmaps.utils.habitat_utils import agent_state2tf, get_position_floor_objects
 # from vlmaps.vlmaps.utils.navigation_utils import get_dist_to_bbox_2d
@@ -91,10 +93,6 @@ import cv2
 
 class IsaacSimSpatialGoalNavigationTask():
     def __init__(self,config):
-        self.actions = []
-        self.pos_list = [] # xyz coord
-        self.pos_list_all = [] # list of list
-        self.simple_pos_list_all = [] # list of list
         self.config = config
         
 
@@ -129,6 +127,9 @@ class IsaacSimSpatialGoalNavigationTask():
     def setup_task(self, item):
         # remember to transpose
         self.action_funcs = []
+        self.pos_list = [] # xyz coord
+        self.pos_list_all = [] # list of list
+        self.simple_pos_list_all = [] # list of list
         self.instruction = item["instruction"]['instruction_text']
         self.goals = np.array(item["reference_path"])
         self.ground_height = np.mean(self.goals[:,2])
@@ -287,7 +288,12 @@ class IsaacSimSpatialGoalNavigationTask():
             (255, 0, 0),     # 蓝色
             (255, 0, 255)    # 紫色
         ]
-
+        # 绘制参考轨迹
+        if len(gt_obs) > 1:
+            for i in range(len(gt_obs) - 1):
+                pt1 = tuple(gt_obs[i])
+                pt2 = tuple(gt_obs[i + 1])
+                cv2.line(vis_map, pt1, pt2, (255, 0, 0), 1, cv2.LINE_AA)  # 参考轨迹始终为蓝色
         # 绘制每个episode的轨迹
         for idx, traj_obs in enumerate(traj_obs_list):
             # 确保traj_obs是二维数组
@@ -305,24 +311,19 @@ class IsaacSimSpatialGoalNavigationTask():
                     pt2 = tuple(traj_obs[i + 1])
                     cv2.line(vis_map, pt1, pt2, color, 1, cv2.LINE_AA)
 
-                # 绘制起始点（绿色空心圆）
-                if len(traj_obs) > 0:
-                    start_point = tuple(traj_obs[0])
-                    cv2.circle(vis_map, start_point, radius=2, color=color, 
-                               thickness=1, lineType=cv2.LINE_AA)
+                # # 绘制起始点（绿色空心圆）
+                # if len(traj_obs) > 0:
+                #     start_point = tuple(traj_obs[0])
+                #     cv2.circle(vis_map, start_point, radius=2, color=color, 
+                #                thickness=1, lineType=cv2.LINE_AA)
 
-                # 绘制终点（蓝色空心圆）
-                if len(traj_obs) > 0:
-                    end_point = tuple(traj_obs[-1])
-                    cv2.circle(vis_map, end_point, radius=2, color=color, 
-                               thickness=1, lineType=cv2.LINE_AA)
+                # # 绘制终点（蓝色空心圆）
+                # if len(traj_obs) > 0:
+                #     end_point = tuple(traj_obs[-1])
+                #     cv2.circle(vis_map, end_point, radius=2, color=color, 
+                #                thickness=1, lineType=cv2.LINE_AA)
 
-        # 绘制参考轨迹
-        if len(gt_obs) > 1:
-            for i in range(len(gt_obs) - 1):
-                pt1 = tuple(gt_obs[i])
-                pt2 = tuple(gt_obs[i + 1])
-                cv2.line(vis_map, pt1, pt2, (255, 0, 0), 1, cv2.LINE_AA)  # 参考轨迹始终为蓝色
+
 
         # 保存图像
         cv2.imwrite(save_path, vis_map)

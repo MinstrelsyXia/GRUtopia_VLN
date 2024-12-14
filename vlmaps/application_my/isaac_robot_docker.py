@@ -197,6 +197,7 @@ class IsaacSimLanguageRobot(LangRobot):
 
         self.item = item
 
+        # for vlmap
         self.setup_map(self.vlmaps_data_dir)
         self.setup_camera()
         cropped_obst_map = self.map.get_obstacle_cropped()
@@ -273,58 +274,10 @@ class IsaacSimLanguageRobot(LangRobot):
         """
         Setup IsaacSim simulator, load IsaacSim scene and relevant mesh data
         """
-        # if not dynamic
-        # if vlmap_dataset==False:
-        #     for item in self.data:
-        #         if item['trajectory_id'] == path_id:
-        #             scene_usd_path = load_scene_usd(self.vln_config, item['scan'])
-        #             instruction = item['instruction']['instruction_text']
-        #             if 'stair' in instruction:
-        #                 continue
-        #             self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
-        #             self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
-        #             self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
-        #             self.init_env(self.sim_config, headless=self.vln_config.headless)
-        #             self.init_omni_env()
-        #             self.init_agents()
-        #             self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
-        #             log.info("Initialized path id %d", path_id)
-        #             log.info("Scan: %s", item['scan'])
-        #             log.info("Instruction: %s", item['instruction']['instruction_text'])
-        #             self.instruction = item['instruction']['instruction_text']
-        #             log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
-        #             return item
-        #     log.error("Path id %d not found in the dataset", path_id)
-        #     return None
-        # else:
-        #     for item in self.data:
-        #         if item['scan'] in self.vlmaps_data_save_dirs.split("/")[-1]:
-        #             # item['scan]: s8pc...
-        #             scene_usd_path = load_scene_usd(self.vln_config, item['scan'])
-        #             self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
-        #             self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
-        #             self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
-        #             self.init_env(self.sim_config, headless=self.vln_config.headless)
-        #             self.init_omni_env()
-        #             self.init_agents()
-        #             self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path,start_point=item["start_position"]) 
-        #             self.init_occupancy_map()
-        #             log.info("Initialized path id %d", item['trajectory_id'])
-        #             log.info("Scan: %s", item['scan'])
-        #             log.info("Instruction: %s", item['instruction']['instruction_text'])
-        #             self.instruction = item['instruction']['instruction_text']
-        #             log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
-        #             return item
-        #     log.error("Path id %d not found in the dataset", path_id)
-        #     return None
-
         for item in self.data:
             if item['episode_id'] == episode_id:
                 scene_usd_path = load_scene_usd(self.vln_config, item['scan'])
                 instruction = item['instruction']['instruction_text']
-                # if 'stair' in instruction:
-                #     print('erroe!!! stair occurrs')
-                #     continue
                 self.sim_config.config.tasks[0].scene_asset_path = scene_usd_path
                 self.sim_config.config.tasks[0].robots[0].position = item["start_position"]
                 self.sim_config.config.tasks[0].robots[0].orientation = item["start_rotation"] 
@@ -667,15 +620,18 @@ class IsaacSimLanguageRobot(LangRobot):
             prev_pos = self.curr_pos_on_map
             prev_ang = self.curr_ang_deg_on_map
         self.subgoal = None
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully executed {action_name}")
 
     def get_robot_bottom_z(self):
         '''get robot bottom z'''
         return self.env._runner.current_tasks[self.task_name].robots[self.robot_name].get_ankle_base_z()-self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
     
     def move_to_object(self, name: str):
+        self.eval_helper.add_action_func(f"Step:{self.step}: move to object {name}")
         self._set_nav_curr_pose()
         pos = self.map.get_nearest_pos(self.curr_pos_on_map, name)
         self.move_to(pos)
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully move to object {name}")
 
     def get_global_free_map(self, verbose=False):
         ''' Use top-down orthogonal camera to get the ground-truth surrounding free map
@@ -823,6 +779,7 @@ class IsaacSimLanguageRobot(LangRobot):
                     reset_robot = self.check_and_reset_robot(cur_iter=self.step, update_freemap=False, verbose=self.vln_config.test_verbose)
                     reset_flag = reset_robot
                     if reset_flag:
+                        self.eval_helper.add_action_func(f"Step:{self.step}: Robot fall down in move_to.")
                         # self.map.update_occupancy_map(verbose = self.vln_config.test_verbose) #! find dilate->vlmap occupancy map
                         # self._set_nav_curr_pose()
                         # # plan the path
@@ -845,8 +802,9 @@ class IsaacSimLanguageRobot(LangRobot):
                         self.eval_helper.start_new_episode(self.step)
                         
                     else:
+                        self.eval_helper.add_action_func(f"Step:{self.step}: reset the robot finished")
                         break
-                self.eval_helper.add_action_func(f"Step:{self.step}: reset the robot finished")
+                
 
 
             if (self.step % 200 == 0):
@@ -993,6 +951,7 @@ class IsaacSimLanguageRobot(LangRobot):
                     reset_robot = self.check_and_reset_robot(cur_iter=self.step, update_freemap=False, verbose=self.vln_config.test_verbose)
                     reset_flag = reset_robot
                     if reset_flag:
+                        self.eval_helper.add_action_func(f"Step:{self.step}: Robot fall down in turn.")
                         # self.map.update_occupancy_map(verbose = self.vln_config.test_verbose) #! find dilate->vlmap occupancy map
                         self._set_nav_curr_pose()
                         # plan the path
@@ -1287,7 +1246,6 @@ class IsaacSimLanguageRobot(LangRobot):
         self.cam_occupancy_map_local = None
         self.cam_occupancy_map_global = None
         self.ObstacleMap = None
-        self.eval_helper = None
     
     def move_to_room(self, room_name):
         pass
@@ -1451,9 +1409,9 @@ def main(config: DictConfig) -> None:
                 while robot.env.simulation_app.is_running():
                     robot.eval_helper.add_pos(robot.agents.get_world_pose()[0])
                     robot.warm_up(200)
-                    
                     #! for debuging
-                    robot.save_metric()
+                    # goal_obs = robot.ObstacleMap._xy_to_px(robot.eval_helper.goals[:,:2])
+                    # robot.move_to(goal_obs[1],'obs')
                     ''' if the target is reached, then raise EarlyFound and stop the exploration'''
                     for cat_i, subgoal in enumerate(parsed_instructions):
                         if cat_i >= skip_flag:
@@ -1479,11 +1437,13 @@ def main(config: DictConfig) -> None:
                     break # break from 'while simulator is running'
 
     except Exception as e:
+        log.error(f"Unexpected error: {e}")
+        log.error("Traceback: %s", traceback.format_exc())
         ''' restart, and save the episode no matter it is finished or not'''
         if robot.env.simulation_app.is_running():
-            robot.save_metric()
-            robot.clear_maps()
             try:
+                robot.save_metric()
+                robot.clear_maps()
                 # 确保父目录存在
                 os.makedirs(os.path.dirname(config.last_scan_file), exist_ok=True)
                 
