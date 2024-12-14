@@ -262,12 +262,18 @@ class DaggerDiffusonPolicyTrainer:
                 losses = []
                 cos_sims= []
 
-                for batch in tqdm.tqdm(
-                    diter,
-                    total=len(diter),
-                    leave=False,
-                    dynamic_ncols=True,
-                ):
+                # Only show progress bar when not running in slurm
+                if not is_slurm_batch_job() and (self.config.DDP.use and not self.config.DDP.use_dp and self.local_rank < 1):
+                    batch_iterator = tqdm.tqdm(
+                        diter,
+                        total=len(diter),
+                        leave=False,
+                        dynamic_ncols=True,
+                    )
+                else:
+                    batch_iterator = diter
+                
+                for batch in batch_iterator:
                     if self.config.IL.analysis_time:
                         start_time = time.time()
                     (
@@ -303,13 +309,14 @@ class DaggerDiffusonPolicyTrainer:
 
                     if self.local_rank < 1:
                         losses.append(loss)
-                        if step_id % 300 == 0:
+                        if step_id % 100 == 0:
+                            self.train_logger.info("================================================")
+                            self.train_logger.info(f"Batches processed: {step_id}.")
                             self.train_logger.info(f"train_loss: {loss}")
                             self.train_logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
                             self.train_logger.info(f"train_dist_loss: {dist_loss}")
                             self.train_logger.info(f"train_pm_loss: {pm_loss}")
                             self.train_logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
-                            self.train_logger.info(f"Batches processed: {step_id}.")
                             self.train_logger.info(
                                 f"On DAgger iter {dagger_it}, Epoch {epoch}."
                             )
