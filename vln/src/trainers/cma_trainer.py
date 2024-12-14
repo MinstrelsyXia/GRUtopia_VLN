@@ -719,7 +719,7 @@ class DaggerCMATrainer:
         if isinstance(obs, str):
             if obs == 'shortest_path_planning_failed':
                 while isinstance(obs, str) and obs == 'shortest_path_planning_failed':
-                    obs = self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
+                    obs = self.eval_env.construct_env(init_omni_env=False, result_json_path=self.result_json_path)
             elif obs == 'all_data_evaluated':
                 self.eval_logger.info(f"All data in {self.eval_env.current_split} and {split} have been evaluated.")
                 return 0, 0
