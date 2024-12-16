@@ -661,7 +661,7 @@ class TaskEnv(VLNDataLoader):
             
             # If cumulative distance exceeds threshold, add new waypoint
             if cumulative_distance >= distance_threshold:
-                cur_speed, only_rotation = self.action_to_speed(current_pos, max_distance=0.3, speed_actions=[], add_final_rotation=False)
+                cur_speed, only_rotation = self.action_to_speed(current_pos, max_distance=0.3, speed_actions=[], add_final_rotation=True)
                 speed_actions.extend(cur_speed)
                 # Reset cumulative distance and update last position
                 cumulative_distance = 0
@@ -671,7 +671,7 @@ class TaskEnv(VLNDataLoader):
                     break     
         
         if len(speed_actions) == 0:
-            cur_speed, only_rotation = self.action_to_speed(predicted_actions[-1], max_distance=0.3, speed_actions=[], add_final_rotation=False)
+            cur_speed, only_rotation = self.action_to_speed(predicted_actions[-1], max_distance=0.3, speed_actions=[], add_final_rotation=True)
             speed_actions.extend(cur_speed)
         
         return speed_actions

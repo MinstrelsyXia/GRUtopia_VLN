@@ -238,12 +238,17 @@ class CMA_DP_noRNN_Net(nn.Module):
         diffusion_output = noisy_diffusion_output
 
         for k in self.noise_scheduler.timesteps[:]:
-            if self.dp_type == 'transformer':
-                noise_pred = self.action_dp_pred_net(
-                    sample=diffusion_output, 
-                    timestep=k.unsqueeze(-1).repeat(diffusion_output.shape[0]).to(device),
-                    cond=lv_state.float(),
-                    type_embeds=type_embeds)
+            noise_pred = self.action_dp_pred_net(
+                sample=diffusion_output, 
+                timestep=k.unsqueeze(-1).repeat(diffusion_output.shape[0]).to(device),
+                cond=lv_state.float(),
+                type_embeds=type_embeds)
+
+            if k!=0 and sample_classifier_free_guidance: #if k!=0
+                noise_out, noise_out_null = noise_pred[:batch_size//2], noise_pred[batch_size//2:]
+                noise_out = noise_out_null + cls_free_guidance_scale * (noise_out - noise_out_null) # TODO: check the scale of cls_free_guidance_scale
+                # diff_out = cls_free_guidance_scale*(diff_out - diff_out_null)
+                noise_pred = torch.cat([noise_out, noise_out], dim=0)
 
             # inverse diffusion step (remove noise)
             diffusion_output = self.noise_scheduler.step(
@@ -251,12 +256,6 @@ class CMA_DP_noRNN_Net(nn.Module):
                 timestep=k,
                 sample=diffusion_output
             ).prev_sample
-            
-            if k !=0 and sample_classifier_free_guidance:
-                diff_out, diff_out_null = diffusion_output[:batch_size//2], diffusion_output[batch_size//2:]
-                # diff_out = diff_out_null + cls_free_guidance_scale * (diff_out - diff_out_null) # TODO: check the scale of cls_free_guidance_scale
-                diff_out = cls_free_guidance_scale*(diff_out - diff_out_null)
-                diffusion_output = torch.cat([diff_out, diff_out], dim=0)
         
         if sample_classifier_free_guidance:
             diffusion_output = diffusion_output[:batch_size//2]
@@ -281,21 +280,24 @@ class CMA_DP_noRNN_Net(nn.Module):
         batch_size = observations['instruction'].shape[0]
         
         # classifier-free guidance
-        if train_classifier_free_guidance:
+        if train_classifier_free_guidance and self.config.MODEL.Diffusion_Policy.random_mask_instr:
             # randomly mask the condition tokens for classifier-free guidance during training
             cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
             cls_free_mask = cls_free_mask.to(device)
             observations['instruction'][cls_free_mask, :] = torch.zeros_like(observations['instruction'][cls_free_mask, :])
+
         if sample_classifier_free_guidance:
             # copy condition to null for sampling
             obs_null = observations.copy()
-            obs_null['instruction'] = torch.zeros_like(obs_null['instruction'])
-            obs_null['stack_rgb'] = torch.zeros_like(obs_null['stack_rgb'])
-            if not self.model_config.IMAGE_ENCODER.DEPTH.update_depth_encoder:
-                # if update_depth_encoder, the null depth has been masked during img feature extraction
-                obs_null['stack_depth'] = torch.zeros_like(obs_null['stack_depth'])
-            else:
-                obs_null['stack_depth'] = obs_null['stack_null_depth']
+            if self.config.MODEL.Diffusion_Policy.random_mask_instr:
+                obs_null['instruction'] = torch.zeros_like(obs_null['instruction'])
+            if self.config.MODEL.Diffusion_Policy.random_mask_rgb:
+                obs_null['stack_rgb'] = torch.zeros_like(obs_null['stack_rgb'])
+                if not self.model_config.IMAGE_ENCODER.DEPTH.update_depth_encoder:
+                    # if update_depth_encoder, the null depth has been masked during img feature extraction
+                    obs_null['stack_depth'] = torch.zeros_like(obs_null['stack_depth'])
+                else:
+                    obs_null['stack_depth'] = obs_null['stack_null_depth']
 
             for k,v in obs_null.items():
                 observations[k] = torch.cat([observations[k], obs_null[k]], dim=0)
@@ -833,7 +835,7 @@ class CMA_DP_noRNN_Net(nn.Module):
                 else:
                     need_rgb_extraction = True
                 
-                if batch['train_cls_free_guidance']:
+                if batch['train_cls_free_guidance'] and self.config.MODEL.Diffusion_Policy.random_mask_rgb:
                     cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
                     cls_free_mask = cls_free_mask.to(device)
                     input_rgb[cls_free_mask] = torch.zeros_like(input_rgb[cls_free_mask])
@@ -852,7 +854,7 @@ class CMA_DP_noRNN_Net(nn.Module):
                     batch['observations']['stack_rgb'] = stack_rgb
                     batch['observations']['stack_depth'] = stack_depth
             else:
-                if batch['train_cls_free_guidance']:
+                if batch['train_cls_free_guidance'] and self.config.MODEL.Diffusion_Policy.random_mask_rgb:
                     cls_free_mask = torch.rand(batch_size) < self.model_config.Diffusion_Policy.cls_mask_ratio
                     cls_free_mask = cls_free_mask.to(device)
                     batch['observations']['stack_rgb'][cls_free_mask] = torch.zeros_like(batch['observations']['stack_rgb'][cls_free_mask])
