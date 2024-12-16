@@ -63,6 +63,8 @@ class DaggerDiffusonPolicyTrainer:
         self.logger = logger
         self.world_size = self.config.world_size if self.config.DDP.use else 1
         self.local_rank = self.config.local_rank
+        print(f"self.world_size: {self.world_size}")
+        print(f"self.local_rank: {self.local_rank}")
         self.is_distributed = self.world_size > 1 and (not self.config.DDP.use_dp)
         
         if self.is_distributed:
@@ -201,7 +203,7 @@ class DaggerDiffusonPolicyTrainer:
                 torch.cuda.empty_cache()
         gc.collect()
                 
-        self.policy, self.optimizer = initialize_policy(
+        self.policy, self.optimizer, self.lr_scheduler = initialize_policy(
             self.config,
             self.train_logger,
             self.config.IL.load_from_ckpt,
@@ -346,33 +348,44 @@ class DaggerDiffusonPolicyTrainer:
                         step_id += 1  # noqa: SIM113
                         
                         # save the ckpt according to the steps
-                        if not self.use_rnn and step_id % self.config.IL.save_interval_steps == 0:
+                        if not self.use_rnn and self.config.IL.save_interval_steps != -1 and step_id % self.config.IL.save_interval_steps == 0:
                             self.save_checkpoint(
                                 f"ckpt-epoch-{epoch}-step-{step_id}.pth",
                                 filter_frozen_weights=self.config.IL.save_filter_frozen_weights
                             )
                 
+                # 更新学习率
+                if self.config.IL.lr_schedule.use:
+                    current_lr = self.optimizer.param_groups[0]["lr"]
+                    self.lr_scheduler.step()
+                    new_lr = self.optimizer.param_groups[0]["lr"]
+                
+                if self.local_rank < 1:
+                    self.train_logger.info(f"Learning rate adjusted from {current_lr:.6f} to {new_lr:.6f}")
+                    writer.add_scalar(f"train_lr_iter_{dagger_it}", new_lr, epoch)
+
                 # save the log
-                self.train_logger.info(f"*******Epoch {epoch}*********")
-                epoch_loss = sum(losses) / len(losses)
-                if epoch_loss < last_least_loss:
-                    least_loss_epoch = epoch
-                    last_least_loss = epoch_loss
-                self.train_logger.info(
-                    f"loss: {epoch_loss:.6f}"
-                )
-                self.train_logger.info(
-                    f"Epoch {least_loss_epoch} has the least loss: {last_least_loss:.6f}"
-                )     
-                # epoch_cos_sim = sum(cos_sims) / len(cos_sims)
-                # if epoch_cos_sim > last_best_cossims:
-                #     best_cossims_epoch = epoch
-                #     last_best_cossims = epoch_cos_sim
-                #     self.train_logger.info(
-                #         f"cos sim: {epoch_cos_sim:.6f}")
-                #     self.train_logger.info(
-                #         f"Epoch {best_cossims_epoch} has the highest cos sim: {last_best_cossims:.6f}"
-                #     )
+                if self.local_rank < 1:
+                    self.train_logger.info(f"*******Epoch {epoch}*********")
+                    epoch_loss = sum(losses) / len(losses)
+                    if epoch_loss < last_least_loss:
+                        least_loss_epoch = epoch
+                        last_least_loss = epoch_loss
+                    self.train_logger.info(
+                        f"loss: {epoch_loss:.6f}"
+                    )
+                    self.train_logger.info(
+                        f"Epoch {least_loss_epoch} has the least loss: {last_least_loss:.6f}"
+                    )     
+                    # epoch_cos_sim = sum(cos_sims) / len(cos_sims)
+                    # if epoch_cos_sim > last_best_cossims:
+                    #     best_cossims_epoch = epoch
+                    #     last_best_cossims = epoch_cos_sim
+                    #     self.train_logger.info(
+                    #         f"cos sim: {epoch_cos_sim:.6f}")
+                    #     self.train_logger.info(
+                    #         f"Epoch {best_cossims_epoch} has the highest cos sim: {last_best_cossims:.6f}"
+                    #     )
 
                 if self.local_rank < 1 and epoch % self.config.IL.save_interval_epochs==0:
                     self.save_checkpoint(
@@ -919,8 +932,8 @@ class DaggerDiffusonPolicyTrainer:
                     'add_noise_to_action': False,
                     'denoise_action': True,
                     'num_sample': self.config.EVAL.num_sample,
-                    # 'vis': self.config.test_verbose,
-                    'vis': False,
+                    'vis': self.config.test_verbose,
+                    # 'vis': False,
                     'step': sim_steps[0],
                     'episode_ids': current_episodes['episode_id'],
                     'stop_mode': self.config.EVAL.stop_mode,

@@ -41,7 +41,7 @@ def initialize_policy(
         
         seed = config.seed
         if config.DDP.use:
-            seed += config.rank
+            seed += config.local_rank
         set_random_seed(seed)
 
         # if default_gpu:
@@ -62,9 +62,6 @@ def initialize_policy(
             action_stats=action_stats,
         )
             
-        optimizer = torch.optim.Adam(
-            self_policy.parameters(), lr=float(config.IL.lr)
-        )
         if load_from_pretrain:
             new_ckpt_weights = {}
             model_config = config.MODEL
@@ -173,5 +170,31 @@ def initialize_policy(
         else:
             self_policy.to(device)
         
-        return self_policy, optimizer
+        optimizer = torch.optim.Adam(
+            self_policy.parameters(), lr=float(config.IL.lr)
+        )
+
+        lr_scheduler = None
+        if config.IL.lr_schedule.use:
+            if config.IL.lr_schedule.type == "cosine":
+                lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    optimizer,
+                    T_max=config.IL.epochs,
+                    eta_min=float(config.IL.lr_schedule.min_lr)
+                )
+            elif config.IL.lr_schedule.type == "step":
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=config.IL.lr_schedule.decay_epochs,
+                    gamma=float(config.IL.lr_schedule.decay_factor)
+                )
+            elif config.IL.lr_schedule.type == "linear":
+                lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer,
+                    start_factor=config.IL.lr_schedule.warmup_factor,
+                    end_factor=1.0,
+                    total_iters=config.IL.lr_schedule.warmup_epochs
+                )
+        
+        return self_policy, optimizer, lr_scheduler
     

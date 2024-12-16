@@ -38,7 +38,8 @@ def set_cuda(opts, device=None) -> Tuple[bool, int, torch.device]:
     # get device settings
     # if opts.local_rank != -1:
     if opts.DDP.use:
-        init_param = init_distributed(opts)
+        # init_param = init_distributed(opts)
+        setup_ddp(opts.local_rank, opts.world_size)
         opts.local_rank = dist.get_rank()
         torch.cuda.set_device(opts.local_rank)
         device = torch.device("cuda", opts.local_rank)
@@ -246,4 +247,12 @@ def reduce_dict(input_dict, average=True):
         reduced_dict = {k: v for k, v in zip(names, values)}
     return reduced_dict
 
-
+def setup_ddp(local_rank, world_size):
+    # Initialize the distributed environment
+    dist.init_process_group(
+        backend='nccl',  # Use NCCL backend for GPU
+        init_method='env://',  # Use environment variables for initialization
+        world_size=world_size,  # Total number of processes
+        rank=local_rank,  # Rank of the current process
+    )
+    torch.cuda.set_device(local_rank)  # Set GPU device for the current process

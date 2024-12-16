@@ -1,4 +1,4 @@
-NAME: 20241212-vlnce-rp-noRNN-DPDec6-txtLayer12-txtQformer-stackRGB8-clsFreeP0.25-bs320-lr2e-4
+NAME: 20241212-vlnce-rp-noRNN-DPDec12-txtLayer12-txtQformer-stackRGB8-clsFreeP0.25-bs320-lr2e-4
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [1]
 TORCH_GPU_ID: 1
@@ -11,8 +11,8 @@ NUM_ENVIRONMENTS: 4
 # TENSORBOARD_DIR: data/tensorboard_dirs/*name
 TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
-EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
-# EVAL_CKPT_PATH_DIR: data/checkpoints/20241202-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint/ckpts/ckpt.58.pth
+# EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
+EVAL_CKPT_PATH_DIR: /ssd/wangliuyi/code/w61_grutopia/data/checkpoints/20241212-vlnce-rp-noRNN-DPDec6-txtLayer12-txtQformer-stackRGB8-clsFreeP0.25-bs320-lr2e-4/ckpts/ckpt-epoch-5-step-13500.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
@@ -53,7 +53,7 @@ EVAL:
   stop_y_threshold: 1e-2
   stop_yaw_threshold: 2e-2
 
-  rotation_threshold: 1e-2
+  rotation_threshold: 1e-1
 
   # for dynamic len_traj_act
   use_dynamic_len_traj_act: false
@@ -87,6 +87,7 @@ IL:
   lr: 1e-4
   
   save_interval_epochs: 2
+  save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: true
   ckpt_to_load: none
@@ -209,8 +210,8 @@ MODEL:
     pred_type: epsilon # epsilon / sample
 
     # classifier-free guidance
-    use_cls_free_guidance: false
-    cls_free_guidance_scale: 2 # 4
+    use_cls_free_guidance: true
+    cls_free_guidance_scale: 1.5
     cls_mask_ratio: 0.25
 
     # distance bounds for distance and action and distance predictions 
@@ -244,7 +245,7 @@ MODEL:
 
     # for transformer
     transformer_n_cond_layers: 0
-    transformer_n_layers: 6
+    transformer_n_layers: 12
     transformer_encoding_size: 512
     # transformer_n_head: 8
     transformer_p_drop_emb: 0
