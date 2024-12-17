@@ -5,16 +5,16 @@ export PYTHONPATH=$PYTHONPATH:/ailab/user/wangliuyi/code/w61_grutopia
 if [ "$1" == "--train" ]; then
   if [ "$2" == "ddp" ]; then
     # DDP training using torch.run
-    export CUDA_VISIBLE_DEVICES=4,5,6
+    export CUDA_VISIBLE_DEVICES=1,2,7
     export NCCL_SOCKET_IFNAME=lo
-    # export NCCL_PORT_RANGE=29501-29510
-    export NCCL_PORT_RANGE=29511-29515
+    export NCCL_PORT_RANGE=29501-29510
+    # export NCCL_PORT_RANGE=29511-29515
 
     python -m torch.distributed.run --nproc_per_node=3 \
             --nnodes=1 \
             --node_rank=0 \
             --master_addr=localhost \
-            --master_port=29510 \
+            --master_port=29500 \
             vln/run_policy.py \
             --exp-config vln/configs/train/cma_dp_train_noRNN.yaml \
             --run-type train \

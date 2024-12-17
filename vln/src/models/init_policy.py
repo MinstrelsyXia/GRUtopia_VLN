@@ -112,6 +112,8 @@ def initialize_policy(
                 state_dict = ckpt_dict['state_dict']
             else:
                 state_dict = ckpt_dict
+            if 'epoch' in ckpt_dict:
+                start_epoch = ckpt_dict['epoch']
             new_state_dict = {}
             # Iterate through the state dictionary items
             for k, v in state_dict.items():
@@ -196,5 +198,5 @@ def initialize_policy(
                     total_iters=config.IL.lr_schedule.warmup_epochs
                 )
         
-        return self_policy, optimizer, lr_scheduler
+        return self_policy, optimizer, lr_scheduler, start_epoch
     

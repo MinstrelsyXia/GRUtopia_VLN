@@ -40,7 +40,7 @@ EVAL:
   SPLIT: [train]
   EPISODE_COUNT: -1
   MAX_STEPS: 195
-  train_eval_interval: 20
+  train_eval_interval: 100
   ACTION: xyyaw # descrete or xyyaw
 
   # for xyyaw
@@ -84,9 +84,9 @@ IL:
   save_interval_epochs: 2
   save_interval_steps: -1
   save_filter_frozen_weights: true # only save the learnable weights!
-  load_from_ckpt: false
-  ckpt_to_load: none
-  load_from_pretrain: true
+  load_from_ckpt: true
+  ckpt_to_load: /ssd/wangliuyi/code/w61_grutopia/data/checkpoints/20241215-vlnce-rp-noRNN-DPDec12Step100-txtLayer12-txtQformer-stackRGB16-ClsFree0.25-bs80x4-lr2e-4-lrCos/ckpts/ckpt.14.pth
+  load_from_pretrain: false
 
   dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_corrected
 
@@ -254,7 +254,7 @@ MODEL:
 
     # for transformer
     transformer_n_cond_layers: 0
-    transformer_n_layers: 8
+    transformer_n_layers: 12
     transformer_encoding_size: 512
     # transformer_n_head: 8
     transformer_p_drop_emb: 0
