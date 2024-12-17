@@ -203,7 +203,7 @@ class DaggerDiffusonPolicyTrainer:
                 torch.cuda.empty_cache()
         gc.collect()
                 
-        self.policy, self.optimizer, self.lr_scheduler = initialize_policy(
+        self.policy, self.optimizer, self.lr_scheduler, start_epoch = initialize_policy(
             self.config,
             self.train_logger,
             self.config.IL.load_from_ckpt,
@@ -215,7 +215,7 @@ class DaggerDiffusonPolicyTrainer:
         is_distributed = self.is_distributed
         rank = self.local_rank if self.is_distributed else 0
         world_size = self.world_size
-        start_epoch = 0
+        # start_epoch = 0
         
         with TensorboardWriter(self.config.TENSORBOARD_DIR, flush_secs=30, purge_step=0) as writer:        
             if self.world_size > 1:
@@ -351,7 +351,8 @@ class DaggerDiffusonPolicyTrainer:
                         if not self.use_rnn and self.config.IL.save_interval_steps != -1 and step_id % self.config.IL.save_interval_steps == 0:
                             self.save_checkpoint(
                                 f"ckpt-epoch-{epoch}-step-{step_id}.pth",
-                                filter_frozen_weights=self.config.IL.save_filter_frozen_weights
+                                filter_frozen_weights=self.config.IL.save_filter_frozen_weights,
+                                epoch=epoch
                             )
                 
                 # 更新学习率
@@ -360,9 +361,9 @@ class DaggerDiffusonPolicyTrainer:
                     self.lr_scheduler.step()
                     new_lr = self.optimizer.param_groups[0]["lr"]
                 
-                if self.local_rank < 1:
-                    self.train_logger.info(f"Learning rate adjusted from {current_lr:.6f} to {new_lr:.6f}")
-                    writer.add_scalar(f"train_lr_iter_{dagger_it}", new_lr, epoch)
+                    if self.local_rank < 1:
+                        self.train_logger.info(f"Learning rate adjusted from {current_lr:.6f} to {new_lr:.6f}")
+                        writer.add_scalar(f"train_lr_iter_{dagger_it}", new_lr, epoch)
 
                 # save the log
                 if self.local_rank < 1:
@@ -390,10 +391,11 @@ class DaggerDiffusonPolicyTrainer:
                 if self.local_rank < 1 and epoch % self.config.IL.save_interval_epochs==0:
                     self.save_checkpoint(
                         f"ckpt.{dagger_it * self.config.IL.epochs + epoch}.pth",
-                        filter_frozen_weights=self.config.IL.save_filter_frozen_weights
+                        filter_frozen_weights=self.config.IL.save_filter_frozen_weights,
+                        epoch=epoch
                     )
             
-    def save_checkpoint(self, file_name: str, filter_frozen_weights=False) -> None:
+    def save_checkpoint(self, file_name: str, filter_frozen_weights=False, epoch=0) -> None:
         """Save checkpoint with specified name.
 
         Args:
@@ -413,6 +415,7 @@ class DaggerDiffusonPolicyTrainer:
         checkpoint = {
             "state_dict": state_dict,
             "config": self.config,
+            'epoch': epoch
         }
             
         torch.save(
@@ -787,7 +790,7 @@ class DaggerDiffusonPolicyTrainer:
                 return 0, 0
 
         '''Init the policy'''
-        self.policy, _ = initialize_policy(
+        self.policy, _, _, _ = initialize_policy(
             self.config,
             self.eval_logger,
             load_from_ckpt=True, # config.IL.load_from_ckpt
@@ -921,6 +924,12 @@ class DaggerDiffusonPolicyTrainer:
                 # this ckpt is too bad to continue
                 self.eval_logger.info(f"Break. This ckpt is too bad to continue with average SPL {np.mean(list(spl_dict.values())):.3f}")
                 break
+                
+            if self.config.test_verbose:
+                rgbs_for_vis_in_model = [x['rgb'] for x in observations]
+                depths_for_vis_in_model = [x['depth'] for x in observations]
+            else:
+                rgbs_for_vis_in_model, depths_for_vis_in_model = None, None
 
             with torch.no_grad():
                 batch_settings = {
@@ -932,8 +941,6 @@ class DaggerDiffusonPolicyTrainer:
                     'add_noise_to_action': False,
                     'denoise_action': True,
                     'num_sample': self.config.EVAL.num_sample,
-                    'vis': self.config.test_verbose,
-                    # 'vis': False,
                     'step': sim_steps[0],
                     'episode_ids': current_episodes['episode_id'],
                     'stop_mode': self.config.EVAL.stop_mode,
@@ -943,6 +950,10 @@ class DaggerDiffusonPolicyTrainer:
                     'train_cls_free_guidance': False,
                     'sample_cls_free_guidance': self.config.MODEL.Diffusion_Policy.use_cls_free_guidance,
                     'need_txt_extraction': True,
+                    'vis': self.config.test_verbose,
+                    'rgbs': rgbs_for_vis_in_model,
+                    'depths': depths_for_vis_in_model,
+                    'instructions': [x['instruction']['instruction_text'] for x in current_episodes],
                 }
                 
                 actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred, stop_progress_pred = net(batch_settings)
@@ -1370,7 +1381,7 @@ class DaggerDiffusonPolicyTrainer:
         from vln.src.trainers.preprocess_features import FeaturePreprocessor
         
         '''Init the model and load the pretrained weights'''
-        self.policy, _ = initialize_policy(
+        self.policy, _,_,_ = initialize_policy(
             self.config,
             self.train_logger,
             self.config.IL.load_from_ckpt,

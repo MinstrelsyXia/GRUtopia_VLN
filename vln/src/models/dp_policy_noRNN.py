@@ -8,6 +8,7 @@ import torch.nn.functional as F
 
 import copy
 import time
+import textwrap
 from transformers import PretrainedConfig
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
@@ -248,7 +249,7 @@ class CMA_DP_noRNN_Net(nn.Module):
                 noise_out, noise_out_null = noise_pred[:batch_size//2], noise_pred[batch_size//2:]
                 noise_out = noise_out_null + cls_free_guidance_scale * (noise_out - noise_out_null) # TODO: check the scale of cls_free_guidance_scale
                 # diff_out = cls_free_guidance_scale*(diff_out - diff_out_null)
-                noise_pred = torch.cat([noise_out, noise_out], dim=0)
+                noise_pred = torch.cat([noise_out, noise_out_null], dim=0)
 
             # inverse diffusion step (remove noise)
             diffusion_output = self.noise_scheduler.step(
@@ -613,88 +614,60 @@ class CMA_DP_noRNN_Net(nn.Module):
                 
         return actions, actions_cumsum, un_actions_nocumsum
     
-    def save_predicted_actions(self, un_actions, gt_actions=None, N=1, save_dir=None, step=None):
+    def save_predicted_actions(self, un_actions, gt_actions=None, N=1, save_dir=None, steps=None, rgbs=None, depths=None, parse_actions=None, instructions=None, episode_ids=None):
         for item_idx in range(N):
-            plt.clf()
-            plt.figure(figsize=(8, 8))  # 增大图像尺寸以便更好地显示
-            
-            # 创建以(0,0)为中心的坐标轴
-            ax = plt.gca()
-            ax.spines['left'].set_position('center')
-            ax.spines['bottom'].set_position('center')
-            ax.spines['right'].set_color('none')
-            ax.spines['top'].set_color('none')
-            
-            # Plot predicted actions with arrows
-            # X is forward, positive Y is left, negative Y is right
-            plt.scatter(-un_actions[item_idx][:, 1], un_actions[item_idx][:, 0], label='un_actions', color='blue', alpha=0.5)
-            for i in range(un_actions[item_idx].shape[0]):
-                # Calculate arrow direction components using yaw angle
-                arrow_length = 0.2  # Adjust this value to change arrow length
-                dx = arrow_length * np.cos(np.pi/2+un_actions[item_idx][i, 2])
-                dy = arrow_length * np.sin(np.pi/2+un_actions[item_idx][i, 2])
+            if rgbs is not None and depths is not None:
+                # Create figure with subplots - 2 rows layout
+                fig = plt.figure(figsize=(24, 12))
                 
-                # Draw arrow
-                plt.arrow(-un_actions[item_idx][i, 1], 
-                        un_actions[item_idx][i, 0], 
-                        dx, dy, 
-                        head_width=0.05, 
-                        head_length=0.1, 
-                        fc='blue', 
-                        ec='blue',
-                        alpha=0.5)
+                # First row: 3 image plots
+                # Plot actions in first subplot
+                ax1 = plt.subplot2grid((2, 3), (0, 0))
+                self._plot_actions(ax1, un_actions[item_idx], gt_actions[item_idx] if gt_actions is not None else None)
+                ax1.set_title('Predicted Actions')
                 
-                # Add point index
-                plt.text(-un_actions[item_idx][i, 1], un_actions[item_idx][i, 0], 
-                        str(i), fontsize=9, color='blue', ha='left')
-
-            # Plot ground truth actions with arrows
-            if gt_actions is not None:
-                plt.scatter(-gt_actions[item_idx][:, 1], gt_actions[item_idx][:, 0], label='gt_actions', color='red', alpha=0.5)
-                for i in range(gt_actions[item_idx].shape[0]):
-                    # Calculate arrow direction components using yaw angle
-                    arrow_length = 0.2  # Adjust this value to change arrow length
-                    dx = arrow_length * np.cos(np.pi/2+gt_actions[item_idx][i, 2])
-                    dy = arrow_length * np.sin(np.pi/2+gt_actions[item_idx][i, 2])
-                    
-                    # Draw arrow
-                    plt.arrow(-gt_actions[item_idx][i, 1], 
-                            gt_actions[item_idx][i, 0], 
-                            dx, dy, 
-                            head_width=0.05, 
-                            head_length=0.1, 
-                            fc='red', 
-                            ec='red',
-                            alpha=0.5)
-                    
-                    # Add point index
-                    plt.text(-gt_actions[item_idx][i, 1], gt_actions[item_idx][i, 0], 
-                            str(i), fontsize=9, color='red', ha='right')
-
-            # 设置坐标轴标签
-            plt.xlabel('y', x=1.0, ha='center')
-            plt.ylabel('x', y=1.0, ha='center')
-            
-            # 获取数据范围并设置对称的显示范围
-            max_range = max(
-                abs(plt.xlim()[0]), abs(plt.xlim()[1]),
-                abs(plt.ylim()[0]), abs(plt.ylim()[1])
-            )
-            plt.xlim(-max_range*1.2, max_range*1.2)
-            plt.ylim(-max_range*1.2, max_range*1.2)
-
-            # 在(0,0)处画一个点
-            plt.plot(0, 0, 'ko', markersize=5)  # 在原点画一个黑点
-            
-            # 移动图例到右上角
-            plt.legend(loc='upper right')
-            plt.grid(True)
-            plt.axis('equal')  # Make sure the aspect ratio is equal
+                # Plot RGB image in second subplot
+                ax2 = plt.subplot2grid((2, 3), (0, 1))
+                ax2.imshow(rgbs[item_idx])
+                ax2.axis('off')
+                ax2.set_title('RGB Image')
+                
+                # Plot depth image in third subplot
+                ax3 = plt.subplot2grid((2, 3), (0, 2))
+                ax3.imshow(depths[item_idx].squeeze(), cmap='viridis')
+                ax3.axis('off')
+                ax3.set_title('Depth Image')
+                
+                # Second row: text information
+                # Plot instructions
+                ax4 = plt.subplot2grid((2, 3), (1, 0), colspan=2)
+                # Wrap text to multiple lines
+                wrapped_text = textwrap.fill(instructions[item_idx], width=60)  # adjust width parameter as needed
+                ax4.text(0.5, 0.5, f"Instructions:\n{wrapped_text}", 
+                        ha='center', va='center', wrap=True, fontsize=20,
+                        bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray', boxstyle='round,pad=1'))
+                ax4.axis('off')
+                
+                # Plot parse_action
+                ax5 = plt.subplot2grid((2, 3), (1, 2))
+                ax5.text(0.5, 0.5, f"Parse Action:\n{parse_actions[item_idx]}", 
+                        ha='center', va='center', wrap=True, fontsize=20,
+                        bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray', boxstyle='round,pad=1'))
+                ax5.axis('off')
+                
+                # Adjust layout to prevent overlapping
+                plt.tight_layout()
+            else:
+                # Original single plot for actions only
+                plt.clf()
+                fig = plt.figure(figsize=(8, 8))
+                ax = plt.gca()
+                self._plot_actions(ax, un_actions[item_idx], gt_actions[item_idx] if gt_actions is not None else None)
             
             if save_dir is not None:
-                save_path = os.path.join(save_dir, f'model_output_step_{step}.jpg')
+                save_path = os.path.join(save_dir, f'model_output_episodesId{episode_ids[item_idx]}_bs{item_idx}_step{steps[item_idx]}.jpg')
             else:
-                save_path = f'data/images/model_output_{item_idx}_step_{step}.jpg'
+                save_path = f'data/images/model_output_episodesId{episode_ids[item_idx]}_bs{item_idx}_step{steps[item_idx]}.jpg'
             plt.savefig(save_path)
             print(f"save fig to {save_path}")
 
@@ -711,25 +684,31 @@ class CMA_DP_noRNN_Net(nn.Module):
         # batch['mode'] = 'pred_actions'
 
         vis = batch['vis']
-        step = batch['step']
+        steps = batch['steps']
         episode_ids = batch['episode_ids']
+        batch_size = batch['observations']['instruction'].shape[0]
         
         noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'], batch['need_txt_extraction'])
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         
-            self.draw_multiple_actions(denoise_action_list, batch, episode_ids, predicted_actions_save_dir, step)
+            self.draw_multiple_actions(denoise_action_list, batch, episode_ids, predicted_actions_save_dir, steps)
             
             # randomly sample one from list
             # actions.append(actions_list[np.random.randint(0, len(actions_list))][0])
             # un_actions_nocumsum.append(un_actions_nocumsum_list[np.random.randint(0, len(un_actions_nocumsum_list))])
             
         else:
-            if vis:
-                un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
-                self.save_predicted_actions(un_actions, gt_actions=None, N=1, save_dir=predicted_actions_save_dir, step=step)
-        
             actions, actions_cumsum, un_actions_nocumsum = self.parse_action(diffusion_output, dist_pred, pm_pred=progress_pred, stop_pm_pred=stop_progress_pred, stop_mode=batch['stop_mode'], steps=batch['steps'])
+            
+            if vis:
+                rgbs = batch['rgbs'] if 'rgbs' in batch else None
+                depths = batch['depths'] if 'depths' in batch else None
+                instructions = batch['instructions'] if 'instructions' in batch else None
+                episode_ids = batch['episode_ids'] if 'episode_ids' in batch else 0
+                
+                un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
+                self.save_predicted_actions(un_actions, gt_actions=None, N=batch_size, save_dir=predicted_actions_save_dir, steps=steps, rgbs=rgbs, depths=depths, parse_actions=actions, instructions=instructions, episode_ids=episode_ids)
         
         return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred, stop_progress_pred
     
