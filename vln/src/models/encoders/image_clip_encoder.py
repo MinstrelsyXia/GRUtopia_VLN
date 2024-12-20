@@ -292,6 +292,9 @@ class ImageEncoder(torch.nn.Module):
         if reshape_flag:
             outputs0 = outputs[0].reshape(BS, -1, *outputs[0].shape[1:])
             outputs1 = outputs[1].reshape(BS, -1, *outputs[1].shape[1:])
+        else:
+            outputs0 = outputs[0]
+            outputs1 = outputs[1]
         if self.analysis_time:
             end_time = time.time()
             print(f"MODEL embed_depth_resnet reshape_flag time: {end_time - start_time}")
