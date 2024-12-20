@@ -74,14 +74,14 @@ class SimulatorRunner:
         self._warm_up()
 
     def step(self, actions: dict, render: bool = True, add_rgb_subframes=False):
-        # start_time = time.time() 
+        start_time = time.time() 
         for task_name, action_dict in actions.items():
             task = self.current_tasks.get(task_name)
             for name, action in action_dict.items():
                 if name in task.robots:
                     task.robots[name].apply_action(action)
         
-        # apply_action_time = time.time() - start_time
+        apply_action_time = time.time() - start_time
 
         self.render_trigger += 1
         # render = render and self.render_trigger > self.render_interval
@@ -92,16 +92,19 @@ class SimulatorRunner:
         if add_rgb_subframes:
             rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
 
-        # world_step_start_time = time.time()
+        world_step_start_time = time.time()
         self._world.step(render=render)
-        # world_step_time = time.time() - world_step_start_time 
+        world_step_time = time.time() - world_step_start_time 
 
         if add_rgb_subframes:
             rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False) # !!!
 
-        # log.info(f"apply_action time: {apply_action_time:.4f}s, world_step time: {world_step_time:.4f}s")
+        log.info(f"apply_action time: {apply_action_time:.4f}s, world_step time: {world_step_time:.4f}s")
 
+        start_time = time.time()
         obs = self.get_obs(add_rgb_subframes=add_rgb_subframes)
+        get_obs_time = time.time() - start_time
+        log.info(f"get_obs time: {get_obs_time:.4f}s")
 
 
         for npc in self.npc:

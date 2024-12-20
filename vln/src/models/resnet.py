@@ -13,6 +13,7 @@ from torch.nn.modules.container import Sequential
 from torch.nn.modules.conv import Conv2d
 from torch.nn import functional as F
 from torch import distributed as distrib
+import time
 
 import numpy as np
 from gym import spaces
@@ -420,8 +421,10 @@ class ResNetEncoder(nn.Module):
         spatial_size: int = 128,
         make_backbone=None,
         normalize_visual_inputs: bool = False,
+        analysis_time: bool = False,
     ):
         super().__init__()
+        self.analysis_time = analysis_time
 
         if "rgb" in observation_space.spaces:
             self._n_input_rgb = observation_space.spaces["rgb"].shape[2]
@@ -510,6 +513,11 @@ class ResNetEncoder(nn.Module):
         x = F.avg_pool2d(x, 2)
 
         x = self.running_mean_and_var(x)
+        if self.analysis_time:
+            start_time = time.time()
         x = self.backbone(x)
+        if self.analysis_time:
+            end_time = time.time()
+            print(f"MODEL resnet50 backbone time: {end_time - start_time}")
         x = self.compression(x)
         return x

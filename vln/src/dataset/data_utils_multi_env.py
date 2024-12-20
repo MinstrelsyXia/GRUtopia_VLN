@@ -15,6 +15,7 @@ from copy import deepcopy
 import shutil
 import zlib
 import pickle
+import msgpack_numpy
 
 import torch
 from torch.utils.data import Dataset
@@ -38,6 +39,19 @@ from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_re
 from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
 from ..local_nav.BEVmap import BEVMap
 
+def transform_rotation_z_90degrees(rotation):
+    ''' 沿着z轴旋转90度
+    '''
+    z_rot_90 = [np.cos(np.pi/4), 0, 0, np.sin(np.pi/4)]  # 90 degrees = pi/2 radians
+    w1, x1, y1, z1 = rotation
+    w2, x2, y2, z2 = z_rot_90
+    revised_rotation = [
+        w1*w2 - x1*x2 - y1*y2 - z1*z2,  # w
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,  # x
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,  # y
+        w1*z2 + x1*y2 - y1*x2 + z1*w2   # z
+    ]
+    return revised_rotation
 
 def load_data(args, split):
     ''' Load data based on VLN-CE
@@ -52,6 +66,7 @@ def load_data(args, split):
             item["original_start_rotation"] = copy.copy(item["start_rotation"])
             item["start_position"] = [item["original_start_position"][0], -item["original_start_position"][2], item["original_start_position"][1]]
             item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][2], -item["original_start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
+            item["start_rotation"] = transform_rotation_z_90degrees(item["start_rotation"])
             item["scan"] = item["scene_id"].split("/")[1]
             item["c_reference_path"] = []
             if "reference_path" in item.keys():
@@ -65,10 +80,15 @@ def load_data(args, split):
     log.info(f"Loaded data with a total of {len(load_data)} items from {split}")
     return load_data, list(set(total_scans))
 
-def load_gather_data(args, split, filter_same_trajectory=False, filter_stairs=False):
+def load_gather_data(args, split, filter_same_trajectory=False, filter_stairs=False, load_eval=False):
     dataset_root_dir = args.datasets.base_data_dir
-    with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
-        data = json.load(f)
+    if load_eval and split != 'train':
+        # only load the eval data (collect successfully)
+        with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_PReval_gather_data.json"), 'r') as f:
+            data = json.load(f)
+    else:
+        with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
+            data = json.load(f)
     with open(os.path.join(dataset_root_dir, "gather_data", "env_scan.json"), 'r') as f:
         scan = json.load(f)
 
@@ -207,15 +227,17 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
                 log.error(f"Error in saving camera image: {e}")
 
 class VLNDataLoader(Dataset):
-    def __init__(self, args, sim_config, splits, filter_same_trajectory=False):
+    def __init__(self, args, sim_config, splits, filter_same_trajectory=False, policy_eval=False, eval_logger=None, load_eval=False):
         self.args = args
         self.sim_config = sim_config
-        self.batch_size = args.settings.batch_size
+        self.batch_size = args.settings.batch_size  
         self.splits = splits
         self.data = {}
+        if eval_logger is not None:
+            log = eval_logger
         for split in splits:
-            if "sample_episodes" in args.settings.mode:
-                data, _ = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs)
+            if "sample_episodes" in args.settings.mode or policy_eval:
+                data, _ = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs, load_eval=load_eval)
             else:
                 data, _ = load_data(args, split)
             self.data[split] = data
@@ -230,7 +252,7 @@ class VLNDataLoader(Dataset):
             raise ValueError("Robot offset not found for robot type")
         
         # process paths offset
-        if "sample_episodes" in args.settings.mode:
+        if "sample_episodes" in args.settings.mode or policy_eval:
             for split in self.splits:
                 for scan, data in self.data[split].items():
                     for item in data:
@@ -336,17 +358,31 @@ class VLNDataLoader(Dataset):
         self.all_episode_finish = False
         self.scan_success_path_id_list = []
     
-    def allocate_data(self, split, scan):
+    def allocate_data(self, split, scan, path_id=None):
         self.scan_data = self.data[split][scan]
         self.sim_config.config.tasks[0].env_num = self.env_num = min(len(self.scan_data), self.env_num)
         self.init_env_manager() # update env_num according to the data length
 
         for idx in range(self.env_num):
-            find_valid = self.update_next_single_data(idx, split, scan, current_step=0, reset_robot=False)
+            find_valid = self.update_next_single_data(idx, split, scan, assigned_path_id=path_id, current_step=0, reset_robot=False)
         
         return find_valid
 
-    def get_next_single_data(self):
+    def get_next_single_data(self, path_id=None):
+        if path_id is not None:
+            find_flag = False
+            for idx, item in enumerate(self.scan_data):
+                if item['trajectory_id'] == path_id:
+                    self.data_idx = idx
+                    find_flag = True
+                    break
+            if not find_flag:
+                log.error(f"Path id {path_id} not found in the dataset")
+                return None
+            else:
+                log.info(f"Path id {path_id} found in the dataset")
+                return self.scan_data[self.data_idx]
+
         if self.data_idx < len(self.scan_data):
             item = self.scan_data[self.data_idx]
             self.data_idx += 1
@@ -373,8 +409,9 @@ class VLNDataLoader(Dataset):
                     if not recollect_failure:
                         exist_flag = True  # Data exists
                     else:
-                        value = zlib.decompress(value)
-                        value = pickle.loads(value)
+                        # value = zlib.decompress(value)
+                        # value = pickle.loads(value)
+                        value = msgpack_numpy.unpackb(value, raw=False)
                         if value['finish_status'] == 'fail':
                             if self.args.sample_episodes.only_recollect_path_planning_fail:
                                 if value['fail_reason'] == 'path planning':
@@ -395,18 +432,19 @@ class VLNDataLoader(Dataset):
             env.close()
         return exist_flag
 
-    def update_next_single_data(self, env_idx, split, scan, current_step=0, reset_robot=True):
+    def update_next_single_data(self, env_idx, split, scan, assigned_path_id=None, current_step=0, reset_robot=True):
         '''Get the next single data and init all settings'''
         is_data_valid = False
         while not is_data_valid:
             '''1. Get new data'''
-            new_data = self.get_next_single_data()
+            new_data = self.get_next_single_data(path_id=assigned_path_id)
             if new_data is None:
                 return False
             
             '''2. Create log path'''
             path_id = new_data['trajectory_id']
             episode_path = os.path.join(self.args.sample_episode_dir, split, scan, f"id_{str(path_id)}")
+            os.makedirs(episode_path, exist_ok=True)
             self.args.episode_path_list[env_idx] = episode_path
             # if os.path.exists(episode_path):
             if self.args.settings.force_sample:
@@ -451,6 +489,7 @@ class VLNDataLoader(Dataset):
             for info in status_info:
                 log.info(info)
 
+            os.makedirs(self.args.episode_path_list[env_idx], exist_ok=True)
             self.args.episode_status_info_file_list[env_idx] = os.path.join(self.args.episode_path_list[env_idx], 'status_info.txt')
             with open(self.args.episode_status_info_file_list[env_idx], 'w') as f:
                 for info in status_info:

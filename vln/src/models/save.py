@@ -28,8 +28,18 @@ def save_training_meta(args):
         with open(os.path.join(args.LOG_DIR, 'training_args.json'), 'w') as writer:
             json.dump(args_dict, writer, indent=4)
 
-def load_checkpoint(self, checkpoint_path, *args, **kwargs):
-    return torch.load(checkpoint_path, *args, **kwargs)
+def load_checkpoint(checkpoint_path, *args, map_location="cpu", **kwargs):
+    try:
+        return torch.load(checkpoint_path, map_location=map_location, *args, **kwargs)
+    except ModuleNotFoundError as e:
+        # 使用 pickle_module 来避免模块依赖问题
+        return torch.load(
+            checkpoint_path,
+            map_location=map_location,
+            pickle_module=torch.serialization.pickle,
+            *args,
+            **kwargs
+        )
 
 class ModelSaver(object):
     def __init__(self, output_dir, prefix='model_step', suffix='pt'):

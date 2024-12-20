@@ -14,7 +14,8 @@ tasks:
   robots:
   - name: h1
     prim_path: "/World/h1"
-    type: "HumanoidRobot"
+    # type: "HumanoidRobot"
+    type: "HumanoidRobotVLNEval"
     position: [0, 0, 0]
     scale: [1, 1, 1]
     orientation: [0,0,0,0]
@@ -78,6 +79,8 @@ tasks:
     - name: "topdown_camera_50"
       enable: true
       size: [500, 500]
+      camera_config:
+        - point_cloud
     - name: "tp_pointcloud"
       enable: True
       size: [64, 64]

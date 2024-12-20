@@ -1,4 +1,4 @@
-NAME: 20241105-vlnce-rp
+NAME: 20241208-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -11,13 +11,17 @@ NUM_ENVIRONMENTS: 4
 # TENSORBOARD_DIR: data/tensorboard_dirs/*name
 TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
-EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
+# EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
+EVAL_CKPT_PATH_DIR: data/checkpoints/20241202-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint/ckpts/ckpt.58.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
+VIDEO_OPTION: true # -1 / true
+VIDEO_DIR: data/checkpoints/*name/videos
+
 SEED: 0
 DDP:
-  use: True
+  use: false
   seed: 0
   fp16: False
   n_workers: 8
@@ -25,36 +29,65 @@ DDP:
 
   node_rank: 0
   world_size: 4
-  cuda_first_device: 4
+  cuda_first_device: 0
 
 EVAL:
   USE_CKPT_CONFIG: False
-  SPLIT: val_seen
+  SAVE_RESULTS: True
+  # SPLIT: [val_seen, val_unseen]
+  SPLIT: [val_unseen]
   EPISODE_COUNT: -1
   MAX_STEPS: 195
   train_eval_interval: 100
-  ACTION: descrete # descrete or xyyaw
+  ACTION: speed # descrete or xyyaw or speed
+
+  # eval dataset settings
+  re_eval: false # if true, will re-evaluate the episodes in the result_json_path
+  load_eval_subset: true # if true, will load the eval subset (collect successfully)
+
+  # for xyyaw
+  success_distance: 3.0
+  stop_x_threshold: 1.5e-2
+  stop_y_threshold: 1.5e-2
+  stop_yaw_threshold: 5e-2
+
+  rotation_threshold: 1e-2
+
+  # for dynamic len_traj_act
+  use_dynamic_len_traj_act: false
+  min_len_traj_act: 3
+  max_len_traj_act: 8
+  min_displacement: 0.15
+
   distance_threshold: 1.5
   num_sample: 1
   auto_remove: false
+
+  start_eval_epoch: -1
   
   # stop settings
   stop_mode: progress # progress / distance
   distance_threshold: 1.5
   pm_threshold: 0.90
 
+  # for isaac-sim envs
+  sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
+  vln_cfg_file: vln/configs/vln_cfg_policy_eval.yaml
+  step_interval: 80 # the same in data sampling
+
+  # len_traj_act
+  len_traj_act: 4
+
 IL:
   epochs: 60
-  batch_size: 4
+  batch_size: 2
   lr: 1e-4
   
   save_interval_epochs: 2
   save_filter_frozen_weights: true # only save the learnable weights!
-  load_from_ckpt: false
-  ckpt_to_load: none
-  load_from_pretrain: true
-
-  dataset_root_dir: data/datasets/R2R_VLNCE_v1-3
+  load_from_ckpt: true
+  ckpt_to_load: /isaac-sim/GRUtopia/data/checkpoints/20241202-vlnce-rp-dp-cond0Dec2_dpIter20_bs4_fullInstr_debugIMU_lr2.5e-4_depthLearned_txtToImg1_waypoint/ckpts/ckpt.58.pth
+  load_from_pretrain: false
 
   camera_name: 'pano_camera_0'
   Filter_failure: 
@@ -67,10 +100,10 @@ IL:
     update_size: 5000
     p: 0.9
     preload_lmdb_features: true # !IMPORTANT!
-    lmdb_features_dir: data/sample_episodes/20241105_sample_episodes/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb
     lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb
     pre_extract_img_features: true
-    denoise_action: false
+    denoise_action: false # For debug!!!
     lmdb_save_episode_id: true
     save_img_raw: false
     sample_action_mode: policy # gt / policy / negative_sampling
@@ -81,7 +114,7 @@ MODEL:
   policy_name: CMA_DP_ImgMultiPatch_Policy # CMA_DP_Policy
 
   # training settings
-  learn_angle: true
+  learn_angle: true # true: [delta_x, delta_y, delta_yaw] / false: [r, theta]
   use_iw: false
   len_traj_act: 4
 
@@ -138,14 +171,15 @@ MODEL:
       ddppo_checkpoint: data/ddppo-models/gibson-4plus-mp3d-train-val-test-resnet50.pth
       backbone: resnet50
 
-
-      
   CROSS_MODAL_ENCODER:
     load_model: False
     input_type: 3
     num_x_layers: 2
     hidden_size: 512
     num_attention_heads: 8
+
+    txt_to_img: True
+    txt_to_img_layer: 1
   
   STATE_ENCODER:
     hidden_size: 512
@@ -172,9 +206,11 @@ MODEL:
       max_dist_cat: 20
 
     action_stats:
-      min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
-      max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
-    
+      # min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
+      # max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
+      min: [-0.5, -0.5, -1.0] # [min_dx, min_dy, min_dyaw]
+      max: [0.5, 0.5, 1.0] # [max_dx, max_dy, max_dyaw]
+
     metric_waypoint_spacing: 1
     negative_mining: False
 
@@ -207,9 +243,11 @@ MODEL:
     normalize: false
   
   IMU_ENCODER:
-    input_size: 2
+    input_size: 3
     encoding_size: 64
     use: true
+
+    to_local_coords: true 
   
   PREV_ACTION_ENCODER:
     encoding_size: 64
@@ -220,7 +258,7 @@ MODEL:
   STEP_ENCODER:
     encoding_size: 64
     use: true
-    max_steps: 200
+    max_steps: 500
 
   LOSS:
     alpha: 0.0001

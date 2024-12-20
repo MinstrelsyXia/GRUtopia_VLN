@@ -11,10 +11,11 @@ from torchvision.transforms import Resize
 from copy import deepcopy
 
 from .lora import LinearWithLoRA, MultiheadAttnWithLoRA
+from transformers import PretrainedConfig
 from vln.src.models.LongCLIP.model import longclip
 from functools import partial
 
-from .bert_backbone import extend_neg_masks
+from .bert_backbone import extend_neg_masks, BertAttention
 
 class InstructionLongCLIPEncoder(nn.Module):
     def __init__(self, config, lora_config=None):
@@ -31,6 +32,16 @@ class InstructionLongCLIPEncoder(nn.Module):
             for name, param in self.text_transformer.named_parameters():
                 param.requires_grad = False
         
+        self.use_qformer = config.use_qformer
+        if self.use_qformer:
+            bert_config = PretrainedConfig.from_pretrained('bert-base-uncased')
+            bert_config.num_attention_heads = 8
+            bert_config.hidden_size = config.hidden_size
+            bert_config.intermediate_size = config.hidden_size
+            bert_config.num_hidden_layers = 1
+            self.q_param = nn.Parameter(torch.randn(1, config.q_former_length, config.hidden_size))
+            self.q_former = BertAttention(bert_config)
+        
         if lora_config is not None and lora_config.add_for_instruction_encoder:
             assign_lora = partial(LinearWithLoRA, rank=lora_config.lora_r, alpha=lora_config.lora_alpha)
             assign_attn_lora = partial(MultiheadAttnWithLoRA, rank=lora_config.lora_r, alpha=lora_config.lora_alpha)
@@ -45,14 +56,25 @@ class InstructionLongCLIPEncoder(nn.Module):
             
             print("Add LoRA for instruction encoder")
 
-    def forward(self, txt_inputs, txt_masks=None):
-        txt_inputs = txt_inputs.long()
-        # padding the length of text to 248
-        if txt_inputs.size(1) < 248:
-            txt_inputs = F.pad(txt_inputs, (0, 248 - txt_inputs.size(1)), value=0)
-        if txt_masks is None:
-            txt_masks = (txt_inputs != 0).to(txt_inputs.device)
-        txt_cls_embeds, txt_full_embeds = self.text_transformer.encode_text(txt_inputs, return_full=True)
-        txt_cls_embeds = txt_cls_embeds.type(torch.float32)
-        txt_full_embeds = txt_full_embeds.type(torch.float32)
-        return txt_full_embeds, txt_masks, txt_cls_embeds
+    def forward(self, txt_inputs, txt_masks=None, use_qformer=True, need_txt_extraction=True):
+        if need_txt_extraction:
+            txt_inputs = txt_inputs.long()
+            # padding the length of text to 248
+            if txt_inputs.size(1) < 248:
+                txt_inputs = F.pad(txt_inputs, (0, 248 - txt_inputs.size(1)), value=0)
+            if txt_masks is None:
+                txt_masks = (txt_inputs != 0).to(txt_inputs.device)
+                
+            txt_cls_embeds, txt_full_embeds = self.text_transformer.encode_text(txt_inputs, return_full=True)
+            txt_cls_embeds = txt_cls_embeds.type(torch.float32)
+            txt_full_embeds = txt_full_embeds.type(torch.float32)
+        else:
+            txt_full_embeds = txt_inputs
+            txt_masks = None
+            txt_cls_embeds = None
+            
+        if self.use_qformer and use_qformer:
+            q_former_outputs = self.q_former(self.q_param.repeat(txt_full_embeds.size(0), 1, 1), encoder_hidden_states=txt_full_embeds)[0]
+            return q_former_outputs, txt_masks, txt_cls_embeds
+        else:
+            return txt_full_embeds, txt_masks, txt_cls_embeds

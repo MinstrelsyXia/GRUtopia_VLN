@@ -351,3 +351,8 @@ class HumanoidMoveBySpeedController(BaseController):
         assert len(action) == 3, 'action must contain 3 elements'
 
         return self.forward(forward_speed=action[0], lateral_speed=action[1], rotation_speed=action[2])
+
+    def get_obs(self):
+        return {
+            'finished': True,
+        }
