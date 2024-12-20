@@ -22,15 +22,16 @@ VIDEO_DIR: data/checkpoints/*name/videos
 SEED: 0
 DDP:
   use: false
-  use_dp: true
+  use_dp: true # true for data parallel, false for DDP
+  backend: nccl
   seed: 0
   fp16: False
   n_workers: 8
-  local_rank: -1 # -1 for use dataParallel rather than DDP. Since for now, the process communication is not supported.
+  find_unused_parameters: true
+  local_rank: 0 
 
   node_rank: 0
   world_size: 4
-  cuda_first_device: 4
 
 EVAL:
   USE_CKPT_CONFIG: False
@@ -44,8 +45,8 @@ EVAL:
   SAMPLE: false
 
   # eval dataset settings
-  re_eval: true # if true, will re-evaluate the episodes in the result_json_path
-  load_eval_subset: true # if true, will load the eval subset (collect successfully)
+  re_eval: False # if true, will re-evaluate the episodes in the result_json_path
+  load_eval_subset: False # if true, will load the eval subset (collect successfully)
 
   # for xyyaw
   success_distance: 3.0
@@ -86,17 +87,27 @@ IL:
   lr: 1e-4
   
   save_interval_epochs: 2
+  save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: true
   ckpt_to_load: none
   load_from_pretrain: false
 
-  dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_corrected
-
   camera_name: 'pano_camera_0'
   Filter_failure: 
     use: true # drop the failure cases
     min_rgb_nums: 15 # the item that is fewer than this number would be dropped.
+
+  analysis_time: False # analysis the processing time for each module
+
+  lr_schedule:
+    use: true
+    type: "cosine" # 可选 cosine/step/linear
+    warmup_epochs: 5
+    warmup_factor: 0.1
+    decay_factor: 0.1
+    decay_epochs: [30, 45] # 用于step scheduler
+    min_lr: 1e-5
 
   DAGGER:
     iterations: 5
