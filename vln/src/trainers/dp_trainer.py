@@ -476,7 +476,7 @@ class DaggerDiffusonPolicyTrainer:
             plt.grid(True)
             plt.axis('equal')  # Make sure the aspect ratio is equal
             
-            save_path = f'data/images/debug_{item_idx}.jpg'
+            save_path = f'logs/images/debug_{item_idx}.jpg'
             plt.savefig(save_path)
             print(f"save fig to {save_path}")
 
@@ -557,7 +557,7 @@ class DaggerDiffusonPolicyTrainer:
         # draw_loss_curve(N, noise_pred, noise, output_file='test.jpg')
         if denoise_action:
             # for watch results
-            un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
+            un_actions = get_action(noise_pred, self.action_stats).cpu().detach().numpy()
             gt_actions = get_action(batch['observations']['actions'], self.action_stats).cpu().detach().numpy()
             self.save_predicted_actions(un_actions, gt_actions)
 
