@@ -16,7 +16,7 @@ from vln.src.local_nav.camera_occupancy_map import CamOccupancyMap
 from vln.src.local_nav.path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
 
 class GlobalTopdownMap:
-    def __init__(self, args, scan_name):
+    def __init__(self, args, scan_name, vis_verbose=False):
         self.args = args
         self.scan_name = scan_name
 
@@ -39,7 +39,7 @@ class GlobalTopdownMap:
                                          map_width=self.width,map_height=self.height,max_step=self.planner_config.a_star_max_iter,
                             windows_head=self.args.windows_head,
                             for_llm=self.args.settings.use_llm,
-                            verbose=True)
+                            verbose=self.args.save_path_planning or vis_verbose)
 
         # init vis settings
         self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
@@ -313,6 +313,37 @@ class GlobalTopdownMap:
             transfer_paths.pop(0)
 
         return transfer_paths
+
+    def draw_point(self, predicted_world_poses, color=[1,0,0], current_world_pose=None, target_world_pose=None, img_save_path=None, step=0, logger=None):        
+        occupancy_map = self.get_map(predicted_world_poses[0])
+        plt.figure(figsize=(6, 6))
+        plt.imshow(occupancy_map, cmap=self.cmap, norm=self.norm, origin='upper')
+        
+        for i, predicted_world_pose in enumerate(predicted_world_poses):
+            if predicted_world_pose is not None:
+                predicted_pixel = self.world_to_pixel(predicted_world_pose)
+                plt.scatter(predicted_pixel[1], predicted_pixel[0], color=color, marker='o', label=f"predicted {i} ({predicted_world_pose[0]:.2f}, {predicted_world_pose[1]:.2f}, {predicted_world_pose[2]:.2f})", s=30)
+        
+        if current_world_pose is not None:
+            current_pixel = self.world_to_pixel(current_world_pose)
+            plt.scatter(current_pixel[1], current_pixel[0], color=[0,0,1], marker='*', label=f"current ({current_world_pose[0]:.2f}, {current_world_pose[1]:.2f}, {current_world_pose[2]:.2f})", s=15)
+        
+        if target_world_pose is not None:
+            target_pixel = self.world_to_pixel(target_world_pose)
+            plt.scatter(target_pixel[1], target_pixel[0], color=[0,1,0], marker='x', label=f"target ({target_world_pose[0]:.2f}, {target_world_pose[1]:.2f}, {target_world_pose[2]:.2f})", s=30)
+        
+        plt.legend(fontsize='x-small')
+        plt.grid(alpha=0.3)
+        plt.colorbar(label='occupied (0: free, 1: occupied)', shrink=0.8)
+        plt.title('Global Topdown Map', fontsize=10)
+        
+        if img_save_path is not None:
+            img_save_path = os.path.join(img_save_path, f"global_topdown_map_{step}.jpg")
+            plt.savefig(img_save_path, dpi=100, bbox_inches='tight')
+            if logger is not None:
+                logger.info(f"Saved global topdown map to {img_save_path}")
+        
+        plt.close()
 
     def vis_nav_path(self, start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
         plt.figure(figsize=(10, 10))

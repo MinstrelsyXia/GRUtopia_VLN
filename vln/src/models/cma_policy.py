@@ -4,101 +4,101 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from gym import Space
-from habitat import Config
-from habitat_baselines.common.baseline_registry import baseline_registry
-from habitat_baselines.rl.models.rnn_state_encoder import (
-    build_rnn_state_encoder,
-)
-from habitat_baselines.rl.ppo.policy import Net
 from torch import Tensor
+from gym import Space
 
-from vlnce_baselines.common.aux_losses import AuxLosses
-from vlnce_baselines.models.encoders import resnet_encoders
-from vlnce_baselines.models.encoders.instruction_encoder import (
+import vln.src.models.encoders as encoders
+
+from vln.src.models.encoders import resnet_encoders
+
+from vln.src.models.encoders.instruction_encoder import (
     InstructionEncoder,
 )
-from vlnce_baselines.models.policy import ILPolicy
-from vlnce_baselines.models.utils import CustomFixedCategorical
+    
+class CategoricalNet(nn.Module):
+    def __init__(self, num_inputs: int, num_outputs: int) -> None:
+        super().__init__()
 
+        self.linear = nn.Linear(num_inputs, num_outputs)
 
-@baseline_registry.register_policy
-class CMAPolicy(ILPolicy):
-    def __init__(
-        self,
-        observation_space: Space,
-        action_space: Space,
-        model_config: Config,
-    ) -> None:
-        super().__init__(
-            CMANet(
-                observation_space=observation_space,
-                model_config=model_config,
-                num_actions=action_space.n,
-            ),
-            action_space.n,
+        nn.init.orthogonal_(self.linear.weight, gain=0.01)
+        nn.init.constant_(self.linear.bias, 0)
+
+    def forward(self, x: Tensor):
+        x = self.linear(x)
+        return CustomFixedCategorical(logits=x)
+
+class CustomFixedCategorical(torch.distributions.Categorical):
+    """Same as the CustomFixedCategorical in hab-lab, but renames log_probs
+    to log_prob. All the torch distributions use log_prob.
+    """
+
+    def sample(
+        self, sample_shape  # noqa: B008
+    ) -> Tensor:
+        return super().sample(sample_shape).unsqueeze(-1)
+
+    def log_prob(self, actions: Tensor) -> Tensor:
+        return (
+            super()
+            .log_prob(actions.squeeze(-1))
+            .view(actions.size(0), -1)
+            .sum(-1)
+            .unsqueeze(-1)
         )
 
-    @classmethod
-    def from_config(
-        cls, config: Config, observation_space: Space, action_space: Space
-    ):
-        return cls(
-            observation_space=observation_space,
-            action_space=action_space,
-            model_config=config.MODEL,
-        )
+    def mode(self):
+        return self.probs.argmax(dim=-1, keepdim=True)
 
 
-class CMANet(Net):
+class CMANet(nn.Module):
     """An implementation of the cross-modal attention (CMA) network in
     https://arxiv.org/abs/2004.02857
     """
 
     def __init__(
-        self, observation_space: Space, model_config: Config, num_actions: int
+        self, config, observation_space, action_stats=None, num_actions=4
     ) -> None:
         super().__init__()
-        self.model_config = model_config
-        model_config.defrost()
-        model_config.INSTRUCTION_ENCODER.final_state_only = False
-        model_config.freeze()
+        self.num_actions = num_actions
+        self.model_config = config.MODEL
+        self.model_config.INSTRUCTION_ENCODER.final_state_only = False
 
         # Init the instruction encoder
         self.instruction_encoder = InstructionEncoder(
-            model_config.INSTRUCTION_ENCODER
+            self.model_config.INSTRUCTION_ENCODER
         )
 
         # Init the depth encoder
-        assert model_config.DEPTH_ENCODER.cnn_type in ["VlnResnetDepthEncoder"]
+        assert self.model_config.DEPTH_ENCODER.cnn_type in ["VlnResnetDepthEncoder"]
         self.depth_encoder = getattr(
-            resnet_encoders, model_config.DEPTH_ENCODER.cnn_type
+            resnet_encoders, self.model_config.DEPTH_ENCODER.cnn_type
         )(
             observation_space,
-            output_size=model_config.DEPTH_ENCODER.output_size,
-            checkpoint=model_config.DEPTH_ENCODER.ddppo_checkpoint,
-            backbone=model_config.DEPTH_ENCODER.backbone,
-            trainable=model_config.DEPTH_ENCODER.trainable,
+            output_size=self.model_config.DEPTH_ENCODER.output_size,
+            checkpoint=self.model_config.DEPTH_ENCODER.ddppo_checkpoint,
+            backbone=self.model_config.DEPTH_ENCODER.backbone,
+            trainable=self.model_config.DEPTH_ENCODER.trainable,
             spatial_output=True,
         )
 
         # Init the RGB visual encoder
-        assert model_config.RGB_ENCODER.cnn_type in [
+        assert self.model_config.RGB_ENCODER.cnn_type in [
             "TorchVisionResNet18",
             "TorchVisionResNet50",
         ]
         self.rgb_encoder = getattr(
-            resnet_encoders, model_config.RGB_ENCODER.cnn_type
+            resnet_encoders, self.model_config.RGB_ENCODER.cnn_type
         )(
-            model_config.RGB_ENCODER.output_size,
-            normalize_visual_inputs=model_config.normalize_rgb,
-            trainable=model_config.RGB_ENCODER.trainable,
+            self.model_config.RGB_ENCODER.output_size,
+            normalize_visual_inputs=self.model_config.normalize_rgb,
+            trainable=self.model_config.RGB_ENCODER.trainable,
             spatial_output=True,
         )
 
         self.prev_action_embedding = nn.Embedding(num_actions + 1, 32)
 
-        hidden_size = model_config.STATE_ENCODER.hidden_size
+        hidden_size = self.model_config.STATE_ENCODER.hidden_size
         self._hidden_size = hidden_size
 
         self.rgb_linear = nn.Sequential(
@@ -106,7 +106,7 @@ class CMANet(Net):
             nn.Flatten(),
             nn.Linear(
                 self.rgb_encoder.output_shape[0],
-                model_config.RGB_ENCODER.output_size,
+                self.model_config.RGB_ENCODER.output_size,
             ),
             nn.ReLU(True),
         )
@@ -114,39 +114,39 @@ class CMANet(Net):
             nn.Flatten(),
             nn.Linear(
                 np.prod(self.depth_encoder.output_shape),
-                model_config.DEPTH_ENCODER.output_size,
+                self.model_config.DEPTH_ENCODER.output_size,
             ),
             nn.ReLU(True),
         )
 
         # Init the RNN state decoder
-        rnn_input_size = model_config.DEPTH_ENCODER.output_size
-        rnn_input_size += model_config.RGB_ENCODER.output_size
+        rnn_input_size = self.model_config.DEPTH_ENCODER.output_size
+        rnn_input_size += self.model_config.RGB_ENCODER.output_size
         rnn_input_size += self.prev_action_embedding.embedding_dim
 
-        self.state_encoder = build_rnn_state_encoder(
+        self.state_encoder = encoders.build_rnn_state_encoder(
             input_size=rnn_input_size,
-            hidden_size=model_config.STATE_ENCODER.hidden_size,
-            rnn_type=model_config.STATE_ENCODER.rnn_type,
-            num_layers=1,
+            hidden_size=self.model_config.STATE_ENCODER.hidden_size,
+            rnn_type=self.model_config.STATE_ENCODER.rnn_type,
+            num_layers=1
         )
 
         self._output_size = (
-            model_config.STATE_ENCODER.hidden_size
-            + model_config.RGB_ENCODER.output_size
-            + model_config.DEPTH_ENCODER.output_size
+            self.model_config.STATE_ENCODER.hidden_size
+            + self.model_config.RGB_ENCODER.output_size
+            + self.model_config.DEPTH_ENCODER.output_size
             + self.instruction_encoder.output_size
         )
 
         self.rgb_kv = nn.Conv1d(
             self.rgb_encoder.output_shape[0],
-            hidden_size // 2 + model_config.RGB_ENCODER.output_size,
+            hidden_size // 2 + self.model_config.RGB_ENCODER.output_size,
             1,
         )
 
         self.depth_kv = nn.Conv1d(
             self.depth_encoder.output_shape[0],
-            hidden_size // 2 + model_config.DEPTH_ENCODER.output_size,
+            hidden_size // 2 + self.model_config.DEPTH_ENCODER.output_size,
             1,
         )
 
@@ -170,19 +170,24 @@ class CMANet(Net):
             nn.ReLU(True),
         )
 
-        self.second_state_encoder = build_rnn_state_encoder(
+        self.second_state_encoder = encoders.build_rnn_state_encoder(
             input_size=self._hidden_size,
             hidden_size=self._hidden_size,
-            rnn_type=model_config.STATE_ENCODER.rnn_type,
+            rnn_type=self.model_config.STATE_ENCODER.rnn_type,
             num_layers=1,
         )
-        self._output_size = model_config.STATE_ENCODER.hidden_size
+        self._output_size = self.model_config.STATE_ENCODER.hidden_size
 
         self.progress_monitor = nn.Linear(self.output_size, 1)
 
         self._init_layers()
 
         self.train()
+        
+        # Determine
+        self.action_distribution = CategoricalNet(
+            self._output_size, self.num_actions
+        )
 
     @property
     def output_size(self) -> int:
@@ -223,6 +228,7 @@ class CMANet(Net):
         rnn_states: Tensor, # [bs, 2, 512]
         prev_actions: Tensor,
         masks: Tensor,
+        deterministic: bool = False,
     ) -> Tuple[Tensor, Tensor]:
         instruction_embedding = self.instruction_encoder(observations)
         depth_embedding = self.depth_encoder(observations)
@@ -294,17 +300,18 @@ class CMANet(Net):
             masks, # [B, 512]
         )
 
-        if self.model_config.PROGRESS_MONITOR.use and AuxLosses.is_active():
+        if self.model_config.PROGRESS_MONITOR.use:
             progress_hat = torch.tanh(self.progress_monitor(x))
             progress_loss = F.mse_loss(
                 progress_hat.squeeze(1),
                 observations["progress"],
                 reduction="none",
             )
-            AuxLosses.register_loss(
-                "progress_monitor",
-                progress_loss,
-                self.model_config.PROGRESS_MONITOR.alpha,
-            )
+        
+        distribution = self.action_distribution(x)
+        if deterministic:
+            actions = distribution.mode()
+        else:
+            actions = distribution.sample() # TODO. lacking sample_shapoe
 
-        return x, rnn_states_out
+        return actions, rnn_states_out

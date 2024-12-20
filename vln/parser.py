@@ -11,7 +11,7 @@ sys.path.append(ISSAC_SIM_DIR)
 from grutopia.core.config import SimulatorConfig
 from vln.src.utils.utils import dict_to_namespace
 
-def process_args():
+def process_args(sim_cfg_file=None, vln_cfg_file=None):
     '''Init parser arguments'''
     parser = argparse.ArgumentParser(description="Main function for VLN in GRUtopia")
     parser.add_argument("--split", default="", type=str, help="The split of the dataset", choices=['train', 'val_seen', 'val_unseen'])
@@ -34,12 +34,16 @@ def process_args():
     # parser.add_argument("--docker_nums", type=int, default=1) # for multi-docker # This should be set in config file
     parser.add_argument("--docker_id", type=int, default=0) # for multi-docker
     parser.add_argument("--lmdb_pathId_dir", type=str)
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     '''Init simulation config'''
+    if sim_cfg_file is not None:
+        args.sim_cfg_file = sim_cfg_file 
     sim_config = SimulatorConfig(args.sim_cfg_file)
 
     '''Init VLN config'''
+    if vln_cfg_file is not None:
+        args.vln_cfg_file = vln_cfg_file
     with open(args.vln_cfg_file, 'r') as f:
         vln_config = dict_to_namespace(yaml.load(f.read(), yaml.FullLoader))
     # update args into vln_config
@@ -71,7 +75,7 @@ def process_args():
             if not os.path.exists(lmdb_name_dir):
                 os.makedirs(lmdb_name_dir)
             
-            if vln_config.sample_episodes.docker_nums > 1:
+            if hasattr(vln_config.sample_episodes, 'docker_nums') and vln_config.sample_episodes.docker_nums > 1:
                 vln_config.lmdb_pathId_dir = os.path.join(lmdb_name_dir, 'pathIds')
                 if not os.path.exists(vln_config.lmdb_pathId_dir):
                     os.makedirs(vln_config.lmdb_pathId_dir)

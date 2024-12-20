@@ -20,15 +20,21 @@ class MyLogger(logging.Logger):
         style="%",
     ):
         super().__init__(name, level)
-        if filename is not None:
-            handler = logging.FileHandler(filename, filemode)  # type:ignore
-        else:
-            handler = logging.StreamHandler(stream)  # type:ignore
         self._formatter = logging.Formatter(format_str, dateformat, style)
-        handler.setFormatter(self._formatter)
-        super().addHandler(handler)
+        
+        # 添加文件处理器
+        if filename is not None:
+            file_handler = logging.FileHandler(filename, filemode)  # type:ignore
+            file_handler.setFormatter(self._formatter)
+            super().addHandler(file_handler)
+        
+        # 添加控制台处理器
+        console_handler = logging.StreamHandler(stream)  # type:ignore
+        console_handler.setFormatter(self._formatter)
+        super().addHandler(console_handler)
 
     def add_filehandler(self, log_filename):
+        """添加额外的文件处理器"""
         filehandler = logging.FileHandler(log_filename)
         filehandler.setFormatter(self._formatter)
         self.addHandler(filehandler)

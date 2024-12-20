@@ -409,7 +409,10 @@ def unnormalize_data(ndata, stats):
         ndata_part = (ndata + 1) / 2
     else:
         ndata_part = (ndata[:, :2] + 1) / 2
-    data = ndata_part * (stats['max'].to(device) - stats['min'].to(device)) + stats['min'].to(device)
+    try:
+        data = ndata_part * (stats['max'].to(device) - stats['min'].to(device)) + stats['min'].to(device)
+    except Exception as e:
+        data = ndata_part * (stats.max.to(device) - stats.min.to(device)) + stats.min.to(device)
     
     # if len(ndata.shape) == 3:
     #     data = torch.cat([data, ndata[:, 2:]], dim=1)

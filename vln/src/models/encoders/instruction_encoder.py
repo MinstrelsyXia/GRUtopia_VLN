@@ -3,13 +3,11 @@ import json
 
 import torch
 import torch.nn as nn
-from habitat import Config
-from habitat.core.simulator import Observations
 from torch import Tensor
 
 
 class InstructionEncoder(nn.Module):
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config) -> None:
         """An encoder that uses RNN to encode an instruction. Returns
         the final hidden state after processing the instruction sequence.
 
@@ -60,7 +58,7 @@ class InstructionEncoder(nn.Module):
             embeddings = torch.tensor(json.load(f))
         return embeddings
 
-    def forward(self, observations: Observations) -> Tensor:
+    def forward(self, observations) -> Tensor:
         """
         Tensor sizes after computation:
             instruction: [batch_size x seq_length]
@@ -73,9 +71,9 @@ class InstructionEncoder(nn.Module):
             instruction = self.embedding_layer(instruction)
         else:
             instruction = observations["rxr_instruction"]
-
-        lengths = (instruction != 0.0).long().sum(dim=2)
-        lengths = (lengths != 0.0).long().sum(dim=1).cpu()
+            lengths = (instruction != 0.0).long().sum(dim=2)
+            
+        lengths = lengths.cpu()
 
         packed_seq = nn.utils.rnn.pack_padded_sequence(
             instruction, lengths, batch_first=True, enforce_sorted=False

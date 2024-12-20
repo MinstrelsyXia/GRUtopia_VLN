@@ -176,8 +176,8 @@ class CamOccupancyMap:
         self.ax.set_title('Top-down RGB Image')
 
     def update_windows_head(self, robot_pos, text_info=None, mode="show"):
-        rgb_data = self.get_camera_data(["rgba"])["rgba"]
-        self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
+        rgb_data = self.get_camera_data()["rgba"]
+        # self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
         self.image_display.set_data(rgb_data)  # Update the image data
         if text_info is not None:
             self.ax.text(0.5, 0.01, text_info, fontsize=10, ha='left', va='bottom', wrap=True)
@@ -189,6 +189,7 @@ class CamOccupancyMap:
         elif mode == 'save':
             img_save_path = self.args.log_image_dir + "/window_topdown_image.png"
             self.window_fig.savefig(img_save_path, bbox_inches='tight')
+            print(f"Window topdown image saved at {img_save_path}")
 
     def close_windows_head(self):
         plt.close('all')  # Close all figures
