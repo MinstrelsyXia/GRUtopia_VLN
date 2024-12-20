@@ -12,7 +12,7 @@ NUM_ENVIRONMENTS: 4
 TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
 EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
-# EVAL_CKPT_PATH_DIR: data/checkpoints/20241120-vlnce-rp-dp-cond0Dec3_dpIter20_bs4_fullInstr/ckpts/ckpt.38.pth
+# EVAL_CKPT_PATH_DIR: /ssd/wangliuyi/code/w61_grutopia/data/checkpoints/20241215-vlnce-rp-noRNN-DPDec12Step20-txtLayer6-txtQformer-stackRGB16-ClsFree0.25-bs80x3-lr2e-4-lrCos/ckpts/ckpt.38.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
@@ -85,7 +85,7 @@ IL:
   save_interval_steps: -1
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: true
-  ckpt_to_load: /ssd/wangliuyi/code/w61_grutopia/data/checkpoints/20241215-vlnce-rp-noRNN-DPDec12Step100-txtLayer12-txtQformer-stackRGB16-ClsFree0.25-bs80x4-lr2e-4-lrCos/ckpts/ckpt.14.pth
+  ckpt_to_load: /ssd/wangliuyi/code/w61_grutopia/data/checkpoints/20241215-vlnce-rp-noRNN-DPDec12Step20-txtLayer6-txtQformer-stackRGB16-ClsFree0.25-bs80x3-lr2e-4-lrCos/ckpts/ckpt.38.pth
   load_from_pretrain: false
 
   dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_corrected
@@ -254,7 +254,7 @@ MODEL:
 
     # for transformer
     transformer_n_cond_layers: 0
-    transformer_n_layers: 12
+    transformer_n_layers: 8
     transformer_encoding_size: 512
     # transformer_n_head: 8
     transformer_p_drop_emb: 0

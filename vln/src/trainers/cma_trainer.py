@@ -725,7 +725,7 @@ class DaggerCMATrainer:
                 return 0, 0
 
         '''Init the policy'''
-        self.policy, _ = initialize_policy(
+        self.policy, _, _, _ = initialize_policy(
             self.config,
             self.eval_logger,
             load_from_ckpt=True, # config.IL.load_from_ckpt
