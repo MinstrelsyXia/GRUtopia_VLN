@@ -28,6 +28,9 @@ from vln.src.utils.utils import dict_to_namespace, namespace_to_dict, Config
 
 from vln.parser import process_args
 
+def get_local_rank():
+    return int(os.environ["LOCAL_RANK"])
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -138,6 +141,10 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         
         if config.DDP.use_dp and config.world_size > 1:
             assert config.IL.batch_size % len(config.TORCH_GPU_IDS) == 0
+        
+        if config.DDP.use and not config.DDP.use_dp:
+            config.local_rank = get_local_rank()
+            print(f"config.local_rank: {config.local_rank}")
 
     random.seed(config.SEED)
     np.random.seed(config.SEED)
