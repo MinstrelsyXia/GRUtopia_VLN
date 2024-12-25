@@ -145,6 +145,7 @@ class CMADataset(torch.utils.data.IterableDataset):
             lengths = []
             finish_status_list = []
             fail_reasons_list = []
+            empty_data_nums = 0
             with lmdb.open(
                 self.lmdb_features_dir,
                 map_size=int(float(self.lmdb_map_size)),
@@ -162,6 +163,10 @@ class CMADataset(torch.utils.data.IterableDataset):
                     data = data_to_load['episode_data']
                     finish_status = data_to_load['finish_status']
                     fail_reason = data_to_load['fail_reason']
+                    # Filter the empty data 
+                    if len(data['camera_info']) == 0:
+                        empty_data_nums += 1
+                        continue
                     if self.config.IL.Filter_failure.use:
                         if finish_status != 'success':
                             if 'rgb' in data['camera_info'][self.camera_name].keys():
@@ -195,6 +200,9 @@ class CMADataset(torch.utils.data.IterableDataset):
                             fail_reasons_list.append(fail_reason)
                             lengths.append(len(new_data))
                 
+                if empty_data_nums > 0:
+                    print(f"empty data nums: {empty_data_nums}")
+                    
                 # process the instruction
                 # copy the instruction to each step
                 for i in range(len(new_preload)):

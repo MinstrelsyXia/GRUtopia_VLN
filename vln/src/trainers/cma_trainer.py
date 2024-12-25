@@ -88,6 +88,8 @@ class DaggerCMATrainer:
         # Init the action stats
         self.action_stats = None
 
+        self.show_tqdm = not self.config.train_quiet
+
         # Init the file_logger
         if self.config.run_type in ['train', 'preprocess_features']:
             train_logger_filename = os.path.join(log_dir, "train.log")
@@ -232,12 +234,17 @@ class DaggerCMATrainer:
                 losses = []
                 cos_sims= []
 
-                for batch in tqdm.tqdm(
-                    diter,
-                    total=len(diter),
-                    leave=False,
-                    dynamic_ncols=True,
-                ):
+                if self.show_tqdm:
+                    batch_iterator = tqdm.tqdm(
+                        diter,
+                        total=len(diter),
+                        leave=False,
+                        dynamic_ncols=True,
+                    )
+                else:
+                    batch_iterator = diter
+
+                for batch in batch_iterator:
                     (
                         observations_batch,
                         prev_actions_batch,

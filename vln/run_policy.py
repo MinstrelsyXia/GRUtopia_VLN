@@ -77,6 +77,11 @@ def main():
         default=False,
         action='store_true',
     )
+    parser.add_argument(
+        "--train_quiet",
+        default=False,
+        action='store_true',
+    )
     
     args = parser.parse_args()
     
@@ -103,6 +108,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     config.show_topdown_window = kwargs.get('show_topdown_window', False)
     config.local_rank = local_rank if local_rank is not None else kwargs.get('local_rank', 0)
     config.debug = kwargs.get('debug', False)
+    config.train_quiet = kwargs.get('train_quiet', False)
     # logger.info(f"config: {config}")
     
     # Process the log dir
