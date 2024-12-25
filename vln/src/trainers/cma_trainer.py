@@ -23,9 +23,9 @@ import json
 from vln.src.models.LongCLIP.model import longclip
 from vln.src.models.utils.bert_token import BertTokenizer
 from vln.src.utils.logger import MyLogger, logger
-from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce, get_checkpoint_id, poll_checkpoint_folder, is_slurm_batch_job, batch_obs, FixedLengthStack, _compute_actions, get_delta, normalize_data, map_action_to_2d, save_video, get_action, to_local_coords
+from vln.src.utils.utils import extract_best_eval_results, load_dataset, action_reduce, aux_reduce, get_checkpoint_id, poll_checkpoint_folder, is_slurm_batch_job, batch_obs, FixedLengthStack, _compute_actions, get_delta, normalize_data, map_action_to_2d, save_video, get_action, to_local_coords
 from vln.src.utils.tensorboard_utils import TensorboardWriter
-from vln.src.dataset.vlnce_dp_dataset import VLNCE_DP_Dataset, collate_fn
+from vln.src.dataset.vlnce_cma_dataset import CMADataset, collate_fn
 from vln.src.models.init_policy import initialize_policy
 from vln.src.envs.env import TaskEnv
 from vln.src.models.utils.feature_extract import extract_image_features, extract_instruction_tokens
@@ -178,8 +178,8 @@ class DaggerCMATrainer:
             with torch.cuda.device(self.device):
                 torch.cuda.empty_cache()
         gc.collect()
-                
-        self.policy, self.optimizer = initialize_policy(
+               
+        self.policy, self.optimizer, self.lr_scheduler, start_epoch = initialize_policy(
             self.config,
             self.train_logger,
             self.config.IL.load_from_ckpt,
@@ -194,28 +194,20 @@ class DaggerCMATrainer:
         start_epoch = 0
         
         with TensorboardWriter(self.config.TENSORBOARD_DIR, flush_secs=30, purge_step=0) as writer:        
-            if self.world_size > 1:
-                img_encoder = self.policy.module.image_encoder
+            if self.config.DDP.use:
                 if not self.config.DDP.use_dp: # use DDP
                     is_distributed = True
                     rank = self.local_rank
-                    world_size = self.world_size
-            else:
-                img_encoder = self.policy.image_encoder
+                    world_size = self.world_sizer
 
-            dataset = VLNCE_DP_Dataset(
+            dataset = CMADataset(
                 self.config,
                 self.lmdb_features_dir,
-                self.policy,
-                self.device,
+                self.config.IL.use_iw,
                 dataset_data=self.train_dataset_data,
+                inflection_weight_coef=self.config.IL.inflection_weight_coef,
+                lmdb_map_size=self.config.IL.DAGGER.lmdb_map_size,
                 batch_size=self.config.IL.batch_size,
-                bert_tokenizer=self.bert_tokenizer,
-                is_distributed=is_distributed, 
-                rank=rank,
-                world_size=world_size,
-                lmdb_save_episode_id=self.config.IL.DAGGER.lmdb_save_episode_id,
-                use_stack=self.config.MODEL.IMAGE_ENCODER.use_stack
             )
             
             num_workers = 4 if not self.config.debug else 0
@@ -250,6 +242,8 @@ class DaggerCMATrainer:
                         observations_batch,
                         prev_actions_batch,
                         not_done_masks,
+                        corrected_actions_batch,
+                        weights_batch,
                     ) = batch
 
                     observations_batch = {
@@ -266,22 +260,23 @@ class DaggerCMATrainer:
                     
                     prev_actions_batch = prev_actions_batch.to(device=self.device, non_blocking=True)
                     not_done_masks = not_done_masks.to(device=self.device, non_blocking=True) if not_done_masks is not None else None  
-                    loss, diffusion_loss, dist_loss, pm_loss, stop_pm_loss = self._update_agent(
+                    loss, pm_loss = self._update_agent(
                         observations_batch,
                         prev_actions_batch,
                         not_done_masks,
-                        denoise_action=self.config.IL.DAGGER.denoise_action,
-                        need_instr_extraction=dataset.need_extract_instr_features
+                        corrected_actions_batch.to(
+                            device=self.device, non_blocking=True
+                        ),
+                        weights_batch.to(
+                            device=self.device, non_blocking=True
+                        ),
                     )
 
                     if self.local_rank < 1:
                         losses.append(loss)
                         if step_id % 300 == 0:
                             self.train_logger.info(f"train_loss: {loss}")
-                            self.train_logger.info(f"train_diffusion_policy_loss: {diffusion_loss}")
-                            self.train_logger.info(f"train_dist_loss: {dist_loss}")
                             self.train_logger.info(f"train_pm_loss: {pm_loss}")
-                            self.train_logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
                             self.train_logger.info(f"Batches processed: {step_id}.")
                             self.train_logger.info(
                                 f"On DAgger iter {dagger_it}, Epoch {epoch}."
@@ -290,33 +285,10 @@ class DaggerCMATrainer:
                             f"train_loss_iter_{dagger_it}", loss, step_id
                         )
                         writer.add_scalar(
-                            f"train_diffusion_policy_loss_iter_{dagger_it}",
-                            diffusion_loss,
-                            step_id,
-                        )
-                        writer.add_scalar(
-                            f"train_dist_loss_iter_{dagger_it}",
-                            dist_loss,
-                            step_id,
-                        )
-                        writer.add_scalar(
-                            f"train_pm_loss_iter_{dagger_it}",
-                            pm_loss,
-                            step_id,
-                        )
-                        writer.add_scalar(
-                            f"train_stop_pm_loss_iter_{dagger_it}",
-                            stop_pm_loss,
-                            step_id,
+                            f"train_pm_loss_iter_{dagger_it}", pm_loss, step_id
                         )
                         step_id += 1  # noqa: SIM113
-                        
-                        # save the ckpt according to the steps
-                        if not self.use_rnn and step_id % self.config.IL.save_interval_steps == 0:
-                            self.save_checkpoint(
-                                f"ckpt-epoch-{epoch}-step-{step_id}.pth",
-                                filter_frozen_weights=self.config.IL.save_filter_frozen_weights
-                            )
+                    
                 
                 # save the log
                 self.train_logger.info(f"*******Epoch {epoch}*********")
@@ -437,13 +409,12 @@ class DaggerCMATrainer:
         observations,
         prev_actions,
         not_done_masks,
+        corrected_actions,
+        weights,
         step_grad: bool = True,
         loss_accumulation_scalar: int = 1,
-        denoise_action=False
     ):
-        # T, N = prev_actions.size()
-        N = self.config.IL.batch_size
-        masks = not_done_masks
+        T, N = corrected_actions.size()
 
         if self.world_size > 1:
             net = self.policy.module
@@ -457,91 +428,35 @@ class DaggerCMATrainer:
             device=self.device,
         ) 
         
-        if 'rgb_features' not in observations \
-            or self.config.MODEL.IMAGE_ENCODER.RGB.update_rgb_encoder \
-                or self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder\
-                    or self.config.MODEL.LORA.add_for_rgb_encoder \
-                        or self.config.MODEL.LORA.add_for_depth_encoder:
-            depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
-            batch = {
-                'mode': 'img_embedding',
-                'rgb_inputs': observations['rgb'],
-                'depth_inputs': observations['depth'],
-                'depth_return_x_before_fc': depth_return_x_before_fc,
-                'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
-                'img_mod': self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-                'process_images': True # not process in dataLoader. Process now.
-            }
-            stack_rgb, stack_depth = self.policy(batch)
-            if len(stack_rgb.shape) == 2:
-                observations['stack_rgb'] = stack_rgb.unsqueeze(1)
-                observations['stack_depth'] = stack_depth.unsqueeze(1)
-            else:
-                observations['stack_rgb'] = stack_rgb
-                observations['stack_depth'] = stack_depth
-            
         batch = {
-            'mode': 'pred_actions',
+            'mode': 'train',
             'observations': observations,
             'rnn_states': recurrent_hidden_states,
             'prev_actions': prev_actions,
-            'masks': not_done_masks,
-            'add_noise_to_action': True,
-            'denoise_action': denoise_action,
+            'masks': not_done_masks
         }
-        if observations['stack_depth'].shape[1] == 1:
-            observations['stack_depth'] = observations['stack_depth'].squeeze(1)
-        if observations['stack_rgb'].shape[1] == 1:
-            observations['stack_rgb'] = observations['stack_rgb'].squeeze(1)
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_hat = self.policy(batch)
-        
-        # !!!
-        # draw_loss_curve(N, noise_pred, noise, output_file='test.jpg')
-        if denoise_action:
-            # for watch results
-            un_actions = get_action(diffusion_output, self.action_stats).cpu().detach().numpy()
-            gt_actions = get_action(batch['observations']['actions'], self.action_stats).cpu().detach().numpy()
-            self.save_predicted_actions(un_actions, gt_actions)
+        logits, rnn_states_out = self.policy(batch)
 
         # for train
-        dist_loss = 0
-        if dist_pred is not None:
-            dist_loss = nn.functional.mse_loss(dist_pred.squeeze(-1), observations['step_distance'])
-            dist_loss = (dist_loss * (masks.float())).mean() / (1e-2 +(masks.float()).mean())
-        
-        # L2 loss
-        if self.config.MODEL.Diffusion_Policy.pred_type == 'epsilon':
-            # pred noise
-            diffusion_loss = action_reduce(masks.squeeze(), F.mse_loss(noise_pred, noise, reduction="none"))
-        elif self.config.MODEL.Diffusion_Policy.pred_type == 'sample':
-            # pred x_0
-            diffusion_loss = action_reduce(masks.squeeze(), F.mse_loss(noise_pred, observations['actions'], reduction="none"))
+        logits = logits.view(T, N, -1)
 
-        # Aux loss
-        aux_loss = 0
-        if self.config.MODEL.PROGRESS_MONITOR.use:
-            progress_loss = F.mse_loss(
-                progress_hat.squeeze(),
-                observations["progress"],
-                reduction="none",
-            )
-            aux_loss = action_reduce(masks.squeeze(), progress_loss)
-        
-        # Total loss
-        loss = self.config.MODEL.LOSS.alpha * self.config.MODEL.LOSS.dist_scale * dist_loss + (1-self.config.MODEL.LOSS.alpha) * diffusion_loss + aux_loss
-        
+        action_loss = F.cross_entropy(
+            logits.permute(0, 2, 1), corrected_actions, reduction="none"
+        )
+        action_loss = ((weights * action_loss).sum(0) / weights.sum(0)).mean()
+
+        aux_mask = (weights > 0).view(-1)
+        aux_loss = aux_reduce(aux_mask, action_loss)
+
+        loss = action_loss + aux_loss
         loss = loss / loss_accumulation_scalar
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 40.)
 
         if step_grad:
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-        # if isinstance(aux_loss, torch.Tensor):
-        #     aux_loss = aux_loss.item()
-        return_dist_loss = dist_loss.item() if dist_pred is not None else 0
-        return loss.item(), diffusion_loss.item(), return_dist_loss, aux_loss
+        return loss.item(), aux_loss.item()
       
     def eval(self, use_gt=False) -> None:
         r"""Main method of trainer evaluation. Calls _eval_checkpoint() that
@@ -804,15 +719,16 @@ class DaggerCMATrainer:
                 # this ckpt is too bad to continue
                 self.eval_logger.info(f"Break. This ckpt is too bad to continue with average SPL {np.mean(list(spl_dict.values())):.3f}")
                 break
-
+            
+            batch = {
+                'mode': 'inference',
+                'observations': observations,
+                'rnn_states': rnn_states,
+                'prev_actions': prev_actions,
+                'masks': not_done_masks
+            }
             with torch.no_grad():
-                actions, rnn_states = self.policy(
-                    batch,
-                    rnn_states,
-                    prev_actions,
-                    not_done_masks,
-                    deterministic=not config.EVAL.SAMPLE,
-                )
+                actions, rnn_states = self.policy(batch)
                 prev_actions.copy_(actions)
 
             # for step_i in range(len_traj_act):
