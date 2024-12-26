@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-# import open3d as o3d
+import open3d as o3d
 from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -12,7 +12,6 @@ import json
 from grutopia.core.util.log import log
 
 from .path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
-import open3d as o3d
 class BEVMap:
     def __init__(self, args, robot_init_pose=(0, 0, 0)):
         self.args = args

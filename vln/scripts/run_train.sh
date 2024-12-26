@@ -57,5 +57,10 @@ elif [ "$1" == "--preprocess_features" ]; then
     --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
     --run-type preprocess_features
   "
+elif [ "$1" == "--train_cma" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_train.yaml
+    --run-type train
+  "
 fi
 python vln/run_policy.py $flags

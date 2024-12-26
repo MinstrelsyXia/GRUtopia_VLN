@@ -42,7 +42,7 @@ sample_episodes:
   recollect_failure: true # recollect failed episodes
   only_recollect_path_planning_fail: true
 
-  docker_nums: 4 # number of docker containers
+  docker_nums: 1 # number of docker containers
 
 robots:
   - name: "CylinderRobot"
