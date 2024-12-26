@@ -122,6 +122,7 @@ work_dirs/
 # grutopia assets
 /asset
 /assets
+assets/
 
 # user scripts
 # /scripts

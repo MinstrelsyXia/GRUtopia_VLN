@@ -1,9 +1,24 @@
 import os,sys
 import json
+import numpy as np
 from collections import defaultdict
 
 from vln.parser import process_args
 from vln.src.dataset.data_utils import load_data
+
+def transform_rotation_z_90degrees(rotation):
+    ''' 沿着z轴旋转90度
+    '''
+    z_rot_90 = [np.cos(np.pi/4), 0, 0, np.sin(np.pi/4)]  # 90 degrees = pi/2 radians
+    w1, x1, y1, z1 = rotation
+    w2, x2, y2, z2 = z_rot_90
+    revised_rotation = [
+        w1*w2 - x1*x2 - y1*y2 - z1*z2,  # w
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,  # x
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,  # y
+        w1*z2 + x1*y2 - y1*x2 + z1*w2   # z
+    ]
+    return revised_rotation
 
 class datasetGather:
     def __init__(self, args, dataset_root_dir=None):
@@ -15,13 +30,15 @@ class datasetGather:
         for split in self.splits:
             self.data[split], self.scan[split] = load_data(self.args, split, dataset_root_dir=dataset_root_dir)
 
-    def gatherSameScanData(self, save_gather_data=True, save_dir='gather_data/'):
+    def gatherSameScanData(self, save_gather_data=True, save_dir='gather_data/', fix_rotation=False):
         scan2data = {split: {} for split in self.splits}
         for split in self.splits:
             for data in self.data[split]:
                 scan = data['scan']
                 if scan not in scan2data[split]:
                     scan2data[split][scan] = []
+                if fix_rotation:
+                    data['start_rotation'] = transform_rotation_z_90degrees(data['start_rotation'])
                 scan2data[split][scan].append(data)
         
         if save_gather_data:
@@ -75,13 +92,13 @@ if __name__ == "__main__":
 
     args, _ = process_args()
     dataset_gather = datasetGather(args, dataset_root_dir=dataset_root_dir)
-    # scan2data = dataset_gather.gatherSameScanData(save_gather_data=True, save_dir='gather_data/')
+    scan2data = dataset_gather.gatherSameScanData(save_gather_data=True, save_dir='gather_data/', fix_rotation=True)
     
     # read_gather_data('gather_data/train_gather_data.json')
 
     '''2. Gather eval data'''
-    val_seen_sample_dataset_file = "data/sample_episodes/20241115_sample_episodes_val_seen/analysis/success_episode_data_val_seen.json"
-    val_unseen_sample_dataset_file = "data/sample_episodes/20241115_sample_episodes_val_unseen/analysis/success_episode_data_val_unseen.json"
+    # val_seen_sample_dataset_file = "data/sample_episodes/20241115_sample_episodes_val_seen/analysis/success_episode_data_val_seen.json"
+    # val_unseen_sample_dataset_file = "data/sample_episodes/20241115_sample_episodes_val_unseen/analysis/success_episode_data_val_unseen.json"
     
-    gather_eval_data(dataset_gather.data['val_unseen'], val_unseen_sample_dataset_file, 'val_unseen')
-    gather_eval_data(dataset_gather.data['val_seen'], val_seen_sample_dataset_file, 'val_seen')
+    # gather_eval_data(dataset_gather.data['val_unseen'], val_unseen_sample_dataset_file, 'val_unseen')
+    # gather_eval_data(dataset_gather.data['val_seen'], val_seen_sample_dataset_file, 'val_seen')
