@@ -729,7 +729,7 @@ class DaggerCMATrainer:
             
             batch = {
                 'mode': 'inference',
-                'observations': observations,
+                'observations': batch,
                 'rnn_states': rnn_states,
                 'prev_actions': prev_actions,
                 'masks': not_done_masks
