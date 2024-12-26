@@ -300,6 +300,10 @@ def action_reduce(action_mask, unreduced_loss: torch.Tensor):
         assert unreduced_loss.shape == action_mask.shape, f"{unreduced_loss.shape} != {action_mask.shape}"
         return (unreduced_loss * action_mask).mean() / (action_mask.float().mean() + 1e-2)
 
+def aux_reduce(mask, loss):
+    loss = torch.masked_select(loss, mask)
+    return loss.mean()
+
 def yaw_rotmat(yaw: float):
     try:
         R = torch.tensor(
