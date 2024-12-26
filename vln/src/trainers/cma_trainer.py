@@ -621,11 +621,11 @@ class DaggerCMATrainer:
         config.IL.ckpt_to_load = checkpoint_path
         config.use_pbar = not is_slurm_batch_job()
 
-        if config.VIDEO_OPTION != -1:
+        # if config.VIDEO_OPTION != -1:
             # TODO
             # config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP_VLNCE")
-            total_rgb_list = []
-            total_topdown_rgb_list = []
+        total_rgb_list = []
+        total_topdown_rgb_list = []
 
         if config.EVAL.SAVE_RESULTS:
             fname = os.path.join(
