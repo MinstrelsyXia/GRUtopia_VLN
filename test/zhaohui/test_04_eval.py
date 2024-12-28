@@ -561,7 +561,7 @@ base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
 mp3d_data_dir = "/ssd/share/Matterport3D/data/v1/scans"
 split_data_types = ['val_unseen','val_seen']
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
-name = '20241216_sample_episodes'
+name = '20241229_sample_episodes'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 the_scan = "zsNo4HB9uLZ"
 checkpoint_index=0
@@ -645,7 +645,7 @@ for path_key in target_path_key_list:
                 fail_reason = value['fail_reason']
                 if fail_reason in retry_list:
                     tmp.append(path_key)
-
+database.close()
 target_path_key_list=tmp
 
 if len(target_path_key_list) == 0:
@@ -780,6 +780,7 @@ for i in range(len(target_path_key_list)):
             key_write = generate_result_key(ckpt_name=ckpt_name,path_key=path_key).encode()
             value_write = msgpack_numpy.packb(info, use_bin_type=True)
             txn.put(key_write, value_write)
+        database_write.close()
         continue
 
     robot_position, robot_rotation = the_task.get_robot_poses_without_offset()
@@ -903,6 +904,7 @@ for i in range(len(target_path_key_list)):
                 key_write = generate_result_key(ckpt_name=ckpt_name,path_key=path_key).encode()
                 value_write = msgpack_numpy.packb(info, use_bin_type=True)
                 txn.put(key_write, value_write)
+            database_write.close()
             stats_episodes[path_key] = info
             spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
             mean_spl = np.mean(list(spl_dict.values()))

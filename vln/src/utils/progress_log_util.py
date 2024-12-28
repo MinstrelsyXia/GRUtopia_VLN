@@ -28,13 +28,13 @@ PROGRESS = None
 LAST_TRIJECTORY_ID = ""
 INITED = False
 
-def init(scan, path_count):
+def init(scan, path_count,rank=0):
     global PROGRESS
     global INITED
     PROGRESS = ProgressInfo(scan,path_count)
     if not os.path.exists('logs/progress/'):
         os.makedirs('logs/progress/')
-    file_handler = logging.FileHandler(f'logs/progress/scan_{scan}.log')
+    file_handler = logging.FileHandler(f'logs/progress/scan_{scan}_rank_{rank}.log')
     file_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s')
     file_handler.setFormatter(formatter)
