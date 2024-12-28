@@ -65,42 +65,43 @@ def initialize_policy(
         if load_from_pretrain:
             new_ckpt_weights = {}
             model_config = config.MODEL
-            if model_config.TEXT_ENCODER.model_name == 'meter':
-                tmp = torch.load(model_config.TEXT_ENCODER.model_path)
-                tmp = tmp['state_dict']
-                
-                for param_name, param in tmp.items():
-                    if 'text_transformer.embeddings' in param_name:
-                        param_name = param_name.replace('text_transformer', 'net.instruction_encoder')
-                        new_ckpt_weights[param_name] = param
-                    elif 'text_transformer.encoder' in param_name:
-                        param_name = param_name.replace('text_transformer.encoder', 'net.instruction_encoder')
-                        new_ckpt_weights[param_name] = param
-                    elif 'cross_modal_image_layers' in param_name:
-                        if model_config.CROSS_MODAL_ENCODER.load_model:
-                            param_name = param_name.replace('cross_modal_image_layers', 'net.cross_modal_encoder.cross_modal_encoder.crossattention')
+            if config.MODEL.policy_name != 'CMA_Policy':
+                if model_config.TEXT_ENCODER.model_name == 'meter':
+                    tmp = torch.load(model_config.TEXT_ENCODER.model_path)
+                    tmp = tmp['state_dict']
+                    
+                    for param_name, param in tmp.items():
+                        if 'text_transformer.embeddings' in param_name:
+                            param_name = param_name.replace('text_transformer', 'net.instruction_encoder')
                             new_ckpt_weights[param_name] = param
-                    else:
-                        new_ckpt_weights[param_name] = param
-                del tmp
-            
-            if model_config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
-                tmp_depth = torch.load(model_config.IMAGE_ENCODER.DEPTH.model_path)
-                for param_name, param in tmp_depth.items():
-                    if 'vision_model' in param_name:
-                        param_name = param_name.replace('vision_model', 'net.image_encoder.depth_transformer.vision_model')
-                        new_ckpt_weights[param_name] = param
+                        elif 'text_transformer.encoder' in param_name:
+                            param_name = param_name.replace('text_transformer.encoder', 'net.instruction_encoder')
+                            new_ckpt_weights[param_name] = param
+                        elif 'cross_modal_image_layers' in param_name:
+                            if model_config.CROSS_MODAL_ENCODER.load_model:
+                                param_name = param_name.replace('cross_modal_image_layers', 'net.cross_modal_encoder.cross_modal_encoder.crossattention')
+                                new_ckpt_weights[param_name] = param
+                        else:
+                            new_ckpt_weights[param_name] = param
+                    del tmp
                 
-                del tmp_depth
-            
-            if model_config.IMAGE_ENCODER.RGB.model_name == 'clip-vit-base-patch32':
-                tmp_rgb = torch.load(os.path.join(model_config.IMAGE_ENCODER.RGB.model_path, 'pytorch_model.bin'))
-                for param_name, param in tmp_rgb.items():
-                    if 'vision_model' in param_name:
-                        param_name = param_name.replace('vision_model', 'net.image_encoder.image_transformer.vision_model')
-                        new_ckpt_weights[param_name] = param
+                if model_config.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
+                    tmp_depth = torch.load(model_config.IMAGE_ENCODER.DEPTH.model_path)
+                    for param_name, param in tmp_depth.items():
+                        if 'vision_model' in param_name:
+                            param_name = param_name.replace('vision_model', 'net.image_encoder.depth_transformer.vision_model')
+                            new_ckpt_weights[param_name] = param
+                    
+                    del tmp_depth
                 
-                del tmp_rgb
+                if model_config.IMAGE_ENCODER.RGB.model_name == 'clip-vit-base-patch32':
+                    tmp_rgb = torch.load(os.path.join(model_config.IMAGE_ENCODER.RGB.model_path, 'pytorch_model.bin'))
+                    for param_name, param in tmp_rgb.items():
+                        if 'vision_model' in param_name:
+                            param_name = param_name.replace('vision_model', 'net.image_encoder.image_transformer.vision_model')
+                            new_ckpt_weights[param_name] = param
+                    
+                    del tmp_rgb
             
             self_policy.load_state_dict(new_ckpt_weights, strict=False)       
         

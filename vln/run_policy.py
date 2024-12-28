@@ -77,6 +77,11 @@ def main():
         default=False,
         action='store_true',
     )
+    parser.add_argument(
+        "--train_quiet",
+        default=False,
+        action='store_true',
+    )
     
     args = parser.parse_args()
     
@@ -103,6 +108,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     config.show_topdown_window = kwargs.get('show_topdown_window', False)
     config.local_rank = local_rank if local_rank is not None else kwargs.get('local_rank', 0)
     config.debug = kwargs.get('debug', False)
+    config.train_quiet = kwargs.get('train_quiet', False)
     # logger.info(f"config: {config}")
     
     # Process the log dir
@@ -167,8 +173,9 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         if not os.path.exists(config.GT_PATH_DIR):
             os.makedirs(config.GT_PATH_DIR)
         
-        if not os.path.exists(config.VIDEO_DIR):
-            os.makedirs(config.VIDEO_DIR)
+        if config.VIDEO_OPTION != -1:
+            if not os.path.exists(config.VIDEO_DIR):
+                os.makedirs(config.VIDEO_DIR)
         
     if config.MODEL.policy_name in ['CMA_DP_ImgMultiPatch_Policy', 'DP_noRNN_Policy']:
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
