@@ -71,6 +71,8 @@ def pixel_to_world(pixel_pose,camera_pose,aperture,width,height):
 
     return [world_x, world_y]
 def get_shortest_path(
+    occupancy_map,
+    topdown_map,
     camera_pose,
     robot_position,
     reference_path,
@@ -80,8 +82,8 @@ def get_shortest_path(
     topdown_map.update_map(freemap, camera_pose, verbose=False, env_idx=0, update_map=True)
     occupancy_map_, _ = topdown_map.get_map(robot_position, return_camera_pose=True)
     start = time.time()
-    start_pixel = world_to_pixel(reference_path[0],camera_pose,aperture,500,500)
-    goal_pixel = world_to_pixel(reference_path[-1],camera_pose,aperture,500,500)
+    start_pixel = world_to_pixel(reference_path[0],camera_pose,500,500,500)
+    goal_pixel = world_to_pixel(reference_path[-1],camera_pose,500,500,500)
     paths, find_flag, fail_reason = path_planner.planning(
         start_pixel[0], 
         start_pixel[1],
@@ -457,10 +459,6 @@ class ActionExecutor:
                 action_name=action_name,  
                 check_fall_and_stuck=True,
             )
-            if action_name == 'move_by_descrete':
-                action_list = actions[0]['h1']['move_by_descrete']
-                for one_action in action_list:
-                    self.eval_logger.info(f"[descrete][step:{self.statistic_info.sim_step}] 完成动作:{describe_action(one_action)}")
 
         robot_position, robot_rotation = the_isaac_robot.get_world_pose()
         outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation)
@@ -475,6 +473,11 @@ class ActionExecutor:
         )
         infos = self.statistic_info.compute_metrics(robot_position=robot_position,fail_reason=reason)
         
+        if action_name == 'move_by_descrete':
+            action_list = actions[0]['h1']['move_by_descrete']
+            for one_action in action_list:
+                self.eval_logger.info(f"[descrete][step:{self.statistic_info.sim_step}] 完成动作:{describe_action(one_action)},距离目标 {round(infos[0]['NE'],2)} 米")
+
         return {
             "outputs_dict": outputs_dict,
             "dones": dones,
@@ -533,7 +536,7 @@ config_dict={
         }
     },
     "IL":{
-        "ckpt_to_load": f"{project_path}/data/checkpoints/habitat_sotas/CMA_PM_DA_Aug_converted.pth",
+        "ckpt_to_load": f"{project_path}/data/checkpoints/20241225_cma_pm_train_bs12_lr2.5e-4/ckpts/ckpt.44.pth",
         "lr_schedule":{
             "use":True,
             "type": "cosine",
@@ -564,6 +567,7 @@ the_scan = "zsNo4HB9uLZ"
 checkpoint_index=0
 per_action_max_step=1500
 max_step=25000
+a_star_max_iter=30000
 is_clip_long = False
 bert_tokenizer=None  #?
 ckpt_name="test"
@@ -616,7 +620,7 @@ with database.begin() as txn:
         print(f"value is None")
         sys.exit()
 target_path_key_list=[]
-retry_list=['']
+retry_list=[]
 for scan,path_key_list in value.items():
     if scan != the_scan:
         continue
@@ -700,7 +704,7 @@ path_planner = AStarPlanner(
     args=Config({}),
     map_width=500,
     map_height=500,
-    max_step=per_action_max_step,
+    max_step=a_star_max_iter,
     windows_head=False,
     for_llm=False,
     verbose=False
@@ -738,6 +742,8 @@ for i in range(len(target_path_key_list)):
     robot_position, robot_rotation = the_isaac_robot.get_world_pose()
     camera_pose = occupancy_map.topdown_camera.get_world_pose()[0] - the_task._offset
     exe_path, shortest_path_length, ext_info = get_shortest_path(
+        occupancy_map = occupancy_map,
+        topdown_map=topdown_map,
         camera_pose = camera_pose,
         robot_position = robot_position,
         reference_path = path_zero['reference_path'],
@@ -749,7 +755,7 @@ for i in range(len(target_path_key_list)):
         result = ext_info['path_planning_fail_reason']
         progress_log_util.trace_end(
             trajectory_id = path_key,
-            step_count=statistic_info.sim_step,
+            step_count=1,
             result = result,
         )
         ext_info['exe_path'] = exe_path
