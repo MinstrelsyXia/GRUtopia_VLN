@@ -19,7 +19,41 @@ from vln.src.models.utils.feature_extract import extract_instruction_tokens
 from vln.src.utils.utils import batch_obs
 import tqdm
 import math
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from datetime import datetime
 
+aperture=500
+
+def vis_nav_path(start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
+    cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])
+    bounds = [0, 1, 3, 254, 256]
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+    plt.figure(figsize=(10, 10))
+    # plt.imshow(occupancy_map, cmap='binary', origin='lower')
+    plt.imshow(occupancy_map, cmap=cmap, norm=norm, origin='upper')
+
+    # Plot start and goal points
+    plt.plot(start_pixel[1], start_pixel[0], 'ro', markersize=6, label='Start')
+    plt.plot(goal_pixel[1], goal_pixel[0], 'bo', markersize=6, label='Goal')
+
+    # Plot the path
+    if len(points) > 0:
+        path = np.array(points)
+        plt.plot(path[:, 1], path[:, 0], 'xb-', linewidth=1, markersize=5, label='Path')
+
+    # Customize the plot
+    plt.title('Path planning')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.legend()
+    plt.grid()
+    plt.colorbar(label='Occupancy (0: Free, 1: Occupied)')
+
+    # Save the plot
+    plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
+    print(f"Saved path planning visualization to {img_save_path}")
+    plt.close()
 def world_to_pixel(world_pose, camera_pose,aperture,width,height):
     cx, cy = camera_pose[0]*10/aperture*width, -camera_pose[1]*10/aperture*height
 
@@ -47,8 +81,8 @@ def get_shortest_path(
     topdown_map.update_map(freemap, camera_pose, verbose=False, env_idx=0, update_map=True)
     occupancy_map_, _ = topdown_map.get_map(robot_position, return_camera_pose=True)
     start = time.time()
-    start_pixel = world_to_pixel(reference_path[0],camera_pose,200,500,500)
-    goal_pixel = world_to_pixel(reference_path[-1],camera_pose,200,500,500)
+    start_pixel = world_to_pixel(reference_path[0],camera_pose,aperture,500,500)
+    goal_pixel = world_to_pixel(reference_path[-1],camera_pose,aperture,500,500)
     paths, find_flag = path_planner.planning(
         start_pixel[0], 
         start_pixel[1],
@@ -58,10 +92,18 @@ def get_shortest_path(
     )
     end = time.time()
     print(f"old planning 耗时{round(end - start,2)}秒")
+    file_name = f"new_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg" 
+    vis_nav_path(
+        start_pixel, 
+        goal_pixel, 
+        paths, 
+        occupancy_map_, 
+        img_save_path=os.path.join(f'{project_path}/test/zhaohui/', file_name)
+    )
     exe_path = []
     if find_flag:
         for node in paths:
-            world_coords = pixel_to_world([node[0],node[1]], camera_pose,200,500,500)
+            world_coords = pixel_to_world([node[0],node[1]], camera_pose,aperture,500,500)
             exe_path.append([world_coords[0], world_coords[1], reference_path[0][2]])
     if exe_path is not None and len(exe_path)>1:
         exe_path.pop(0)
@@ -534,7 +576,7 @@ config_dict={
 config = Config(config_dict)
 local_rank=0
 log_dir="/ssd/zhaohui/workspace/w61_grutopia_1220/test/zhaohui/"
-base_data_dir = '/ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected'
+base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
 mp3d_data_dir = "/ssd/share/Matterport3D/data/v1/scans"
 split_data_types = ['val_unseen','val_seen']
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
@@ -566,6 +608,8 @@ args_dict = {
     }
 }
 data_map = {}
+split_map={}
+robot_offset = np.array([0.   , 0.   , 0.975])
 for split_data_type in split_data_types:
     load_data_map, _ = load_gather_data(Config(args_dict), split_data_type, filter_same_trajectory=False, filter_stairs=True)
     for scan,path_list in load_data_map.items():
@@ -574,7 +618,11 @@ for split_data_type in split_data_types:
             trajectory_id = path['trajectory_id']
             episode_id = path['episode_id']
             path_key = f"{trajectory_id}_{episode_id}"
+            path["start_position"] += robot_offset
+            for i, _ in enumerate(path["reference_path"]):
+                path["reference_path"][i] += robot_offset
             data_map[path_key] = path
+            split_map[path_key] = split_data_type
 database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 rank = 0
 key = f"eval_rank_{rank}".encode()
@@ -590,10 +638,13 @@ for scan,path_key_list in value.items():
     else:
         path_key = path_key_list[0]
 data = data_map[path_key]
-print(data)
+print(f"split: {split_map[path_key]}")
+print(f"scan: {the_scan}")
+print(f"trajectory_id_episode_id: {path_key}")
+print(f"data: {data}")
 
 # 加载环境和机器人
-sim_cfg_file = f'{project_path}/vln/configs/sample_episodes_sim_cfg.yaml'
+sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
 sim_config = SimulatorConfig(sim_cfg_file)
 scene_asset_path = load_scene_usd(Config(args_dict), the_scan)
 sim_config.config.tasks[0].scene_asset_path = scene_asset_path
@@ -607,7 +658,14 @@ the_task = env._runner.current_tasks[list(env._runner.current_tasks.keys())[0]]
 the_robot = the_task.robots[list(the_task.robots.keys())[0]]
 the_isaac_robot = the_robot.isaac_robot
 
-for _ in range(10):
+the_task.set_single_robot_poses_without_offset(start_position, start_rotation)
+the_isaac_robot.set_world_velocity(np.zeros(6))
+the_isaac_robot.set_joint_velocities(np.zeros(len(the_isaac_robot.dof_names)))
+the_isaac_robot.set_joint_positions(np.zeros(len(the_isaac_robot.dof_names)))
+the_isaac_robot.set_joint_efforts(np.zeros(len(the_isaac_robot.dof_names)))
+
+# for _ in range(10):
+while True:
     env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=False, render=False)
 env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=True, render=True)
 
@@ -615,12 +673,12 @@ from vln.src.local_nav.camera_occupancy_map import CamOccupancyMap
 from vln.src.local_nav.global_topdown_map import GlobalTopdownMap
 args_dict = {
     "maps":{
-        "dilation_iterations":4,
+        "dilation_iterations":2,
         "add_dilation":True,
         "global_topdown_config":{
             "width":500,
             "height":500,
-            "aperture":200,
+            "aperture":aperture,
             "camera_transform_height":0.8,
             "voxel_size":0.1
         },
@@ -633,13 +691,13 @@ args_dict = {
     "windows_head":False,
     "save_path_planning":False,
     "settings":{
-        "use_llm":True,
+        "use_llm":False,
         "max_step":25000,
         "sample_camera_list":['pano_camera_0']
     },
     "log_image_dir":"",
 }
-topdown_map = GlobalTopdownMap(Config(args_dict), scan, vis_verbose=False)
+topdown_map = GlobalTopdownMap(Config(args_dict), the_scan, vis_verbose=False)
 occupancy_map = CamOccupancyMap(Config(args_dict), the_robot.sensors['topdown_camera_500'])
 path_planner = AStarPlanner(
     args=Config({}),
@@ -720,6 +778,7 @@ while True:
         eval_logger.info(f"Break. This ckpt is too bad to continue with average SPL {np.mean(list(spl_dict.values())):.3f}")
         sys.exit()
     with torch.no_grad():
+        policy_start=time.time()
         actions, rnn_states = policy(
             batch,
             rnn_states,
@@ -727,6 +786,8 @@ while True:
             not_done_masks,
             deterministic=not config.EVAL.SAMPLE,
         )
+        policy_end=time.time()
+        eval_logger.info(f"policy duration:{round((policy_end - policy_start), 2)}")
         prev_actions.copy_(actions)
         if config.EVAL.ACTION == 'descrete':
             for bs_i, a in enumerate(actions):
