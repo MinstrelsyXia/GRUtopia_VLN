@@ -674,11 +674,12 @@ class AStarPlanner:
                                self.calc_xy_index(sy, self.min_y), 0.0, -1)
         goal_node = self.Node(self.calc_xy_index(gx, self.min_x),
                               self.calc_xy_index(gy, self.min_y), 0.0, -1)
-
+        fail_reason=''
         if self.obstacle_map[goal_node.x, goal_node.y] == 255:
             # goal is in the obstacle
             log.warning("Goal is in the obstacle.")
-            return [], False
+            fail_reason='goal_in_obstacle'
+            return [], False, fail_reason
 
         open_set, closed_set = dict(), dict()
         open_set[self.calc_grid_index(start_node)] = start_node
@@ -692,6 +693,7 @@ class AStarPlanner:
             step += 1
             if len(open_set) == 0:
                 log.info("Path Planning failed! Open set is empty..")
+                fail_reason='open_set_empty'
                 break
 
             c_id = min(
@@ -757,6 +759,7 @@ class AStarPlanner:
             log.info("Cannot find path. Return the path to the nearest node")
             goal_node = current
             find_flag = False
+            fail_reason='path_planning'
 
         rx, ry = self.calc_final_path(goal_node, closed_set)
         points_list = list(zip(rx, ry))
@@ -778,8 +781,8 @@ class AStarPlanner:
                 self.vis_whole_path(self.obstacle_map, no_latest_img_path, self.history_path, for_llm=True, vis_latest_path=False)
             else:
                 self.vis_path(self.obstacle_map, sx, sy, gx, gy, points, img_save_path, legend=path_legend)
-            
-        return points, find_flag
+
+        return points, find_flag, fail_reason
 
     def get_cost(self,x,y):
         if x < self.max_x and y < self.max_y:
