@@ -46,7 +46,7 @@ def vis_nav_path(start_pixel, goal_pixel, path, occupancy_map, img_save_path='pa
 def generate_result_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"
 ckpt_name="test"
-path_key="62_13"
+path_key="138_37"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
 name = '20241216_sample_episodes'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
@@ -83,7 +83,7 @@ with database_read.begin() as txn:
         for point in exe_path:
             pixel = world_to_pixel(point,camera_pose,aperture,width,height)
             exe_path_pixel.append(pixel)
-        date_str = f"{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        date_str = path_key #f"{datetime.now().strftime('%Y%m%d%H%M%S')}"
         file_name = f"{date_str}_reference.jpg" 
         vis_nav_path(
             start_pixel=reference_path_pixel[0], 
