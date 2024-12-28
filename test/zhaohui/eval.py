@@ -31,7 +31,8 @@ if __name__ == "__main__":
     rank = args.rank
     print(f"rank:{rank}")
 
-    project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
+    # project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
+    project_path = '/isaac-sim/GRUtopia'
     name = '20241229_sample_episodes'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     
@@ -57,7 +58,7 @@ if __name__ == "__main__":
             print(f"[round:{round_count}]开始抓取scan:{scan}")
             command = [
                 'python', 
-                '/ssd/zhaohui/workspace/w61_grutopia_1220/test/zhaohui/one_scan.py',
+                f'{project_path}/test/zhaohui/eval_one_scan.py',
                 '--rank',
                 str(rank),
                 '--scan',

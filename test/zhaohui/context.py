@@ -506,8 +506,9 @@ class Context:
         rank = self.rank
         the_scan = self.scan
         headless = True
-        retry_list=[]
-        project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
+        retry_list=['goal_in_obstacle']
+        # project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
+        project_path = '/isaac-sim/GRUtopia'
         config_dict={
             "local_rank":0,
             "DDP":{
@@ -577,9 +578,9 @@ class Context:
         }
         config = Config(config_dict)
 
-        log_dir="/ssd/zhaohui/workspace/w61_grutopia_1220/logs/eval"
+        log_dir=f"{project_path}/logs/eval"
         base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-        mp3d_data_dir = "/ssd/share/Matterport3D/data/v1/scans"
+        mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
         split_data_types = ['val_unseen','val_seen']
         name = '20241229_sample_episodes'
         lmdb_path = project_path + f'/data/sample_episodes/{name}'
@@ -641,7 +642,6 @@ class Context:
                 eval_logger.info("value is None")
                 return
         target_path_key_list=[]
-        retry_list=[]
         for scan,path_key_list in value.items():
             if scan != the_scan:
                 continue
