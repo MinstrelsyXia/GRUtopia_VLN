@@ -34,7 +34,7 @@ class CustomFixedCategorical(torch.distributions.Categorical):
     """
 
     def sample(
-        self, sample_shape  # noqa: B008
+        self, sample_shape=torch.Size()  # noqa: B008
     ) -> Tensor:
         return super().sample(sample_shape).unsqueeze(-1)
 
@@ -222,13 +222,12 @@ class CMANet(nn.Module):
 
         return torch.einsum("ni, nci -> nc", attn, v)
 
-    def forward(
+    def _forward(
         self,
         observations: Dict[str, Tensor],
         rnn_states: Tensor, # [bs, 2, 512]
         prev_actions: Tensor,
         masks: Tensor,
-        deterministic: bool = False,
     ) -> Tuple[Tensor, Tensor]:
         instruction_embedding = self.instruction_encoder(observations)
         depth_embedding = self.depth_encoder(observations)
@@ -307,11 +306,23 @@ class CMANet(nn.Module):
                 observations["progress"],
                 reduction="none",
             )
-        
-        distribution = self.action_distribution(x)
-        if deterministic:
-            actions = distribution.mode()
-        else:
-            actions = distribution.sample() # TODO. lacking sample_shapoe
 
-        return actions, rnn_states_out
+        return x, rnn_states_out
+
+    def build_distribution(
+        self, observations, rnn_states, prev_actions, masks
+    ) -> CustomFixedCategorical:
+        features, rnn_states = self.forward(
+            observations, rnn_states, prev_actions, masks
+        )
+        return self.action_distribution(features)
+    
+    def forward(self, batch):
+        x, rnn_states_out = self._forward(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+        # distribution = self.action_distribution(x) # This would meet the error when using DataParallel during training "TypeError: 'CustomFixedCategorical' object is not iterable"
+        if batch['mode'] == 'train':
+            outputs = self.action_distribution(x).logits
+        elif batch['mode'] == 'inference':
+            outputs = self.action_distribution(x).mode()
+        return outputs, rnn_states_out
+

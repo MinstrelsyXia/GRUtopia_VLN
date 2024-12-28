@@ -37,10 +37,12 @@ def set_cuda(opts, device=None) -> Tuple[bool, int, torch.device]:
 
     # get device settings
     # if opts.local_rank != -1:
-    if opts.DDP.use:
+    if opts.DDP.use and not opts.DDP.use_dp:
         # init_param = init_distributed(opts)
         setup_ddp(opts.local_rank, opts.world_size)
+        opts.defrost()
         opts.local_rank = dist.get_rank()
+        opts.freeze()
         torch.cuda.set_device(opts.local_rank)
         device = torch.device("cuda", opts.local_rank)
         n_gpu = 1

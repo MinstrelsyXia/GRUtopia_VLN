@@ -22,6 +22,9 @@ class TaskEnv(VLNDataLoader):
         self.eval_logger = eval_logger
         
         vln_config.camera_list = vln_config.settings.camera_list
+        if hasattr(config, 'VLN_DATASETS'):
+            vln_config.datasets.base_data_dir = config.VLN_DATASETS
+
         super().__init__(vln_config, sim_config, splits, filter_same_trajectory, policy_eval=policy_eval, eval_logger=eval_logger, load_eval=self.config.EVAL.load_eval_subset)
         
         # self.args -> vln_config
