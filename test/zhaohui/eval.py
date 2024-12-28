@@ -49,7 +49,7 @@ if __name__ == "__main__":
             if value is None:
                 print(f"value of {key} from {lmdb_path}/sample_data.lmdb is None")
                 sys.exit()
-        
+        database.close()
         #获取所有 rank 列表
         scan_list = []
         for k,v in value.items():

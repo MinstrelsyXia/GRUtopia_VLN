@@ -641,6 +641,7 @@ class Context:
             if value is None:
                 eval_logger.info("value is None")
                 return
+        
         target_path_key_list=[]
         for scan,path_key_list in value.items():
             if scan != the_scan:
@@ -667,6 +668,7 @@ class Context:
                             tmp.append(path_key)
 
         target_path_key_list=tmp
+        database.close()
 
         if len(target_path_key_list) == 0:
             eval_logger.info(f"[scan:{the_scan}] has no data to eval")
@@ -728,7 +730,7 @@ class Context:
         )
         stuck_checker = StuckChecker(the_task._offset,the_isaac_robot)
         robot_bottom_z = the_robot.get_ankle_height() - sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
-        progress_log_util.init(the_scan, len(target_path_key_list))
+        progress_log_util.init(the_scan, len(target_path_key_list), rank=rank)
         progress_log_util.progress_logger.info(f"start sampling scan: {the_scan}, total_path:{len(target_path_key_list)}")
 
         for i in range(len(target_path_key_list)):
@@ -796,6 +798,7 @@ class Context:
                     key_write = generate_result_key(ckpt_name=ckpt_name,path_key=path_key).encode()
                     value_write = msgpack_numpy.packb(info, use_bin_type=True)
                     txn.put(key_write, value_write)
+                database_write.close()
                 continue
 
             robot_position, robot_rotation = the_task.get_robot_poses_without_offset()
@@ -920,6 +923,7 @@ class Context:
                         key_write = generate_result_key(ckpt_name=ckpt_name,path_key=path_key).encode()
                         value_write = msgpack_numpy.packb(info, use_bin_type=True)
                         txn.put(key_write, value_write)
+                    database_write.close()
                     stats_episodes[path_key] = info
                     spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
                     mean_spl = np.mean(list(spl_dict.values()))
