@@ -45,10 +45,10 @@ def vis_nav_path(start_pixel, goal_pixel, path, occupancy_map, img_save_path='pa
     plt.close()
 def generate_result_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"
-ckpt_name="test"
-path_key="138_37"
+ckpt_name="ckpt.44"
+path_key="412_115"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
-name = '20241216_sample_episodes'
+name = '20241229_sample_episodes'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 # database_write = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)

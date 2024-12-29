@@ -45,6 +45,7 @@ if __name__ == "__main__":
     try:
         print("context.run()")
         context.run()
+        os.kill(os.getpid(), 9) 
     except KeyboardInterrupt:
         print("Program stopped by user.")
     finally:
