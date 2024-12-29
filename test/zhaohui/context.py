@@ -506,7 +506,7 @@ class Context:
         rank = self.rank
         the_scan = self.scan
         headless = True
-        retry_list=['goal_in_obstacle']
+        retry_list=[]
         # project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
         project_path = '/isaac-sim/GRUtopia'
         config_dict={
