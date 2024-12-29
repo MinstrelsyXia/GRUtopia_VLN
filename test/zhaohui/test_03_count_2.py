@@ -27,13 +27,13 @@ def get_split_map():
                 split_map[path_key] = split_data_type
     return split_map
 
-ranks =[0,1,2,3,4,5,6,7] 
+ranks =[8,9,10,11,12,13,14,15] 
 ckpt_name="ckpt.44"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
 name = '20241229_sample_episodes'
 # split = 'val_seen'
-# split = 'val_unseen'
-split = ''
+split = 'val_unseen'
+# split = ''
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 split_map = get_split_map()
