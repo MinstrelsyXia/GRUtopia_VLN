@@ -4,7 +4,7 @@ import msgpack_numpy
 def generate_result_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"
 
-ranks =[0,1,2,3,4,5,6,7] 
+ranks =[8,9,10,11,12,13,14,15] 
 ckpt_name="ckpt.44"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
 name = '20241229_sample_episodes'
