@@ -80,6 +80,7 @@ def get_t_info_list(datas):
 files = [os.path.join(base_dir, file) for file in os.listdir(base_dir)]
 
 total = 0
+total_duration = 0
 result={
     "success":0,
     "exceed_per_action_max_step":0,
@@ -91,29 +92,49 @@ result={
     "open_set_empty":0,
     "path_planning":0,
 }
-success_durations = 0
 
+duration_map={
+    "success":0,
+    "exceed_per_action_max_step":0,
+    "exceed_total_max_step":0,
+    "stuck":0,
+    "fall":0,
+    "not_reach_goal":0,
+    "goal_in_obstacle":0,
+    "open_set_empty":0,
+    "path_planning":0,
+}
+
+scan_file_map={}
 for file in files:
-    scan = file.split('/')[-1].split('.')[0].split('_')[-1]
-    datas = read_file(file)
-    total_path = get_total_path(datas)
-    t_info_map = get_t_info_map(datas)
-    print(f"[scan:{scan}]应采集数据 {total_path} 条,实采集数据{len(t_info_map)}条")
-    for k,v in t_info_map.items():
+    scan = file.split('/')[-1].split('.')[0].split('_')[1]
+    if scan not in scan_file_map:
+        scan_file_map[scan]=[file]
+    else:
+        old = scan_file_map[scan]
+        old.append(file)
+        scan_file_map[scan]=old
+
+for scan, file_list in scan_file_map.items():
+
+    total_t_info_map = {}
+    for file in file_list:
+        datas = read_file(file)
+        t_info_map = get_t_info_map(datas)
+        for k,v in t_info_map.items():
+            total_t_info_map[k] = v
+    print(f"[scan:{scan}] 总共抓取数据{len(total_t_info_map)}条")
+    for k,v in total_t_info_map.items():
         total = total + 1
         result[v.result] = result[v.result] + 1
-        if v.result == 'success':
-            success_durations = success_durations + v.duration
-        # if v.result == 'stuck':
-        #     print(f"====[{scan}][{v.trajectory_id}][{v.step_count}][stuck]")
-        # if v.result == 'fall':
-        #     print(f"====[{scan}][{v.trajectory_id}][{v.step_count}][fall]")
-        # if v.result == 'path planning':
-        #     print(f"====[{scan}][{v.trajectory_id}][plan]")
-        # if v.result == 'max step':
-        #     print(f"====[{scan}][{v.trajectory_id}][{v.step_count}][max]")
+        duration_map[v.result]= duration_map[v.result] + v.duration
+        total_duration += v.duration
+   
+print(f"总共抓取数据{total}条,其中")
+for type,num in result.items():
+    if num == 0:
+        continue
+    duration = round(duration_map[type] / num,2)
+    print(f"[{type}]{num} 条 ,平均每条耗时：{duration} 秒")
 
-print(f"[total:{total}][result:{result}][success_durations:{round(success_durations,2)}]")
-
-# [scan:kEZ7cmS4wCh]应采集数据 6 条,实采集数据4条
-# [scan:82sE5b5pLXE]应采集数据 3 条,实采集数据1条
+print(f"平均每条数据处理耗时：{round(total_duration)} / {total} = {round(total_duration / total  ,2)}")
