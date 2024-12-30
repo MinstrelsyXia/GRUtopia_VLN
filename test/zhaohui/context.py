@@ -558,7 +558,7 @@ class Context:
                 }
             },
             "IL":{
-                "ckpt_to_load": f"{project_path}/data/checkpoints/20241225_cma_pm_train_bs12_lr2.5e-4/ckpts/ckpt.44.pth",
+                "ckpt_to_load": f"{project_path}/data/checkpoints/20241225_cma_pm_train_flash_bs12_lr2.5e-4/ckpts/ckpt.44.pth",
                 "lr_schedule":{
                     "use":True,
                     "type": "cosine",
@@ -582,14 +582,14 @@ class Context:
         base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
         mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
         split_data_types = ['val_unseen','val_seen']
-        name = '20241229_sample_episodes'
+        name = '20241230_sample_episodes'
         lmdb_path = project_path + f'/data/sample_episodes/{name}'
         per_action_max_step=1500
         max_step=25000
         a_star_max_iter=30000
         is_clip_long = False
         bert_tokenizer=None
-        ckpt_name="ckpt.44"
+        ckpt_name="ckpt.44.flash"
 
         eval_logger_filename = os.path.join(log_dir, f"eval_{rank}.log")
         eval_logger = MyLogger(

@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
     project_path = '/isaac-sim/GRUtopia'
-    name = '20241229_sample_episodes'
+    name = '20241230_sample_episodes'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     
     round_count = 0
