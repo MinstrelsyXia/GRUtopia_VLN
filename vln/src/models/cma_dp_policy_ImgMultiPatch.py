@@ -68,10 +68,10 @@ class CMA_DP_Net(nn.Module):
         self.image_encoder = encoders.ImageEncoder(self.model_config, self.model_config.IMAGE_ENCODER, observation_space, self.model_config.LORA)
         
         # Init the cross-modal fusion network
-        try:
-            bert_config = PretrainedConfig.from_pretrained('roberta-base')
-        except Exception as e:
-            bert_config = PretrainedConfig.from_pretrained('data/pretrained/roberta')
+        # try:
+        #     bert_config = PretrainedConfig.from_pretrained('roberta-base')
+        # except Exception as e:
+        bert_config = PretrainedConfig.from_pretrained('data/pretrained/roberta')
         cross_modal_config = copy.deepcopy(bert_config)
         for k,v in vars(self.model_config.CROSS_MODAL_ENCODER).items():
             setattr(cross_modal_config, k, v)
@@ -234,6 +234,14 @@ class CMA_DP_Net(nn.Module):
 
             self._init_pm_layers()
         
+        # Init the stop progress predictor
+        if self.model_config.STOP_PROGRESS_PREDICTOR.use:
+            self.stop_progress_predictor = encoders.DistanceNetwork(
+                embedding_dim=self.model_config.STATE_ENCODER.hidden_size, 
+                normalize=True) # stop_progress_pred
+
+            self._init_pm_layers()
+        
         self._output_size = self.num_actions
 
         self.train()
@@ -253,16 +261,11 @@ class CMA_DP_Net(nn.Module):
         return self.state_encoder.num_recurrent_layers
 
     def _init_pm_layers(self) -> None:
-        if self.model_config.PROGRESS_MONITOR.use:
-            # nn.init.kaiming_normal_(
-            #     self.progress_monitor.weight, nonlinearity="tanh"
-            # )
-            # nn.init.constant_(self.progress_monitor.bias, 0)
-            for param in self.progress_monitor.parameters():
-                if param.ndim == 2:  # Typically weights are 2D
-                    nn.init.kaiming_normal_(param, nonlinearity="tanh")
-                elif param.ndim == 1:  # Typically biases are 1D
-                    nn.init.constant_(param, 0)
+        for param in self.progress_monitor.parameters():
+            if param.ndim == 2:  # Typically weights are 2D
+                nn.init.kaiming_normal_(param, nonlinearity="relu")
+            elif param.ndim == 1:  # Typically biases are 1D
+                nn.init.constant_(param, 0)
 
     def _attn(
         self, q: Tensor, k: Tensor, v: Tensor, mask: Optional[Tensor] = None
@@ -446,7 +449,7 @@ class CMA_DP_Net(nn.Module):
                     if self.model_config.Diffusion_Policy.cond == 'v2_instr':
                         txt_dp_embeds = fused_update_txt_embeds[:,0,:].unsqueeze(1)
                     elif self.model_config.Diffusion_Policy.cond == 'v2_Fullinstr':
-                        txt_dp_embeds = fused_update_txt_embeds
+                        txt_dp_embeds = fused_update_txt_embeds[: self.model_config.Diffusion_Policy.txt_len, :]
                     lv_state = torch.cat([img_txt_embeds, txt_dp_embeds, state], dim=1)
                     if self.model_config.STEP_ENCODER.use:
                         lv_state = torch.cat([lv_state, steps_dp_embeds],dim=1)
@@ -514,7 +517,7 @@ class CMA_DP_Net(nn.Module):
                     if self.model_config.Diffusion_Policy.cond == 'v2_instr':
                         txt_dp_embeds = fused_update_txt_embeds[:,0,:].unsqueeze(1)
                     elif self.model_config.Diffusion_Policy.cond == 'v2_Fullinstr':
-                        txt_dp_embeds = fused_update_txt_embeds
+                        txt_dp_embeds = fused_update_txt_embeds[: self.model_config.Diffusion_Policy.txt_len, :]
                     lv_state = torch.cat([img_txt_embeds, txt_dp_embeds, state], dim=1)
                     if self.model_config.STEP_ENCODER.use:
                         lv_state = torch.cat([lv_state, steps_dp_embeds],dim=1)
@@ -573,8 +576,12 @@ class CMA_DP_Net(nn.Module):
         if self.model_config.PROGRESS_MONITOR.use:
             # progress_pred = torch.tanh(self.progress_monitor(state)) # pm_pred 
             progress_pred = self.progress_monitor(state.squeeze(1))
+        
+        stop_progress_pred = None
+        if self.model_config.STOP_PROGRESS_PREDICTOR.use:
+            stop_progress_pred = self.stop_progress_predictor(state.squeeze(1))
 
-        return noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list
+        return noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred
 
     def update_rnn_states(
         self,
@@ -664,10 +671,11 @@ class CMA_DP_Net(nn.Module):
             for idx in range(un_actions_nocumsum[0].shape[0]):
                 if stop_mode == 'progress':
                     stop_flag = False
-                    # Check if 4 consecutive steps are stop actions
-                    if idx + 3 < len(un_actions_nocumsum[0]):  # Make sure we have enough steps ahead
+                    M_stops = 3
+                    # Check if M consecutive steps are stop actions
+                    if idx + M_stops < len(un_actions_nocumsum[0]):  # Make sure we have enough steps ahead
                         consecutive_stops = True
-                        for i in range(3):  # Check current and next 2 steps
+                        for i in range(M_stops):  # Check current and next M steps
                             curr_action = un_actions_nocumsum[0][idx+i]
                             if not (abs(curr_action[0]) < float(self.config.EVAL.stop_x_threshold) and \
                                   abs(curr_action[1]) < float(self.config.EVAL.stop_y_threshold) and \
@@ -857,75 +865,11 @@ class CMA_DP_Net(nn.Module):
         step = batch['step']
         episode_ids = batch['episode_ids']
 
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
+        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         
-            actions = []
-            un_actions_nocumsum = []
-            rnn_states_list = []
-
-            # 创建图像（只创建一次）
-            fix, ax = plt.subplots(1, 1, figsize=(8, 8))
-
-            # 设置坐标轴
-            ax.spines['right'].set_color('none')
-            ax.spines['top'].set_color('none')
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
-
-            # 存储所有轨迹的数据范围
-            all_x = []
-            all_y = []
-
-            for i in range(batch['num_sample']):
-                dp_output = denoise_action_list[i]
-                actions_list = []
-                un_actions_nocumsum_list = []
-                
-                # 获取动作并转换为numpy数组
-                un_actions = get_action(dp_output, self.action_stats).cpu().detach().numpy()
-                
-                if vis:
-                    # 收集数据范围
-                    all_x.extend(un_actions[0][:, 0])
-                    all_y.extend(un_actions[0][:, 1])
-                    # 绘制轨迹
-                    ax.plot(un_actions[0][:, 0], un_actions[0][:, 1], 
-                        alpha=0.5, marker='o', label=f'Sample {i+1}')
-                
-                actions_list.append(un_actions)
-                un_actions_nocumsum_list.append(un_actions)
-                
-                # 保存到总列表
-                actions.append(actions_list)
-                un_actions_nocumsum.append(un_actions_nocumsum_list)
-            
-            if vis:
-                # 设置对称的显示范围
-                max_range = max(
-                    abs(max(all_x)), abs(min(all_x)),
-                    abs(max(all_y)), abs(min(all_y))
-                )
-                ax.set_xlim(-max_range*1.2, max_range*1.2)
-                ax.set_ylim(-max_range*1.2, max_range*1.2)
-                
-                # 添加原点和网格
-                ax.plot(0, 0, 'ko', markersize=5)
-                ax.grid(True)
-                ax.axis('equal')
-                
-                # 添加图例
-                ax.legend(loc='upper right')
-                
-                # 保存图像
-                save_dir = 'logs/images/num_samples'
-                os.makedirs(save_dir, exist_ok=True)
-                save_file = f'logs/images/num_samples/EpisodeId_{episode_ids}_step_{step}.png'
-                plt.savefig(save_file)
-                print(f"Save image to {save_file}")
-                
-                plt.close()
+            self.draw_multiple_actions(denoise_action_list, batch, episode_ids, predicted_actions_save_dir, step)
             
             # randomly sample one from list
             # actions.append(actions_list[np.random.randint(0, len(actions_list))][0])
@@ -938,7 +882,72 @@ class CMA_DP_Net(nn.Module):
         
             actions, actions_cumsum, un_actions_nocumsum = self.parse_action(diffusion_output, dist_pred, pm_pred=progress_pred, stop_mode=batch['stop_mode'], steps=batch['steps'])
         
-        return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred
+        return actions, rnn_states_out, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, progress_pred, stop_progress_pred
+    
+    def draw_multiple_actions(self, denoise_action_list, batch, episode_ids, save_dir=None, step=0):
+        actions = []
+        un_actions_nocumsum = []
+        rnn_states_list = []
+
+        # 创建图像（只创建一次）
+        fix, ax = plt.subplots(1, 1, figsize=(8, 8))
+
+        # 设置坐标轴
+        ax.spines['right'].set_color('none')
+        ax.spines['top'].set_color('none')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+
+        # 存储所有轨迹的数据范围
+        all_x = []
+        all_y = []
+
+        for i in range(batch['num_sample']):
+            dp_output = denoise_action_list[i]
+            actions_list = []
+            un_actions_nocumsum_list = []
+            
+            # 获取动作并转换为numpy数组
+            un_actions = get_action(dp_output, self.action_stats).cpu().detach().numpy()
+            
+            # 收集数据范围
+            all_x.extend(un_actions[0][:, 0])
+            all_y.extend(un_actions[0][:, 1])
+            # 绘制轨迹
+            ax.plot(un_actions[0][:, 0], un_actions[0][:, 1], 
+                alpha=0.5, marker='o', label=f'Sample {i+1}')
+            
+            actions_list.append(un_actions)
+            un_actions_nocumsum_list.append(un_actions)
+            
+            # 保存到总列表
+            actions.append(actions_list)
+            un_actions_nocumsum.append(un_actions_nocumsum_list)
+
+        # 设置对称的显示范围
+        max_range = max(
+            abs(max(all_x)), abs(min(all_x)),
+            abs(max(all_y)), abs(min(all_y))
+        )
+        ax.set_xlim(-max_range*1.2, max_range*1.2)
+        ax.set_ylim(-max_range*1.2, max_range*1.2)
+        
+        # 添加原点和网格
+        ax.plot(0, 0, 'ko', markersize=5)
+        ax.grid(True)
+        ax.axis('equal')
+        
+        # 添加图例
+        ax.legend(loc='upper right')
+        
+        # 保存图像
+        save_dir = 'logs/images/num_samples'
+        os.makedirs(save_dir, exist_ok=True)
+        save_file = f'logs/images/num_samples/EpisodeId_{episode_ids}_step_{step}.png'
+        plt.savefig(save_file)
+        print(f"Save image to {save_file}")
+        
+        plt.close()
 
     def forward(
         self, batch
@@ -952,6 +961,15 @@ class CMA_DP_Net(nn.Module):
         elif mode == "pred_actions":
             if 'num_sample' not in batch:
                 batch['num_sample'] = 1
+            if batch['need_img_extraction']:
+                stack_rgb, stack_depth = self.img_embedding(batch['observations']['rgb'], batch['observations']['depth'], batch['img_mod'], batch['depth_return_x_before_fc'], batch['proj'], batch['process_images'])
+                if len(stack_rgb.shape) == 2:
+                    batch['observations']['stack_rgb'] = stack_rgb.unsqueeze(1)
+                    batch['observations']['stack_depth'] = stack_depth.unsqueeze(1)
+                else:
+                    batch['observations']['stack_rgb'] = stack_rgb
+                    batch['observations']['stack_depth'] = stack_depth
+
             return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
         
         elif mode == "update_rnn":

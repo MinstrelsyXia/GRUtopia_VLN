@@ -14,6 +14,19 @@ from vln.src.models.encoders import resnet_encoders
 from vln.src.models.encoders.instruction_encoder import (
     InstructionEncoder,
 )
+    
+class CategoricalNet(nn.Module):
+    def __init__(self, num_inputs: int, num_outputs: int) -> None:
+        super().__init__()
+
+        self.linear = nn.Linear(num_inputs, num_outputs)
+
+        nn.init.orthogonal_(self.linear.weight, gain=0.01)
+        nn.init.constant_(self.linear.bias, 0)
+
+    def forward(self, x: Tensor):
+        x = self.linear(x)
+        return CustomFixedCategorical(logits=x)
 
 class CustomFixedCategorical(torch.distributions.Categorical):
     """Same as the CustomFixedCategorical in hab-lab, but renames log_probs
@@ -21,7 +34,7 @@ class CustomFixedCategorical(torch.distributions.Categorical):
     """
 
     def sample(
-        self, sample_shape  # noqa: B008
+        self, sample_shape=torch.Size()  # noqa: B008
     ) -> Tensor:
         return super().sample(sample_shape).unsqueeze(-1)
 
@@ -47,6 +60,7 @@ class CMANet(nn.Module):
         self, config, observation_space, action_stats=None, num_actions=4
     ) -> None:
         super().__init__()
+        self.num_actions = num_actions
         self.model_config = config.MODEL
         self.model_config.INSTRUCTION_ENCODER.final_state_only = False
 
@@ -169,6 +183,11 @@ class CMANet(nn.Module):
         self._init_layers()
 
         self.train()
+        
+        # Determine
+        self.action_distribution = CategoricalNet(
+            self._output_size, self.num_actions
+        )
 
     @property
     def output_size(self) -> int:
@@ -203,7 +222,7 @@ class CMANet(nn.Module):
 
         return torch.einsum("ni, nci -> nc", attn, v)
 
-    def forward(
+    def _forward(
         self,
         observations: Dict[str, Tensor],
         rnn_states: Tensor, # [bs, 2, 512]
@@ -289,3 +308,21 @@ class CMANet(nn.Module):
             )
 
         return x, rnn_states_out
+
+    def build_distribution(
+        self, observations, rnn_states, prev_actions, masks
+    ) -> CustomFixedCategorical:
+        features, rnn_states = self.forward(
+            observations, rnn_states, prev_actions, masks
+        )
+        return self.action_distribution(features)
+    
+    def forward(self, batch):
+        x, rnn_states_out = self._forward(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+        # distribution = self.action_distribution(x) # This would meet the error when using DataParallel during training "TypeError: 'CustomFixedCategorical' object is not iterable"
+        if batch['mode'] == 'train':
+            outputs = self.action_distribution(x).logits
+        elif batch['mode'] == 'inference':
+            outputs = self.action_distribution(x).mode()
+        return outputs, rnn_states_out
+

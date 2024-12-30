@@ -42,9 +42,25 @@ elif [ "$1" == "--collect_dataset" ]; then
   "
 elif [ "$1" == "--eval" ]; then
   flags="
-    --exp-config vln/configs/train/cma_dp_w61.yaml
     --run-type eval
+    --exp-config vln/configs/train/cma_dp_w61.yaml
     --headless
+    --test_verbose
+  "
+elif [ "$1" == "--train_noRNN" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
+    --run-type train
+  "
+elif [ "$1" == "--preprocess_features" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
+    --run-type preprocess_features
+  "
+elif [ "$1" == "--train_cma" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_train.yaml
+    --run-type train
   "
 fi
 python vln/run_policy.py $flags

@@ -7,6 +7,7 @@ import gzip
 import copy
 import glob
 import cv2
+import yacs.config
 
 import numpy as np
 import torch
@@ -289,10 +290,19 @@ def unnormalize_data(ndata, stats):
 
 def action_reduce(action_mask, unreduced_loss: torch.Tensor):
     # Reduce over non-batch dimensions to get loss per batch element
-    while unreduced_loss.dim() > 1:
-        unreduced_loss = unreduced_loss.mean(dim=-1)
-    assert unreduced_loss.shape == action_mask.shape, f"{unreduced_loss.shape} != {action_mask.shape}"
-    return (unreduced_loss * action_mask).mean() / (action_mask.float().mean() + 1e-2)
+    if action_mask is None:
+        while unreduced_loss.dim() > 1:
+            unreduced_loss = unreduced_loss.mean(dim=-1)
+        return unreduced_loss.mean()
+    else:
+        while unreduced_loss.dim() > 1:
+            unreduced_loss = unreduced_loss.mean(dim=-1)
+        assert unreduced_loss.shape == action_mask.shape, f"{unreduced_loss.shape} != {action_mask.shape}"
+        return (unreduced_loss * action_mask).mean() / (action_mask.float().mean() + 1e-2)
+
+def aux_reduce(mask, loss):
+    loss = torch.masked_select(loss, mask)
+    return loss.mean()
 
 def yaw_rotmat(yaw: float):
     try:
@@ -578,9 +588,12 @@ def batch_obs(
 
     return batch_t.map(lambda v: v.to(device))
 
-def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl):
+def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl, is_topdown=False):
     # 保存视频
-    video_path = os.path.join(VIDEO_DIR, f"{split}_episode_{ep_id}_ckpt_{checkpoint_index}_spl_{spl}.mp4")
+    if is_topdown:
+        video_path = os.path.join(VIDEO_DIR, f"{split}_episode_{ep_id}_ckpt_{checkpoint_index}_spl_{spl}_topdown.mp4")
+    else:
+        video_path = os.path.join(VIDEO_DIR, f"{split}_episode_{ep_id}_ckpt_{checkpoint_index}_spl_{spl}.mp4")
     video_writer = cv2.VideoWriter(
         video_path,
         cv2.VideoWriter_fourcc(*'mp4v'),
@@ -591,3 +604,26 @@ def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl):
         video_writer.write(frame)
     video_writer.release()
     print(f"Save video to {video_path}")
+
+class Config(yacs.config.CfgNode):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, new_allowed=True)
+
+def namespace_to_dict(namespace):
+    """Recursively converts Namespace objects to dictionaries."""
+    if not isinstance(namespace, (argparse.Namespace, dict)):
+        return namespace
+    
+    if isinstance(namespace, argparse.Namespace):
+        namespace = vars(namespace)
+    
+    result = {}
+    for key, value in namespace.items():
+        if isinstance(value, (dict, argparse.Namespace)):
+            result[key] = namespace_to_dict(value)
+        elif isinstance(value, list):
+            result[key] = [namespace_to_dict(item) if isinstance(item, (dict, argparse.Namespace)) else item 
+                          for item in value]
+        else:
+            result[key] = value
+    return result

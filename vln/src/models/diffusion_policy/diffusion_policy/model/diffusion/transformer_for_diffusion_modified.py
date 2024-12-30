@@ -23,7 +23,8 @@ class TransformerForDiffusion(ModuleAttrMixin):
             time_as_cond: bool=True,
             obs_as_cond: bool=False,
             n_cond_layers: int = 0,
-            head_dim: int=64
+            head_dim: int=64,
+            cls_mask_ratio: float=0
         ) -> None:
         super().__init__()
 
@@ -49,6 +50,7 @@ class TransformerForDiffusion(ModuleAttrMixin):
         # cond encoder
         self.time_emb = SinusoidalPosEmb(n_emb)
         self.cond_obs_emb = None
+        self.cls_mask_ratio = cls_mask_ratio # For now, I randomly mask the condition at the beginning of the network. Not inside the diffusion model.
         
         if obs_as_cond:
             self.cond_obs_emb = nn.Linear(cond_dim, n_emb)
@@ -276,7 +278,8 @@ class TransformerForDiffusion(ModuleAttrMixin):
         sample: torch.Tensor, 
         timestep: Union[torch.Tensor, float, int], 
         cond: Optional[torch.Tensor]=None,
-        type_embeds: torch.Tensor=None,  **kwargs):
+        type_embeds: torch.Tensor=None,  
+        **kwargs):
         """
         x: (B,T,input_dim)
         timestep: (B,) or int, diffusion step
