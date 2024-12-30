@@ -465,8 +465,8 @@ if __name__ == "__main__":
     if vln_config.settings.mode == "sample_episodes_multiprocess":
         sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
-        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
-        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split=vln_config.split, assigned_scan=vln_config.scan, assigned_path_id=vln_config.path_id)
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
+        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split=vln_config.split, assigned_scan=vln_config.scan, assigned_path_id=vln_config.path_id)
     elif vln_config.settings.mode == "sample_episodes_reset_scans_with_assigned_path":
         # This is for multi-docker
         data = read_assigned_json(vln_config, vln_config.lmdb_pathId_dir, vln_config.docker_id)
