@@ -12,14 +12,24 @@ import tqdm
 import io
 import lmdb
 import random
+import time
 from collections import defaultdict
 import zlib
 import msgpack_numpy
 import matplotlib.pyplot as plt
 import copy
 import torch
+from PIL import Image
 from torch.utils.data import Dataset, IterableDataset
 import torchvision.transforms.functional as TF
+from torchvision.transforms import Resize, ToPILImage
+from transformers import CLIPImageProcessor, CLIPVisionModel, CLIPVisionConfig
+from torchvision.transforms import Compose, CenterCrop, ToTensor, Normalize
+try:
+    from torchvision.transforms import InterpolationMode
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = Image.BICUBIC
 
 from vln.src.models.utils.feature_extract import extract_image_features, extract_instruction_tokens
 
@@ -34,6 +44,18 @@ def _block_shuffle(lst, block_size):
     random.shuffle(blocks)
 
     return [ele for block in blocks for ele in block]
+
+def _convert_image_to_rgb(image):
+    return image.convert("RGB")
+
+def _transform(n_px):
+    return Compose([
+        Resize(n_px, interpolation=BICUBIC),
+        CenterCrop(n_px),
+        _convert_image_to_rgb,
+        ToTensor(),
+        Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+    ])
 
 class ObservationsDict(dict):
     def pin_memory(self):
@@ -54,7 +76,7 @@ class VLNCE_DP_Dataset(IterableDataset):
         context_type: str = "temporal",
         end_slack: int = 0,
         goals_per_obs: int = 1,
-        normalize: bool = True,
+        normalize: bool = False,
         obs_type: str = "rgbd",
         goal_type: str = "instruction",
         lmdb_map_size=1e9,
@@ -77,13 +99,13 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.camera_name = self.config.IL.camera_name
         self.lmdb_features_dir = lmdb_features_dir
         self.lmdb_map_size = lmdb_map_size
-        self.preload_size = batch_size * 100
+
         self._preload = []
         self.batch_size = batch_size
         
         self.action_stats = {}
-        self.action_stats['min'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.min.cpu())
-        self.action_stats['max'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.max.cpu())
+        self.action_stats['min'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.min)
+        self.action_stats['max'] = np.array(self.config.MODEL.Diffusion_Policy.action_stats.max)
 
         if self.config.MODEL.use_iw:
             self.use_iw = True
@@ -98,7 +120,18 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.img_mod = self.config.MODEL.IMAGE_ENCODER.RGB.img_mod
         self.is_clip_long = (self.config.MODEL.TEXT_ENCODER.type == 'clip-long')
         self.policy = policy
-                    
+        
+        self.use_rnn = 'noRNN' not in self.config.MODEL.policy_name
+        self.preload_size = batch_size * 10 if self.use_rnn else 8
+
+        # preprocess images
+        self.to_pil = ToPILImage()
+        self.image_processor = _transform(n_px=224) # copy fron clip-long
+        
+        self.need_extract_instr_features = False if not self.config.MODEL.TEXT_ENCODER.update_text_encoder else True # has preprocessed the instruction
+        
+        if self.config.IL.analysis_time:
+            start_time = time.time()
         with lmdb.open(
             self.lmdb_features_dir,
             map_size=int(self.lmdb_map_size),
@@ -110,8 +143,11 @@ class VLNCE_DP_Dataset(IterableDataset):
             with lmdb_env.begin() as txn:
                 cursor = txn.cursor()
                 self.lmdb_keys = []
-                for key, _ in cursor:
-                    self.lmdb_keys.append(key.decode())
+                while cursor.next():
+                    self.lmdb_keys.append(cursor.key().decode())
+        if self.config.IL.analysis_time:
+            end_time = time.time()
+            print(f"Time taken to load LMDB: {end_time - start_time:.2f} seconds")
 
         self.start = 0
         self.end = self.length
@@ -168,6 +204,29 @@ class VLNCE_DP_Dataset(IterableDataset):
         else:
             self.num_action_params = 2
 
+    def _create_new_data(self, data, yaws, instruction, finish_status, fail_reason):
+        """Helper function to create new data entry"""
+        new_data = {
+            'instruction': instruction,
+            'progress': data['progress'],
+            'globalgps': data['robot_info']['position'],
+            'global_rotation': data['robot_info']['orientation'],
+            'globalyaw': yaws,
+        }
+
+        # Handle RGB and depth features/data
+        if 'rgb_features' in data:
+            new_data['rgb_features'] = data['rgb_features']
+            if self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder:
+                new_data['depth'] = np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1)
+            else:
+                new_data['depth_features'] = data['depth_features']
+        else:
+            new_data['rgb'] = data['camera_info'][self.camera_name]['rgb']
+            new_data['depth'] = np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1)
+        
+        return new_data
+
     def _load_next(self):
         if len(self._preload) == 0:
             if len(self.load_ordering) == 0:
@@ -200,9 +259,26 @@ class VLNCE_DP_Dataset(IterableDataset):
                     fail_reason = data_to_load['fail_reason']
                     if self.config.IL.Filter_failure.use:
                         if finish_status != 'success':
-                            if len(data['camera_info']) == 0 or len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
-                                continue
-                    
+                            if 'rgb' in data['camera_info'][self.camera_name].keys():
+                                if len(data['camera_info']) == 0 or len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
+                                    continue
+                            else:
+                                if len(data['camera_info']) == 0 or len(data['rgb_features']) < self.config.IL.Filter_failure.min_rgb_nums:
+                                    continue
+                        if finish_status == 'stuck':
+                            drop_last_frame_nums = 25
+                            data['camera_info'][self.camera_name]['rgb'] = data['camera_info'][self.camera_name]['rgb'][:-drop_last_frame_nums]
+                            data['camera_info'][self.camera_name]['depth'] = data['camera_info'][self.camera_name]['depth'][:-drop_last_frame_nums]
+                            data['robot_info']['yaw'] = data['robot_info']['yaw'][:-drop_last_frame_nums]
+                            data['robot_info']['position'] = data['robot_info']['position'][:-drop_last_frame_nums]
+                            data['robot_info']['orientation'] = data['robot_info']['orientation'][:-drop_last_frame_nums]
+                            data['progress'] = data['progress'][:-drop_last_frame_nums]
+                            data['step'] = data['step'][:-drop_last_frame_nums]
+                            if 'rgb_features' in data.keys():
+                                data['rgb_features'] = data['rgb_features'][:-drop_last_frame_nums]
+                            if 'depth_features' in data.keys():
+                                data['depth_features'] = data['depth_features'][:-drop_last_frame_nums]
+
                     # convert yaw from [-2pi,2pi] to [-pi, pi]
                     yaws = np.array(data['robot_info']['yaw']).copy()
                     for yaw_i, yaw in enumerate(data['robot_info']['yaw']):
@@ -210,34 +286,40 @@ class VLNCE_DP_Dataset(IterableDataset):
                         if yaw > np.pi:
                             yaw -= 2*np.pi
                         yaws[yaw_i] = yaw
-                            
-                    for ep_idx in range(len(self.dataset_data[key])):
-                        instr = self.dataset_data[key][ep_idx]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
-                            
-                        new_data = {
-                            'instruction': instr,
-                            'progress': data['progress'],
-                            'globalgps': data['robot_info']['position'],
-                            'global_rotation': data['robot_info']['orientation'],
-                            'globalyaw': yaws,
-                            'rgb': data['camera_info'][self.camera_name]['rgb'],
-                            'depth': np.expand_dims(data['camera_info'][self.camera_name]['depth'], axis=-1),
-                        }
+
+                    if 'instr_features' in data and not self.config.MODEL.TEXT_ENCODER.update_text_encoder:
+                        instructions = data['instr_features']
+                        self.need_extract_instr_features = False
+                    else:
+                        instructions = [
+                            self.dataset_data[key][ep_idx]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
+                            for ep_idx in range(len(self.dataset_data[key]))
+                        ]
+                        self.need_extract_instr_features = True
+
+                    for instruction in instructions:
+                        new_data = self._create_new_data(data, yaws, instruction, finish_status, fail_reason)
                         new_preload.append(new_data)
                         finish_status_list.append(finish_status)
                         fail_reasons_list.append(fail_reason)
-                        lengths.append(len(new_preload[-1]))
+                        lengths.append(len(new_data))
 
-            # compute stack images, positions, yaw, and relative actions, time_distance for each observations
-            new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
+                if self.need_extract_instr_features:
+                    # compute stack images, positions, yaw, and relative actions, time_distance for each observations
+                    new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
             
             # process the instruction
-            for i in range(len(new_preload)):
-                new_preload[i]['instruction'] = np.tile(np.array(new_preload[i]['instruction']), (len(new_preload[i]['progress']),1))
-            
-            # compute the action_stats ranges # !!!
-            min_x, min_y, min_yaw = 999, 999, 999
-            max_x, max_y, max_yaw = -999, -999, -999
+            # copy the instruction to each step
+            if self.need_extract_instr_features:
+                for i in range(len(new_preload)):
+                    new_preload[i]['instruction'] = np.tile(np.array(new_preload[i]['instruction']), (len(new_preload[i]['progress']),1))
+            else:
+                for i in range(len(new_preload)):
+                    new_preload[i]['instruction'] = np.expand_dims(new_preload[i]['instruction'], axis=0)
+                    new_preload[i]['instruction'] = np.tile(new_preload[i]['instruction'], (len(new_preload[i]['progress']), 1, 1))
+
+            if self.config.IL.analysis_time:
+                start_time = time.time()
             
             for item_idx in range(len(new_preload)):
                 item_obs = new_preload[item_idx]
@@ -250,6 +332,9 @@ class VLNCE_DP_Dataset(IterableDataset):
                 # total_steps = min(total_steps, 200)
                 # for k,v in item_obs.items():
                 #     item_obs[k] = item_obs[k][:total_steps]
+
+                # add stop_progress
+                item_obs["stop_progress"] = np.arange(total_steps) / total_steps
                 
                 for k,v in item_obs.items():
                     item_obs[k] = torch.from_numpy(np.array(item_obs[k]))
@@ -271,35 +356,31 @@ class VLNCE_DP_Dataset(IterableDataset):
                     self.extract_img_features = True
                 
                 # Stack images
-                # img_stack_nums = 1 if not self.use_stack else self.config.MODEL.IMAGE_ENCODER.img_stack_nums
-                # if self.extract_img_features:
-                #     # extract image features from raw images
-                #     img_shape = item_obs["rgb"][0].shape
-                #     depth_shape = item_obs["depth"][0].shape
-                #     if len(depth_shape) == 2:
-                #         # [256, 256] -> [256, 256, 1]
-                #         item_obs["depth"] = torch.unsqueeze(item_obs["depth"], dim=-1)
-                #         # TODO: change 256 to 224?
-                #     item_obs = extract_image_features(self.policy, item_obs,
-                #                                       img_mod=self.img_mod, len_traj_act=self.config.MODEL.len_traj_act,
-                #                                       world_size=self.world_size,
-                #                                       depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
-                #                                       proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
-                #                                       net_device=self.device)
-                #     item_obs["rgb_features"] = item_obs["stack_rgb"]
-                #     item_obs["depth_features"] = item_obs["stack_depth"]
+                img_stack_nums = 1 if not self.use_stack else self.config.MODEL.IMAGE_ENCODER.img_stack_nums
+                if self.extract_img_features:
+                    # extract image features from raw images
+                    # process RGB images
+                    process_images = []
+                    for image in item_obs["rgb"]:
+                        image = image.permute(2,0,1) # H,W,C -> C,H,W
+                        process_images.append(self.image_processor(self.to_pil(image)))
+                    item_obs["rgb"] = torch.stack(process_images) # [T, 3, 224, 224]
+                    
+                    img_shape = item_obs["rgb"][0].shape
+                else:
+                    img_shape = item_obs["rgb_features"][0].shape
+                
+                if "depth" in item_obs.keys():
+                    depth_shape = item_obs["depth"][0].shape
+                    if len(depth_shape) == 2:
+                        # [256, 256] -> [256, 256, 1]
+                        item_obs["depth"] = torch.unsqueeze(item_obs["depth"], dim=-1)
+                else:
+                    depth_shape = item_obs["depth_features"][0].shape
 
-                # img_shape = item_obs["rgb_features"][0].shape
-                # if self.img_mod == 'cls':
-                #     item_obs["stack_rgb"] = torch.zeros((total_steps, img_stack_nums, img_shape[-1]))
-                # elif self.img_mod == 'multi_patches_avg_pooling':
-                #     img_patch_num = item_obs["rgb_features"][0].shape[0]
-                #     item_obs["stack_rgb"] = torch.zeros((total_steps, img_stack_nums, img_patch_num, img_shape[-1]))
-                # if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'TAC':
-                #     item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, img_shape[-1]))
-                # elif self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet':
-                #     depth_shape = item_obs["depth_features"][0].shape
-                #     item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, depth_shape[0], depth_shape[1], depth_shape[2]))
+                if self.use_stack:
+                    item_obs["stack_rgb"] = torch.zeros((total_steps, img_stack_nums, *img_shape))
+                    item_obs["stack_depth"] = torch.zeros((total_steps, img_stack_nums, *depth_shape))
                     
                 if self.config.MODEL.IMU_ENCODER.use:
                     item_obs["imu"] = torch.zeros((total_steps, self.config.MODEL.IMU_ENCODER.input_size))
@@ -310,26 +391,29 @@ class VLNCE_DP_Dataset(IterableDataset):
                     # compute imu
                     if self.config.MODEL.IMU_ENCODER.use:
                         current_pos = item_obs["globalgps"][step_idx][[0,1]]
-                        item_obs["imu"][step_idx][:2] = to_local_coords(current_pos, start_pos, start_yaw)
+                        if self.config.MODEL.IMU_ENCODER.to_local_coords:
+                            item_obs["imu"][step_idx][:2] = to_local_coords(current_pos, start_pos, start_yaw)
                         if self.config.MODEL.IMU_ENCODER.input_size == 3:
                             item_obs["imu"][step_idx][2] = item_obs["globalyaw"][step_idx] - start_yaw
                     
-                #     # stack multiple images and depths
-                #     if step_idx == 0:
-                #         if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.MODEL.IMAGE_ENCODER.RGB.multi_patches_num:
-                #             # sample data use multi patches, but only use the first cls token
-                #             item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_features"][0][0]
-                #         else:
-                #             item_obs["stack_rgb"][step_idx][0] = item_obs["rgb_features"][0]
-                #         item_obs["stack_depth"][step_idx][0] = item_obs["depth_features"][0]
-                #     else:
-                #         prev_step_idx = min(img_stack_nums, step_idx+1)
-                #         # use np.flip to make the latest image in the first token
-                #         flip_images = np.flip(item_obs["rgb_features"][step_idx+1-prev_step_idx: step_idx+1], axis=0)
-                #         if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'cls' and item_obs["rgb_features"][0].shape[0] == self.config.MODEL.IMAGE_ENCODER.RGB.multi_patches_num:
-                #             flip_images = flip_images[:,0]
-                #         item_obs["stack_rgb"][step_idx][:prev_step_idx] = flip_images
-                #         item_obs["stack_depth"][step_idx][:prev_step_idx] = np.flip(item_obs["depth_features"][step_idx+1-prev_step_idx: step_idx+1], axis=0)
+                    # stack multiple images and depths
+                    if self.use_stack:
+                        if self.extract_img_features:
+                            rgb_key_name = "rgb"
+                            depth_key_name = "depth"
+                        else:
+                            rgb_key_name = "rgb_features"
+                            depth_key_name = "depth" if self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder else "depth_features" 
+                            
+                        if step_idx == 0:
+                            item_obs["stack_rgb"][step_idx][0] = item_obs[rgb_key_name][step_idx]
+                            item_obs["stack_depth"][step_idx][0] = item_obs[depth_key_name][step_idx]
+                        else:
+                            prev_step_idx = min(img_stack_nums, step_idx+1)     
+                            # use torch.flip to make the latest image in the first token
+                            flip_images = torch.flip(item_obs[rgb_key_name][step_idx+1-prev_step_idx: step_idx+1], dims=[0])
+                            item_obs["stack_rgb"][step_idx][:prev_step_idx] = flip_images
+                            item_obs["stack_depth"][step_idx][:prev_step_idx] = torch.flip(item_obs[depth_key_name][step_idx+1-prev_step_idx: step_idx+1], dims=[0])
                 
                 for step_idx in range(total_steps):
                     # compute actions
@@ -345,14 +429,6 @@ class VLNCE_DP_Dataset(IterableDataset):
                                                          fill_mode='constant')[:self.config.MODEL.len_traj_act]
                     
                     action_deltas = get_delta(actions)
-                    # Compute the action stats ranges # !!!
-                    for act in action_deltas:
-                        min_x = min(min_x, act[0])
-                        min_y = min(min_y, act[1])
-                        min_yaw = min(min_yaw, act[2])
-                        max_x = max(max_x, act[0])
-                        max_y = max(max_y, act[1])
-                        max_yaw = max(max_yaw, act[2])
                     
                     if self.learn_angle:                         
                         item_obs["actions"][step_idx] = normalize_data(action_deltas, self.action_stats) # convert actions to [-1, 1]
@@ -378,7 +454,26 @@ class VLNCE_DP_Dataset(IterableDataset):
                 # if self.lmdb_save_episode_id:
                 #     new_preload[item_idx].append(episode_ids[item_idx])
                 #     new_preload[item_idx].append(gt_actions[item_idx])
-                    
+
+            if not self.use_rnn:
+                # do not use rnn in model, so split the data into multiple batches
+                split_new_preload = []
+                for i in range(len(new_preload)):
+                    total_steps = len(new_preload[i]['progress'])
+                    keys = new_preload[i].keys()
+                    for j in range(total_steps):
+                        new_data = {}
+                        for k in keys:
+                            new_data[k] = new_preload[i][k][j]
+                        new_data['use_rnn'] = self.use_rnn
+                        split_new_preload.append(new_data)
+                new_preload = split_new_preload
+                lengths = [1] * len(new_preload)
+                
+            if self.config.IL.analysis_time:
+                end_time = time.time()
+                print(f"Time taken to process data in dataLoader: {end_time - start_time:.2f} seconds")
+
             sort_priority = list(range(len(lengths)))
             random.shuffle(sort_priority)
 
@@ -387,7 +482,9 @@ class VLNCE_DP_Dataset(IterableDataset):
 
             for idx in _block_shuffle(sorted_ordering, self.batch_size):
                 self._preload.append(new_preload[idx])
-
+        
+        if len(self._preload) == 0:
+            raise StopIteration
         return self._preload.pop() # pop one item each time
     
     def __next__(self):
@@ -506,7 +603,7 @@ class VLNCE_DP_Dataset(IterableDataset):
 
 
     def __len__(self) -> int:
-        return len(self.index_to_data)
+        return self.length * 200
     
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -576,33 +673,52 @@ def collate_fn(batch):
 
     observations_batch = new_observations_batch
 
-    max_traj_len = max(ele.size(0) for ele in observations_batch['progress'])
-    not_done_masks_batch = torch.ones(B, max_traj_len, dtype=torch.uint8)
-    for bid in range(B):
-        for sensor in observations_batch:
-            if sensor == 'progress':
-                observations_batch[sensor][bid] = _pad_helper(
-                observations_batch[sensor][bid], max_traj_len, fill_val=1.0
-            )
-            else:
-                # if sensor == 'instruction':
-                #     observations_batch[sensor][bid] = observations_batch[sensor][bid].unsqueeze(0)
-                observations_batch[sensor][bid] = _pad_helper(
-                    observations_batch[sensor][bid], max_traj_len, fill_val=0.0
+    if 'use_rnn' in observations_batch:
+        use_rnn = observations_batch['use_rnn'][0]
+        del observations_batch['use_rnn']
+    else:
+        use_rnn = True
+    if use_rnn:
+        max_traj_len = max(ele.size(0) for ele in observations_batch['progress'])
+        not_done_masks_batch = torch.ones(B, max_traj_len, dtype=torch.uint8)
+        for bid in range(B):
+            for sensor in observations_batch:
+                if sensor == 'progress':
+                    observations_batch[sensor][bid] = _pad_helper(
+                    observations_batch[sensor][bid], max_traj_len, fill_val=1.0
                 )
+                else:
+                    # if sensor == 'instruction':
+                    #     observations_batch[sensor][bid] = observations_batch[sensor][bid].unsqueeze(0)
+                    observations_batch[sensor][bid] = _pad_helper(
+                        observations_batch[sensor][bid], max_traj_len, fill_val=0.0
+                    )
 
-    for sensor in observations_batch:
-        observations_batch[sensor] = torch.stack(
-            observations_batch[sensor], dim=1
-        )
-        observations_batch[sensor] = observations_batch[sensor].view(
-            -1, *observations_batch[sensor].size()[2:]
-        )
+        for sensor in observations_batch:
+            observations_batch[sensor] = torch.stack(
+                observations_batch[sensor], dim=1
+            )
+            observations_batch[sensor] = observations_batch[sensor].view(
+                -1, *observations_batch[sensor].size()[2:]
+            )
 
-    observations_batch = ObservationsDict(observations_batch)
-    # length 330: longest_episode_length*batch_size
-    return (
-        observations_batch,
-        observations_batch['prev_actions'],
-        not_done_masks_batch.view(-1, 1),
-    )
+        observations_batch = ObservationsDict(observations_batch)
+        # length 330: longest_episode_length*batch_size
+        return (
+            observations_batch,
+            observations_batch['prev_actions'],
+            not_done_masks_batch.view(-1, 1),
+        )
+    else:
+        for sensor in observations_batch:
+            if sensor == 'use_rnn':
+                continue
+            observations_batch[sensor] = torch.stack(
+                observations_batch[sensor], dim=0
+            )
+        observations_batch = ObservationsDict(observations_batch)
+        return (
+            observations_batch,
+            observations_batch['prev_actions'],
+            None
+        )

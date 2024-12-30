@@ -36,14 +36,22 @@ def set_cuda(opts, device=None) -> Tuple[bool, int, torch.device]:
         return True, 0, torch.device("cpu")
 
     # get device settings
-    if opts.local_rank != -1:
-        init_distributed(opts)
+    # if opts.local_rank != -1:
+    if opts.DDP.use and not opts.DDP.use_dp:
+        # init_param = init_distributed(opts)
+        setup_ddp(opts.local_rank, opts.world_size)
+        opts.defrost()
+        opts.local_rank = dist.get_rank()
+        opts.freeze()
         torch.cuda.set_device(opts.local_rank)
         device = torch.device("cuda", opts.local_rank)
         n_gpu = 1
         default_gpu = dist.get_rank() == 0
         if default_gpu:
             logger.info(f"Found {dist.get_world_size()} GPUs")
+        logger.info(f"Process rank: {dist.get_rank()}, "
+                   f"Local rank: {opts.local_rank}, "
+                   f"Device: {device}")
     else:
         default_gpu = True
         device = torch.device("cuda") if device is None else device
@@ -54,26 +62,32 @@ def set_cuda(opts, device=None) -> Tuple[bool, int, torch.device]:
 
 
 def wrap_model(
-    model: torch.nn.Module, device: torch.device, local_rank: int, logger, world_size=1
+    model: torch.nn.Module, device: torch.device, local_rank: int, logger, world_size=1, use_dp=False
 ) -> torch.nn.Module:
-    if isinstance(device, int):
-        model.to(device)
-
-    if local_rank != -1:
-        model = DDP(model, device_ids=[local_rank], find_unused_parameters=True)
-        # At the time of DDP wrapping, parameters and buffers (i.e., model.state_dict()) 
-        # on rank0 are broadcasted to all other ranks.
-    elif torch.cuda.device_count() > 1 and world_size > 1:
-        logger.info(f"Using data parallel on GPUS: {device}")
-        print(f"Using data parallel on GPUS: {device}")
+    if world_size > 1 and use_dp:  # DP模式
         if isinstance(device, list):
             model = torch.nn.DataParallel(model, device_ids=device)
+            model = model.to(device[0])
         else:
             model = torch.nn.DataParallel(model)
+            model = model.to(device)
+    elif world_size > 1:  # DDP模式
+        # 确保模型在正确的GPU上
+        device = torch.device(f"cuda:{local_rank}")
+        model = model.to(device)
+        print(f"Process {local_rank} using device: {device}")
         
-        model = model.to(device[0])
-    else:
-        model = model.to(device[0])
+        model = DDP(
+            model,
+            device_ids=[local_rank],  # 使用local_rank对应的GPU
+            output_device=local_rank,
+            find_unused_parameters=True
+        )
+    else:  # 单GPU模式
+        if isinstance(device, list):
+            model = model.to(device[0])
+        else:
+            model = model.to(device)
 
     return model
 
@@ -130,9 +144,7 @@ def load_init_param(opts):
         # WARNING: this assumes that each node has the same number of GPUs
         n_gpus = torch.cuda.device_count()
         rank = local_rank + node_rank * n_gpus
-    opts.defrost()
     opts.rank = rank
-    opts.freeze()
 
     return {
         "backend": "nccl",
@@ -149,6 +161,7 @@ def init_distributed(opts):
     print(f"Init distributed {init_param['rank']} - {init_param['world_size']}")
 
     dist.init_process_group(**init_param)
+    return init_param
 
 
 def is_default_gpu(opts) -> bool:
@@ -236,4 +249,12 @@ def reduce_dict(input_dict, average=True):
         reduced_dict = {k: v for k, v in zip(names, values)}
     return reduced_dict
 
-
+def setup_ddp(local_rank, world_size):
+    # Initialize the distributed environment
+    dist.init_process_group(
+        backend='nccl',  # Use NCCL backend for GPU
+        init_method='env://',  # Use environment variables for initialization
+        world_size=world_size,  # Total number of processes
+        rank=local_rank,  # Rank of the current process
+    )
+    torch.cuda.set_device(local_rank)  # Set GPU device for the current process

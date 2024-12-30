@@ -1,1 +1,2 @@
 from .dp_trainer import DaggerDiffusonPolicyTrainer
+from .cma_trainer import DaggerCMATrainer

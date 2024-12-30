@@ -12,5 +12,12 @@ msgpack_numpy
 tensorboard
 gym
 einops
+yacs
+opencv-python
+matplotlib
+httpx
+toml
+pydantic==1.9.0
+scipy
 
 # pip install -e vln/src/models/diffusion_policy

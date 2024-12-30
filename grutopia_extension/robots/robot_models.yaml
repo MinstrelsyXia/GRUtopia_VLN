@@ -143,7 +143,8 @@ robots:
 
 
 - type: "HumanoidRobotVLNEval"
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_500.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
   gains: [0.0, 0.0]
@@ -300,6 +301,13 @@ robots:
   - name: "move_along_speeds"
     type: MoveAlongSpeedsController
     steps_per_speed: 50
+    sub_controllers:
+    - name: move_by_speed
+  - name: "move_by_descrete"
+    type: DescreteController
+    steps_per_action: 50
+    forward_distance: 0.25
+    rotation_angle: 15.0
     sub_controllers:
     - name: move_by_speed
 

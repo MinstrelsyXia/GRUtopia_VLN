@@ -50,6 +50,23 @@ class LmdbReader:
 
         env.close()
         return all_data  # Return all episode data as a dictionary
+
+    def read_all_keys(self):
+        """从LMDB数据库中读取所有键值。
+
+        Returns:
+            list: 包含所有键值的列表
+        """
+        env = lmdb.open(self.lmdb_path, readonly=True, lock=False)  # 以只读模式打开LMDB
+        keys = []
+
+        with env.begin() as txn:
+            with txn.cursor() as cursor:
+                for key, _ in cursor:
+                    keys.append(key.decode('utf-8'))  # 将字节类型的键值解码为字符串
+
+        env.close()
+        return keys
     
     def save_episode_video(self, episode_data, key, output_dir, use_pid=False):
         """Save the episode video to a file."""
@@ -206,10 +223,11 @@ class LmdbReader:
 
 if __name__ == '__main__':
     mode = 'save_video'
-    use_pid = True
+    use_pid = False
     
-    pid_lmdb_path = '/isaac-sim/GRUtopia/data/sample_episodes/20241206_sample_episodes_debug/sample_data.lmdb'
-    original_lmdb_path = '/isaac-sim/GRUtopia/data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
+    pid_lmdb_path = 'data/sample_episodes/20241207_sample_episodes/sample_data.lmdb'
+    # original_lmdb_path = '/data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
+    original_lmdb_path = 'data/sample_episodes/20241216_sample_episodes_descrete_flash/sample_data.lmdb'
 
     val_seen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_seen/sample_data.lmdb'
     val_unseen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_unseen/sample_data.lmdb'
@@ -235,7 +253,8 @@ if __name__ == '__main__':
         #         data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)
 
         '''2. Load the target path_id'''
-        path_id = '1407'
+        # all_keys = data_collector.read_all_keys()
+        path_id = '109'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
         if episode_data is not None:

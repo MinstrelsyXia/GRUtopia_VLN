@@ -420,6 +420,7 @@ class VLNDataLoader(Dataset):
                     save_img_flag = True
                 elif data == 'pointcloud':
                     save_img_flag = False
+                    #save_img_flag = True
                 if save_imgs and save_img_flag:
                     save_dir = os.path.join(self.args.log_image_dir, "obs")
                     if not os.path.exists(save_dir):
@@ -602,7 +603,7 @@ class VLNDataLoader(Dataset):
         '''
         camera_list = []
         for camera in self.args.camera_list:
-            if 'debug' not in camera and 'topdown' not in camera:
+            if 'debug' not in camera and 'topdown' not in camera and 'pointcloud' not in camera:
                 camera_list.append(camera)
         pointclouds, _, _ = self.process_pointcloud(camera_list)
         robot_ankle_z = self.get_robot_bottom_z()
