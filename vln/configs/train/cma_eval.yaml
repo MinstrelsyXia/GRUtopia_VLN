@@ -1,4 +1,4 @@
-NAME: 20241225_cma_pm_train_bs12_lr2.5e-4
+NAME: 20241225_cma_pm_train_flash_bs12_lr2.5e-4
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -79,6 +79,7 @@ EVAL:
   sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
   vln_cfg_file: vln/configs/vln_cfg_policy_eval.yaml
   step_interval: 50 
+  compute_shortest_path: False # if true, will compute the shortest path based on isaac-sim planner, otherwise, will use the geodesic distance in the data
   
   # len_traj_act
   len_traj_act: 4

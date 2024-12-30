@@ -209,12 +209,17 @@ class TaskEnv(VLNDataLoader):
 
         # get_shortest_path
         self.prev_position = self.get_robot_poses()[self.env_idx][0]
-        self.gt_exe_path, self.shortest_path_length = self.get_shortest_path(self.current_scan, verbose=self.config.test_verbose)
-        # np.save(os.path.join(self.EP_DIR, 'gt_exe_path.npy'), self.gt_exe_path) # !!!
-        self.eval_logger.info(f"The shortest path length is {self.shortest_path_length:.2f}")
-        if self.shortest_path_length == 0:
-            self.eval_logger.error(f"The shortest path planning for {self.current_scan} has failed. Please check the data.")
-            return 'shortest_path_planning_failed'
+        if self.config.EVAL.compute_shortest_path:
+            # compute the shortest path based on isaac-sim planner
+            self.gt_exe_path, self.shortest_path_length = self.get_shortest_path(self.current_scan, verbose=self.config.test_verbose)
+            # np.save(os.path.join(self.EP_DIR, 'gt_exe_path.npy'), self.gt_exe_path) # !!!
+            self.eval_logger.info(f"The shortest path length is {self.shortest_path_length:.2f}")
+            if self.shortest_path_length == 0:
+                self.eval_logger.error(f"The shortest path planning for {self.current_scan} has failed. Please check the data.")
+                return 'shortest_path_planning_failed'
+        else:
+            # directly use the geodesic distance in the data
+            self.shortest_path_length = self.data_item['info']['geodesic_distance']
 
         # obtain the observations
         obs = self.get_obs()
