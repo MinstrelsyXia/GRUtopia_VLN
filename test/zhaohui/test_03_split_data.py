@@ -10,7 +10,7 @@ split_data_types = ['val_unseen','val_seen']
 filter_same_trajectory = False
 base_data_dir = '/ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected'
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
-name = '20241230_sample_episodes'
+name = '20250101_sample_episodes'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 
 
