@@ -629,15 +629,18 @@ class IsaacSimLanguageRobot(LangRobot):
         row, col = self.ObstacleMap._xy_to_px(pos[0],pos[1])
 
     def warm_up(self,warm_step =50):
+        import time
+        start_time = time.time()
         self.step = 0
         env_actions = [{'h1': {'stand_still': []}}]
         while self.step < warm_step:
-            self.env.step(actions=env_actions)
+            self.env.step(actions=env_actions,add_rgb_subframes=False,render=False)
             self.step += 1
             if (self.step % 50 == 0):
                 self.check_and_reset_robot(self.step, update_freemap=True, verbose=True)
-        self.update_all_maps()
-        log.info("Warm up finished, updated all maps")
+        # self.update_all_maps()
+        end_time = time.time()
+        print("fps",warm_step/(end_time-start_time))
 
     def from_obsmap_to_vlmap(self,pos):
         '''
@@ -882,12 +885,13 @@ class IsaacSimLanguageRobot(LangRobot):
                 #     rgb, depth = agent.update_memory(dialogue_result=None, update_candidates= True, verbose=task_config['verbose']) 
                 # else:
                 #     obs = runner.step(actions=actions, render = False)
-                self.env.step(actions= env_actions)
-                current_orientation = self.agents.get_world_pose()[1]
+
 
 
 
                 if (self.step % 200 == 0): # change from 50 to 200
+                    self.env.step(actions= env_actions,add_rgb_subframes=True)
+                    current_orientation = self.agents.get_world_pose()[1]
                     if vis: 
                         self.update_all_maps()
                     log.info(f"Step {self.step}: Present at {self.quat_to_euler_angles(current_orientation)[2]}, need to navigate to {rotation_goal}")
@@ -904,7 +908,9 @@ class IsaacSimLanguageRobot(LangRobot):
                             # rotation_goals = [(current_yaw + degree) % 360 - 360 if (current_yaw + degree) % 360 > 180 else (current_yaw + degree) % 360 for degree in np.arange(angle_deg+base_yaw-current_yaw, 0, -2)]
       
                             rotation_goals = [(current_yaw + degree)%(2*np.pi) - (2*np.pi) if (current_yaw + degree)%(2*np.pi) > np.pi else (self.quat_to_euler_angles(current_orientation)[2] + degree)%(2*np.pi) for degree in np.linspace( (angle_deg / 180.0 * np.pi + base_yaw - current_yaw+4*np.pi)%(2*np.pi), 0, 10, endpoint=False)]
-                            break    
+                            break
+                else:
+                    self.env.step(actions= env_actions)
         self._retrive_robot_stuck_check()
         return True
 

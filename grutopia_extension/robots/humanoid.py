@@ -122,6 +122,8 @@ class Humanoid(IsaacRobot):
 
     def apply_actuator_model(self, control_action: ArticulationAction, controller_name: str,
                              joint_set: ArticulationSubset):
+        if joint_set is None or control_action is None:
+            return
         name = 'base_legs'
         actuator = self.actuators[name]
 
@@ -198,9 +200,6 @@ class HumanoidRobot(BaseRobot):
             usd_path=usd_path,
         )
 
-        if robot_model.joint_names is not None:
-            self.joint_subset = ArticulationSubset(self.isaac_robot, robot_model.joint_names)
-
         self._robot_scale = np.array([1.0, 1.0, 1.0])
         if config.scale is not None:
             self._robot_scale = np.array(config.scale)
@@ -209,15 +208,18 @@ class HumanoidRobot(BaseRobot):
         self._robot_ik_base = None
 
         self._robot_base = RigidPrim(prim_path=config.prim_path + '/pelvis', name=config.name + '_base')
-        self._robot_right_ankle = RigidPrim(prim_path=config.prim_path + '/right_ankle_link', name=config.name + 'right_ankle')
-        self._robot_left_ankle = RigidPrim(prim_path=config.prim_path + '/left_ankle_link', name=config.name + 'left_ankle')
+        self._robot_right_ankle = RigidPrim(prim_path=config.prim_path + '/right_ankle_link',
+                                            name=config.name + 'right_ankle')
+        self._robot_left_ankle = RigidPrim(prim_path=config.prim_path + '/left_ankle_link',
+                                           name=config.name + 'left_ankle')
+        self._imu_link = RigidPrim(prim_path=config.prim_path + '/imu_link', name=config.name + '_imu')
+        self._torso_link = RigidPrim(prim_path=config.prim_path + '/torso_link', name=config.name + '_torso')
 
     def post_reset(self):
         super().post_reset()
         self.isaac_robot._process_actuators_cfg()
         if self._gains is not None:
             self.isaac_robot.set_gains(self._gains)
-
 
     def get_ankle_height(self):
         return np.min([self._robot_right_ankle.get_world_pose()[0][2], self._robot_left_ankle.get_world_pose()[0][2]])
@@ -253,18 +255,130 @@ class HumanoidRobot(BaseRobot):
                 continue
             controller = self.controllers[controller_name]
             control = controller.action_to_control(controller_action)
-            self.isaac_robot.apply_actuator_model(control, controller_name, self.joint_subset)
+            self.isaac_robot.apply_actuator_model(control, controller_name, controller.get_joint_subset())
         
         # top-down camera reset
         if 'topdown_camera_500' in self.sensors:
             orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
             robot_pos = self.isaac_robot.get_world_pose()[0]
-            self.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
+            self.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
         
         if 'topdown_camera_50' in self.sensors:
             orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
             robot_pos = self.isaac_robot.get_world_pose()[0]
-            self.sensors['topdown_camera_50']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.8],orientation_quat)
+            self.sensors['topdown_camera_50']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
+
+    def get_obs(self, add_rgb_subframes=False):
+        position, orientation = self._robot_base.get_world_pose()
+
+        # custom
+        obs = {
+            'position': position,
+            'orientation': orientation,
+        }
+
+        # common
+        for c_obs_name, controller_obs in self.controllers.items():
+            obs[c_obs_name] = controller_obs.get_obs()
+        for sensor_name, sensor_obs in self.sensors.items():
+            obs[sensor_name] = sensor_obs.get_data(add_rgb_subframes=add_rgb_subframes)
+        return obs
+
+
+@BaseRobot.register('HumanoidRobotVLNEval')
+class HumanoidRobotVLNEval(BaseRobot):
+
+    def __init__(self, config: Config, robot_model: RobotModel, scene: Scene):
+        super().__init__(config, robot_model, scene)
+        self._sensor_config = robot_model.sensors
+        self._gains = robot_model.gains
+        self._start_position = np.array(config.position) if config.position is not None else None
+        self._start_orientation = np.array(config.orientation) if config.orientation is not None else None
+
+        log.debug(f'humanoid {config.name}: position    : ' + str(self._start_position))
+        log.debug(f'humanoid {config.name}: orientation : ' + str(self._start_orientation))
+
+        usd_path = robot_model.usd_path
+        if usd_path.startswith('/Isaac'):
+            usd_path = get_assets_root_path() + usd_path
+
+        log.debug(f'humanoid {config.name}: usd_path         : ' + str(usd_path))
+        log.debug(f'humanoid {config.name}: config.prim_path : ' + str(config.prim_path))
+        self.isaac_robot = Humanoid(
+            prim_path=config.prim_path,
+            name=config.name,
+            position=self._start_position,
+            orientation=self._start_orientation,
+            usd_path=usd_path,
+        )
+
+        self._robot_scale = np.array([1.0, 1.0, 1.0])
+        if config.scale is not None:
+            self._robot_scale = np.array(config.scale)
+            self.isaac_robot.set_local_scale(self._robot_scale)
+
+        self._robot_ik_base = None
+
+        self._robot_base = RigidPrim(prim_path=config.prim_path + '/pelvis', name=config.name + '_base')
+        self._robot_right_ankle = RigidPrim(prim_path=config.prim_path + '/right_ankle_link',
+                                            name=config.name + 'right_ankle')
+        self._robot_left_ankle = RigidPrim(prim_path=config.prim_path + '/left_ankle_link',
+                                           name=config.name + 'left_ankle')
+        self._imu_link = RigidPrim(prim_path=config.prim_path + '/imu_link', name=config.name + '_imu')
+        self._torso_link = RigidPrim(prim_path=config.prim_path + '/torso_link', name=config.name + '_torso')
+
+    def post_reset(self):
+        super().post_reset()
+        self.isaac_robot._process_actuators_cfg()
+        if self._gains is not None:
+            self.isaac_robot.set_gains(self._gains)
+
+    def get_ankle_height(self):
+        return np.min([self._robot_right_ankle.get_world_pose()[0][2], self._robot_left_ankle.get_world_pose()[0][2]])
+
+    def get_robot_scale(self):
+        return self._robot_scale
+
+    def get_robot_base(self) -> RigidPrim:
+        return self._robot_base
+
+    def get_robot_ik_base(self):
+        return self._robot_ik_base
+
+    def get_world_pose(self):
+        return self._robot_base.get_world_pose()
+
+    def oracle_set_world_pose(self, position, orientation):
+        # Note that this is without offset
+        self.isaac_robot.set_world_pose(position, orientation)
+        self.isaac_robot.set_joint_velocities(np.zeros(len(self.isaac_robot.dof_names)))
+        self.isaac_robot.set_joint_positions(np.zeros(len(self.isaac_robot.dof_names)))
+        self.isaac_robot.set_linear_velocity(np.zeros(3))
+        self.isaac_robot.set_angular_velocity(np.zeros(3))
+
+    def apply_action(self, action: dict):
+        """
+        Args:
+            action (dict): inputs for controllers.
+        """
+        for controller_name, controller_action in action.items():
+            if controller_name not in self.controllers:
+                log.warn(f'unknown controller {controller_name} in action')
+                continue
+            controller = self.controllers[controller_name]
+            control = controller.action_to_control(controller_action)
+            self.isaac_robot.apply_actuator_model(control, controller_name, controller.get_joint_subset())
+        
+        # top-down camera reset
+        if 'topdown_camera_500' in self.sensors:
+            orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+            robot_pos = self.isaac_robot.get_world_pose()[0]
+            self.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
+        
+        if 'topdown_camera_50' in self.sensors:
+            orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+            robot_pos = self.isaac_robot.get_world_pose()[0]
+            self.sensors['topdown_camera_50']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
 
     def get_obs(self, add_rgb_subframes=False):
         position, orientation = self._robot_base.get_world_pose()
