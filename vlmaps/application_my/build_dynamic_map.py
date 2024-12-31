@@ -826,11 +826,22 @@ class TMP(VLMap):
         return mask
     
     def judge_room(self, obs):
-        room_names = ['bedroom', 'dining', 'kitchen', 'living', 'office', 'other']
+        room_names = ['bedroom', 'dining room', 'kitchen', 'living room', 'office', 'hallway', 'unknown']
         similarity = []
+        
+        # 获取相似度
         for room_name in room_names:
             similarity.append(self.get_score_mat_clip(obs, [room_name]))
-        return room_names[np.argmax(similarity)]
+        
+        # 创建并打印结果字典
+        room_scores = {room: f"{sim[0]:.4f}" for room, sim in zip(room_names, similarity)}
+        
+        # 打印格式化结果
+        print("Room Similarities:")
+        for room, score in room_scores.items():
+            print(f"'{room}': {score}")
+        return room_names[np.argmax(similarity)], room_scores
+
 
 
     

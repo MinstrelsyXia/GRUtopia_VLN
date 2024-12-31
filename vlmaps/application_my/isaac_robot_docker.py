@@ -57,6 +57,7 @@ from vlmaps.application_my.utils import NotFound, EarlyFound, TooManySteps,extra
 import logging
 import traceback
 import argparse
+import time
 
 logging.getLogger('PIL').setLevel(logging.WARNING) # used to delete the log file from PIL
 logging.getLogger('numba').setLevel(logging.WARNING)
@@ -658,14 +659,26 @@ class IsaacSimLanguageRobot(LangRobot):
 
     def warm_up(self,warm_step =50):
         self.step = 0
-        env_actions = [{'h1': {'stand_still': []}}]
+        # env_actions = [{'h1': {'stand_still': []}}]
+        env_actions = [{'h1': {'move_along_path': [[self.agent_init_pose.tolist()]]}}]
+        fps_start = time.time()
         while self.step < warm_step:
             self.env.step(actions=env_actions)
             self.step += 1
             if (self.step % 50 == 0):
-                self.check_and_reset_robot(self.step, update_freemap=True, verbose=True)
-        self.update_all_maps()
+                # self.check_and_reset_robot(self.step, update_freemap=True, verbose=True)
+                fps_end = time.time()
+
+                # 计算fps,单位为step/s
+                fps = 50 / (fps_end - fps_start)
+                print(f"Current step: {self.step}. FPS: {fps:.2f}")
+                log.info(f"Current step: {self.step}. FPS: {fps:.2f}")
+                fps_start = fps_end
         log.info("Warm up finished, updated all maps")
+        update_start = time.time()
+        self.update_all_maps()
+        update_end = time.time()
+        print(f"Update all maps time: {update_end - update_start}")
 
     def from_obsmap_to_vlmap(self,pos):
         '''
@@ -770,7 +783,10 @@ class IsaacSimLanguageRobot(LangRobot):
             self.step = self.step + 1
             env_actions = []
             env_actions.append(actions)
-            self.env.step(actions=env_actions)
+            if self.step % 200 == 0:
+                self.env.step(actions=env_actions,add_rgb_subframes=True,render=True)
+            else:
+                self.env.step(actions=env_actions,add_rgb_subframes=False,render=False)
             # log.info(f'action now {actions}')
 
             #! check whether robot falls first, then update map
@@ -863,10 +879,29 @@ class IsaacSimLanguageRobot(LangRobot):
         3. 若是则直接走，若不是去下一个frontier看看
         '''
         # 如何周围全都navigable, 则直接判断现在的房间，再move to frontier看看frontier房间是什么
-        room_pos, frontier_angle = self.map.get_room_pos(room_name)
-        self.move_to(room_pos)
+
+        frontier_pos, frontier_angle = self.ObstacleMap._frontiers_px, self.ObstacleMap._frontiers_angles_obs
+        distance = np.linalg.norm(frontier_pos - self.agents.get_world_pose()[0][:2])
+        near_to_far_idx = np.argsort(distance)
+        similarity_list = np.zeros(len(frontier_pos))
+        for idx in near_to_far_idx:
+            frontier_pos = frontier_pos[idx]
+            frontier_angle = frontier_angle[idx]
+            self.move_to(frontier_pos)
+            angle = self.get_angle(frontier_angle)
+            self.turn(angle)
+            pred_room,room_scores = self.map.judge_room(self.obs)
+            similarity_list[idx] = room_scores[room_name]
+            if pred_room == room_name:
+                return True
+        print('all fails, moving to the most likely one')
+        most_likely_idx = np.argmax(similarity_list)
+        frontier_pos = frontier_pos[most_likely_idx]
+        frontier_angle = frontier_angle[most_likely_idx]
+        self.move_to(frontier_pos)
         angle = self.get_angle(frontier_angle)
         self.turn(angle)
+        return True
 
     def move_to_end_of_the_hallway(self):
         '''
@@ -944,7 +979,10 @@ class IsaacSimLanguageRobot(LangRobot):
                 #     rgb, depth = agent.update_memory(dialogue_result=None, update_candidates= True, verbose=task_config['verbose']) 
                 # else:
                 #     obs = runner.step(actions=actions, render = False)
-                self.env.step(actions= env_actions)
+                if self.step % 200 == 0:
+                    self.env.step(actions= env_actions,add_rgb_subframes=True,render=True)
+                else:
+                    self.env.step(actions= env_actions,add_rgb_subframes=False,render=False)
                 current_orientation = self.agents.get_world_pose()[1]
 
                 if (self.step % 1000 == 0):
@@ -1240,6 +1278,23 @@ class IsaacSimLanguageRobot(LangRobot):
 
         self.eval_helper.display_trajectory(save_path = self.test_file_save_dir + '/trajectory.png', occupancy_map=self.ObstacleMap.nav_map_visual, traj_obs_list=traj_obs, gt_obs=gt_obs)
 
+    def move_to_frontier(self):
+        '''
+        move to the frontier position and turn to the frontier direction
+        '''
+        pass
+    
+
+    def exit_room(self, room_name):
+        '''
+        exit the room with the given room name
+        1) move to a nearest frontier
+        2) turn to the frontier direction
+        3) judge if the current view still sees the room
+        '''
+        pass
+        
+        
     def clear_maps(self):
         self.step = 0
         self.map = None
@@ -1247,8 +1302,8 @@ class IsaacSimLanguageRobot(LangRobot):
         self.cam_occupancy_map_global = None
         self.ObstacleMap = None
     
-    def move_to_room(self, room_name):
-        pass
+
+        
 
 
 

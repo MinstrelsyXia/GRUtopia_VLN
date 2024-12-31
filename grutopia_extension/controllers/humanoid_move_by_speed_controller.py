@@ -2,61 +2,192 @@ from typing import List
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from omni.isaac.core.articulations import ArticulationSubset
+from omni.isaac.core.prims import RigidPrim
 from omni.isaac.core.scenes import Scene
 from omni.isaac.core.utils.types import ArticulationAction
-from rsl_rl.modules.actor_critic import ActorCritic
 
 import grutopia.core.util.gym as gymutil
 import grutopia.core.util.math as math_utils
 from grutopia.core.robot.controller import BaseController
 from grutopia.core.robot.robot import BaseRobot
 from grutopia.core.robot.robot_model import ControllerModel
-from grutopia.core.util.rsl_rl import pickle
+from grutopia.core.robot.sensor import BaseSensor
+from grutopia.core.util.math import quat_apply_yaw
+
+
+def init_height_points():
+    """ Returns points at which the height measurements are sampled (in base frame)
+
+        Returns:
+            [torch.Tensor]: Tensor of shape (self.num_height_points, 3)
+        """
+    measured_points_x = [-0.55, -0.45, -0.35, -0.25, -0.15, -0.05, 0.05, 0.15, 0.25, 0.35, 0.45, 0.55]
+    measured_points_y = [-0.35, -0.25, -0.15, -0.05, 0.05, 0.15, 0.25, 0.35]
+    y = torch.tensor(measured_points_y, device='cpu', requires_grad=False)
+    x = torch.tensor(measured_points_x, device='cpu', requires_grad=False)
+    grid_x, grid_y = torch.meshgrid(x, y)
+
+    num_height_points = grid_x.numel()
+    points = torch.zeros(num_height_points, 3, device='cpu', requires_grad=False)
+    points[:, 0] = grid_x.flatten()
+    points[:, 1] = grid_y.flatten()
+
+    return points
+
+
+class StaticHeightSamples:
+    """Manually built height map."""
+
+    def __init__(self, resolution: float = 0.1):
+        points = torch.zeros(100, 100)
+
+        points[55:65, 35:65] = 0.2
+        points[65:69, 35:65] = 0.4
+        points[69:73, 35:65] = 0.6
+        points[73:77, 35:65] = 0.8
+        points[77:100, 35:65] = 1.0
+        self.height_map = points
+        self.resolution = resolution
+        self.x_min = -50
+        self.y_min = -50
+        self.x_max = 50
+        self.y_max = 50
+
+    def get_heights(self, points: torch.Tensor) -> torch.Tensor:
+        px = (points[:, 0] / self.resolution).long()
+        py = (points[:, 1] / self.resolution).long()
+        indices_x = px - self.x_min
+        indices_y = py - self.y_min
+
+        indices_x = torch.clip(indices_x, 0, self.x_max - self.x_min)
+        indices_y = torch.clip(indices_y, 0, self.y_max - self.y_min)
+
+        return self.height_map[indices_x, indices_y]
+
+
+class DynamicHeightSamples:
+
+    def __init__(self, resolution: float = 0.1):
+        """Initialize height samples.
+        Args:
+            resolution: resolution of samples.
+        """
+        self.x_min: int = None
+        self.x_max: int = None
+        self.y_min: int = None
+        self.y_max: int = None
+        self.height_map: torch.Tensor = None
+        self.resolution = resolution
+
+    def adjust_range(self, x_min: int, x_max: int, y_min: int, y_max: int, padding: float = 0.0):
+        """Adjust the range of x and y of the height map.
+        Args:
+            x_min, x_max: new range of x.
+            y_min, y_max: new range of y.
+            padding: padding value to newly added points.
+        """
+        # Just set if no range has been set yet.
+        if self.x_min is None:
+            self.x_min, self.x_max = x_min, x_max
+            self.y_min, self.y_max = y_min, y_max
+            self.height_map = torch.full((x_max - x_min + 1, y_max - y_min + 1), fill_value=padding)
+            return
+
+        # Check if x range needs to be expanded.
+        if x_min < self.x_min or x_max > self.x_max:
+            pad_left = max(0, self.x_min - x_min)
+            pad_right = max(0, x_max - self.x_max)
+            self.height_map = F.pad(self.height_map, (0, 0, pad_left, pad_right), value=padding)
+            self.x_min = min(self.x_min, x_min)
+            self.x_max = max(self.x_max, x_max)
+
+        # Check if y range needs to be expanded.
+        if y_min < self.y_min or y_max > self.y_max:
+            pad_top = max(0, self.y_min - y_min)
+            pad_bottom = max(0, y_max - self.y_max)
+            self.height_map = F.pad(self.height_map, (pad_top, pad_bottom, 0, 0), value=padding)
+            self.y_min = min(self.y_min, y_min)
+            self.y_max = max(self.y_max, y_max)
+
+    def set_heights(self, points: torch.Tensor, robot_pos: np.ndarray):
+        """Set the height of the points in the map.
+        Args:
+            points: (N, 3) points from point cloud data.
+            robot_pos: (x, y, z) robot base position, for data validation and padding.
+        """
+
+        # Filter points to a reasonable surrounding range.
+        x_range_max = robot_pos[0] + 3.0
+        x_range_min = robot_pos[0] - 3.0
+        y_range_max = robot_pos[1] + 3.0
+        y_range_min = robot_pos[1] - 3.0
+        mask = (points[:, 0] < x_range_max) & (points[:, 0] > x_range_min) & (points[:, 1] < y_range_max) & (
+            points[:, 1] > y_range_min)
+        # Disgard points from own body.
+        inner_x_range_max = robot_pos[0] + 0.5
+        inner_x_range_min = robot_pos[0] - 0.5
+        inner_y_range_max = robot_pos[1] + 0.5
+        inner_y_range_min = robot_pos[1] - 0.5
+        body_mask = (points[:, 0] > inner_x_range_min) & (points[:, 0] < inner_x_range_max) & (
+            points[:, 1] < inner_y_range_max) & (points[:, 1] > inner_y_range_min)
+        mask = mask & ~body_mask
+        filtered_points = points[mask]
+        if filtered_points.numel() == 0:
+            return
+
+        px = (filtered_points[:, 0] / self.resolution).long()
+        py = (filtered_points[:, 1] / self.resolution).long()
+        min_x, max_x = torch.min(px).item(), torch.max(px).item()
+        min_y, max_y = torch.min(py).item(), torch.max(py).item()
+
+        # Adjust the range so all points fit in the height map.
+        self.adjust_range(min_x, max_x, min_y, max_y, robot_pos[2])
+
+        # Compute the indices.
+        indices_x = px - self.x_min
+        indices_y = py - self.y_min
+
+        # Set the heights.
+        self.height_map[indices_x, indices_y] = filtered_points[:, 2]
+
+    def get_heights(self, points: torch.Tensor) -> torch.Tensor:
+        """Get heights of a set of points.
+        Args:
+            points: (N, ≥2) shaped Tensor.
+        Returns:
+            heights: N-elements vector of heights.
+        """
+        if self.x_min is None:
+            return torch.zeros(points.shape[0])
+
+        px = (points[:, 0] / self.resolution).long()
+        py = (points[:, 1] / self.resolution).long()
+        indices_x = px - self.x_min
+        indices_y = py - self.y_min
+
+        indices_x = torch.clip(indices_x, 0, self.x_max - self.x_min)
+        indices_y = torch.clip(indices_y, 0, self.y_max - self.y_min)
+
+        return self.height_map[indices_x, indices_y]
+
+    @property
+    def shape(self):
+        return self.height_map.shape
 
 
 class RLPolicy:
     """RL policy for h1 locomotion."""
 
-    def __init__(self, path: str) -> None:
-        self.policy_cfg = {
-            'class_name': 'ActorCritic',
-            'init_noise_std': 1.0,
-            'actor_hidden_dims': [1024, 512, 256],
-            'critic_hidden_dims': [1024, 512, 256],
-            'activation': 'elu'
-        }
-        self.empirical_normalization = False
+    def __init__(self, path: str):
+        self.path = path
+        return None
 
-        num_obs = 471
-        num_critic_obs = 471
-        self.env_actions = 19
-        self.actor_critic = ActorCritic(num_obs, num_critic_obs, self.env_actions, **self.policy_cfg)
-        self.load(path=path)
-
-    def load(self, path: str, load_optimizer=False):
-        loaded_dict = torch.load(path, pickle_module=pickle)
-        self.actor_critic.load_state_dict(loaded_dict['model_state_dict'])
-        if self.empirical_normalization:
-            self.obs_normalizer.load_state_dict(loaded_dict['obs_norm_state_dict'])
-            self.critic_obs_normalizer.load_state_dict(loaded_dict['critic_obs_norm_state_dict'])
-        if load_optimizer:
-            self.alg.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
-        self.current_learning_iteration = loaded_dict['iter']
-        return loaded_dict['infos']
-
-    def get_inference_policy(self, device=None):
-        self.eval_mode()  # switch to evaluation mode (dropout for example)
-        if device is not None:
-            self.actor_critic.to(device)
-        policy = self.actor_critic.act_inference
-        return policy
-
-    def eval_mode(self):
-        self.actor_critic.eval()
-        if self.empirical_normalization:
-            self.obs_normalizer.eval()
-            self.critic_obs_normalizer.eval()
+    def get_inference_policy(self, device: str = None):
+        self.policy = torch.jit.load(self.path, map_location=device)
+        self.policy.eval()
+        return self.policy
 
 
 @BaseController.register('HumanoidMoveBySpeedController')
@@ -91,9 +222,16 @@ class HumanoidMoveBySpeedController(BaseController):
         if self.joint_names is not None:
             self.joint_subset = ArticulationSubset(self.robot.isaac_robot, self.joint_names)
         self._old_joint_positions = np.zeros(19)
-        self.policy_input_obs_num = 471
+        self.policy_input_obs_num = 492
         self._old_policy_obs = np.zeros(self.policy_input_obs_num)
         self._apply_times_left = 0  # Specifies how many times the action generated by the policy needs to be repeatedly applied.
+
+        self.height_points = init_height_points()
+        self.num_height_points = len(self.height_points)
+        self.dynamic_height_samples = DynamicHeightSamples()
+        self.point_cloud_sensor = None
+        self.update_height_samples_trigger = 0
+        self.static_height_samples = StaticHeightSamples()
 
     def forward(
         self,
@@ -101,7 +239,7 @@ class HumanoidMoveBySpeedController(BaseController):
         rotation_speed: float = 0,
         lateral_speed: float = 0,
     ) -> ArticulationAction:
-        if self._apply_times_left > 0: # !!!
+        if self._apply_times_left > 0:
             self._apply_times_left -= 1
             if self.joint_subset is None:
                 return ArticulationAction(joint_positions=self.applied_joint_positions)
@@ -112,14 +250,50 @@ class HumanoidMoveBySpeedController(BaseController):
         robot_base = self.robot.get_robot_base()
         base_pose_w = robot_base.get_world_pose()
         base_quat_w = torch.tensor(base_pose_w[1]).reshape(1, -1)
-        base_lin_vel_w = torch.tensor(robot_base.get_linear_velocity()).reshape(1, -1)
         base_ang_vel_w = torch.tensor(robot_base.get_angular_velocity()[:]).reshape(1, -1)
-        base_lin_vel = np.array(math_utils.quat_rotate_inverse(base_quat_w, base_lin_vel_w).reshape(-1))
         base_ang_vel = np.array(math_utils.quat_rotate_inverse(base_quat_w, base_ang_vel_w).reshape(-1))
         base_ang_vel = base_ang_vel * np.pi / 180.0
 
+        torso_link: RigidPrim = self.robot._torso_link
+        torso_pos_w, torso_quat_w = torso_link.get_world_pose()
+
+        robot_pos_for_height_samples = base_pose_w[0].copy()
+        floor_height = self.robot.get_ankle_height() - 0.05
+        robot_pos_for_height_samples[2] = floor_height
+
+        if self.point_cloud_sensor is None:
+            self.point_cloud_sensor: BaseSensor = self.robot.sensors['tp_pointcloud']
+
+        # Update height samples.
+        if self.update_height_samples_trigger == 0:
+            sensor_data = self.point_cloud_sensor.get_data()
+            if 'pointcloud' in sensor_data and sensor_data['pointcloud'] is not None:
+                point_cloud_data = torch.Tensor(sensor_data['pointcloud'])
+                self.dynamic_height_samples.set_heights(point_cloud_data, robot_pos_for_height_samples)
+            else:
+                self.update_height_samples_trigger -= 1
+
+        self.update_height_samples_trigger += 1
+        if self.update_height_samples_trigger == 5:
+            self.update_height_samples_trigger = 0
+
+        # Calculate the height points (in shape of [num_height_points, 3]) in world frame.
+        height_points_w = quat_apply_yaw(torch.Tensor(torso_quat_w), self.height_points) + torch.Tensor(torso_pos_w)
+
+        heights = self.dynamic_height_samples.get_heights(height_points_w)
+
+        heights[heights > floor_height + 0.2] = floor_height
+        heights[heights < floor_height - 0.2] = floor_height
+
+        imu_link: RigidPrim = self.robot._imu_link
+        imu_pose_w = imu_link.get_world_pose()
+        imu_quat_w = torch.tensor(imu_pose_w[1]).reshape(1, -1)
+        imu_ang_vel_w = torch.tensor(imu_link.get_angular_velocity()[:]).reshape(1, -1)
+        imu_ang_vel = np.array(math_utils.quat_rotate_inverse(imu_quat_w, imu_ang_vel_w).reshape(-1))
+        imu_ang_vel = imu_ang_vel * np.pi / 180.0
+
         projected_gravity = torch.tensor([[0., 0., -1.]], device='cpu', dtype=torch.float)
-        projected_gravity = np.array(math_utils.quat_rotate_inverse(base_quat_w, projected_gravity).reshape(-1))
+        projected_gravity = np.array(math_utils.quat_rotate_inverse(imu_quat_w, projected_gravity).reshape(-1))
         joint_pos = self.joint_subset.get_joint_positions(
         ) if self.joint_subset is not None else self.robot.isaac_robot.get_joint_positions()
         joint_vel = self.joint_subset.get_joint_velocities(
@@ -129,23 +303,23 @@ class HumanoidMoveBySpeedController(BaseController):
 
         joint_pos -= default_dof_pos
 
-        base_height = base_pose_w[0][2]
-        ankle_height = self.robot.get_ankle_height()
-        relative_base_height = base_height - ankle_height + 0.0758 # 0.0758 is the height of the right ankle from the ground. # !!!
-        heights = np.clip(relative_base_height - 0.5 - np.zeros(121), -1., 1.) * 5.0
+        heights = np.clip(torso_pos_w[2] - 1.0 - heights, -1., 1.) * 5.0
 
         # Set action command.
-        tracking_command = np.array([forward_speed, lateral_speed, rotation_speed, 0.0], dtype=np.float32)
+        tracking_command = np.array([forward_speed, lateral_speed, rotation_speed], dtype=np.float32)
 
-        raw_policy_obs = np.concatenate([
-            tracking_command * np.array([2.0, 2.0, 0.25, 1.0]), base_ang_vel * 0.25, projected_gravity,
-            self.gym_adapter.sim2gym(joint_pos),
-            self.gym_adapter.sim2gym(joint_vel) * 0.05,
-            self.gym_adapter.sim2gym(self._old_joint_positions.reshape(19)), base_lin_vel * 2.0, heights
+        current_obs = np.concatenate([
+            tracking_command * np.array([2.0, 2.0, 0.25]),  # dim = 3
+            imu_ang_vel * 0.25,  # dim = 3
+            projected_gravity,  # dim = 3
+            self.gym_adapter.sim2gym(joint_pos),  # dim = 19
+            self.gym_adapter.sim2gym(joint_vel) * 0.05,  # dim = 19
+            self.gym_adapter.sim2gym(self._old_joint_positions.reshape(19)),  # dim = 19
+            heights  # dim = 96
         ])
-        policy_obs = np.concatenate([self._old_policy_obs[70:350], raw_policy_obs])
+        policy_obs = np.concatenate([self._old_policy_obs[66:396], current_obs])
         self._old_policy_obs = policy_obs
-        policy_obs = policy_obs.reshape(1, 471)
+        policy_obs = policy_obs.reshape(1, 492)
 
         # Infer with policy.
         with torch.inference_mode():
@@ -177,3 +351,8 @@ class HumanoidMoveBySpeedController(BaseController):
         assert len(action) == 3, 'action must contain 3 elements'
 
         return self.forward(forward_speed=action[0], lateral_speed=action[1], rotation_speed=action[2])
+
+    def get_obs(self):
+        return {
+            'finished': True,
+        }

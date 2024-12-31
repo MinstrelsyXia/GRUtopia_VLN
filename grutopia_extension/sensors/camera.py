@@ -101,16 +101,18 @@ class Camera(BaseSensor):
     def get_data(self, add_rgb_subframes=False) -> Dict:
         if self.config.enable:
             rgba = {}
+            depth = {}
             pointcloud = {}
-            # if self.config.camera_config is None or 'no_rgb' not in self.config.camera_config:
-            if add_rgb_subframes:
-                rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False)
-            rgba = self._camera.get_rgba()
-            depth = self._camera.get_depth()
+            if self.config.camera_config is None or 'no_rgb' not in self.config.camera_config:
+                if add_rgb_subframes:
+                    rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False)
+                rgba = self._camera.get_rgba()
+                
             if add_rgb_subframes:
                 rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
-            # if self.config.camera_config and 'point_cloud' in self.config.camera_config:
-            pointcloud = self._camera.get_pointcloud()
+            depth = self._camera.get_depth()
+            if self.config.camera_config and 'point_cloud' in self.config.camera_config:
+                pointcloud = self._camera.get_pointcloud()
             return {'rgba': rgba, 'pointcloud': pointcloud, 'depth': depth}
         return {}
     
@@ -119,7 +121,7 @@ class Camera(BaseSensor):
         # if "bbox" in data_type:
         #     output_data["bbox"] = self._camera.get_bbox()
         if "rgba" in data_type:
-            rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
+            rep.orchestrator.step(rt_subframes=10, delta_time=0.0, pause_timeline=False) # !!!
             output_data["rgba"] = self._camera.get_rgba()
             rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
         if "depth" in data_type:

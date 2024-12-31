@@ -1,4 +1,4 @@
-NAME="xxy_test_2"
+NAME="xxy_test"
 
 export CACHE_ROOT=/ssd/xiaxinyuan/docker  # 设置缓存路径
 export WEBUI_HOST=127.0.0.1  # 设置 Web UI 监听地址，默认为 127.0.0.1

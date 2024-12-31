@@ -29,7 +29,7 @@ class BaseEnv:
         from omni.isaac.kit import SimulationApp
         self.headless = headless
         # self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0, 'renderer': 'RayTracing'})
-        self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0,'multi_gpu': False}) # !!!
+        self._simulation_app = SimulationApp({'headless': self.headless, 'anti_aliasing': 0}) # !!!
 
         if webrtc:
             from omni.isaac.core.utils.extensions import enable_extension  # noqa
@@ -71,7 +71,7 @@ class BaseEnv:
     def get_dt(self):
         return self._runner.dt
 
-    def step(self, actions: List[Dict[str, Any]], add_rgb_subframes=False, render=False) -> List[Dict[str, Any]]:
+    def step(self, actions: List[Dict[str, Any]], add_rgb_subframes=False, render=False, analysis_time=False) -> List[Dict[str, Any]]:
         """
         run step with given action(with isaac step)
 
@@ -95,7 +95,7 @@ class BaseEnv:
         }
 
         # log.debug(action_after_reshape)
-        self._runner.step(action_after_reshape, add_rgb_subframes=add_rgb_subframes, render=render)
+        self._runner.step(action_after_reshape, add_rgb_subframes=add_rgb_subframes, render=render, analysis_time=analysis_time)
         observations = self.get_observations()
         return observations
 

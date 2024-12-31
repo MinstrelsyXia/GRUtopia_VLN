@@ -4,21 +4,12 @@ simulator:
   rendering_interval: 2
 
 tasks:
-<<<<<<< HEAD
-- type: "SingleInferenceTask"
-  name: "vln"
-  scene_asset_path: ""
-  scene_scale: [1, 1, 1]
-  env_num: 1
-  offset_size: 0.0
-=======
 - type: "VLNTask"
   name: "vln"
   scene_asset_path: ""
   scene_scale: [1, 1, 1]
   env_num: 2
   offset_size: 100.0
->>>>>>> grutopia_new/fix_holes
   light_on: true
   robots:
   - name: h1
@@ -42,9 +33,6 @@ tasks:
     sensor_params:
     - name: "pano_camera_0"
       enable: true
-<<<<<<< HEAD
-      size: [640,480] # 长，宽（实际rgb.shape = [480,640])
-=======
       size: [640, 480]
     - name: "topdown_camera_50"
       enable: false
@@ -55,7 +43,6 @@ tasks:
     - name: "h1_pano_camera_debug"
       enable: false
       size: [640, 480]
->>>>>>> grutopia_new/fix_holes
     # - name: "pano_camera_45"
     #   enable: true
     #   size: [256, 256]

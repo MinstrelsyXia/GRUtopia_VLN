@@ -100,9 +100,11 @@ class BaseController(Base, ABC):
         """
         if hasattr(self, 'joint_subset'):
             return self.joint_subset
-        if len(self.sub_controllers) > 0:
-            return self.sub_controllers[0].get_joint_subset()
-        raise NotImplementedError('attr joint_subset not found')
+        if not hasattr(self, 'sub_controllers'):
+            return None
+        if self.sub_controllers is None or len(self.sub_controllers) == 0:
+            return None
+        return self.sub_controllers[0].get_joint_subset()
 
 
 def config_inject(user_config: ControllerParams, model: ControllerModel) -> ControllerModel:
@@ -141,6 +143,8 @@ def create_controllers(config: RobotUserConfig, robot_model: RobotModel, robot: 
     controller_map = {}
     available_controllers = {a.name: a for a in robot_model.controllers}
 
+    if config.controller_params is None:
+        return controller_map
     for controller_param in config.controller_params:
         controller_name = controller_param.name
         if controller_name in available_controllers:

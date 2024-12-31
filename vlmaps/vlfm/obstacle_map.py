@@ -280,6 +280,7 @@ class ObstacleMap(BaseMap):
             
         self.nav_map_visual = navigable_map_visual
 
+    
     def _p_angle_to_xyz(self, angle):
         '''
         将obstacle map坐标系中的角度转换为xyz世界坐标系中的角度

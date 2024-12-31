@@ -55,3 +55,74 @@ def quaternion_to_gravity_component(quaternion: np.ndarray):
         [rotated_gravity_quaternion[1], rotated_gravity_quaternion[2], rotated_gravity_quaternion[3]])
 
     return gravity_component_local
+
+
+def normalize(x: torch.Tensor, eps: float = 1e-9) -> torch.Tensor:
+    """Normalizes a given input tensor to unit length.
+
+    Args:
+        x: Input tensor of shape (N, dims).
+        eps: A small value to avoid division by zero. Defaults to 1e-9.
+
+    Returns:
+        Normalized tensor of shape (N, dims).
+    """
+    return x / x.norm(p=2, dim=-1).clamp(min=eps, max=None).unsqueeze(-1)
+
+
+def yaw_quat(quat: torch.Tensor) -> torch.Tensor:
+    """Extract the yaw component of a quaternion.
+
+    Args:
+        quat: The orientation in (w, x, y, z). Shape is (..., 4)
+
+    Returns:
+        A quaternion with only yaw component.
+    """
+    shape = quat.shape
+    quat_yaw = quat.clone().view(-1, 4)
+    qw = quat_yaw[:, 0]
+    qx = quat_yaw[:, 1]
+    qy = quat_yaw[:, 2]
+    qz = quat_yaw[:, 3]
+    yaw = torch.atan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz))
+    quat_yaw[:] = 0.0
+    quat_yaw[:, 3] = torch.sin(yaw / 2)
+    quat_yaw[:, 0] = torch.cos(yaw / 2)
+    quat_yaw = normalize(quat_yaw)
+    return quat_yaw.view(shape)
+
+
+def quat_apply_yaw(quat: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
+    """Rotate a vector only around the yaw-direction.
+
+    Args:
+        quat: The orientation in (w, x, y, z). Shape is (N, 4).
+        vec: The vector in (x, y, z). Shape is (N, 3).
+
+    Returns:
+        The rotated vector in (x, y, z). Shape is (N, 3).
+    """
+    quat_yaw = yaw_quat(quat)
+    return quat_apply(quat_yaw, vec)
+
+
+def quat_apply(quat: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
+    """Apply a quaternion rotation to a vector.
+
+    Args:
+        quat: The quaternion in (w, x, y, z). Shape is (..., 4).
+        vec: The vector in (x, y, z). Shape is (..., 3).
+
+    Returns:
+        The rotated vector in (x, y, z). Shape is (..., 3).
+    """
+    # store shape
+    shape = vec.shape
+    # reshape to (N, 3) for multiplication
+    quat = quat.reshape(-1, 4)
+    vec = vec.reshape(-1, 3)
+    # extract components from quaternions
+    xyz = quat[:, 1:]
+    t = xyz.cross(vec, dim=-1) * 2
+    return (vec + quat[:, 0:1] * t + xyz.cross(t, dim=-1)).view(shape)

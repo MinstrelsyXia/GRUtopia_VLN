@@ -1,7 +1,7 @@
 simulator:
-  physics_dt: 1/240
-  rendering_dt: 1/240
-  rendering_interval: 5
+  physics_dt: 1/200
+  rendering_dt: 1/200
+  rendering_interval: 10
 
 tasks:
 - type: "SingleInferenceTask"
@@ -25,45 +25,56 @@ tasks:
     - name: "move_to_point"
     - name: "move_along_path"
     - name: "rotate"
-    - name: "move_with_keyboard"
+    # - name: "move_with_keyboard"
     # - name: "web_chat"
-    - name: "stand_still"
-    - name: "oracle_move_to_point"
-    - name: "oracle_move_along_path"
+    # - name: "stand_still"
+    # - name: "oracle_move_to_point"
+    # - name: "oracle_move_along_path"
     sensor_params:
     - name: "pano_camera_0"
       enable: true
       size: [640, 480]
+      camera_config:
+        - point_cloud
     - name: "pano_camera_45"
-      enable: true
+      enable: false
       size: [256, 256]
     - name: "pano_camera_90"
-      enable: true
+      enable: false
       size: [256, 256]
     - name: "pano_camera_135"
-      enable: true
+      enable: false
       size: [256, 256]
     - name: "pano_camera_180"
-      enable: true
+      enable: false
       size: [256, 256]
     - name: "pano_camera_225"
-      enable: true
+      enable: false
       size: [256, 256]
     - name: "pano_camera_270"
-      enable: true
+      enable: false
       size: [256, 256]
     - name: "pano_camera_315"
-      enable: true
+      enable: false
       size: [256, 256]
     - name: "h1_pano_camera_debug"
-      enable: true
+      enable: false
       size: [256, 256]
     - name: "topdown_camera_50"
       enable: true
       size: [500, 500]
+      camera_config: []
     - name: "topdown_camera_500"
       enable: true
       size: [500, 500]
+      camera_config: []
+    - name: "tp_pointcloud"
+      enable: True
+      size: [64, 64]
+      camera_config:
+        - no_rgb
+        - point_cloud
+
     # - name: "camera_lookdown"
     #   enable: true
     #   size: [224, 224]

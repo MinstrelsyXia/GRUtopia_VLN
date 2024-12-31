@@ -3,18 +3,20 @@ from typing import List, Optional, Tuple
 from pydantic import BaseModel
 
 from grutopia.core.config.robot.params import ControllerParams
+from grutopia.core.config.robot.params.sensor import CameraConfigEnum
 
 
 class SensorModel(BaseModel):
     """Sensor config in robot_model config."""
     name: str
-    prim_path: Optional[str]
+    prim_path: Optional[str] = None
     type: str
 
     # Fields from params.
     enable: Optional[bool] = True
-    size: Optional[Tuple[int, int]]  # Camera only
-    scan_rate: Optional[int]  # RPS. Lidar only
+    size: Optional[Tuple[int, int]] = None  # Camera only
+    camera_config: Optional[List[CameraConfigEnum]] = None
+    scan_rate: Optional[int] = None  # RPS. Lidar only
 
 
 class ControllerModel(BaseModel):
