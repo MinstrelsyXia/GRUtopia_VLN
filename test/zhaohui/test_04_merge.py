@@ -7,9 +7,9 @@ def generate_result_key(ckpt_name, path_key):
 
 
 ranks =list(range(8,16))
-ckpt_name="ckpt.44"
+ckpt_name="ckpt.44.flash"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
-name = '20241229_sample_episodes'
+name = '20241230_sample_episodes'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 all_path_key_list=[]
