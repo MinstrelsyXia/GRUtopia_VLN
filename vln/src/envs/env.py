@@ -350,7 +350,7 @@ class TaskEnv(VLNDataLoader):
         while not finish_state:
             obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
             current_position = self.get_robot_poses()[self.env_idx][0]
-            self.current_path_length += np.linalg.norm(current_position - self.prev_position)
+            self.current_path_length += np.linalg.norm(current_position[:,:2] - self.prev_position[:,:2])
             self.prev_position = current_position
 
             finish_state = self._get_action_state(obs, action_name)
