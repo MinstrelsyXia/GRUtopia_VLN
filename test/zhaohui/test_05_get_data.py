@@ -45,10 +45,10 @@ def vis_nav_path(start_pixel, goal_pixel, path, occupancy_map, img_save_path='pa
     plt.close()
 def generate_result_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"
-ckpt_name="ckpt.44"
-path_key="412_115"
-project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
-name = '20241229_sample_episodes'
+ckpt_name="ckpt.cma"
+path_key="15_1"
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0102'
+name = '20250102_ckpt_cma'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 # database_write = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
@@ -65,7 +65,7 @@ with database_read.begin() as txn:
         value = msgpack_numpy.unpackb(value)
         reference_path=value['reference_path']
         pred_traj_list=value['pred_traj_list']
-        exe_path=value['ext_info']['exe_path']
+        # exe_path=value['ext_info']['exe_path']
         camera_pose=value['ext_info']['camera_pose']
         aperture=value['ext_info']['aperture']
         width=value['ext_info']['width']
@@ -79,10 +79,10 @@ with database_read.begin() as txn:
         for point in pred_traj_list:
             pixel = world_to_pixel(point,camera_pose,aperture,width,height)
             pred_traj_pixel.append(pixel)
-        exe_path_pixel = []
-        for point in exe_path:
-            pixel = world_to_pixel(point,camera_pose,aperture,width,height)
-            exe_path_pixel.append(pixel)
+        # exe_path_pixel = []
+        # for point in exe_path:
+        #     pixel = world_to_pixel(point,camera_pose,aperture,width,height)
+        #     exe_path_pixel.append(pixel)
         date_str = path_key #f"{datetime.now().strftime('%Y%m%d%H%M%S')}"
         file_name = f"{date_str}_reference.jpg" 
         vis_nav_path(
@@ -92,14 +92,14 @@ with database_read.begin() as txn:
             occupancy_map=map_info,
             img_save_path=os.path.join(f'{project_path}/test/zhaohui/', file_name)
         )
-        file_name = f"{date_str}_expect.jpg" 
-        vis_nav_path(
-            start_pixel=reference_path_pixel[0], 
-            goal_pixel=reference_path_pixel[-1], 
-            path=exe_path_pixel,
-            occupancy_map=map_info,
-            img_save_path=os.path.join(f'{project_path}/test/zhaohui/', file_name)
-        )
+        # file_name = f"{date_str}_expect.jpg" 
+        # vis_nav_path(
+        #     start_pixel=reference_path_pixel[0], 
+        #     goal_pixel=reference_path_pixel[-1], 
+        #     path=exe_path_pixel,
+        #     occupancy_map=map_info,
+        #     img_save_path=os.path.join(f'{project_path}/test/zhaohui/', file_name)
+        # )
         file_name = f"{date_str}_real.jpg" 
         vis_nav_path(
             start_pixel=reference_path_pixel[0], 

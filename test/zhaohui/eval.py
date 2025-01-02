@@ -31,9 +31,8 @@ if __name__ == "__main__":
     rank = args.rank
     print(f"rank:{rank}")
 
-    # project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
     project_path = '/isaac-sim/GRUtopia'
-    name = '20241230_sample_episodes'
+    name = '20250102_ckpt_cma'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     
     round_count = 0

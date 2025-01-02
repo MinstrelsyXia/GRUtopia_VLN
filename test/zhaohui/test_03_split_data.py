@@ -8,9 +8,9 @@ import msgpack_numpy
 split_number = 16
 split_data_types = ['val_unseen','val_seen']
 filter_same_trajectory = False
-base_data_dir = '/ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected'
-project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
-name = '20250101_sample_episodes'
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0102'
+base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+name = '20250102_ckpt_cma'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 
 
