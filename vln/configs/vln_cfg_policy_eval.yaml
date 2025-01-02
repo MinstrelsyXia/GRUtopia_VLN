@@ -24,7 +24,7 @@ settings:
     - topdown_camera_500
     - topdown_camera_50
   
-  max_step: 25000
+  max_step: 50000
   per_action_max_step: 1500
 
 robots:
