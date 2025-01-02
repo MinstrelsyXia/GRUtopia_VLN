@@ -28,9 +28,9 @@ def get_split_map():
     return split_map
 
 ranks =list(range(0,8))
-ckpt_name="ckpt.44.flash"
-project_path = '/ssd/zhaohui/workspace/w61_grutopia_1220'
-name = '20241230_sample_episodes'
+ckpt_name="ckpt.cma"
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0102'
+name = '20250102_ckpt_cma'
 # split = 'val_seen'
 # split = 'val_unseen'
 split = ''
@@ -50,9 +50,6 @@ all_rank_count_map={
         "stuck":0,
         "fall":0,
         "not_reach_goal":0,
-        "goal_in_obstacle":0,
-        "open_set_empty":0,
-        "path_planning":0,
     }
 
 for rank in ranks:
@@ -63,9 +60,6 @@ for rank in ranks:
         "stuck":0,
         "fall":0,
         "not_reach_goal":0,
-        "goal_in_obstacle":0,
-        "open_set_empty":0,
-        "path_planning":0,
     }
     key = f"eval_rank_{rank}".encode()
     with database_read.begin() as txn:
