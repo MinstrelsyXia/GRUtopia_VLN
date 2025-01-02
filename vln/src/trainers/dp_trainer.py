@@ -312,7 +312,7 @@ class DaggerDiffusonPolicyTrainer:
 
                     if self.local_rank < 1:
                         losses.append(loss)
-                        if step_id % 100 == 0:
+                        if step_id % 100 == 0: 
                             self.train_logger.info("================================================")
                             self.train_logger.info(f"Batches processed: {step_id}.")
                             self.train_logger.info(f"train_loss: {loss}")
