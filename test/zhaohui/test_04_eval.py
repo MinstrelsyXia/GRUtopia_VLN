@@ -1,4 +1,4 @@
-from vln.src.v2.env.discrete_eval import DiscreteEvalSingleScanEnv
+from vln.src.v2.envs.discrete_eval import DiscreteEvalSingleScanEnv
 from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
 from grutopia.core.config import SimulatorConfig
 from vln.src.dataset.data_utils_multi_env import load_scene_usd
