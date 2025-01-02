@@ -469,7 +469,11 @@ class CMA_DP_Net(nn.Module):
 
         # 6.2 Current img features combine with the text features
         rgb_depth_his_embeds = torch.cat((rgb_depth_embeds, state), dim=1)
-        img_txt_embeds, img_txt_attn_probs = self.img_txt_cross_encoder(rgb_depth_his_embeds, text_embeds, q_masks=masks, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
+        try:
+            img_txt_embeds, img_txt_attn_probs = self.img_txt_cross_encoder(rgb_depth_his_embeds, text_embeds, q_masks=masks, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
+        except Exception as e:
+            print(e)
+            img_txt_embeds, img_txt_attn_probs = self.img_txt_cross_encoder(rgb_depth_his_embeds, text_embeds, q_masks=masks, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
         img_txt_attn_probs = img_txt_attn_probs[:,0,:]
 
         # 6.3 Current text features combine with the historical img features

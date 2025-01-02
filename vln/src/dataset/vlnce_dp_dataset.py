@@ -128,7 +128,8 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.to_pil = ToPILImage()
         self.image_processor = _transform(n_px=224) # copy fron clip-long
         
-        self.need_extract_instr_features = False if not self.config.MODEL.TEXT_ENCODER.update_text_encoder else True # has preprocessed the instruction
+        # self.need_extract_instr_features = False if not self.config.MODEL.TEXT_ENCODER.update_text_encoder else True # has preprocessed the instruction
+        self.need_extract_instr_features = True
         
         if self.config.IL.analysis_time:
             start_time = time.time()
