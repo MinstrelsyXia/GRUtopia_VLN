@@ -38,19 +38,19 @@ class Args:
 
 # 需要处理的 path_id 列表
 path_id_list = [
-    94
+    482
 ]
 
 headless=False
-split='train'
-the_scan ='1LXtFkjw3qL'
-project_path = "/ssd/zhaohui/workspace/w61_grutopia_1220"
+split='val_unseen'
+the_scan ='EU6Fwq7SyZv'
+project_path = "/ssd/zhaohui/workspace/w61_grutopia_0102"
 args = Args()
 
 # 获取数据
 
 data_map, _ = load_gather_data(args, split, filter_same_trajectory=True, filter_stairs=True)
-robot_offset = np.array([0.   , 0.   , 0.975])
+robot_offset = np.array([0.   , 0.   , 1.05])
 filtered_path_list = []
 for scan_id, path_list in data_map.items():
     if scan_id != the_scan:
@@ -71,7 +71,7 @@ for scan_id, path_list in data_map.items():
         filtered_path_list.append(one_path)
 
 # 加载场景
-sim_cfg_file = f'{project_path}/vln/configs/sample_episodes_sim_cfg.yaml'
+sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
 sim_config = SimulatorConfig(sim_cfg_file)
 scene_asset_path = load_scene_usd(args, the_scan)
 sim_config.config.tasks[0].scene_asset_path = scene_asset_path
@@ -100,7 +100,8 @@ for path in filtered_path_list:
     for _ in range(240):
         env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=False, render=False)
     # 检查是否摔倒
-    robot_position, robot_rotation = the_isaac_robot.get_world_pose()
+    # robot_position, robot_rotation = the_isaac_robot.get_world_pose()
+    robot_position, robot_rotation = the_task.get_robot_poses_without_offset()
     robot_bottom_z = the_robot.get_ankle_height() - sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
     is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
     print(f"[scan:{the_scan}][path:{the_path_id}][fall:{is_fall}]")
