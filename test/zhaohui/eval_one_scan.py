@@ -54,7 +54,7 @@ if __name__ == "__main__":
     ckpt_name="ckpt.cma"
     name = '20250102_ckpt_cma'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
-    retry_list=[]
+    retry_list=['fall','exceed_total_max_step']
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
     ckpt_to_load = f"{project_path}/data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth"
     sim_config = SimulatorConfig(sim_cfg_file)
