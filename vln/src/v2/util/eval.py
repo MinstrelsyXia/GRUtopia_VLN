@@ -143,11 +143,11 @@ class ActionExecutor:
         env:BaseEnv, 
         task, 
         stuck_checker:StuckChecker,
-        isaac_robot,
+        robot,
 
         per_action_max_step,
         total_max_step,
-        robot_bottom_z,
+        robot_ankle_height,
 
         statistic_info:Statistic_Info,
         context,
@@ -156,12 +156,13 @@ class ActionExecutor:
         self.env=env
         self.task=task
         self.stuck_checker = stuck_checker
-        self.isaac_robot = isaac_robot
+        self.robot = robot
+        self.isaac_robot = self.robot.isaac_robot
 
         # 执行 step 需要的配置信息
         self.per_action_max_step=per_action_max_step
         self.total_max_step = total_max_step
-        self.robot_bottom_z = robot_bottom_z
+        self.robot_ankle_height = robot_ankle_height
         # 统计信息
         self.statistic_info = statistic_info
         # 可以优化掉的变量
@@ -185,7 +186,8 @@ class ActionExecutor:
 
     def _check_fall_and_stuck(self,robot_position,robot_rotation,step):
         is_stuck = self.stuck_checker.check_robot_stuck(robot_position, robot_rotation, cur_iter=step, max_iter=2500, threshold=0.2)
-        is_fall = check_robot_fall(robot_position, robot_rotation, self.robot_bottom_z)
+        robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
+        is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
 
         if is_stuck or is_fall:
             reason = 'fall' if is_fall else 'stuck'

@@ -47,7 +47,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         self.eval_config = eval_config
         #TODO:
         self.per_action_max_step=1500
-        self.max_step=25000
+        self.max_step=40000
         self.timestamp = time.time()
         self.lmdb_path = lmdb_path
         self.ckpt_name = ckpt_name
@@ -90,7 +90,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         scan = self.dataloader.target_scan
         progress_log_util.init(scan, len(eval_path_key_list), rank=self.dataloader.rank)
         progress_log_util.progress_logger.info(f"start eval scan: {scan}, total_path:{len(eval_path_key_list)}")
-        robot_bottom_z = self.robot.get_ankle_height() - self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+        robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
 
         self.policy.eval()
         for path_key in eval_path_key_list:
@@ -179,11 +179,11 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     env=self.env, 
                     task=self.task, 
                     stuck_checker=stuck_checker,
-                    isaac_robot=self.isaac_robot,
+                    robot=self.robot,
 
                     per_action_max_step=self.per_action_max_step,
                     total_max_step=self.max_step,
-                    robot_bottom_z=robot_bottom_z,
+                    robot_ankle_height=robot_ankle_height,
 
                     statistic_info=statistic_info,
                     context=self,
