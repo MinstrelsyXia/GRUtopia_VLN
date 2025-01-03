@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as distr
+from torchvision.ops import sigmoid_focal_loss
 import tqdm
 import time
 from copy import deepcopy
@@ -105,8 +106,8 @@ class DaggerDiffusonPolicyTrainer:
         self.action_stats = None
         if hasattr(self.config.MODEL, 'Diffusion_Policy'):
             self.action_stats = {
-                'min': torch.from_numpy(np.array(self.config.MODEL.Diffusion_Policy.action_stats.min)).to(self.device),
-                'max': torch.from_numpy(np.array(self.config.MODEL.Diffusion_Policy.action_stats.max)).to(self.device)
+                'min': torch.Tensor(np.asarray(self.config.MODEL.Diffusion_Policy.action_stats.min)).to(self.device),
+                'max': torch.Tensor(np.asarray(self.config.MODEL.Diffusion_Policy.action_stats.max)).to(self.device)
             }
         
         # use rnn or not
@@ -301,7 +302,7 @@ class DaggerDiffusonPolicyTrainer:
                     
                     prev_actions_batch = prev_actions_batch.to(device=self.device, non_blocking=True)
                     not_done_masks = not_done_masks.to(device=self.device, non_blocking=True) if not_done_masks is not None else None  
-                    loss, diffusion_loss, dist_loss, pm_loss, stop_pm_loss = self._update_agent(
+                    loss, diffusion_loss, dist_loss, pm_loss, stop_pm_loss, open_acc_top1, open_acc_top4 = self._update_agent(
                         observations_batch,
                         prev_actions_batch,
                         not_done_masks,
@@ -311,7 +312,7 @@ class DaggerDiffusonPolicyTrainer:
 
                     if self.local_rank < 1:
                         losses.append(loss)
-                        if step_id % 100 == 0:
+                        if step_id % 100 == 0: 
                             self.train_logger.info("================================================")
                             self.train_logger.info(f"Batches processed: {step_id}.")
                             self.train_logger.info(f"train_loss: {loss}")
@@ -319,6 +320,10 @@ class DaggerDiffusonPolicyTrainer:
                             self.train_logger.info(f"train_dist_loss: {dist_loss}")
                             self.train_logger.info(f"train_pm_loss: {pm_loss}")
                             self.train_logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
+                            if open_acc_top1 is not None:
+                                self.train_logger.info(f"train_open_acc_top1: {open_acc_top1}")
+                            if open_acc_top4 is not None:
+                                self.train_logger.info(f"train_open_acc_top4: {open_acc_top4}")
                             self.train_logger.info(
                                 f"On DAgger iter {dagger_it}, Epoch {epoch}."
                             )
@@ -345,6 +350,18 @@ class DaggerDiffusonPolicyTrainer:
                             stop_pm_loss,
                             step_id,
                         )
+                        if open_acc_top1 is not None:
+                            writer.add_scalar(
+                                f"train_open_acc_top1_iter_{dagger_it}",
+                                open_acc_top1,
+                                step_id,
+                            )
+                        if open_acc_top4 is not None:
+                            writer.add_scalar(
+                                f"train_open_acc_top4_iter_{dagger_it}",
+                                open_acc_top4,
+                                step_id,
+                            )
                         step_id += 1  # noqa: SIM113
                         
                         # save the ckpt according to the steps
@@ -560,6 +577,13 @@ class DaggerDiffusonPolicyTrainer:
             un_actions = get_action(noise_pred, self.action_stats).cpu().detach().numpy()
             gt_actions = get_action(batch['observations']['actions'], self.action_stats).cpu().detach().numpy()
             self.save_predicted_actions(un_actions, gt_actions)
+        
+        # Compute open accuracy
+        open_acc_top1, open_acc_top4 = None, None
+        if self.config.IL.compute_open_accurate:
+            cos_similarities = F.cosine_similarity(noise_pred, noise, dim=-1)  # Compute cosine similarity along the last dimension
+            open_acc_top1 = torch.mean(cos_similarities[:,0])
+            open_acc_top4 = torch.mean(cos_similarities[:,0:4])
 
         # for train
         dist_loss = 0
@@ -568,12 +592,23 @@ class DaggerDiffusonPolicyTrainer:
             dist_loss = (dist_loss * (masks.float())).mean() / (1e-2 +(masks.float()).mean())
         
         # L2 loss
-        if self.config.MODEL.Diffusion_Policy.pred_type == 'epsilon':
+        masks_unsqueeze = masks.squeeze() if masks is not None else None
+        if self.config.MODEL.Diffusion_Policy.pred_type == 'epsilon' and self.config.MODEL.Diffusion_Policy.use:
             # pred noise
-            diffusion_loss = action_reduce(masks, F.mse_loss(noise_pred, noise, reduction="none"))
-        elif self.config.MODEL.Diffusion_Policy.pred_type == 'sample':
+            f_loss = F.mse_loss(noise_pred, noise, reduction="none")
+            if self.config.MODEL.Diffusion_Policy.stop_weight > 0:
+                stop_weights = batch['observations']['stop_weights']
+                stop_weights = stop_weights.to(noise_pred.device).unsqueeze(-1).unsqueeze(-1)
+                f_loss = f_loss * stop_weights
+            diffusion_loss = action_reduce(masks_unsqueeze, f_loss)
+        elif self.config.MODEL.Diffusion_Policy.pred_type == 'sample' or not self.config.MODEL.Diffusion_Policy.use:
             # pred x_0
-            diffusion_loss = action_reduce(masks, F.mse_loss(noise_pred, observations['actions'], reduction="none"))
+            f_loss = F.mse_loss(noise_pred, observations['actions'], reduction="none")
+            if self.config.MODEL.Diffusion_Policy.stop_weight > 0:
+                stop_weights = batch['observations']['stop_weights']
+                stop_weights = stop_weights.to(noise_pred.device)
+                f_loss = f_loss * stop_weights
+            diffusion_loss = action_reduce(masks_unsqueeze, f_loss)
 
         # Aux loss
         pm_loss = 0
@@ -583,16 +618,26 @@ class DaggerDiffusonPolicyTrainer:
                 observations["progress"].to(progress_hat.device),
                 reduction="none",
             )
-            pm_loss = action_reduce(masks, progress_loss)
+            pm_loss = action_reduce(masks_unsqueeze, progress_loss)
         
         stop_pm_loss = 0
         if self.config.MODEL.STOP_PROGRESS_PREDICTOR.use:
-            stop_pm_loss = F.mse_loss(
-                stop_progress_pred.squeeze(),
-                observations["stop_progress"].to(stop_progress_pred.device),
-                reduction="none",
-            )
-            stop_pm_loss = action_reduce(masks, stop_pm_loss)
+            if self.config.MODEL.STOP_PROGRESS_PREDICTOR.type == 'logits':
+                # focal loss
+                stop_pm_loss = sigmoid_focal_loss(
+                    inputs=stop_progress_pred, # [bs,1]
+                    targets=observations["stop_progress"].to(stop_progress_pred.device).unsqueeze(-1), # [bs,1]
+                    alpha=self.config.MODEL.STOP_PROGRESS_PREDICTOR.alpha,
+                    gamma=self.config.MODEL.STOP_PROGRESS_PREDICTOR.gamma,
+                    reduction="none",
+                )
+            else:
+                stop_pm_loss = F.mse_loss(
+                    stop_progress_pred.squeeze(),
+                    observations["stop_progress"].to(stop_progress_pred.device).squeeze(),
+                    reduction="none",
+                )
+            stop_pm_loss = action_reduce(masks_unsqueeze, stop_pm_loss)
         
         # Total loss
         loss = self.config.MODEL.LOSS.alpha * self.config.MODEL.LOSS.dist_scale * dist_loss + (1-self.config.MODEL.LOSS.alpha) * diffusion_loss + pm_loss + stop_pm_loss
@@ -608,7 +653,8 @@ class DaggerDiffusonPolicyTrainer:
         # if isinstance(aux_loss, torch.Tensor):
         #     aux_loss = aux_loss.item()
         return_dist_loss = dist_loss.item() if dist_pred is not None else 0
-        return loss.item(), diffusion_loss.item(), return_dist_loss, pm_loss.item(), stop_pm_loss.item()
+        stop_pm_loss_item = stop_pm_loss.item() if isinstance(stop_pm_loss, torch.Tensor) else 0
+        return loss.item(), diffusion_loss.item(), return_dist_loss, pm_loss.item(), stop_pm_loss_item, open_acc_top1.item(), open_acc_top4.item()
       
     def eval(self, use_gt=False) -> None:
         r"""Main method of trainer evaluation. Calls _eval_checkpoint() that
@@ -953,7 +999,7 @@ class DaggerDiffusonPolicyTrainer:
                     'vis': self.config.test_verbose,
                     'rgbs': rgbs_for_vis_in_model,
                     'depths': depths_for_vis_in_model,
-                    'instructions': [x['instruction']['instruction_text'] for x in current_episodes],
+                    'instructions': [current_episodes['instruction']['instruction_text']],
                 }
                 
                 actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred, stop_progress_pred = net(batch_settings)
