@@ -209,7 +209,9 @@ class TaskEnv(VLNDataLoader):
 
         # get_shortest_path
         self.prev_position = self.get_robot_poses()[self.env_idx][0]
-        self.gt_exe_path, self.shortest_path_length = self.get_shortest_path(self.current_scan, verbose=self.config.test_verbose)
+
+        # compute the shortest path based on isaac-sim planner
+        self.gt_exe_path, self.shortest_path_length = self.get_shortest_path(self.current_scan, verbose=self.config.test_verbose, compute_shortest_path=self.config.EVAL.compute_shortest_path)
         # np.save(os.path.join(self.EP_DIR, 'gt_exe_path.npy'), self.gt_exe_path) # !!!
         self.eval_logger.info(f"The shortest path length is {self.shortest_path_length:.2f}")
         if self.shortest_path_length == 0:
@@ -221,26 +223,31 @@ class TaskEnv(VLNDataLoader):
         
         return obs
     
-    def get_shortest_path(self, scan, verbose=False):
+    def get_shortest_path(self, scan, verbose=False, compute_shortest_path=True):
         # Init the topdown map
         self.topdown_map = self.GlobalTopdownMap(self.args, scan, vis_verbose=verbose)
         self.freemap, self.camera_pose = self.get_global_free_map_single(self.env_idx, verbose=False)
         self.topdown_map.update_map(self.freemap, self.camera_pose, verbose=False, env_idx=self.env_idx)
         self.eval_logger.info(f"The shortest path has been initialized for Scan {scan}, Episode_id {self.data_item['episode_id']}")  
 
-        # Compute the shortest path
-        exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=verbose, save_dir=self.EP_DIR)
-        # exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=True, save_dir=self.config.GT_PATH_DIR, all_paths=self.data_item['reference_path']) # DEBUG 
+        if compute_shortest_path:
+            # Compute the shortest path
+            if compute_shortest_path:
+                exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=verbose, save_dir=self.EP_DIR)
+            # exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=True, save_dir=self.config.GT_PATH_DIR, all_paths=self.data_item['reference_path']) # DEBUG 
 
-        # compute the length
-        # 计算路径总长度
-        if exe_path is not None:
-            shortest_path_length = 0
-            for i in range(len(exe_path)-1):
-                # 计算相邻两点之间的欧氏距离
-                shortest_path_length += np.linalg.norm(np.array(exe_path[i+1]) - np.array(exe_path[i]))
+            # compute the length
+            # 计算路径总长度
+            if exe_path is not None:
+                shortest_path_length = 0
+                for i in range(len(exe_path)-1):
+                    # 计算相邻两点之间的欧氏距离
+                    shortest_path_length += np.linalg.norm(np.array(exe_path[i+1]) - np.array(exe_path[i]))
+            else:
+                shortest_path_length = 0
         else:
-            shortest_path_length = 0
+            exe_path = None
+            shortest_path_length = self.data_item['info']['geodesic_distance']
         
         return exe_path, shortest_path_length
     
@@ -345,7 +352,7 @@ class TaskEnv(VLNDataLoader):
         while not finish_state:
             obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
             current_position = self.get_robot_poses()[self.env_idx][0]
-            self.current_path_length += np.linalg.norm(current_position - self.prev_position)
+            self.current_path_length += np.linalg.norm(current_position[:2] - self.prev_position[:2])
             self.prev_position = current_position
 
             finish_state = self._get_action_state(obs, action_name)

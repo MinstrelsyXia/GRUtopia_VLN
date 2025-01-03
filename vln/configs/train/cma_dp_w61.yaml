@@ -2,7 +2,7 @@ NAME: 20250101_dp_TransEnc0Dec3_InstrCLS_transformGPS_localIMU_CFG
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
-TORCH_GPU_IDS: [0]
+TORCH_GPU_IDS: [0,1,2,3]
 # SIMULATOR_GPU_IDS: [0]
 # TORCH_GPU_ID: 1
 # TORCH_GPU_IDS: [2]
@@ -21,15 +21,17 @@ VIDEO_DIR: data/checkpoints/*name/videos
 
 SEED: 0
 DDP:
-  use: false
+  use: true
+  use_dp: true # true for data parallel, false for DDP
+  backend: nccl
   seed: 0
   fp16: False
   n_workers: 8
-  local_rank: -1 # -1 for use dataParallel rather than DDP. Since for now, the process communication is not supported.
+  find_unused_parameters: true
+  local_rank: 0 
 
   node_rank: 0
   world_size: 4
-  cuda_first_device: 0
 
 EVAL:
   USE_CKPT_CONFIG: False
@@ -79,9 +81,11 @@ EVAL:
   len_traj_act: 4
 
 IL:
-  epochs: 60
-  batch_size: 2
+  epochs: 100
+  batch_size: 4
   lr: 1e-4
+
+  dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_corrected
   
   save_interval_epochs: 2
   save_filter_frozen_weights: true # only save the learnable weights!
@@ -93,6 +97,19 @@ IL:
   Filter_failure: 
     use: true # drop the failure cases
     min_rgb_nums: 15 # the item that is fewer than this number would be dropped.
+  
+  analysis_time: False # analysis the processing time for each module
+
+  compute_open_accurate: True
+
+  lr_schedule:
+    use: true
+    type: "cosine" # 可选 cosine/step/linear
+    warmup_epochs: 5
+    warmup_factor: 0.1
+    decay_factor: 0.1
+    decay_epochs: [30, 45] # 用于step scheduler
+    min_lr: 1e-5
 
   DAGGER:
     iterations: 5
@@ -131,6 +148,14 @@ MODEL:
     hidden_size: 512
     vocab_size: 50265
     embedding_size: 512
+
+    sot_token: 49406
+    eot_token: 49407
+    pad_token: 0
+
+    # text Q-former
+    use_qformer: False
+    q_former_length: 5
 
   IMAGE_ENCODER:
     img_stack_nums: 4 # the history images for inputs
@@ -179,7 +204,7 @@ MODEL:
     num_attention_heads: 8
 
     txt_to_img: True
-    txt_to_img_layer: 1
+    txt_to_img_layer: 2
   
   STATE_ENCODER:
     hidden_size: 512
@@ -188,7 +213,11 @@ MODEL:
 
     rgb_depth_embed_method: flat # for multi_patches_avg_pooling. flat / first
 
+    use_dropout: False
+    dropout_rate: 0.2
+
   Diffusion_Policy:
+    use: true
     type: transformer # resnet_unet
 
     # scheduler
@@ -196,6 +225,18 @@ MODEL:
 
     # pred_type
     pred_type: epsilon # epsilon / sample
+
+    # for diffusion sampling
+    add_random_variance: True 
+    clip_sample: True
+
+    # classifier-free guidance
+    use_cls_free_guidance: True
+    cls_free_guidance_scale: 1.5
+    cls_mask_ratio: 0.25
+    random_mask_rgb: True
+    random_mask_instr: True
+    cls_mask_method: mask_token # mask_token / mask_inputs
 
     # distance bounds for distance and action and distance predictions 
     distance:
@@ -233,10 +274,15 @@ MODEL:
     # transformer_n_head: 8
     transformer_p_drop_emb: 0.2
     cond: 'v2_instr' # rnn_instr / rnn_instr_vis / rnn_Fullinstr_vis / rnn_Fullinstr / v2_instr / v2_Fullinstr
+    txt_len: 80 # use for v2_Fullinstr
+    state_concat_with_noise: False # concat states with noise during decoder
 
     # action output params
     waypoint_spacing: 1
     len_traj_pred: 8
+
+    # stop_weight
+    stop_weight: 1
   
   DISTANCE_PREDICTOR:
     use: false
@@ -254,6 +300,17 @@ MODEL:
   
   PROGRESS_MONITOR:
     use: true
+    concat_state_txt: True
+
+  STOP_PROGRESS_PREDICTOR:
+    use: True
+    concat_state_txt: True
+
+    type: continuous # logits / continuous
+
+    # focal loss for logits
+    alpha: 0.25 # default: 0.25
+    gamma: 2 # default: 2
   
   STEP_ENCODER:
     encoding_size: 64

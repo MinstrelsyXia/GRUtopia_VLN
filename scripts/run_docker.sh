@@ -1,5 +1,5 @@
-NAME=w61_grutopia_cma_pm
-sudo docker run -d --name ${NAME} -it --rm --gpus='"device=1,2"' --network host \
+NAME=w61_grutopia_test
+sudo docker run -d --name ${NAME} -it --rm --gpus='"device=1"' --network host \
      -e "ACCEPT_EULA=Y" \
      -e "PRIVACY_CONSENT=Y" \
      -e "WEBUI_HOST=${WEBUI_HOST}" \
