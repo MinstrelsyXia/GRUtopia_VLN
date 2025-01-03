@@ -47,7 +47,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         self.eval_config = eval_config
         #TODO:
         self.per_action_max_step=1500
-        self.max_step=40000
+        self.max_step=25000
         self.timestamp = time.time()
         self.lmdb_path = lmdb_path
         self.ckpt_name = ckpt_name
