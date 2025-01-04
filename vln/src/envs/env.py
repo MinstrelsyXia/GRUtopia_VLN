@@ -573,6 +573,48 @@ class TaskEnv(VLNDataLoader):
         
         return speed_actions
 
+    def action_to_speed_new(self, action, add_last_rotate=False, step_per_action=80, physics_dt=1/200):
+        # rotate first, and then forward
+        position_threshold = float(self.config.EVAL.rotation_threshold)
+        max_forward_speed = 2.0  # 最大前进速度
+        max_rotate_speed = 2.0   # 最大旋转速度
+        last_rotation_threshold = 0.1
+        per_act_time = step_per_action * physics_dt
+        speed_actions = []
+
+        delta_x, delta_y, delta_yaw = action[0], action[1], action[2]
+        distance = np.sqrt(delta_x**2 + delta_y**2)
+        xy_delta_yaw = np.arctan2(delta_y, delta_x)
+
+        if distance < position_threshold:
+            # only rotation without moving
+            rotation_speed = delta_yaw / per_act_time
+            # 限制旋转速度
+            rotation_speed = np.clip(rotation_speed, -max_rotate_speed, max_rotate_speed)
+            speed_actions.append([0, 0, rotation_speed])
+            return speed_actions
+        
+        # rotate first
+        rotation_speed = xy_delta_yaw / per_act_time
+        # 限制旋转速度
+        rotation_speed = np.clip(rotation_speed, -max_rotate_speed, max_rotate_speed)
+        speed_actions.append([0, 0, rotation_speed])
+
+        # move last
+        forward_speed = distance / per_act_time
+        # 限制前进速度
+        forward_speed = np.clip(forward_speed, 0, max_forward_speed)
+        speed_actions.append([forward_speed, 0, 0])
+
+        if add_last_rotate:
+            last_rotation_delta = delta_yaw - xy_delta_yaw
+            if abs(last_rotation_delta) > last_rotation_threshold:
+                last_rotation_speed = last_rotation_delta / per_act_time
+                last_rotation_speed = np.clip(last_rotation_speed, -max_rotate_speed, max_rotate_speed)
+                speed_actions.append([0, 0, last_rotation_speed])
+
+        return speed_actions
+    
     def action_to_speed(self, action, max_distance=0.5, speed_actions=[], add_final_rotation=True):
         # 设置阈值参数
         position_threshold = float(self.config.EVAL.rotation_threshold)  # 位置变化阈值,小于此值认为不需要移动
@@ -638,13 +680,13 @@ class TaskEnv(VLNDataLoader):
         if add_final_rotation:
             last_rotation_delta = delta_yaw - xy_delta_yaw
             if abs(last_rotation_delta) > self.yaw_threshold:
-                rotation_speed *= last_rotation_delta
+                rotation_speed = last_rotation_delta * 80 / 200
                 rotation_speed = np.clip(rotation_speed, -self.max_rotation_speed, self.max_rotation_speed)
                 speed_actions.append([0, 0, rotation_speed])
 
         return speed_actions, only_rotation
     
-    def adaptive_action_to_speed(self, predicted_actions, len_traj_act, verbose=False):
+    def adaptive_action_to_speed(self, predicted_actions, len_traj_act, add_last_rotate=False, verbose=False):
         '''Further adjust target points and orientations based on distance thresholds
         
         Args:
@@ -659,6 +701,7 @@ class TaskEnv(VLNDataLoader):
         cumulative_distance = 0
         distance_threshold = 0.15  # Threshold for adding new waypoint (in meters)
         last_pos = predicted_actions[0]
+        tmp_add_last_rotate = False
         
         if len_traj_act is None:
             len_traj_act = len(predicted_actions)
@@ -672,7 +715,10 @@ class TaskEnv(VLNDataLoader):
             
             # If cumulative distance exceeds threshold, add new waypoint
             if cumulative_distance >= distance_threshold:
-                cur_speed, only_rotation = self.action_to_speed(current_pos, max_distance=0.3, speed_actions=[], add_final_rotation=True)
+                # cur_speed, only_rotation = self.action_to_speed(current_pos, max_distance=0.3, speed_actions=[], add_final_rotation=True)
+                if add_last_rotate and len(speed_actions) == len_traj_act - 2:
+                    tmp_add_last_rotate = True
+                cur_speed = self.action_to_speed_new(current_pos, add_last_rotate=tmp_add_last_rotate)
                 speed_actions.extend(cur_speed)
                 # Reset cumulative distance and update last position
                 cumulative_distance = 0
@@ -682,7 +728,8 @@ class TaskEnv(VLNDataLoader):
                     break     
         
         if len(speed_actions) == 0:
-            cur_speed, only_rotation = self.action_to_speed(predicted_actions[-1], max_distance=0.3, speed_actions=[], add_final_rotation=True)
+            # cur_speed, only_rotation = self.action_to_speed(predicted_actions[-1], max_distance=0.3, speed_actions=[], add_final_rotation=True)
+            cur_speed = self.action_to_speed_new(current_pos, add_last_rotate=tmp_add_last_rotate)
             speed_actions.extend(cur_speed)
         
         return speed_actions
