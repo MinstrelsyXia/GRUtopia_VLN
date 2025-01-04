@@ -83,8 +83,6 @@ EVAL:
   # len_traj_act
   len_traj_act: 4
 
-  only_exe_first_action: False
-
 IL:
   epochs: 60
   batch_size: 2
