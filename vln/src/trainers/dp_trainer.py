@@ -1078,6 +1078,9 @@ class DaggerDiffusonPolicyTrainer:
                             target_poses, target_quats, exe_actions = self.eval_env.predicted_action_to_global(a, step_i=-1, verbose=self.config.test_verbose) # for debug. drawing the predicted actions
                         speed_actions = self.eval_env.get_speed_actions(a, len_traj_act=len_traj_act,verbose=self.config.test_verbose)
                         exe_action = speed_actions
+
+                        if self.config.EVAL.only_exe_first_action:
+                            exe_action = exe_action[:1]
                         action = [
                             {'h1': {'move_along_speeds': [exe_action]}}
                         ]
@@ -1087,8 +1090,8 @@ class DaggerDiffusonPolicyTrainer:
                         #     ]
 
                 outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=self.config.test_verbose) 
-                steps[0] += len(speed_actions)
-                total_actions.append(speed_actions)
+                steps[0] += 1
+                total_actions.append(exe_action)
 
             outputs_dict = outputs['outputs_dict']
             dones = outputs['dones']
