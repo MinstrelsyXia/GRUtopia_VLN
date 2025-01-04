@@ -329,7 +329,8 @@ class TaskEnv(VLNDataLoader):
         infos = self.compute_metrics(fail_reason=reason)
 
         current_position = self.get_robot_poses()[self.env_idx][0]
-        stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list = self._update_states(current_position, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=verbose)
+
+        # stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list = self._update_states(current_position, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=verbose)
         
         return {"outputs_dict": outputs_dict,
                 "dones": dones,

@@ -83,6 +83,8 @@ EVAL:
   # len_traj_act
   len_traj_act: 4
 
+  only_exe_first_action: False
+
 IL:
   epochs: 60
   batch_size: 2
@@ -233,7 +235,7 @@ MODEL:
     clip_sample: True
 
     # classifier-free guidance
-    use_cls_free_guidance: False
+    use_cls_free_guidance: True
     cls_free_guidance_scale: 1.5
     cls_mask_ratio: 0.25
     random_mask_rgb: True
