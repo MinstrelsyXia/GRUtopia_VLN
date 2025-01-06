@@ -80,7 +80,10 @@ class CMADataset(torch.utils.data.IterableDataset):
         dataset_data,
         inflection_weight_coef=1.0,
         lmdb_map_size=1e9,
-        batch_size=1
+        batch_size=1,
+        is_distributed=False,
+        rank=0,
+        world_size=1,
     ):
         super().__init__()
         self.config = config
