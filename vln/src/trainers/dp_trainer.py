@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as distr
+from torchvision.ops import sigmoid_focal_loss
 import tqdm
 import time
 from copy import deepcopy
@@ -105,8 +106,8 @@ class DaggerDiffusonPolicyTrainer:
         self.action_stats = None
         if hasattr(self.config.MODEL, 'Diffusion_Policy'):
             self.action_stats = {
-                'min': torch.from_numpy(np.array(self.config.MODEL.Diffusion_Policy.action_stats.min)).to(self.device),
-                'max': torch.from_numpy(np.array(self.config.MODEL.Diffusion_Policy.action_stats.max)).to(self.device)
+                'min': torch.Tensor(np.asarray(self.config.MODEL.Diffusion_Policy.action_stats.min)).to(self.device),
+                'max': torch.Tensor(np.asarray(self.config.MODEL.Diffusion_Policy.action_stats.max)).to(self.device)
             }
         
         # use rnn or not
@@ -301,7 +302,7 @@ class DaggerDiffusonPolicyTrainer:
                     
                     prev_actions_batch = prev_actions_batch.to(device=self.device, non_blocking=True)
                     not_done_masks = not_done_masks.to(device=self.device, non_blocking=True) if not_done_masks is not None else None  
-                    loss, diffusion_loss, dist_loss, pm_loss, stop_pm_loss = self._update_agent(
+                    loss, diffusion_loss, dist_loss, pm_loss, stop_pm_loss, open_acc_top1, open_acc_top4 = self._update_agent(
                         observations_batch,
                         prev_actions_batch,
                         not_done_masks,
@@ -311,7 +312,7 @@ class DaggerDiffusonPolicyTrainer:
 
                     if self.local_rank < 1:
                         losses.append(loss)
-                        if step_id % 100 == 0:
+                        if step_id % 100 == 0: 
                             self.train_logger.info("================================================")
                             self.train_logger.info(f"Batches processed: {step_id}.")
                             self.train_logger.info(f"train_loss: {loss}")
@@ -319,6 +320,10 @@ class DaggerDiffusonPolicyTrainer:
                             self.train_logger.info(f"train_dist_loss: {dist_loss}")
                             self.train_logger.info(f"train_pm_loss: {pm_loss}")
                             self.train_logger.info(f"train_stop_pm_loss: {stop_pm_loss}")
+                            if open_acc_top1 is not None:
+                                self.train_logger.info(f"train_open_acc_top1: {open_acc_top1}")
+                            if open_acc_top4 is not None:
+                                self.train_logger.info(f"train_open_acc_top4: {open_acc_top4}")
                             self.train_logger.info(
                                 f"On DAgger iter {dagger_it}, Epoch {epoch}."
                             )
@@ -345,6 +350,18 @@ class DaggerDiffusonPolicyTrainer:
                             stop_pm_loss,
                             step_id,
                         )
+                        if open_acc_top1 is not None:
+                            writer.add_scalar(
+                                f"train_open_acc_top1_iter_{dagger_it}",
+                                open_acc_top1,
+                                step_id,
+                            )
+                        if open_acc_top4 is not None:
+                            writer.add_scalar(
+                                f"train_open_acc_top4_iter_{dagger_it}",
+                                open_acc_top4,
+                                step_id,
+                            )
                         step_id += 1  # noqa: SIM113
                         
                         # save the ckpt according to the steps
@@ -560,6 +577,13 @@ class DaggerDiffusonPolicyTrainer:
             un_actions = get_action(noise_pred, self.action_stats).cpu().detach().numpy()
             gt_actions = get_action(batch['observations']['actions'], self.action_stats).cpu().detach().numpy()
             self.save_predicted_actions(un_actions, gt_actions)
+        
+        # Compute open accuracy
+        open_acc_top1, open_acc_top4 = None, None
+        if self.config.IL.compute_open_accurate:
+            cos_similarities = F.cosine_similarity(noise_pred, noise, dim=-1)  # Compute cosine similarity along the last dimension
+            open_acc_top1 = torch.mean(cos_similarities[:,0])
+            open_acc_top4 = torch.mean(cos_similarities[:,0:4])
 
         # for train
         dist_loss = 0
@@ -568,12 +592,23 @@ class DaggerDiffusonPolicyTrainer:
             dist_loss = (dist_loss * (masks.float())).mean() / (1e-2 +(masks.float()).mean())
         
         # L2 loss
-        if self.config.MODEL.Diffusion_Policy.pred_type == 'epsilon':
+        masks_unsqueeze = masks.squeeze() if masks is not None else None
+        if self.config.MODEL.Diffusion_Policy.pred_type == 'epsilon' and self.config.MODEL.Diffusion_Policy.use:
             # pred noise
-            diffusion_loss = action_reduce(masks, F.mse_loss(noise_pred, noise, reduction="none"))
-        elif self.config.MODEL.Diffusion_Policy.pred_type == 'sample':
+            f_loss = F.mse_loss(noise_pred, noise, reduction="none")
+            if self.config.MODEL.Diffusion_Policy.stop_weight > 0:
+                stop_weights = batch['observations']['stop_weights']
+                stop_weights = stop_weights.to(noise_pred.device).unsqueeze(-1).unsqueeze(-1)
+                f_loss = f_loss * stop_weights
+            diffusion_loss = action_reduce(masks_unsqueeze, f_loss)
+        elif self.config.MODEL.Diffusion_Policy.pred_type == 'sample' or not self.config.MODEL.Diffusion_Policy.use:
             # pred x_0
-            diffusion_loss = action_reduce(masks, F.mse_loss(noise_pred, observations['actions'], reduction="none"))
+            f_loss = F.mse_loss(noise_pred, observations['actions'], reduction="none")
+            if self.config.MODEL.Diffusion_Policy.stop_weight > 0:
+                stop_weights = batch['observations']['stop_weights']
+                stop_weights = stop_weights.to(noise_pred.device)
+                f_loss = f_loss * stop_weights
+            diffusion_loss = action_reduce(masks_unsqueeze, f_loss)
 
         # Aux loss
         pm_loss = 0
@@ -583,16 +618,26 @@ class DaggerDiffusonPolicyTrainer:
                 observations["progress"].to(progress_hat.device),
                 reduction="none",
             )
-            pm_loss = action_reduce(masks, progress_loss)
+            pm_loss = action_reduce(masks_unsqueeze, progress_loss)
         
         stop_pm_loss = 0
         if self.config.MODEL.STOP_PROGRESS_PREDICTOR.use:
-            stop_pm_loss = F.mse_loss(
-                stop_progress_pred.squeeze(),
-                observations["stop_progress"].to(stop_progress_pred.device),
-                reduction="none",
-            )
-            stop_pm_loss = action_reduce(masks, stop_pm_loss)
+            if self.config.MODEL.STOP_PROGRESS_PREDICTOR.type == 'logits':
+                # focal loss
+                stop_pm_loss = sigmoid_focal_loss(
+                    inputs=stop_progress_pred, # [bs,1]
+                    targets=observations["stop_progress"].to(stop_progress_pred.device).unsqueeze(-1), # [bs,1]
+                    alpha=self.config.MODEL.STOP_PROGRESS_PREDICTOR.alpha,
+                    gamma=self.config.MODEL.STOP_PROGRESS_PREDICTOR.gamma,
+                    reduction="none",
+                )
+            else:
+                stop_pm_loss = F.mse_loss(
+                    stop_progress_pred.squeeze(),
+                    observations["stop_progress"].to(stop_progress_pred.device).squeeze(),
+                    reduction="none",
+                )
+            stop_pm_loss = action_reduce(masks_unsqueeze, stop_pm_loss)
         
         # Total loss
         loss = self.config.MODEL.LOSS.alpha * self.config.MODEL.LOSS.dist_scale * dist_loss + (1-self.config.MODEL.LOSS.alpha) * diffusion_loss + pm_loss + stop_pm_loss
@@ -608,7 +653,8 @@ class DaggerDiffusonPolicyTrainer:
         # if isinstance(aux_loss, torch.Tensor):
         #     aux_loss = aux_loss.item()
         return_dist_loss = dist_loss.item() if dist_pred is not None else 0
-        return loss.item(), diffusion_loss.item(), return_dist_loss, pm_loss.item(), stop_pm_loss.item()
+        stop_pm_loss_item = stop_pm_loss.item() if isinstance(stop_pm_loss, torch.Tensor) else 0
+        return loss.item(), diffusion_loss.item(), return_dist_loss, pm_loss.item(), stop_pm_loss_item, open_acc_top1.item(), open_acc_top4.item()
       
     def eval(self, use_gt=False) -> None:
         r"""Main method of trainer evaluation. Calls _eval_checkpoint() that
@@ -953,7 +999,7 @@ class DaggerDiffusonPolicyTrainer:
                     'vis': self.config.test_verbose,
                     'rgbs': rgbs_for_vis_in_model,
                     'depths': depths_for_vis_in_model,
-                    'instructions': [x['instruction']['instruction_text'] for x in current_episodes],
+                    'instructions': [current_episodes['instruction']['instruction_text']],
                 }
                 
                 actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred, stop_progress_pred = net(batch_settings)
@@ -1032,103 +1078,110 @@ class DaggerDiffusonPolicyTrainer:
                             target_poses, target_quats, exe_actions = self.eval_env.predicted_action_to_global(a, step_i=-1, verbose=self.config.test_verbose) # for debug. drawing the predicted actions
                         speed_actions = self.eval_env.get_speed_actions(a, len_traj_act=len_traj_act,verbose=self.config.test_verbose)
                         exe_action = speed_actions
-                        action = [
-                            {'h1': {'move_along_speeds': [exe_action]}}
-                        ]
+
+                        # action = [
+                        #     {'h1': {'move_along_speeds': [exe_action]}}
+                        # ]
                         # if len(exe_action) == 0:
                         #     action = [
                         #         {'h1': {'stop': ['stop']}}
                         #     ]
+                
+                for a_i, exe_a in enumerate(exe_action):
+                    action = [
+                        {'h1': {'move_along_speeds': [[exe_a]]}}
+                    ]
 
-                outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=self.config.test_verbose) 
-                steps[0] += len(speed_actions)
-                total_actions.append(speed_actions)
+                    outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=self.config.test_verbose) 
+                    if a_i % 2 == 0: # this is for rotate first, move forward last
+                        steps[0] += 1
+                    total_actions.append(exe_action)
 
-            outputs_dict = outputs['outputs_dict']
-            dones = outputs['dones']
-            infos = outputs['infos']
-            sim_steps = outputs['current_step_list']
-            stack_rgb = outputs['stack_rgb']
-            stack_depth = outputs['stack_depth']
-            prev_globalgps = outputs['prev_globalgps']
-            prev_globalyaw = outputs['prev_globalyaw']
-            total_rgb_list = outputs['total_rgb_list']
-            total_topdown_rgb_list = outputs['total_topdown_rgb_list']
-      
-            if self.use_rnn:
-                # update RNN states
-                ## Update prev_actions
-                if len_traj_act > 1:
-                    for idx in range(len(actions)):
-                        # reverse to make the latest frame to be 0 position
-                        prev_globalgps_numpy = np.array(prev_globalgps[idx].get_stack(reverse=True))
-                        prev_globalyaw_numpy = np.array(prev_globalyaw[idx].get_stack(reverse=True))
-                        prev_act = _compute_actions( 
-                            prev_globalgps_numpy, prev_globalyaw_numpy,
-                            curr_time=0, fill_mode="constant",
-                            len_traj_pred=self.config.MODEL.len_traj_act,
-                            waypoint_spacing=self.config.MODEL.Diffusion_Policy.waypoint_spacing,
-                            learn_angle=self.config.MODEL.learn_angle,
-                            metric_waypoint_spacing=self.config.MODEL.Diffusion_Policy.metric_waypoint_spacing,
-                            num_action_params=self.action_dim,
-                            normalize=False)
-                        prev_act_delta = torch.from_numpy(get_delta(prev_act)).to(self.device)
-                        prev_act_delta_norm = normalize_data(prev_act_delta, self.action_stats)
-                        prev_actions[idx] = prev_act_delta_norm
-                    
-                    ## Update image features in batch
-                    # if self.config.MODEL.IMAGE_ENCODER.use_stack:
-                    batch_stack_rgb, batch_stack_depth, batch_stack_rgb_length = [], [], []
-                    for env_idx in range(len(stack_rgb)):
-                        cur_rgb = np.array(stack_rgb[env_idx].get_stack(reverse=True))
-                        cur_depth = np.array(stack_depth[env_idx].get_stack(reverse=True))
-                        batch_stack_rgb_length.append(len(cur_rgb))
-                        if len(cur_rgb) < stack_rgb_length:
-                            cur_rgb = np.concatenate([cur_rgb, np.zeros((stack_rgb_length-len(cur_rgb), *cur_rgb.shape[1:]))], axis=0)
-                            cur_depth = np.concatenate([cur_depth, np.zeros((stack_rgb_length-len(cur_depth), *cur_depth.shape[1:]))], axis=0)
-                        batch_stack_rgb.append(cur_rgb)
-                        batch_stack_depth.append(cur_depth) 
-                    batch_stack_rgb = torch.from_numpy(np.array(batch_stack_rgb).astype(np.uint8)).to(self.device)
-                    batch_stack_depth = torch.from_numpy(np.array(batch_stack_depth)).to(self.device)
-
-                    # else:
-                    #     batch_stack_rgb, batch_stack_depth = None, None
-
-                    # if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'multi_patches_avg_pooling' and not self.config.MODEL.IMAGE_ENCODER.use_stack:
-                    if not self.config.MODEL.IMAGE_ENCODER.use_stack:
-                        batch['rgb'] = batch_stack_rgb.squeeze(1)
-                        batch['depth'] = batch_stack_depth.squeeze(1)
-                        batch_stack_rgb, batch_stack_depth = None, None  
-
-                    batch = extract_image_features(
-                        self.policy, batch, 
-                        img_mod=self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-                        len_traj_act=self.config.MODEL.len_traj_act,
-                        world_size=self.world_size,
-                        depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
-                        stack_rgb = batch_stack_rgb,
-                        stack_depth = batch_stack_depth,
-                        batch_stack_rgb_length = batch_stack_rgb_length,
-                        proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
-                        need_rgb_extraction=True,
-                        classifier_free_mask_depth=classifier_free_mask_depth,
-                        )
-
-                    batch["steps"] = torch.from_numpy(np.array(steps)).to(self.device)
-                    
+                    outputs_dict = outputs['outputs_dict']
+                    dones = outputs['dones']
+                    infos = outputs['infos']
+                    sim_steps = outputs['current_step_list']
+                    stack_rgb = outputs['stack_rgb']
+                    stack_depth = outputs['stack_depth']
+                    prev_globalgps = outputs['prev_globalgps']
+                    prev_globalyaw = outputs['prev_globalyaw']
+                    total_rgb_list = outputs['total_rgb_list']
+                    total_topdown_rgb_list = outputs['total_topdown_rgb_list']
+            
                     if self.use_rnn:
-                        with torch.no_grad():
-                            prev_actions_batch = torch.stack(prev_actions, axis=0).to(self.device)
-                            batch_settings = {
-                                'mode': 'update_rnn',
-                                'observations': batch,
-                                'rnn_states': rnn_states,
-                                'prev_actions': prev_actions_batch,
-                                'masks': not_done_masks,
-                            }
+                        # update RNN states
+                        ## Update prev_actions
+                        if len_traj_act > 1:
+                            for idx in range(len(actions)):
+                                # reverse to make the latest frame to be 0 position
+                                prev_globalgps_numpy = np.array(prev_globalgps[idx].get_stack(reverse=True))
+                                prev_globalyaw_numpy = np.array(prev_globalyaw[idx].get_stack(reverse=True))
+                                prev_act = _compute_actions( 
+                                    prev_globalgps_numpy, prev_globalyaw_numpy,
+                                    curr_time=0, fill_mode="constant",
+                                    len_traj_pred=self.config.MODEL.len_traj_act,
+                                    waypoint_spacing=self.config.MODEL.Diffusion_Policy.waypoint_spacing,
+                                    learn_angle=self.config.MODEL.learn_angle,
+                                    metric_waypoint_spacing=self.config.MODEL.Diffusion_Policy.metric_waypoint_spacing,
+                                    num_action_params=self.action_dim,
+                                    normalize=False)
+                                prev_act_delta = torch.from_numpy(get_delta(prev_act)).to(self.device)
+                                prev_act_delta_norm = normalize_data(prev_act_delta, self.action_stats)
+                                prev_actions[idx] = prev_act_delta_norm
                             
-                            _, update_rnn_states= net(batch_settings)
-                            rnn_states = update_rnn_states
+                            ## Update image features in batch
+                            # if self.config.MODEL.IMAGE_ENCODER.use_stack:
+                            batch_stack_rgb, batch_stack_depth, batch_stack_rgb_length = [], [], []
+                            for env_idx in range(len(stack_rgb)):
+                                cur_rgb = np.array(stack_rgb[env_idx].get_stack(reverse=True))
+                                cur_depth = np.array(stack_depth[env_idx].get_stack(reverse=True))
+                                batch_stack_rgb_length.append(len(cur_rgb))
+                                if len(cur_rgb) < stack_rgb_length:
+                                    cur_rgb = np.concatenate([cur_rgb, np.zeros((stack_rgb_length-len(cur_rgb), *cur_rgb.shape[1:]))], axis=0)
+                                    cur_depth = np.concatenate([cur_depth, np.zeros((stack_rgb_length-len(cur_depth), *cur_depth.shape[1:]))], axis=0)
+                                batch_stack_rgb.append(cur_rgb)
+                                batch_stack_depth.append(cur_depth) 
+                            batch_stack_rgb = torch.from_numpy(np.array(batch_stack_rgb).astype(np.uint8)).to(self.device)
+                            batch_stack_depth = torch.from_numpy(np.array(batch_stack_depth)).to(self.device)
+
+                            # else:
+                            #     batch_stack_rgb, batch_stack_depth = None, None
+
+                            # if self.config.MODEL.IMAGE_ENCODER.RGB.img_mod == 'multi_patches_avg_pooling' and not self.config.MODEL.IMAGE_ENCODER.use_stack:
+                            if not self.config.MODEL.IMAGE_ENCODER.use_stack:
+                                batch['rgb'] = batch_stack_rgb.squeeze(1)
+                                batch['depth'] = batch_stack_depth.squeeze(1)
+                                batch_stack_rgb, batch_stack_depth = None, None  
+
+                            batch = extract_image_features(
+                                self.policy, batch, 
+                                img_mod=self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
+                                len_traj_act=self.config.MODEL.len_traj_act,
+                                world_size=self.world_size,
+                                depth_encoder_type=self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
+                                stack_rgb = batch_stack_rgb,
+                                stack_depth = batch_stack_depth,
+                                batch_stack_rgb_length = batch_stack_rgb_length,
+                                proj=self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+                                need_rgb_extraction=True,
+                                classifier_free_mask_depth=classifier_free_mask_depth,
+                                )
+
+                            batch["steps"] = torch.from_numpy(np.array(steps)).to(self.device)
+                            
+                            if self.use_rnn:
+                                with torch.no_grad():
+                                    prev_actions_batch = torch.stack(prev_actions, axis=0).to(self.device)
+                                    batch_settings = {
+                                        'mode': 'update_rnn',
+                                        'observations': batch,
+                                        'rnn_states': rnn_states,
+                                        'prev_actions': prev_actions_batch,
+                                        'masks': not_done_masks,
+                                    }
+                                    
+                                    _, update_rnn_states= net(batch_settings)
+                                    rnn_states = update_rnn_states
 
             for idx in range(len(actions)):
                 # reverse to make the latest frame to be 0 position

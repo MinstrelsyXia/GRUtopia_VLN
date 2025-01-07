@@ -128,7 +128,8 @@ class VLNCE_DP_Dataset(IterableDataset):
         self.to_pil = ToPILImage()
         self.image_processor = _transform(n_px=224) # copy fron clip-long
         
-        self.need_extract_instr_features = False if not self.config.MODEL.TEXT_ENCODER.update_text_encoder else True # has preprocessed the instruction
+        # self.need_extract_instr_features = False if not self.config.MODEL.TEXT_ENCODER.update_text_encoder else True # has preprocessed the instruction
+        self.need_extract_instr_features = True
         
         if self.config.IL.analysis_time:
             start_time = time.time()
@@ -259,8 +260,10 @@ class VLNCE_DP_Dataset(IterableDataset):
                     fail_reason = data_to_load['fail_reason']
                     if self.config.IL.Filter_failure.use:
                         if finish_status != 'success':
+                            if len(data['camera_info']) == 0: # without any camera info
+                                continue
                             if 'rgb' in data['camera_info'][self.camera_name].keys():
-                                if len(data['camera_info']) == 0 or len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
+                                if len(data['camera_info'][self.camera_name]['rgb']) < self.config.IL.Filter_failure.min_rgb_nums:
                                     continue
                             else:
                                 if len(data['camera_info']) == 0 or len(data['rgb_features']) < self.config.IL.Filter_failure.min_rgb_nums:
@@ -334,7 +337,12 @@ class VLNCE_DP_Dataset(IterableDataset):
                 #     item_obs[k] = item_obs[k][:total_steps]
 
                 # add stop_progress
-                item_obs["stop_progress"] = np.arange(total_steps) / total_steps
+                if self.config.MODEL.STOP_PROGRESS_PREDICTOR.type == 'continuous':
+                    item_obs["stop_progress"] = (np.arange(total_steps) + 1) / total_steps
+                else:
+                    item_obs["stop_progress"] = np.zeros(total_steps) # 0 for CONTINUE and 1 for STOP
+                
+                item_obs["stop_weights"] = np.ones(total_steps)
                 
                 for k,v in item_obs.items():
                     item_obs[k] = torch.from_numpy(np.array(item_obs[k]))
@@ -449,6 +457,15 @@ class VLNCE_DP_Dataset(IterableDataset):
                             item_obs["prev_actions"][step_idx] = normalize_data(prev_action_deltas, self.action_stats)
                         else:
                             item_obs["prev_actions"][step_idx] = map_action_to_2d(prev_action_deltas)
+                        
+                    # update stop_progress
+                    if self.config.MODEL.STOP_PROGRESS_PREDICTOR.type == 'logits':
+                        if step_idx >= total_steps - 2: # 最后两个step的stop都可以取1
+                            item_obs["stop_progress"][step_idx] = 1
+                        
+                    if self.config.MODEL.Diffusion_Policy.stop_weight > 0:
+                        if step_idx >= total_steps - 4: # 最后四个step的action的weight加重
+                            item_obs["stop_weights"][step_idx] = self.config.MODEL.Diffusion_Policy.stop_weight
      
                 # add additional information
                 # if self.lmdb_save_episode_id:
