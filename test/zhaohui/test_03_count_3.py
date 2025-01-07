@@ -30,9 +30,9 @@ def get_split_map(project_path):
         split_map[split_data_type]=path_key_list
     return split_map
 
-ckpt_name="ckpt.cma"
+ckpt_name="ckpt.44"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0102'
-name = '20250102_ckpt_cma'
+name = '20250103_ckpt_44'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 split_map = get_split_map(project_path)
@@ -45,7 +45,7 @@ for split,path_key_list in split_map.items():
         with database_read.begin() as txn:
             value = txn.get(data_key.encode())
             if value is None:
-                print.info(f"[key:{data_key}] value is None ")
+                print(f"[key:{data_key}] value is None ")
                 continue
             value = msgpack_numpy.unpackb(value)
         data_list.append(value)

@@ -6,13 +6,13 @@ from vln.src.v2.util.eval import(
 import lmdb
 import msgpack_numpy
 
-split_data_types = ['val_seen'] #'val_seen'
+split_data_types = ['val_unseen'] #'val_seen'
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0102'
 base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
 robot_offset = np.array([0.   , 0.   , 1.05])
 filter_same_trajectory=False
-ckpt_name="ckpt.cma"
-name = '20250102_ckpt_cma'
+ckpt_name="ckpt.44"
+name = '20250103_ckpt_44'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 
 dataloader = BasePathKeyDataloader(
@@ -31,7 +31,8 @@ for path_key in path_key_data:
     with database_read.begin() as txn:
         info_value = txn.get(info_key.encode())
         if info_value is None:
-            print(f"[key:{info_key}] value is None")
+            # print(f"[key:{info_key}] value is None")
+            continue
         info_value = msgpack_numpy.unpackb(info_value)
         fail_reason = info_value['fail_reason']
         steps = info_value['steps']

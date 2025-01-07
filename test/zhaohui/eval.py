@@ -32,7 +32,7 @@ if __name__ == "__main__":
     print(f"rank:{rank}")
 
     project_path = '/isaac-sim/GRUtopia'
-    name = '20250102_ckpt_cma'
+    name = '20250103_ckpt_44'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     
     round_count = 0
