@@ -133,6 +133,12 @@ def load_gather_data(args, split, filter_same_trajectory=False, filter_stairs=Fa
                 new_data[scan].append(item)
         data = new_data
 
+    # calculate the number of data
+    total_length = 0
+    for scan, data_item in data.items():
+        total_length += len(data_item)
+    log.info(f"Total number of data: {total_length}")
+        
     return data, scan
 
 def load_scene_usd(args, scan):

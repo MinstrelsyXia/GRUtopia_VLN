@@ -209,7 +209,9 @@ class TaskEnv(VLNDataLoader):
 
         # get_shortest_path
         self.prev_position = self.get_robot_poses()[self.env_idx][0]
-        self.gt_exe_path, self.shortest_path_length = self.get_shortest_path(self.current_scan, verbose=self.config.test_verbose)
+
+        # compute the shortest path based on isaac-sim planner
+        self.gt_exe_path, self.shortest_path_length = self.get_shortest_path(self.current_scan, verbose=self.config.test_verbose, compute_shortest_path=self.config.EVAL.compute_shortest_path)
         # np.save(os.path.join(self.EP_DIR, 'gt_exe_path.npy'), self.gt_exe_path) # !!!
         self.eval_logger.info(f"The shortest path length is {self.shortest_path_length:.2f}")
         if self.shortest_path_length == 0:
@@ -221,26 +223,31 @@ class TaskEnv(VLNDataLoader):
         
         return obs
     
-    def get_shortest_path(self, scan, verbose=False):
+    def get_shortest_path(self, scan, verbose=False, compute_shortest_path=True):
         # Init the topdown map
         self.topdown_map = self.GlobalTopdownMap(self.args, scan, vis_verbose=verbose)
         self.freemap, self.camera_pose = self.get_global_free_map_single(self.env_idx, verbose=False)
         self.topdown_map.update_map(self.freemap, self.camera_pose, verbose=False, env_idx=self.env_idx)
         self.eval_logger.info(f"The shortest path has been initialized for Scan {scan}, Episode_id {self.data_item['episode_id']}")  
 
-        # Compute the shortest path
-        exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=verbose, save_dir=self.EP_DIR)
-        # exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=True, save_dir=self.config.GT_PATH_DIR, all_paths=self.data_item['reference_path']) # DEBUG 
+        if compute_shortest_path:
+            # Compute the shortest path
+            if compute_shortest_path:
+                exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=verbose, save_dir=self.EP_DIR)
+            # exe_path = self.topdown_map.navigate_p2p(self.data_item['reference_path'][0], self.data_item['reference_path'][-1], step_time=0, verbose=True, save_dir=self.config.GT_PATH_DIR, all_paths=self.data_item['reference_path']) # DEBUG 
 
-        # compute the length
-        # 计算路径总长度
-        if exe_path is not None:
-            shortest_path_length = 0
-            for i in range(len(exe_path)-1):
-                # 计算相邻两点之间的欧氏距离
-                shortest_path_length += np.linalg.norm(np.array(exe_path[i+1]) - np.array(exe_path[i]))
+            # compute the length
+            # 计算路径总长度
+            if exe_path is not None:
+                shortest_path_length = 0
+                for i in range(len(exe_path)-1):
+                    # 计算相邻两点之间的欧氏距离
+                    shortest_path_length += np.linalg.norm(np.array(exe_path[i+1]) - np.array(exe_path[i]))
+            else:
+                shortest_path_length = 0
         else:
-            shortest_path_length = 0
+            exe_path = None
+            shortest_path_length = self.data_item['info']['geodesic_distance']
         
         return exe_path, shortest_path_length
     
@@ -322,7 +329,8 @@ class TaskEnv(VLNDataLoader):
         infos = self.compute_metrics(fail_reason=reason)
 
         current_position = self.get_robot_poses()[self.env_idx][0]
-        stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list = self._update_states(current_position, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=verbose)
+
+        # stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list = self._update_states(current_position, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=verbose)
         
         return {"outputs_dict": outputs_dict,
                 "dones": dones,
@@ -345,7 +353,7 @@ class TaskEnv(VLNDataLoader):
         while not finish_state:
             obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
             current_position = self.get_robot_poses()[self.env_idx][0]
-            self.current_path_length += np.linalg.norm(current_position - self.prev_position)
+            self.current_path_length += np.linalg.norm(current_position[:2] - self.prev_position[:2])
             self.prev_position = current_position
 
             finish_state = self._get_action_state(obs, action_name)
@@ -565,6 +573,48 @@ class TaskEnv(VLNDataLoader):
         
         return speed_actions
 
+    def action_to_speed_new(self, action, add_last_rotate=False, step_per_action=80, physics_dt=1/200):
+        # rotate first, and then forward
+        position_threshold = float(self.config.EVAL.rotation_threshold)
+        max_forward_speed = 2.0  # 最大前进速度
+        max_rotate_speed = 2.0   # 最大旋转速度
+        last_rotation_threshold = 0.1
+        per_act_time = step_per_action * physics_dt
+        speed_actions = []
+
+        delta_x, delta_y, delta_yaw = action[0], action[1], action[2]
+        distance = np.sqrt(delta_x**2 + delta_y**2)
+        xy_delta_yaw = np.arctan2(delta_y, delta_x)
+
+        if distance < position_threshold:
+            # only rotation without moving
+            rotation_speed = delta_yaw / per_act_time
+            # 限制旋转速度
+            rotation_speed = np.clip(rotation_speed, -max_rotate_speed, max_rotate_speed)
+            speed_actions.append([0, 0, rotation_speed])
+            return speed_actions
+        
+        # rotate first
+        rotation_speed = xy_delta_yaw / per_act_time
+        # 限制旋转速度
+        rotation_speed = np.clip(rotation_speed, -max_rotate_speed, max_rotate_speed)
+        speed_actions.append([0, 0, rotation_speed])
+
+        # move last
+        forward_speed = distance / per_act_time
+        # 限制前进速度
+        forward_speed = np.clip(forward_speed, 0, max_forward_speed)
+        speed_actions.append([forward_speed, 0, 0])
+
+        if add_last_rotate:
+            last_rotation_delta = delta_yaw - xy_delta_yaw
+            if abs(last_rotation_delta) > last_rotation_threshold:
+                last_rotation_speed = last_rotation_delta / per_act_time
+                last_rotation_speed = np.clip(last_rotation_speed, -max_rotate_speed, max_rotate_speed)
+                speed_actions.append([0, 0, last_rotation_speed])
+
+        return speed_actions
+    
     def action_to_speed(self, action, max_distance=0.5, speed_actions=[], add_final_rotation=True):
         # 设置阈值参数
         position_threshold = float(self.config.EVAL.rotation_threshold)  # 位置变化阈值,小于此值认为不需要移动
@@ -630,13 +680,13 @@ class TaskEnv(VLNDataLoader):
         if add_final_rotation:
             last_rotation_delta = delta_yaw - xy_delta_yaw
             if abs(last_rotation_delta) > self.yaw_threshold:
-                rotation_speed *= last_rotation_delta
+                rotation_speed = last_rotation_delta * 80 / 200
                 rotation_speed = np.clip(rotation_speed, -self.max_rotation_speed, self.max_rotation_speed)
                 speed_actions.append([0, 0, rotation_speed])
 
         return speed_actions, only_rotation
     
-    def adaptive_action_to_speed(self, predicted_actions, len_traj_act, verbose=False):
+    def adaptive_action_to_speed(self, predicted_actions, len_traj_act, add_last_rotate=False, verbose=False):
         '''Further adjust target points and orientations based on distance thresholds
         
         Args:
@@ -651,6 +701,7 @@ class TaskEnv(VLNDataLoader):
         cumulative_distance = 0
         distance_threshold = 0.15  # Threshold for adding new waypoint (in meters)
         last_pos = predicted_actions[0]
+        tmp_add_last_rotate = False
         
         if len_traj_act is None:
             len_traj_act = len(predicted_actions)
@@ -664,7 +715,10 @@ class TaskEnv(VLNDataLoader):
             
             # If cumulative distance exceeds threshold, add new waypoint
             if cumulative_distance >= distance_threshold:
-                cur_speed, only_rotation = self.action_to_speed(current_pos, max_distance=0.3, speed_actions=[], add_final_rotation=True)
+                # cur_speed, only_rotation = self.action_to_speed(current_pos, max_distance=0.3, speed_actions=[], add_final_rotation=True)
+                if add_last_rotate and len(speed_actions) == len_traj_act - 2:
+                    tmp_add_last_rotate = True
+                cur_speed = self.action_to_speed_new(current_pos, add_last_rotate=tmp_add_last_rotate)
                 speed_actions.extend(cur_speed)
                 # Reset cumulative distance and update last position
                 cumulative_distance = 0
@@ -674,7 +728,8 @@ class TaskEnv(VLNDataLoader):
                     break     
         
         if len(speed_actions) == 0:
-            cur_speed, only_rotation = self.action_to_speed(predicted_actions[-1], max_distance=0.3, speed_actions=[], add_final_rotation=True)
+            # cur_speed, only_rotation = self.action_to_speed(predicted_actions[-1], max_distance=0.3, speed_actions=[], add_final_rotation=True)
+            cur_speed = self.action_to_speed_new(current_pos, add_last_rotate=tmp_add_last_rotate)
             speed_actions.extend(cur_speed)
         
         return speed_actions
