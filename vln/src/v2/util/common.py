@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.ndimage import binary_dilation
 from grutopia.core.util.log import log
+import math
 
 def create_robot_mask(
     topdown_global_map_camera,
@@ -89,3 +90,24 @@ def get_action_state(obs, action_name):
             action_state = robot[action_name]
             return action_state['finished']
     return False
+
+def check_is_on_track(
+    robot_position,
+    robot_rotation,
+    action,
+    action_index,
+    real_points,
+):
+    if action == 1:
+        distance = np.linalg.norm(robot_position[:2] - real_points[action_index][:2])
+        if distance > 0.5:
+            log.info(f"[distance:{round(distance, 2)} > 0.5 ] replanning")
+            return False
+    else:
+        from omni.isaac.core.utils.rotations import quat_to_euler_angles
+        _, _, real_yaw = quat_to_euler_angles(robot_rotation)
+        yaw_diff = abs(real_yaw - real_points[action_index])
+        if yaw_diff > math.pi / 6:
+            log.info(f"[yaw_diff: {round(yaw_diff * (180 / math.pi))} 度 > 30 度] replanning")
+            return False
+    return True

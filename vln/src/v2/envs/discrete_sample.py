@@ -7,7 +7,12 @@ from grutopia.core.util.log import log
 from vln.src.v2.util import progress_log_util
 from vln.src.v2.util.discrete_planner import AStarDiscretePlanner
 from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
-from vln.src.v2.util.common import check_robot_fall, describe_action, get_action_state
+from vln.src.v2.util.common import (
+    check_robot_fall, 
+    describe_action, 
+    get_action_state,
+    check_is_on_track
+)
 from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.v2.util.data_collector import DataCollector
 import math
@@ -72,26 +77,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             return False, fail_reason
         return True, 'success'
 
-    def check_is_on_track(
-        self,
-        action,
-        action_index,
-        real_points,
-    ):
-        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-        if action == 1:
-            distance = np.linalg.norm(robot_position[:2] - real_points[action_index][:2])
-            if distance > 0.5:
-                log.info(f"[distance:{round(distance, 2)} > 0.5 ] replanning")
-                return False
-        else:
-            from omni.isaac.core.utils.rotations import quat_to_euler_angles
-            _, _, real_yaw = quat_to_euler_angles(robot_rotation)
-            yaw_diff = abs(real_yaw - real_points[action_index])
-            if yaw_diff > math.pi / 6:
-                log.info(f"[yaw_diff: {round(yaw_diff * (180 / math.pi))} 度 > 30 度] replanning")
-                return False
-        return True
+
 
 
     def sample(self):
@@ -158,6 +144,14 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                 if finish:
                     distance_str = "-"
                     if result == "success":
+                        data_collector.collect_observation_by_env(
+                            env=self.env,
+                            step=self.step,
+                            process=current_point_index / len(nav_path),
+                            camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
+                            robot_pose=self.task.get_robot_poses_without_offset(),
+                        )
+                        data_collector.collect_action([0])
                         robot_position, _ = self.isaac_robot.get_world_pose()
                         distance = np.linalg.norm(robot_position[:2] - nav_path[-1][:2])
                         distance_str = f"{round(distance, 2)}"
@@ -193,7 +187,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                 action_index = 0
                 for action in action_list:
                     env_action = [{'h1': {'move_by_descrete': [action]}}]
-                    data_collector.collect_observation(
+                    data_collector.collect_observation_by_env(
                         env=self.env,
                         step=self.step,
                         process=current_point_index / len(nav_path),
@@ -207,7 +201,10 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                         finish = True
                         result = fail_reason
                         break
-                    is_on_track = self.check_is_on_track(
+                    robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                    is_on_track = check_is_on_track(
+                        robot_position=robot_position,
+                        robot_rotation=robot_rotation,
                         action=action,
                         action_index=action_index,
                         real_points=real_points,
@@ -220,4 +217,5 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                     if current_point_index == len(nav_path) - 1:
                         finish = True
                         result = 'success'
-            progress_log_util.report()
+        
+        progress_log_util.report()

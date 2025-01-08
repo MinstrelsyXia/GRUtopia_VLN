@@ -18,38 +18,39 @@ class DataCollector:
         depth_info = (depth_info - min_depth) / (max_depth - min_depth)
         return depth_info
     
-    def collect_observation(self, env ,step , process, camera_pose, robot_pose):
-        from omni.isaac.core.utils.rotations import quat_to_euler_angles,euler_angles_to_quat
-        task_name = 'vln_0'
-        robot_name = 'h1_0'
-        camera = 'pano_camera_0'
+    def collect_observation(self, rgb, depth ,step , process, camera_pose, robot_pose):
+        from omni.isaac.core.utils.rotations import quat_to_euler_angles
         episode_data = {
             'camera_info': {},
             'robot_info': {},
             'step': step,
             'progress': process
         }
-        obs = env.get_observations(add_rgb_subframes=True)
-        cur_obs = obs[task_name][robot_name][camera]
-        pos, quat = camera_pose[0], camera_pose[1]
-        _,_, yaw = quat_to_euler_angles(quat)
-        rgb_info = cur_obs['rgba'][..., :3]
-        depth_info = self.norm_depth(cur_obs['depth'])
-        episode_data['camera_info'][camera] = {
-            'rgb': rgb_info,
+        depth_info = self.norm_depth(depth)
+        c_pos, c_quat = camera_pose[0], camera_pose[1]
+        _,_, c_yaw = quat_to_euler_angles(c_quat)
+        episode_data['camera_info']['pano_camera_0'] = {
+            'rgb': rgb,
             'depth': depth_info,
-            'position': pos.tolist(),
-            'orientation': quat.tolist(),
-            'yaw': yaw
+            'position': c_pos.tolist(),
+            'orientation': c_quat.tolist(),
+            'yaw': c_yaw
         }
-        pos, quat = robot_pose[0], robot_pose[1]
-        _,_, yaw = quat_to_euler_angles(quat)
+        r_pos, r_quat = robot_pose[0], robot_pose[1]
+        _,_, r_yaw = quat_to_euler_angles(r_quat)
         episode_data['robot_info'] = {
-            "position": pos.tolist(),
-            "orientation": quat.tolist(),
-            "yaw": yaw
+            "position": r_pos.tolist(),
+            "orientation": r_quat.tolist(),
+            "yaw": r_yaw
         }
         self.episode_total_data.append(episode_data)
+
+    def collect_observation_by_env(self, env , step , process, camera_pose, robot_pose):
+        obs = env.get_observations(add_rgb_subframes=True)
+        cur_obs = obs['vln_0']['h1_0']['pano_camera_0']
+        rgb = cur_obs['rgba'][..., :3]
+        depth = cur_obs['depth']
+        self.collect_observation(rgb, depth, step , process, camera_pose, robot_pose)
 
     def collect_action(self, action):
         self.actions.append(action)

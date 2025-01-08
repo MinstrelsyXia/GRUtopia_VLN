@@ -10,6 +10,7 @@ from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.v2.util.data_collector import DataCollector
 from vln.src.models.init_policy import initialize_policy
 from vln.src.v2.util.eval import get_obs
+from vln.src.v2.util.discrete_dagger_controller import DiscreteDaggerController
 from vln.src.models.utils.feature_extract import extract_instruction_tokens
 from vln.src.utils.utils import batch_obs
 import numpy as np
@@ -60,55 +61,7 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
             self.eval_config.MODEL.STATE_ENCODER.hidden_size,
             device=self.device,
         )
-        self.prev_action = 1
         
-    def get_action_from_policy(self, instruction):
-        self.policy.eval()
-        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-        observations = get_obs(self.env, instruction ,robot_position,robot_rotation)
-        observations = extract_instruction_tokens(
-            observations, 
-            #TODO:
-            bert_tokenizer=None,
-            is_clip_long=False
-        )
-        observations = batch_obs(observations, self.device)
-        observations["steps"] = torch.from_numpy(np.array([self.step])).to(self.device)
-        not_done_masks = torch.zeros(1, 1, dtype=torch.uint8, device=self.device)
-        prev_actions = torch.tensor([self.prev_action] , dtype=torch.uint8, device=self.device)
-        batch = {
-            'mode': 'inference',
-            'observations': observations,
-            'rnn_states': self.rnn_states,
-            'prev_actions': prev_actions,
-            'masks': not_done_masks
-        }
-        with torch.no_grad():
-            actions, rnn_states = self.policy(batch)
-        self.rnn_states = rnn_states
-        return actions[0].item()
-
-    def get_action_from_planner(self, goal):
-        map_info = self.get_global_map(robot_height=1.55,)
-        camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
-        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-        height, width = self.topdown_global_map_camera._camera._resolution
-        action_list, real_points, find_flag = plan_and_get_actions_discrete(
-            map_info=map_info,
-            robot_position=robot_position,
-            robot_rotation=robot_rotation,
-            goal = goal,
-            camera_pose = camera_pose,
-            aperture=self.aperture,
-            width=width,
-            height=height,
-            path_planner=self.path_planner,
-        )
-        if find_flag:
-            return action_list[0]
-        else: 
-            return None
-
     def sample(self):
         self.load_scan_and_robot()
         height, width = self.topdown_global_map_camera._camera._resolution
@@ -141,11 +94,12 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
                 trajectory_id = path_key,
                 step_count=0,
             )
-            # data_collector = DataCollector(
-            #     lmdb_path=self.dataloader.lmdb_path,
-            #     key=str(trajectory_id),
-            #     instruction=data['instruction']['instruction_text'],
-            # )
+            dagger_controller = DiscreteDaggerController(data, self)
+            data_collector = DataCollector(
+                lmdb_path=self.dataloader.lmdb_path,
+                key=str(trajectory_id),
+                instruction=data['instruction']['instruction_text'],
+            )
             start_position = data['start_position']
             start_rotation = data['start_rotation']
             self.reset_robot(start_position, start_rotation)
@@ -159,7 +113,7 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
                     step_count=0,
                     result = 'fast_fall',
                 )
-                # data_collector.save_data('fast_fall')
+                data_collector.save_data('fast_fall')
                 log.info(f"[scan:{scan}][path:{trajectory_id}] finish[step:0] result: fast_fall")
                 continue
             stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
@@ -168,53 +122,51 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
             result = None
             current_point_index = 0
             self.step = 0
-            flap = 1
 
             while True:
-                flap += 1
                 if finish:
                     distance_str = "-"
                     if result == "success":
+                        data_collector.collect_observation_by_env(
+                            env=self.env,
+                            step=self.step,
+                            process=current_point_index / len(nav_path),
+                            camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
+                            robot_pose=self.task.get_robot_poses_without_offset(),
+                        )
+                        data_collector.collect_action([0])
                         robot_position, _ = self.isaac_robot.get_world_pose()
                         distance = np.linalg.norm(robot_position[:2] - nav_path[-1][:2])
                         distance_str = f"{round(distance, 2)}"
                     log.info(f"[scan:{scan}][path:{trajectory_id}] finish[step:{self.step}] result:{result}, distance:{distance_str} m")
-                    # data_collector.save_data(result)
+                    data_collector.save_data(result)
                     progress_log_util.trace_end(
                         trajectory_id = path_key,
                         step_count=self.step,
                         result = result,
                     )
+                    dagger_controller.report()
                     break
-                
-                robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-                # path_plan
-                if flap % 10 != 0:
-                    # update self.rnn_states
-                    self.get_action_from_policy(data['instruction'])
-                    action = self.get_action_from_planner(nav_path[current_point_index + 1])
-                    action_type = 'planner'
-                else:
-                    action = self.get_action_from_policy(data['instruction'])
-                    action_type = 'policy'
-                
+
+                action, action_type, rgb, depth = dagger_controller.get_next_action(current_point_index)
                 if action is None:
                     finish = True
                     result = 'path planning'
                     continue
                 
                 env_action = [{'h1': {'move_by_descrete': [action]}}]
-                # data_collector.collect_observation(
-                #     env=self.env,
-                #     step=self.step,
-                #     process=current_point_index / len(nav_path),
-                #     camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
-                #     robot_pose=self.task.get_robot_poses_without_offset(),
-                # )
-                # data_collector.collect_action(action)
+                data_collector.collect_observation(
+                    rgb=rgb,
+                    depth=depth,
+                    step=self.step,
+                    process=current_point_index / len(nav_path),
+                    camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
+                    robot_pose=self.task.get_robot_poses_without_offset(),
+                )
+                data_collector.collect_action(action)
                 action_success, fail_reason = self.execute_one_action(env_action,stuck_checker)
                 self.prev_action = action
-                log.info(f"[scan:{scan}][path:{path_key}] finish one action[step:{self.step}][action_type:{action_type}][{fail_reason}] {describe_action(action)}")
+                log.info(f"[scan:{scan}][path:{path_key}] finish one action[step:{self.step}][action_type:{action_type}][ {current_point_index + 1} / {len(nav_path)} ][{fail_reason}] {describe_action(action)}")
                 if not action_success:
                     finish = True
                     result = fail_reason
@@ -226,4 +178,5 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
                     if current_point_index == len(nav_path) - 1:
                         finish = True
                         result = 'success'
-            progress_log_util.report()
+
+        progress_log_util.report()
