@@ -7,7 +7,7 @@ import numpy as np
 from vln.src.utils.utils import Config
 import sys
 
-headless=False
+headless=True
 target_scan="1LXtFkjw3qL"
 target_trajectory = 94
 rank=3
@@ -123,7 +123,8 @@ env = DiscreteSampleDaggerSingleScanEnv(
     start_rotation=start_rotation,
     headless=headless,
     dataloader=dataloader,
-    eval_config=Config(eval_config)
+    eval_config=Config(eval_config),
+    policy_probability=0.3,
 )
 
 env.sample()
