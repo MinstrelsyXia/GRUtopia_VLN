@@ -1,6 +1,8 @@
 import lmdb
 import msgpack_numpy
 import sys
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
@@ -45,10 +47,10 @@ def vis_nav_path(start_pixel, goal_pixel, path, occupancy_map, img_save_path='pa
     plt.close()
 def generate_eval_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"
-ckpt_name="ckpt.cma"
-path_key="15_1"
-project_path = '/ssd/zhaohui/workspace/w61_grutopia_0102'
-name = '20250102_ckpt_cma'
+ckpt_name="ckpt.cma.10"
+path_key="93_4"
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
+name = '20250108_eval_cma'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 # database_write = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)

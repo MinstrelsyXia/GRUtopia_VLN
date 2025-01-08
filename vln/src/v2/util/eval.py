@@ -207,7 +207,7 @@ class ActionExecutor:
             self.statistic_info.current_path_length += np.linalg.norm(robot_position[:2] - prev_position[:2])
             prev_position = robot_position
 
-            finish_state = self.get_action_state(obs, action_name)
+            finish_state = get_action_state(obs, action_name)
             step += 1
             self.statistic_info.sim_step += 1
             over_max_step, desc = self._check_max_steps(step)
