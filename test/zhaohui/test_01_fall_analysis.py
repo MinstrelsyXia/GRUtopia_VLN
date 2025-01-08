@@ -1,7 +1,7 @@
 from vln.src.v2.dataloader.base import BasePathKeyDataloader
 import numpy as np
 from vln.src.v2.util.eval import(
-    generate_result_key
+    generate_eval_key
 )
 import lmdb
 import msgpack_numpy
@@ -27,7 +27,7 @@ path_key_data = dataloader.path_key_data
 path_key_scan = dataloader.path_key_scan
 path_key_split = dataloader.path_key_split
 for path_key in path_key_data:
-    info_key = generate_result_key(ckpt_name,path_key)
+    info_key = generate_eval_key(ckpt_name,path_key)
     with database_read.begin() as txn:
         info_value = txn.get(info_key.encode())
         if info_value is None:

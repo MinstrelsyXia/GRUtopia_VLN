@@ -82,3 +82,10 @@ def describe_action(action):
         return "右转15°"
     else:
         return "结束"
+
+def get_action_state(obs, action_name):
+    for env_idx, (task_name, task) in enumerate(obs.items()):
+        for robot_name, robot in task.items():
+            action_state = robot[action_name]
+            return action_state['finished']
+    return False

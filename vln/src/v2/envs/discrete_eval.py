@@ -7,7 +7,7 @@ from vln.src.v2.util.eval import(
     get_obs,
     Statistic_Info,
     ActionExecutor,
-    generate_result_key
+    generate_eval_key
 )
 from vln.src.models.utils.feature_extract import extract_instruction_tokens
 import torch
@@ -227,7 +227,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         
                     database_write = lmdb.open(f"{self.lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
                     with database_write.begin(write=True) as txn:
-                        key_write = generate_result_key(ckpt_name=self.ckpt_name,path_key=path_key).encode()
+                        key_write = generate_eval_key(ckpt_name=self.ckpt_name,path_key=path_key).encode()
                         value_write = msgpack_numpy.packb(info, use_bin_type=True)
                         txn.put(key_write, value_write)
                     database_write.close()

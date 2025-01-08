@@ -2,7 +2,7 @@ import lmdb
 import msgpack_numpy
 import sys
 
-def generate_result_key(ckpt_name, path_key):
+def generate_eval_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"
 
 
@@ -29,7 +29,7 @@ database.close()
 print(f"total_path_key:{len(all_path_key_list)}")
 ids = []
 for path_key in all_path_key_list:
-    ids.append(generate_result_key(ckpt_name,path_key))
+    ids.append(generate_eval_key(ckpt_name,path_key))
 
 total = len(ids)
 
