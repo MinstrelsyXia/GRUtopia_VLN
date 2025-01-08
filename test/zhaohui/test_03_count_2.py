@@ -3,7 +3,7 @@ import msgpack_numpy
 from vln.src.dataset.data_utils_multi_env import load_gather_data
 from vln.src.utils.utils import Config
 
-def generate_result_key(ckpt_name, path_key):
+def generate_eval_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"
 
 def get_split_map():
@@ -77,7 +77,7 @@ for rank in ranks:
                 if split_map[path_key] != split:
                     continue
             total_count += 1
-            info_key = generate_result_key(ckpt_name,path_key)
+            info_key = generate_eval_key(ckpt_name,path_key)
             with database_read.begin() as txn:
                 info_value = txn.get(info_key.encode())
                 if info_value is None:

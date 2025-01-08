@@ -2,7 +2,7 @@ from .base import BasePathKeyDataloader
 import lmdb
 import msgpack_numpy
 from vln.src.v2.util.eval import(
-    generate_result_key
+    generate_eval_key
 )
 
 class EvalPathKeyDataloader(BasePathKeyDataloader):
@@ -48,7 +48,7 @@ class EvalPathKeyDataloader(BasePathKeyDataloader):
         # 根据完成情况进行过滤
         filtered_target_path_key_list = []
         for path_key in target_path_key_list:
-            eval_key = generate_result_key(ckpt_name=self.ckpt_name,path_key=path_key)
+            eval_key = generate_eval_key(ckpt_name=self.ckpt_name,path_key=path_key)
             with database.begin() as txn:
                 value = txn.get(eval_key.encode())
                 if value is None:

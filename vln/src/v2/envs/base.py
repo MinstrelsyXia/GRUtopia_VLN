@@ -77,3 +77,7 @@ class BaseSingleScanEnv:
         for _ in range(step_count - 1):
             self.env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=False, render=False)
         self.env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=True, render=True)
+    
+    def stop(self):
+        if(hasattr(self.env, 'simulation_app')):
+            self.env.simulation_app.close()

@@ -2,7 +2,7 @@ import numpy as np
 import importlib
 from grutopia.core.env import BaseEnv
 from vln.src.v2.util.stuck_checker import StuckChecker
-from vln.src.v2.util.common import check_robot_fall, describe_action
+from vln.src.v2.util.common import check_robot_fall, describe_action, get_action_state
 from grutopia.core.util.log import log
 
 class Statistic_Info:
@@ -170,13 +170,6 @@ class ActionExecutor:
         # 进程 stuck 检查使用
         self.context = context
 
-    def _get_action_state(self, obs, action_name):
-        for env_idx, (task_name, task) in enumerate(obs.items()):
-            for robot_name, robot in task.items():
-                action_state = robot[action_name]
-                return action_state['finished']
-        return False
-
     def _check_max_steps(self, step):
         if step > self.per_action_max_step:
             return True, 'exceed_per_action_max_step'
@@ -214,7 +207,7 @@ class ActionExecutor:
             self.statistic_info.current_path_length += np.linalg.norm(robot_position[:2] - prev_position[:2])
             prev_position = robot_position
 
-            finish_state = self._get_action_state(obs, action_name)
+            finish_state = self.get_action_state(obs, action_name)
             step += 1
             self.statistic_info.sim_step += 1
             over_max_step, desc = self._check_max_steps(step)
@@ -313,5 +306,5 @@ def get_obs(env, instruction,robot_position,robot_rotation):
     obs_data['globalyaw'] = yaw
     return [obs_data]
 
-def generate_result_key(ckpt_name, path_key):
+def generate_eval_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"

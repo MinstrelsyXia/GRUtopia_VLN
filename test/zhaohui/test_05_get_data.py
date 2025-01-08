@@ -43,7 +43,7 @@ def vis_nav_path(start_pixel, goal_pixel, path, occupancy_map, img_save_path='pa
     plt.savefig(img_save_path, pad_inches=0, bbox_inches='tight', dpi=100)
     print(f"Saved path planning visualization to {img_save_path}")
     plt.close()
-def generate_result_key(ckpt_name, path_key):
+def generate_eval_key(ckpt_name, path_key):
     return f"eval_{ckpt_name}_{path_key}"
 ckpt_name="ckpt.cma"
 path_key="15_1"
@@ -53,10 +53,10 @@ lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 # database_write = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
 # with database_write.begin(write=True) as txn:
-#     key_write = generate_result_key(ckpt_name=ckpt_name,path_key=path_key).encode()
+#     key_write = generate_eval_key(ckpt_name=ckpt_name,path_key=path_key).encode()
 #     txn.delete(key_write)
 with database_read.begin() as txn:
-    key = generate_result_key(ckpt_name=ckpt_name,path_key=path_key).encode()
+    key = generate_eval_key(ckpt_name=ckpt_name,path_key=path_key).encode()
     value = txn.get(key)
     if value is None:
         print(f"value is None")

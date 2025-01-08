@@ -1,6 +1,7 @@
 from vln.src.dataset.data_utils_multi_env import load_gather_data
 import numpy as np
 from vln.src.utils.utils import Config
+from vln.src.v2.dataloader.data_reviser import revise_one_data, skip_list
 
 class BasePathKeyDataloader:
     def __init__(
@@ -9,6 +10,7 @@ class BasePathKeyDataloader:
         split_data_types,
         robot_offset,
         filter_same_trajectory,
+        revise_data = False,
     ):
         self.path_key_data = {}
         self.path_key_scan = {}
@@ -24,6 +26,10 @@ class BasePathKeyDataloader:
             for scan, path_list in load_data_map.items():
                 for path in path_list:
                     trajectory_id = path['trajectory_id']
+                    if revise_data:
+                        if trajectory_id in skip_list:
+                            continue
+                        path = revise_one_data(path)
                     episode_id = path['episode_id']
                     path_key = f"{trajectory_id}_{episode_id}"
                     path["start_position"] += robot_offset

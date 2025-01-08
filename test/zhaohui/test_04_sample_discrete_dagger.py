@@ -1,26 +1,22 @@
-from vln.src.v2.envs.discrete_eval import DiscreteEvalSingleScanEnv
-from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
-from grutopia.core.config import SimulatorConfig
+from vln.src.v2.dataloader.sample import SamplePathKeyDataloader
+from vln.src.v2.envs.discrete_sample_dagger import DiscreteSampleDaggerSingleScanEnv
 from vln.src.dataset.data_utils_multi_env import load_scene_usd
 from vln.src.utils.utils import Config
+from grutopia.core.config import SimulatorConfig
 import numpy as np
+from vln.src.utils.utils import Config
 import sys
 
-
-headless = True
-split_data_types = ['val_unseen','val_seen']
+headless=False
+target_scan="1LXtFkjw3qL"
+target_trajectory = 94
+rank=3
+name = '20250107_sample_discrete'
+split_data_types = ['train']
+robot_offset = np.array([0.   , 0.   , 1.05])
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
 base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
 mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
-robot_offset = np.array([0.   , 0.   , 1.05])
-rank=0
-ckpt_name="ckpt.cma"
-name = '20250107_sample_discrete'
-lmdb_path = project_path + f'/data/sample_episodes/{name}'
-target_scan="zsNo4HB9uLZ"
-retry_list=[]
-sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
-sim_config = SimulatorConfig(sim_cfg_file)
 args_dict = {
     "datasets":{
         "mp3d_data_dir":mp3d_data_dir,
@@ -28,23 +24,28 @@ args_dict = {
     }
 }
 scene_asset_path = load_scene_usd(Config(args_dict), target_scan)
-dataloader=EvalPathKeyDataloader(
+retry_list=[]
+lmdb_path = project_path + f'/data/sample_episodes/{name}'
+dataloader=SamplePathKeyDataloader(
     base_data_dir,
     split_data_types,
     robot_offset,
     rank,
-    ckpt_name,
     lmdb_path,
     target_scan,
     retry_list,
+    target_trajectory,
 )
-eval_path_key_list = dataloader.eval_path_key_list
-if len(eval_path_key_list) == 0:
+sample_path_key_list = dataloader.sample_path_key_list
+if len(sample_path_key_list) == 0:
     print("no data")
     sys.exit(0)
-path_zero = dataloader.path_key_data[eval_path_key_list[0]]
+path_zero = dataloader.path_key_data[sample_path_key_list[0]]
 start_position = path_zero['start_position']
 start_rotation = path_zero['start_rotation']
+
+sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
+sim_config = SimulatorConfig(sim_cfg_file)
 
 eval_config={
     "local_rank":0,
@@ -114,16 +115,16 @@ eval_config={
     "use_pbar":False,
 }
 
-env = DiscreteEvalSingleScanEnv(
-    sim_config,
-    scene_asset_path,
-    start_position,
-    start_rotation,
-    headless,
-    dataloader,
-    Config(eval_config),
-    lmdb_path,
-    ckpt_name,
+
+env = DiscreteSampleDaggerSingleScanEnv(
+    sim_config=sim_config,
+    scene_asset_path=scene_asset_path,
+    start_position=start_position,
+    start_rotation=start_rotation,
+    headless=headless,
+    dataloader=dataloader,
+    eval_config=Config(eval_config)
 )
 
-env.eval()
+env.sample()
+env.stop()
