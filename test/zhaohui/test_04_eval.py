@@ -14,10 +14,10 @@ base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
 mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
 robot_offset = np.array([0.   , 0.   , 1.05])
 rank=0
-ckpt_name="ckpt.cma"
-name = '20250107_sample_discrete'
+ckpt_name="ckpt.cma.10"
+name = '20250108_eval_cma'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
-target_scan="zsNo4HB9uLZ"
+target_scan="E9uDoFAP3SH"
 retry_list=[]
 sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
 sim_config = SimulatorConfig(sim_cfg_file)
@@ -127,3 +127,4 @@ env = DiscreteEvalSingleScanEnv(
 )
 
 env.eval()
+env.stop()

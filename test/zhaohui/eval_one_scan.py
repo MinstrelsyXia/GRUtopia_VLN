@@ -51,12 +51,12 @@ if __name__ == "__main__":
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
-    ckpt_name="ckpt.44"
-    name = '20250103_ckpt_44'
+    ckpt_name="ckpt.cma.10"
+    name = '20250108_eval_cma'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list=[]
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
-    ckpt_to_load = f"{project_path}/data/checkpoints/20241225_cma_pm_train_bs12_lr2.5e-4/ckpts/ckpt.44.pth"
+    ckpt_to_load = f"{project_path}/data/checkpoints/cma/ckpts/converted/ckpt.10_converted.pth"
     sim_config = SimulatorConfig(sim_cfg_file)
     args_dict = {
         "datasets":{
