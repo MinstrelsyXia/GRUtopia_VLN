@@ -97,6 +97,16 @@ class BaseTask(OmniBaseTask, ABC):
         self._scene = scene
         self.load()
 
+    def cleanup(self) -> None:
+        """Called before calling a reset() on the world to removed temporary objects that were added during
+        simulation for instance.
+        """
+        log.info("================ cleanup task ==================")
+        for robot in self.robots.values():
+            # Using try here because we want to ignore all exceptions
+            for sensor in robot.sensors.values():
+                sensor.reset()
+
     def get_observations(self,add_rgb_subframes=False) -> Dict[str, Any]:
         """
         Returns current observations from the objects needed for the behavioral layer.

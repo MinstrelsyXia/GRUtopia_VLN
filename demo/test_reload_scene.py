@@ -1,7 +1,8 @@
 from grutopia.core.config import SimulatorConfig
 from grutopia.core.env import BaseEnv
 from grutopia.core.util.container import is_in_container
-file_path = './demo/configs/h1_locomotion.yaml'
+# file_path = './demo/configs/h1_locomotion.yaml'
+file_path = './demo/configs/h1_locomotion_vlnce.yaml'
 sim_config = SimulatorConfig(file_path)
 headless = False
 webrtc = False
@@ -9,7 +10,7 @@ if is_in_container():
     headless = True
     webrtc = True
 
-sim_config.config.tasks[0].scene_asset_path = '/ssd/wangliuyi/data/Matterport3D/data/v1/scans/1LXtFkjw3qL/matterport_mesh/b94039b4eb8947bdb9ff5719d9173eae/isaacsim_b94039b4eb8947bdb9ff5719d9173eae.usd'
+sim_config.config.tasks[0].scene_asset_path = '../Matterport3D/data/v1/scans/1LXtFkjw3qL/matterport_mesh/b94039b4eb8947bdb9ff5719d9173eae/isaacsim_b94039b4eb8947bdb9ff5719d9173eae.usd'
     
 # env = BaseEnv(sim_config, headless=headless, webrtc=webrtc)
 env = BaseEnv(sim_config, headless=True, webrtc=False, native=True)
@@ -46,10 +47,15 @@ while env.simulation_app.is_running():
         # env.runner._world.clear()
 
         env.reset_env()
+        # env._runner._world.reset()
 
-        sim_config.config.tasks[0].scene_asset_path = '/ssd/wangliuyi/data/Matterport3D/data/v1/scans/1pXnuDYAj8r/matterport_mesh/2e84c97e728d46babd3270f4e1a0ae3a/isaacsim_2e84c97e728d46babd3270f4e1a0ae3a.usd'
-        env.runner.add_tasks(sim_config.config.tasks)
-        # env.runner.reset()
+        sim_config.config.tasks[0].scene_asset_path = '../Matterport3D/data/v1/scans/1pXnuDYAj8r/matterport_mesh/2e84c97e728d46babd3270f4e1a0ae3a/isaacsim_2e84c97e728d46babd3270f4e1a0ae3a.usd'
+
+        env._runner._world.clear()
+        env._runner.add_tasks(sim_config.config.tasks)
+
+        print('reset scene successfully')
+        
         move_action = {'move_along_path': [path]}
         rotate_action = {'rotate': [euler_angles_to_quat(np.array([0, 0, np.pi]))]}
         path_finished = False
