@@ -567,9 +567,9 @@ class TaskEnv(VLNDataLoader):
         ''' v3: adaptive to choose the keypoints '''
         speed_actions = self.adaptive_action_to_speed(predicted_actions, len_traj_act, verbose)
         
-        if verbose:
-            for i, action in enumerate(speed_actions):
-                self.eval_logger.info(f"Action {i}: forward={action[0]:.3f}, lateral={action[1]:.3f}, rotation={action[2]:.3f}")
+        # if verbose:
+        #     for i, action in enumerate(speed_actions):
+        #         self.eval_logger.info(f"Action {i}: forward={action[0]:.3f}, lateral={action[1]:.3f}, rotation={action[2]:.3f}")
         
         return speed_actions
 
@@ -727,8 +727,9 @@ class TaskEnv(VLNDataLoader):
                 if len(speed_actions) >= len_traj_act:
                     break     
         
-        if len(speed_actions) == 0:
+        if len(speed_actions) == 0 or len(predicted_actions) == 1:
             # cur_speed, only_rotation = self.action_to_speed(predicted_actions[-1], max_distance=0.3, speed_actions=[], add_final_rotation=True)
+            current_pos = predicted_actions[-1]
             cur_speed = self.action_to_speed_new(current_pos, add_last_rotate=tmp_add_last_rotate)
             speed_actions.extend(cur_speed)
         

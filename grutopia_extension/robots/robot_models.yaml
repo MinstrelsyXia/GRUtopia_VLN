@@ -104,7 +104,7 @@ robots:
     type: "Camera"
     prim_path: "torso_link/Camera"
   - name: "tp_pointcloud"
-    type: "Camera"
+    type: "RepCamera"
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
     type: "Camera"
