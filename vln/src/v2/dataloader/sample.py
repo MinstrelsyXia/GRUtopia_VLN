@@ -20,6 +20,7 @@ class SamplePathKeyDataloader(BasePathKeyDataloader):
             split_data_types=split_data_types,
             robot_offset=robot_offset,
             filter_same_trajectory=False,
+            revise_data=True,
         )
         self.rank = rank
         self.lmdb_path = lmdb_path
@@ -48,24 +49,25 @@ class SamplePathKeyDataloader(BasePathKeyDataloader):
                         target_path_key_list = [path_key]
                         break
         # TODO 根据完成情况进行过滤
-        filtered_target_path_key_list = target_path_key_list #[]
-        # for path_key in target_path_key_list:
-        #     eval_key = generate_eval_key(ckpt_name=self.ckpt_name,path_key=path_key)
-        #     with database.begin() as txn:
-        #         value = txn.get(eval_key.encode())
-        #         if value is None:
-        #             filtered_target_path_key_list.append(path_key)
-        #         else:
-        #             value = msgpack_numpy.unpackb(value)
-        #             if value['success'] == 1.0:
-        #                 if 'success' in self.retry_list:
-        #                     filtered_target_path_key_list.append(path_key)
-        #                 else:
-        #                     continue
-        #             else:
-        #                 fail_reason = value['fail_reason']
-        #                 if fail_reason in retry_list:
-        #                     filtered_target_path_key_list.append(path_key)
+        filtered_target_path_key_list = []
+        for path_key in target_path_key_list:
+            trajectory_id = path_key.split('_')[0]
+            sample_key = str(trajectory_id)
+            with database.begin() as txn:
+                value = txn.get(sample_key.encode())
+                if value is None:
+                    filtered_target_path_key_list.append(path_key)
+                else:
+                    value = msgpack_numpy.unpackb(value)
+                    if value['finish_status'] == 'success':
+                        if 'success' in self.retry_list:
+                            filtered_target_path_key_list.append(path_key)
+                        else:
+                            continue
+                    else:
+                        fail_reason = value['fail_reason']
+                        if fail_reason in retry_list:
+                            filtered_target_path_key_list.append(path_key)
 
         self.sample_path_key_list=filtered_target_path_key_list
         database.close()

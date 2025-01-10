@@ -7,6 +7,7 @@ from vln.src.v2.util.common import check_is_on_track
 from grutopia.core.util.log import log
 import numpy as np
 import torch
+import time
 
 class DiscreteDaggerController:
     def __init__(
@@ -58,6 +59,7 @@ class DiscreteDaggerController:
             self.action_count = action_count
 
     def random_for_policy(self):
+        random.seed(time.time())
         random_number = random.uniform(0, 1)
         return random_number < self.policy_probability
 
@@ -87,7 +89,7 @@ class DiscreteDaggerController:
         robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
         observations = get_obs(self.env, self.instruction ,robot_position,robot_rotation)
         rgb = observations[0]['rgb']
-        depth = observations[0]['depth']
+        depth = observations[0]['depth'].squeeze()
         observations = extract_instruction_tokens(
             observations, 
             bert_tokenizer=None,

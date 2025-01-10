@@ -26,12 +26,11 @@ class DataCollector:
             'step': step,
             'progress': process
         }
-        depth_info = self.norm_depth(depth)
         c_pos, c_quat = camera_pose[0], camera_pose[1]
         _,_, c_yaw = quat_to_euler_angles(c_quat)
         episode_data['camera_info']['pano_camera_0'] = {
             'rgb': rgb,
-            'depth': depth_info,
+            'depth': depth,
             'position': c_pos.tolist(),
             'orientation': c_quat.tolist(),
             'yaw': c_yaw
@@ -50,6 +49,7 @@ class DataCollector:
         cur_obs = obs['vln_0']['h1_0']['pano_camera_0']
         rgb = cur_obs['rgba'][..., :3]
         depth = cur_obs['depth']
+        depth = self.norm_depth(depth)
         self.collect_observation(rgb, depth, step , process, camera_pose, robot_pose)
 
     def collect_action(self, action):

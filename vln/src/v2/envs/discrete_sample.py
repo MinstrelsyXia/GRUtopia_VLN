@@ -42,6 +42,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
         self.aperture = aperture
         self.max_step = max_step
         self.robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+        self.timestamp = time.time()
 
     def update_timestamp(self):
         self.timestamp = time.time()
