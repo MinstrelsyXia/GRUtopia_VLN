@@ -8,10 +8,10 @@ from vln.src.utils.utils import Config
 import sys
 
 headless=True
-target_scan="1LXtFkjw3qL"
-target_trajectory = 94
-rank=3
-name = '20250107_sample_discrete'
+target_scan="7y3sRwLe3Va"
+target_trajectory = 4
+rank=0
+name = '20250110_dagger'
 split_data_types = ['train']
 robot_offset = np.array([0.   , 0.   , 1.05])
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
@@ -124,7 +124,7 @@ env = DiscreteSampleDaggerSingleScanEnv(
     headless=headless,
     dataloader=dataloader,
     eval_config=Config(eval_config),
-    policy_probability=0.3,
+    policy_probability=0.2,
 )
 
 env.sample()

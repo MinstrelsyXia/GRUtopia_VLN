@@ -6,11 +6,12 @@ import msgpack_numpy
 
 #参数
 split_number = 16
-split_data_types = ['val_unseen','val_seen']
-filter_same_trajectory = False
+# split_data_types = ['val_unseen','val_seen']
+split_data_types = ['train']
+filter_same_trajectory = True
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
 base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-name = '20250108_eval_110_flash'
+name = '20250110_dagger'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 
 
@@ -72,7 +73,8 @@ if not os.path.exists(lmdb_path):
 database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
 with database.begin(write=True) as txn:
     for rank, path_key_map in ranked_data.items():
-        key = f"eval_rank_{rank}".encode()
+        key = f"sample_rank_{rank}".encode()
         value = msgpack_numpy.packb(path_key_map, use_bin_type=True)
         txn.put(key, value)
         print(f"finish [key:{key}]")
+database.close()

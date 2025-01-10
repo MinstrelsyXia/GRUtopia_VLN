@@ -79,16 +79,18 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
         scan = self.dataloader.target_scan
 
         progress_log_util.init(scan, len(sample_path_key_list), rank=self.dataloader.rank)
-        progress_log_util.progress_logger.info(f"start eval scan: {scan}, total_path:{len(sample_path_key_list)}")
+        progress_log_util.progress_logger.info(f"start sample scan: {scan}, total_path:{len(sample_path_key_list)}")
 
         for path_key in sample_path_key_list:
             split = path_key_split[path_key]
             data = path_key_data[path_key]
             nav_path = data['reference_path']
             trajectory_id = path_key.split('_')[0]
+            episode_id = path_key.split('_')[1]
             log.info(f"split: {split}")
             log.info(f"scan: {scan}")
-            log.info(f"trajectory_id_episode_id: {path_key}")
+            log.info(f"trajectory_id: {trajectory_id}")
+            log.info(f"episode_id: {episode_id}")
             log.info(f"data: {data}")
             progress_log_util.trace_start(
                 trajectory_id = path_key,
@@ -170,7 +172,7 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
                 if not action_success:
                     finish = True
                     result = fail_reason
-                    break
+                    continue
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
                 distance = np.linalg.norm(robot_position[:2] - nav_path[current_point_index + 1][:2])
                 if distance < 0.25:
