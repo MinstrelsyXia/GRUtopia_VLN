@@ -41,6 +41,7 @@ all_rank_count_map={
     "fast_fall":0,
     "stuck":0,
     "fall":0,
+    "path planning":0,
 }
 
 for rank in ranks:
@@ -50,6 +51,7 @@ for rank in ranks:
         "fast_fall":0,
         "stuck":0,
         "fall":0,
+        "path planning":0,
     }
     key = f"sample_rank_{rank}".encode()
     with database_read.begin() as txn:
