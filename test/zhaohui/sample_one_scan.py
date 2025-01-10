@@ -18,8 +18,8 @@ def check_process_stuck(env:DiscreteSampleDaggerSingleScanEnv):
         index+=1
         current_time = time.time()
         duration = round(current_time - env.timestamp,2)
-        if  duration > 600:
-            print("10分钟时间戳未更新,杀死进程")
+        if  duration > 300:
+            print("5分钟时间戳未更新,杀死进程")
             os.kill(os.getpid(), 9) 
         else:
             if index % 60 == 0:
