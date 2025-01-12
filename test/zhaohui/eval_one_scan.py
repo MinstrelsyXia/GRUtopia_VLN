@@ -18,8 +18,8 @@ def check_process_stuck(env:DiscreteEvalSingleScanEnv):
         index+=1
         current_time = time.time()
         duration = round(current_time - env.timestamp,2)
-        if  duration > 600:
-            print("10分钟时间戳未更新,杀死进程")
+        if  duration > 300:
+            print("5分钟时间戳未更新,杀死进程")
             os.kill(os.getpid(), 9) 
         else:
             if index % 60 == 0:
@@ -51,12 +51,12 @@ if __name__ == "__main__":
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
-    ckpt_name="ckpt.110.flash"
-    name = '20250108_eval_110_flash'
+    ckpt_name="ckpt.70"
+    name = '20250112_eval_70'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list=[]
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
-    ckpt_to_load = f"{project_path}/data/checkpoints/20250106_cma_pm_train_torchGPU1_bs2_lr2.5e-4_flash/ckpts/ckpt.110.pth"
+    ckpt_to_load = f"{project_path}/data/checkpoints/20250106_cma_pm_train_torchGPU1_bs2_lr2.5e-4/ckpts/ckpt.70.pth"
     sim_config = SimulatorConfig(sim_cfg_file)
     args_dict = {
         "datasets":{
