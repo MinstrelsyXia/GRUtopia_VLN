@@ -152,7 +152,7 @@ class DiscreteDaggerController:
             height=height,
             path_planner=self.path_planner,
         )
-        if not find_flag:
+        if not find_flag or len(action_list) == 0:
             return None
         self.planner_action_list = action_list
         self.planner_real_point_list = real_points
