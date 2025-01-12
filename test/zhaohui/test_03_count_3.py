@@ -30,9 +30,9 @@ def get_split_map(project_path):
         split_map[split_data_type]=path_key_list
     return split_map
 
-ckpt_name="ckpt.110.flash"
+ckpt_name="ckpt.70"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
-name = '20250108_eval_110_flash'
+name = '20250112_eval_70'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 split_map = get_split_map(project_path)
