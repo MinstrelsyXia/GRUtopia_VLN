@@ -40,7 +40,7 @@ if __name__ == "__main__":
         round_count +=1
 
         # 获取该rank 所有需要抓取的数据
-        database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
+        database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, readonly=True, lock=False)
         key = f"sample_rank_{rank}"
         with database.begin() as txn:
             value = txn.get(key.encode())

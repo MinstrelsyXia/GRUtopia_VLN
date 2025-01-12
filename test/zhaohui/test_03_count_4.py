@@ -29,7 +29,7 @@ project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
 name = '20250110_dagger'
 
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
-database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
+database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, readonly=True, lock=False)
 
 all_rank_total_count=0
 all_rank_finist_count=0
