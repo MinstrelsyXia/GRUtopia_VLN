@@ -7,9 +7,9 @@ def generate_eval_key(ckpt_name, path_key):
 
 
 ranks =list(range(8,16))
-ckpt_name="ckpt.cma.10"
+ckpt_name="ckpt.cma"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
-name = '20250108_eval_cma'
+name = '20250114_eval_cma'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 all_path_key_list=[]

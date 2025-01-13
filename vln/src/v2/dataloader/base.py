@@ -10,7 +10,7 @@ class BasePathKeyDataloader:
         split_data_types,
         robot_offset,
         filter_same_trajectory,
-        revise_data = False,
+        revise_data = True,
     ):
         self.path_key_data = {}
         self.path_key_scan = {}
