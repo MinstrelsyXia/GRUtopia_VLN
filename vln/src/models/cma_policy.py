@@ -62,8 +62,9 @@ class CMANet(nn.Module):
         super().__init__()
         self.num_actions = num_actions
         self.model_config = config.MODEL
+        self.model_config.defrost()
         self.model_config.INSTRUCTION_ENCODER.final_state_only = False
-
+        self.model_config.freeze()
         # Init the instruction encoder
         self.instruction_encoder = InstructionEncoder(
             self.model_config.INSTRUCTION_ENCODER
