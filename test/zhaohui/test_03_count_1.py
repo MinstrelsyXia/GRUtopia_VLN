@@ -2,8 +2,8 @@ import os
 import time
 from dataclasses import dataclass
 
-project_path = "/ssd/zhaohui/workspace/w61_grutopia_1220"
-base_dir = f'{project_path}/logs/progress/'
+project_path = "/ssd/zhaohui/workspace/w61_grutopia_0107"
+base_dir = f'{project_path}/20250110_dagger.log/progress/'
 
 @dataclass(order=True)
 class TrajectoryInfo:
@@ -91,6 +91,9 @@ result={
     "goal_in_obstacle":0,
     "open_set_empty":0,
     "path_planning":0,
+    "fast_fall":0,
+    "path planning":0,
+    "max_step":0,
 }
 
 duration_map={
@@ -103,6 +106,9 @@ duration_map={
     "goal_in_obstacle":0,
     "open_set_empty":0,
     "path_planning":0,
+    "fast_fall":0,
+    "path planning":0,
+    "max_step":0,
 }
 
 scan_file_map={}
