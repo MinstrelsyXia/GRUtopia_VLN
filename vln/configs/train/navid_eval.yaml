@@ -36,7 +36,7 @@ DDP:
   world_size: 4
 
 EVAL:
-  model_path: data/checkpoints/navid
+  model_path: data/checkpoints/navid/navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split
   USE_CKPT_CONFIG: False
   SAVE_RESULTS: True
   # SPLIT: [val_seen, val_unseen]
@@ -133,7 +133,7 @@ IL:
     recollect_first: false
 
 MODEL:
-  policy_name: CMA_Policy
+  policy_name: Navid_Policy
 
   ablate_instruction: False
   ablate_depth: False

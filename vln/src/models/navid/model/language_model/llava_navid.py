@@ -24,8 +24,8 @@ from transformers import AutoConfig, AutoModelForCausalLM, \
 
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-from navid.model.navid_arch import NaVidMetaModel, NaVidMetaForCausalLM
-from navid.constants import NAVIGATION_IDENTIFIER
+from vln.src.models.navid.model.navid_arch import NaVidMetaModel, NaVidMetaForCausalLM
+from vln.src.models.navid.constants import NAVIGATION_IDENTIFIER
 
 class LlavaConfig(LlamaConfig):
     model_type = "llava"

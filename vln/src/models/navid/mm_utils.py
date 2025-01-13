@@ -6,7 +6,7 @@ import math
 import ast
 
 from transformers import StoppingCriteria
-from navid.constants import IMAGE_TOKEN_INDEX
+from vln.src.models.navid.constants import IMAGE_TOKEN_INDEX
 
 
 def select_best_resolution(original_size, possible_resolutions):

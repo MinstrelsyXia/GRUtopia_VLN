@@ -63,7 +63,7 @@ def draw_loss_curve(N, noise_pred, noise, output_file='test.jpg'):
     plt.savefig(output_file)
     print(f"save fig to {output_file}")
 
-class DaggerCMATrainer:
+class NavidTrainer:
     def __init__(self, config=None, sim_config=None, logger=None):
         self.lmdb_features_dir = config.IL.DAGGER.lmdb_features_dir
         self.config = config
@@ -495,7 +495,7 @@ class DaggerCMATrainer:
         self.eval_logger.info(f"Current {self.config.EVAL.SPLIT} SR: {sr:.4f}")
 
     def _eval_checkpoint(
-        self
+        self, split=None
     ) -> None:
         """Evaluates a single checkpoint.
         """
@@ -513,17 +513,8 @@ class DaggerCMATrainer:
         total_rgb_list = []
         total_topdown_rgb_list = []
         
-        '''Init the task env'''
-        obs = self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
-        if isinstance(obs, str):
-            if obs == 'shortest_path_planning_failed':
-                while isinstance(obs, str) and obs == 'shortest_path_planning_failed':
-                    obs = self.eval_env.construct_env(init_omni_env=False, result_json_path=self.result_json_path)
-            elif obs == 'all_data_evaluated':
-                self.eval_logger.info(f"All data in {self.eval_env.current_split} and {split} have been evaluated.")
-                return 0, 0
-
         '''Init the policy'''
+        self.conv_mode = "vicuna_v1"
         self.model_name = get_model_name_from_path(self.config.EVAL.model_path)
         self.tokenizer, self.model, self.image_processor, self.context_len = load_pretrained_model(self.config.EVAL.model_path, None, get_model_name_from_path(self.config.EVAL.model_path))
         
@@ -536,11 +527,22 @@ class DaggerCMATrainer:
 
         self.count_id = 0
         self.reset()
+        
+        '''Init the task env'''
+        obs = self.eval_env.construct_env(init_omni_env=True, result_json_path=self.result_json_path)
+        if isinstance(obs, str):
+            if obs == 'shortest_path_planning_failed':
+                while isinstance(obs, str) and obs == 'shortest_path_planning_failed':
+                    obs = self.eval_env.construct_env(init_omni_env=False, result_json_path=self.result_json_path)
+            elif obs == 'all_data_evaluated':
+                self.eval_logger.info(f"All data in {self.eval_env.current_split} and {split} have been evaluated.")
+                return 0, 0
 
         '''Get the observations'''
         observations = self.eval_env.get_obs()
+        batch = observations[0]
 
-        batch_size = batch['instruction'].shape[0]
+        batch_size = 1
 
         stats_episodes = {}
 
@@ -563,8 +565,6 @@ class DaggerCMATrainer:
 
         steps = [0] * batch_size
         sim_steps = [0] * batch_size
-        steps_batch = torch.from_numpy(np.array(steps)).to(self.device)
-        batch["steps"] = steps_batch
 
         for env_idx in range(self.eval_env.env_nums):
             if config.VIDEO_OPTION != -1:
@@ -583,7 +583,7 @@ class DaggerCMATrainer:
                 self.eval_logger.info(f"Break. This ckpt is too bad to continue with average SPL {np.mean(list(spl_dict.values())):.3f}")
                 break
             
-            action = self.act(observations)
+            action = self.act(observations[0]) # only one env
             actions = [action]
 
             if self.config.EVAL.ACTION == 'descrete':
@@ -647,15 +647,8 @@ class DaggerCMATrainer:
                 self.reset()
                 
                 # Initialize parameters
-                prev_actions[i] = torch.zeros(1, device=self.device, dtype=torch.long)
-                rnn_states[i] = torch.zeros(
-                    self.policy.num_recurrent_layers,
-                    config.MODEL.STATE_ENCODER.hidden_size,
-                    device=self.device,
-                )
                 steps[i] = 0
                 dones[i] = False
-                not_done_masks[i] = 1
 
                 total_actions = []
 
@@ -681,8 +674,8 @@ class DaggerCMATrainer:
                     for j in range(len(total_topdown_rgb_list)):
                         total_topdown_rgb_list[j] = cv2.resize(total_topdown_rgb_list[j], (init_height, init_width))
                     # save rgbs as videos
-                    save_video(config.VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, stats_episodes[ep_id]["spl"])
-                    save_video(config.VIDEO_DIR, total_topdown_rgb_list, split, ep_id, checkpoint_index, stats_episodes[ep_id]["spl"], is_topdown=True)
+                    save_video(config.VIDEO_DIR, total_rgb_list, split, ep_id, 0, stats_episodes[ep_id]["spl"])
+                    save_video(config.VIDEO_DIR, total_topdown_rgb_list, split, ep_id, 0, stats_episodes[ep_id]["spl"], is_topdown=True)
                     # generate_video(
                     #     video_option=config.VIDEO_OPTION,
                     #     video_dir=config.VIDEO_DIR,
@@ -716,14 +709,6 @@ class DaggerCMATrainer:
 
                 total_actions = []
 
-            observations = extract_instruction_tokens(
-                observations, 
-                bert_tokenizer=self.bert_tokenizer,
-                is_clip_long=self.is_clip_long
-            )
-            batch = batch_obs(observations, self.device)
-
-            batch["steps"] = torch.from_numpy(np.array(steps)).to(self.device)
 
         if config.use_pbar:
             pbar.close()
@@ -735,21 +720,9 @@ class DaggerCMATrainer:
                 sum(v[k] for v in stats_episodes.values()) / num_episodes
             )
 
-        if config.EVAL.SAVE_RESULTS:
-            with open(fname, "w") as f:
-                json.dump(aggregated_stats, f, indent=4)
-                        # Record detailed results
-            if self.config.EVAL.save_details:
-                detailed_fname = fname.replace('stats_ckpt', 'stats_ckpt_detailed')
-                sorted_stats = {k: stats_episodes[k] for k in sorted(stats_episodes.keys(), key=int)}
-                with open(detailed_fname, "w") as f:
-                    json.dump(sorted_stats, f, indent=4)
-
-        logger.info(f"Episodes evaluated: {num_episodes}")
-        checkpoint_num = int(checkpoint_index) + 1
+        self.eval_logger.info(f"Episodes evaluated: {num_episodes}")
         for k, v in aggregated_stats.items():
-            logger.info(f"{k}: {v:.6f}")
-            writer.add_scalar(f"eval_{split}_{k}", v, checkpoint_num)
+            self.eval_logger.info(f"{k}: {v:.6f}")
 
         return aggregated_stats['spl'], aggregated_stats['success']
     
@@ -787,8 +760,10 @@ class DaggerCMATrainer:
             
             return {"action": temp_action}
 
-        navigation_qs = self.promt_template.format(observations["instruction"]["text"])
+        navigation_qs = self.promt_template.format(observations["instruction"])
         navigation = self.predict_inference(navigation_qs)
+        if self.config.test_verbose:
+            self.eval_logger.info(f"Navigation Output: {navigation}")
         
         action_index, num = self.extract_result(navigation[:-1])
 
