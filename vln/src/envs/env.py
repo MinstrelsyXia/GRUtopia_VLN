@@ -855,6 +855,7 @@ class TaskEnv(VLNDataLoader):
         
         # 计算Oracle Success Rate (OSR) - 轨迹中是否有点达到目标
         min_distance = ne if ne < self.shortest_to_goal_distance else self.shortest_to_goal_distance # 如果需要轨迹中最小距离,需要在step中记录
+        self.shortest_to_goal_distance = min_distance
         metrics['osr'] = float(min_distance < self.success_distance)
         
         # 计算Trajectory Length (TL) - 轨迹总长度

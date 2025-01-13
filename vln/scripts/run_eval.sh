@@ -12,7 +12,7 @@ while [ $attempt -le $max_attempts ]; do
             --run-type eval
             --headless
             --test_verbose
-            EVAL.SPLIT ['val_unseen']
+            EVAL.SPLIT ['val_seen']
             EVAL.re_eval False
         "
     elif [ "$1" == "--val_unseen" ]; then
