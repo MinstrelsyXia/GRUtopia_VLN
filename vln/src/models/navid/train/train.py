@@ -34,11 +34,11 @@ import torch
 import transformers
 
 from torch.utils.data import Dataset
-from navid.train.llava_trainer import LLaVATrainer
+from vln.src.models.navid.train.llava_trainer import LLaVATrainer
 
-from navid import conversation as conversation_lib
-from navid.model import *
-from navid.mm_utils import tokenizer_image_token
+from vln.src.models.navid import conversation as conversation_lib
+from vln.src.models.navid.model import *
+from vln.src.models.navid.mm_utils import tokenizer_image_token
 
 from PIL import Image
 from decord import VideoReader, cpu
@@ -46,7 +46,7 @@ from decord import VideoReader, cpu
 import time
 
 
-from navid.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN, VIDEO_START_SPECIAL_TOKEN, VIDEO_END_SPECIAL_TOKEN, IMAGE_START_TOKEN, IMAGE_END_TOKEN, NAVIGATION_SPECIAL_TOKEN, IAMGE_SEPARATOR,  NAVIGATION_IDENTIFIER
+from vln.src.models.navid.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN, VIDEO_START_SPECIAL_TOKEN, VIDEO_END_SPECIAL_TOKEN, IMAGE_START_TOKEN, IMAGE_END_TOKEN, NAVIGATION_SPECIAL_TOKEN, IAMGE_SEPARATOR,  NAVIGATION_IDENTIFIER
 
 
 local_rank = None
