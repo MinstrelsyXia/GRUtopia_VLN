@@ -17,7 +17,7 @@ while [ $attempt -le $max_attempts ]; do
         "
     elif [ "$1" == "--val_unseen" ]; then
         flags="
-            --exp-config vln/configs/train/cma_dp_eval_val.yaml
+            --exp-config vln/configs/train/cma_dp_eval.yaml
             --run-type eval
             --headless
             --test_verbose
