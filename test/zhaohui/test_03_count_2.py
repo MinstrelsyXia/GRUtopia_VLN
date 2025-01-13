@@ -28,9 +28,9 @@ def get_split_map():
     return split_map
 
 ranks =list(range(0,8))
-ckpt_name="ckpt.70"
+ckpt_name="ckpt.cma"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
-name = '20250112_eval_70'
+name = '20250114_eval_cma'
 # split = 'val_seen'
 # split = 'val_unseen'
 split = ''
