@@ -200,7 +200,7 @@ class DaggerCMATrainer:
                 if not self.config.DDP.use_dp: # use DDP
                     is_distributed = True
                     rank = self.local_rank
-                    world_size = self.world_sizer
+                    world_size = self.world_size
 
             dataset = CMADataset(
                 self.config,
@@ -210,6 +210,9 @@ class DaggerCMATrainer:
                 inflection_weight_coef=self.config.IL.inflection_weight_coef,
                 lmdb_map_size=self.config.IL.DAGGER.lmdb_map_size,
                 batch_size=self.config.IL.batch_size,
+                is_distributed=is_distributed, 
+                rank=rank,
+                world_size=world_size,
             )
             
             num_workers = 4 if not self.config.debug else 0

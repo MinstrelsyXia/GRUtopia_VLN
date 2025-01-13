@@ -80,7 +80,10 @@ class CMADataset(torch.utils.data.IterableDataset):
         dataset_data,
         inflection_weight_coef=1.0,
         lmdb_map_size=1e9,
-        batch_size=1
+        batch_size=1,
+        is_distributed=False,
+        rank=0,
+        world_size=1,
     ):
         super().__init__()
         self.config = config
@@ -114,6 +117,11 @@ class CMADataset(torch.utils.data.IterableDataset):
 
     def _create_new_data(self, data, instruction, finish_status, fail_reason):
         """Helper function to create new data entry"""
+        # process data['action']
+        if isinstance(data['action'][-1], list):
+            data['action'] = data['action'][:-1] + data['action'][-1]
+            data['action'] = np.array(data['action'])
+
         new_data = {
             'instruction': instruction,
             'progress': data['progress'],
@@ -189,6 +197,9 @@ class CMADataset(torch.utils.data.IterableDataset):
                             if 'depth_features' in data.keys():
                                 data['depth_features'] = data['depth_features'][:-drop_last_frame_nums]
 
+                        # For dagger dataset, the key is like '999_01', we need to remove the '_01'
+                        if '_' in key:
+                            key = key.split('_')[0]
                         instructions = [
                             self.dataset_data[key][ep_idx]['instruction']['instruction_tokens']
                             for ep_idx in range(len(self.dataset_data[key]))
