@@ -884,7 +884,7 @@ class CMA_DP_Net(nn.Module):
             for idx in range(un_actions_nocumsum[0].shape[0]):
                 if stop_mode in ['progress', 'stop_progress']:
                     if stop_mode == 'stop_progress':
-                        stop_flag = stop_pm_pred[0].item() > self.config.EVAL.stop_pm_threshold
+                        stop_flag = stop_pm_pred[0].item() > self.config.EVAL.continuous_stop_pm_threshold
                     else:
                         stop_flag = pm_pred[0].item() > self.config.EVAL.pm_threshold
                     M_stops = 3

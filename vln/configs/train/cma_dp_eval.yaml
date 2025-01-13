@@ -70,10 +70,11 @@ EVAL:
   start_eval_epoch: -1
   
   # stop settings
-  stop_mode: progress # progress / distance
+  stop_mode: stop_progress # progress / distance
   distance_threshold: 1.5
   pm_threshold: 0.90
-  stop_pm_threshold: 0.90
+  continuous_stop_pm_threshold: 0.80 # 0.80 for continuous and 0.75 for logits
+  logits_stop_pm_threshold: 0.50
 
   # for isaac-sim envs
   sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
