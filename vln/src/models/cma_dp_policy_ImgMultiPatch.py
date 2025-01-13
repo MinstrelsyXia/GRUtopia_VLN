@@ -879,6 +879,7 @@ class CMA_DP_Net(nn.Module):
 
         if self.config.EVAL.ACTION == 'xyyaw' or self.config.EVAL.ACTION == 'speed':
             actions = []
+            output_stop = False
             # un_actions = un_actions_nocumsum.detach().cpu().numpy()
             for idx in range(un_actions_nocumsum[0].shape[0]):
                 if stop_mode in ['progress', 'stop_progress']:
@@ -901,9 +902,13 @@ class CMA_DP_Net(nn.Module):
                         if consecutive_stops or stop_flag:
                             # Only stop if we have 4 consecutive stop actions and progress monitor threshold is met
                             actions.append("STOP")
+                            output_stop = True
                             continue
                 actions.append(un_actions[0][idx]) 
             
+            if output_stop:
+                # once stop, the action should be stop
+                actions[0] = "STOP"
             actions = [actions]
         elif self.config.EVAL.ACTION == 'descrete':
             # 0: stop, 1: move forward, 2: turn left, 3: turn right
@@ -1234,3 +1239,6 @@ class CMA_DP_Net(nn.Module):
                     batch['observations']['stack_depth'][cls_free_mask] = torch.zeros_like(batch['observations']['stack_depth'][cls_free_mask])
 
             return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'], batch['need_txt_extraction'])
+
+        elif mode == "act":
+            return self.act(batch)
