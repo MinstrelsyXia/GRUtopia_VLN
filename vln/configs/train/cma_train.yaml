@@ -1,4 +1,4 @@
-NAME: 20250106_cma_pm_train_torchGPU1_bs12_lr2.5e-4_flash
+NAME: 20250113_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger01
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -82,19 +82,19 @@ EVAL:
   len_traj_act: 4
 
 IL:
-  epochs: 100
-  batch_size: 12
+  epochs: 120
+  batch_size: 2
   lr: 2.5e-4
 
   use_iw: True
   inflection_weight_coef: 3.2
   
-  save_interval_epochs: 2
+  save_interval_epochs: 20
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
-  load_from_ckpt: False
-  ckpt_to_load: none
-  load_from_pretrain: True
+  load_from_ckpt: True
+  ckpt_to_load: data/checkpoints/20250106_cma_pm_train_torchGPU1_bs2_lr2.5e-4/ckpts/ckpt.118.pth
+  load_from_pretrain: False
 
   dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_preprocessed
 
@@ -122,7 +122,8 @@ IL:
     p: 0.9
     preload_lmdb_features: true # !IMPORTANT!
     # lmdb_features_dir: data/sample_episodes/20241213_sample_episodes_descrete_controller/sample_data.lmdb
-    lmdb_features_dir: data/sample_episodes/20241216_sample_episodes_descrete_flash/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/20241216_sample_episodes_descrete_flash/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20250113_descrete_dagger_01/sample_data.lmdb
     lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb
     pre_extract_img_features: true
     denoise_action: false # For debug!!!

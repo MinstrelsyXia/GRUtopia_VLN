@@ -638,6 +638,7 @@ class DaggerDiffusonPolicyTrainer:
                     reduction="none",
                 )
             stop_pm_loss = action_reduce(masks_unsqueeze, stop_pm_loss)
+            stop_pm_loss *= self.config.MODEL.STOP_PROGRESS_PREDICTOR.loss_alpha
         
         # Total loss
         loss = self.config.MODEL.LOSS.alpha * self.config.MODEL.LOSS.dist_scale * dist_loss + (1-self.config.MODEL.LOSS.alpha) * diffusion_loss + pm_loss + stop_pm_loss
