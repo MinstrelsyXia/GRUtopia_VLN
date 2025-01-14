@@ -49,15 +49,15 @@ if __name__ == "__main__":
     headless = True
     split_data_types = ['val_unseen','val_seen']
     project_path = '/isaac-sim/GRUtopia'
-    base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    base_data_dir = f'{project_path}/../VLN/VLNCE/R2R_VLNCE_v1-3_corrected'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
-    ckpt_name="ckpt.cma"
-    name = '20250114_eval_cma'
+    ckpt_name="navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split"
+    name = '20250114_eval_navid'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list=[]
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
-    ckpt_to_load = f"{project_path}/data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth"
+    ckpt_to_load = f"{project_path}/data/checkpoints/navid/navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split"
     sim_config = SimulatorConfig(sim_cfg_file)
     args_dict = {
         "datasets":{
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         "fp16":False,
         "seed":0,
         "MODEL":{
-            "policy_name":"CMA_Policy",
+            "policy_name":"Navid_Policy",
             "ablate_instruction":False,
             "ablate_depth":False,
             "ablate_rgb":False,
@@ -164,15 +164,17 @@ if __name__ == "__main__":
         ckpt_name,
     )
     
-    monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
-    monitor_thread.start()
+    env.eval()
+    
+    # monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
+    # monitor_thread.start()
 
-    try:
-        print("env.eval()")
-        env.eval()
-        os.kill(os.getpid(), 9) 
-    except KeyboardInterrupt:
-        print("Program stopped by user.")
-    finally:
-        monitor_thread.join()
-        print("Program terminated.")
+    # try:
+    #     print("env.eval()")
+    #     env.eval()
+    #     os.kill(os.getpid(), 9) 
+    # except KeyboardInterrupt:
+    #     print("Program stopped by user.")
+    # finally:
+    #     monitor_thread.join()
+    #     print("Program terminated.")
