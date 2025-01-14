@@ -4,6 +4,7 @@ import os
 import threading
 import sys
 from vln.src.v2.envs.discrete_eval import DiscreteEvalSingleScanEnv
+from vln.src.v2.envs.navid_discrete_eval import NavidDiscreteEvalSingleScanEnv
 from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
 from grutopia.core.config import SimulatorConfig
 from vln.src.dataset.data_utils_multi_env import load_scene_usd
@@ -12,7 +13,7 @@ import numpy as np
 import sys
 from grutopia.core.util.log import log
 
-def check_process_stuck(env:DiscreteEvalSingleScanEnv):
+def check_process_stuck(env:NavidDiscreteEvalSingleScanEnv):
     index = 0
     while True:
         index+=1
@@ -151,7 +152,7 @@ if __name__ == "__main__":
         "use_pbar":False,
     }
 
-    env = DiscreteEvalSingleScanEnv(
+    env = NavidDiscreteEvalSingleScanEnv(
         sim_config,
         scene_asset_path,
         start_position,
