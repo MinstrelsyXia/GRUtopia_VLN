@@ -27,9 +27,9 @@ def get_split_map():
                 split_map[path_key] = split_data_type
     return split_map
 
-ranks =list(range(0,8))
+ranks =list(range(0,4))
 ckpt_name="navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split"
-project_path = '/ssd/wangliuyi/code/grutopia_eval_dockers'
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0115'
 name = '20250114_eval_navid'
 # split = 'val_seen'
 # split = 'val_unseen'
