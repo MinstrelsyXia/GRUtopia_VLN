@@ -125,8 +125,7 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
             stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
             map_info = self.topdown_snapshot()
-            robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation)
+            
 
             # observations = batch_obs(observations, self.device)
             # observations["steps"] = torch.from_numpy(np.array([0])).to(self.device)
@@ -150,6 +149,8 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 if statistic_info.sim_step % 1000 == 0:
                     log.info(f"[split:{split}][scan:{scan}][trajectory_id_episode_id: {path_key}][step:{statistic_info.sim_step}]")
                 
+                robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation)
                 action = self.act(observations[0]) # only one env
                 actions = [action]
                 
@@ -245,7 +246,10 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         # if self.config.test_verbose:
         #     self.eval_logger.info(f"Navigation Output: {navigation}")
         
+        
         action_index, num = self.extract_result(navigation[:-1])
+        # log.info(f"Navigation Output: {navigation}")
+        # log.info(f"action_index:{action_index} num:{num}")
 
         if action_index == 0:
             self.pending_action_list.append(0)
