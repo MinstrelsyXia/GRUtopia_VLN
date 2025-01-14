@@ -164,17 +164,17 @@ if __name__ == "__main__":
         ckpt_name,
     )
     
-    env.eval()
+    # env.eval()
     
-    # monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
-    # monitor_thread.start()
+    monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
+    monitor_thread.start()
 
-    # try:
-    #     print("env.eval()")
-    #     env.eval()
-    #     os.kill(os.getpid(), 9) 
-    # except KeyboardInterrupt:
-    #     print("Program stopped by user.")
-    # finally:
-    #     monitor_thread.join()
-    #     print("Program terminated.")
+    try:
+        print("env.eval()")
+        env.eval()
+        os.kill(os.getpid(), 9) 
+    except KeyboardInterrupt:
+        print("Program stopped by user.")
+    finally:
+        monitor_thread.join()
+        print("Program terminated.")
