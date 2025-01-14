@@ -362,7 +362,7 @@ class TaskEnv(VLNDataLoader):
 
             if self._check_max_steps(start_step):
                 dones[self.env_idx] = True
-                reason = 'exceed_max_step' if self.current_step_list[self.env_idx] > self.max_step else 'single_action_exceed_max_step'
+                reason = 'exceed_max_step' if self.current_step_list[self.env_idx] - self.start_step_list[self.env_idx] > self.max_step else 'single_action_exceed_max_step'
                 break
 
             if start_step % self.config.EVAL.step_interval == 0:
@@ -472,7 +472,7 @@ class TaskEnv(VLNDataLoader):
             global_quats.append(self.euler_angles_to_quat(euler_angles[i]))  # Now expects [N, 3] input
 
         if verbose:
-            self.topdown_map.draw_point(predicted_world_poses=global_positions, color=[1,0,0], current_world_pose=current_position, target_world_pose=self.data_item['reference_path'][-1], img_save_path=self.EP_DIR, step=self.current_step_list[self.env_idx], logger=self.eval_logger)
+            self.topdown_map.draw_point(predicted_world_poses=global_positions, color=[1,0,0], current_world_pose=current_position, target_world_pose=self.data_item['reference_path'][-1], img_save_path=self.EP_DIR, step=self.current_step_list[self.env_idx]-self.start_step_list[self.env_idx], logger=self.eval_logger)
             
             # self.draw_prediction(current_yaw, predicted_action, global_yaws, step_i)
         
