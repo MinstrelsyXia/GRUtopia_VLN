@@ -28,7 +28,7 @@ def get_split_map():
     return split_map
 
 ranks =list(range(0,4))
-ckpt_name="navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split"
+ckpt_name="navid-7b.0"
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0115'
 name = '20250114_eval_navid'
 # split = 'val_seen'
