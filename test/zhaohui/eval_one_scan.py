@@ -52,7 +52,7 @@ if __name__ == "__main__":
     base_data_dir = f'{project_path}/../VLN/VLNCE/R2R_VLNCE_v1-3_corrected'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
-    ckpt_name="navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split"
+    ckpt_name="navid-7b.0"
     name = '20250114_eval_navid'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list=[]

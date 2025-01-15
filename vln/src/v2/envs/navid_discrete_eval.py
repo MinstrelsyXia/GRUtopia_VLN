@@ -61,12 +61,13 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         self.max_rotation_count=25
         self.timestamp = time.time()
         self.lmdb_path = lmdb_path
-        self.ckpt_name = os.path.join('data/checkpoints/navid', ckpt_name)
+        self.ckpt_name = ckpt_name
+        self.ckpt_path = eval_config.IL.ckpt_to_load
         
         '''Init the policy'''
         self.conv_mode = "vicuna_v1"
-        self.model_name = get_model_name_from_path(self.ckpt_name)
-        self.tokenizer, self.model, self.image_processor, self.context_len = load_pretrained_model(self.ckpt_name, None, get_model_name_from_path(self.ckpt_name))
+        self.model_name = get_model_name_from_path(self.ckpt_path)
+        self.tokenizer, self.model, self.image_processor, self.context_len = load_pretrained_model(self.ckpt_path, None, get_model_name_from_path(self.ckpt_path))
         
         log.info("Initialization Complete")
         
@@ -247,8 +248,6 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
         navigation_qs = self.promt_template.format(observations["instruction"])
         navigation = self.predict_inference(navigation_qs)
-        # if self.config.test_verbose:
-        #     self.eval_logger.info(f"Navigation Output: {navigation}")
         
         action_index, num = self.extract_result(navigation[:-1])
 

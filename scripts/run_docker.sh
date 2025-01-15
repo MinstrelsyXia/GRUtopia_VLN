@@ -1,5 +1,5 @@
-NAME=w61_navid_valid_01
-sudo docker run -d --name ${NAME} -it --rm --gpus='"device=0,1"' --network host \
+NAME=w61_zhaohui_00
+sudo docker run -d --name ${NAME} -it --rm --gpus='"device=1,2"' --network host \
      -e "ACCEPT_EULA=Y" \
      -e "PRIVACY_CONSENT=Y" \
      -e "WEBUI_HOST=${WEBUI_HOST}" \
