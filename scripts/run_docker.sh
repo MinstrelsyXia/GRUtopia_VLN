@@ -18,7 +18,7 @@ sudo docker run -d --name ${NAME} -it --rm --gpus='"device=0,1"' --network host 
      -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:rw \
      -v /ssd/wangliuyi/code/GRUtopia/data:/isaac-sim/GRUtopia/data:rw \
      -v /ssd/wangliuyi/code/GRUtopia/assets:/isaac-sim/GRUtopia/assets:rw \
-     w61_grutopia:v0.3
+     w61_grutopia:v0.4
 
 # enter the docker
 docker exec -it ${NAME} /bin/bash
