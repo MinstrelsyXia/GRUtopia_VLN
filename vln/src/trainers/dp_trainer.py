@@ -1069,11 +1069,10 @@ class DaggerDiffusonPolicyTrainer:
                         total_actions.append(exe_actions)
 
             elif self.config.EVAL.ACTION == 'speed':
+                stop_flag = False
                 for a_i, a in enumerate(actions):
                     if isinstance(a[0], str) and a[0] == 'STOP':
-                        action = [
-                            {'h1': {'stop': ['stop']}}
-                        ]
+                        stop_flag = True
                     else:
                         if self.config.test_verbose:
                             target_poses, target_quats, exe_actions = self.eval_env.predicted_action_to_global(a, step_i=-1, verbose=self.config.test_verbose) # for debug. drawing the predicted actions
@@ -1089,9 +1088,14 @@ class DaggerDiffusonPolicyTrainer:
                         #     ]
                 
                 for a_i, exe_a in enumerate(exe_action):
-                    action = [
-                        {'h1': {'move_along_speeds': [[exe_a]]}}
-                    ]
+                    if stop_flag:
+                        action = [
+                            {'h1': {'stop': ['stop']}}
+                        ]
+                    else:
+                        action = [
+                            {'h1': {'move_along_speeds': [[exe_a]]}}
+                        ]
 
                     outputs = self.eval_env.step(action, stack_rgb, stack_depth, prev_globalgps, prev_globalyaw, total_rgb_list, total_topdown_rgb_list, verbose=self.config.test_verbose) 
                     if a_i % 2 == 0: # this is for rotate first, move forward last
@@ -1108,6 +1112,9 @@ class DaggerDiffusonPolicyTrainer:
                     prev_globalyaw = outputs['prev_globalyaw']
                     total_rgb_list = outputs['total_rgb_list']
                     total_topdown_rgb_list = outputs['total_topdown_rgb_list']
+                    
+                    if dones[0]:
+                        break
             
                     if self.use_rnn:
                         # update RNN states
