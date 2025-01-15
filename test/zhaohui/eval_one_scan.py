@@ -56,7 +56,7 @@ if __name__ == "__main__":
     name = '20250114_eval_navid'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list=[]
-    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
+    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_navid_eval.yaml'
     ckpt_to_load = f"{project_path}/data/checkpoints/navid/navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split"
     sim_config = SimulatorConfig(sim_cfg_file)
     args_dict = {
@@ -164,17 +164,17 @@ if __name__ == "__main__":
         ckpt_name,
     )
     
-    # env.eval()
+    env.eval()
     
-    monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
-    monitor_thread.start()
+    # monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
+    # monitor_thread.start()
 
-    try:
-        print("env.eval()")
-        env.eval()
-        os.kill(os.getpid(), 9) 
-    except KeyboardInterrupt:
-        print("Program stopped by user.")
-    finally:
-        monitor_thread.join()
-        print("Program terminated.")
+    # try:
+    #     print("env.eval()")
+    #     env.eval()
+    #     os.kill(os.getpid(), 9) 
+    # except KeyboardInterrupt:
+    #     print("Program stopped by user.")
+    # finally:
+    #     monitor_thread.join()
+    #     print("Program terminated.")

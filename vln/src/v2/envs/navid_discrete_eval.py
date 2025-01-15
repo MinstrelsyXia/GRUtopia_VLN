@@ -2,6 +2,7 @@ import os, sys
 import re
 import random
 import cv2
+from matplotlib import pyplot as plt
 from .base import BaseSingleScanEnv
 from grutopia.core.config import SimulatorConfig
 from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
@@ -57,6 +58,7 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         #TODO:
         self.per_action_max_step=1500
         self.max_step=25000
+        self.max_rotation_count=25
         self.timestamp = time.time()
         self.lmdb_path = lmdb_path
         self.ckpt_name = os.path.join('data/checkpoints/navid', ckpt_name)
@@ -174,7 +176,8 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     per_action_max_step=self.per_action_max_step,
                     total_max_step=self.max_step,
                     robot_ankle_height=robot_ankle_height,
-
+                    max_rotation_count=self.max_rotation_count,
+                    
                     statistic_info=statistic_info,
                     context=self,
                 )
@@ -233,7 +236,7 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
         self.first_forward = False
 
-    def act(self, observations, turn_angle=15):
+    def act(self, observations, turn_angle=30):
         rgb = observations["rgb"]
         self.rgb_list.append(rgb)
 
