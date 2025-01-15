@@ -185,6 +185,8 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 reason = outputs['reason']
                 statistic_info = executor.statistic_info
                 statistic_info.policy_step +=1
+                
+                observations = outputs_dict
 
                 if dones[0]:
                     result = reason
@@ -231,7 +233,7 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
         self.first_forward = False
 
-    def act(self, observations):
+    def act(self, observations, turn_angle=15):
         rgb = observations["rgb"]
         self.rgb_list.append(rgb)
 
@@ -254,11 +256,11 @@ class NavidDiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 self.pending_action_list.append(1)
 
         elif action_index == 2:
-            for _ in range(min(3,int(num/30))):
+            for _ in range(min(3,int(num/turn_angle))): # default for navid is 30
                 self.pending_action_list.append(2)
 
         elif action_index == 3:
-            for _ in range(min(3,int(num/30))):
+            for _ in range(min(3,int(num/turn_angle))):
                 self.pending_action_list.append(3)
         
         if action_index is None or len(self.pending_action_list)==0:
