@@ -5,11 +5,11 @@ import lmdb
 import msgpack_numpy
 
 #参数
-split_number = 16
+split_number = 8
 split_data_types = ['val_unseen','val_seen']
 # split_data_types = ['train']
 filter_same_trajectory = False
-project_path = '/ssd/wangliuyi/code/grutopia_eval_dockers'
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0115'
 base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
 name = '20250114_eval_navid'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
