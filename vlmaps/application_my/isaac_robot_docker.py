@@ -775,7 +775,7 @@ class IsaacSimLanguageRobot(LangRobot):
         init_step = self.step
         actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
         log.info(f"actions: {actions}")
-        log.info(f"moving from {start} to {goal} on {paths},moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}'")
+        # log.info(f"moving from {start} to {goal} on {paths},moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}'")
 
         while np.linalg.norm(goal_xy - self.agents.get_world_pose()[0][:2]) > threshold:
             # np.linalg.norm(self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2]) - np.array(goal_modified) )
@@ -870,7 +870,16 @@ class IsaacSimLanguageRobot(LangRobot):
                     raise EarlyFound(f"Goal {goal} is reached early")
 
         return True
-    
+    def move_forward(self, meters: float):
+        self._set_nav_curr_pose()
+        self.eval_helper.add_action_func(f"Step:{self.step}: move forward {meters}")
+        curr_pos = self.agents.get_world_pose()[0][:2]
+        curr_pos_obs = self.ObstacleMap._xy_to_px(np.array([[curr_pos[0],curr_pos[1]]]))[0]
+        curr_ang_obs = self.quat_to_euler_angles(self.agents.get_world_pose()[1])[2]+np.pi/2
+        pos = self.ObstacleMap.get_forward_pos(curr_pos_obs, curr_ang_obs, meters)
+        self.move_to(pos,type= 'obs')
+        self.eval_helper.add_action_func(f"Step:{self.step}: successfully move forward {meters}")
+
     def move_to_room(self, room_name):
         '''
         self.move_to_room("room_type");
@@ -880,6 +889,7 @@ class IsaacSimLanguageRobot(LangRobot):
         '''
         # 如何周围全都navigable, 则直接判断现在的房间，再move to frontier看看frontier房间是什么
 
+        ''' 1) 按次序走到一个个frontier'''
         frontier_pos, frontier_angle = self.ObstacleMap._frontiers_px, self.ObstacleMap._frontiers_angles_obs
         distance = np.linalg.norm(frontier_pos - self.agents.get_world_pose()[0][:2])
         near_to_far_idx = np.argsort(distance)
@@ -1228,13 +1238,16 @@ class IsaacSimLanguageRobot(LangRobot):
         self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
         self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))
     
-    def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False):
+    def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False,prev_orientation=None):
         is_fall = self.check_robot_fall(self.agents, adjust=False)
         is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=300, threshold=0.2)
+        # prev_orientation = prev_orientation if prev_orientation is not None else self.agent_init_rotation
+        prev_orientation = self.agent_last_valid_rotation
         if (not is_fall) and (not is_stuck):
             if update_freemap:
                 self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
                 # ! using gt because in real life, a robot knows when it falls
+                self.agent_last_valid_rotation = prev_orientation
             return False
         else:
             if is_fall:
@@ -1245,7 +1258,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 self.eval_helper.add_action_func(f"Robot is stuck.")
             random_position = self.randomly_pick_position_from_freemap()
             # self.reset_robot(random_position, self.agent_last_valid_rotation)
-            self.reset_robot(random_position, self.agent_init_rotation)
+            self.reset_robot(random_position, prev_orientation)
             log.info(f"Reset robot pose to {random_position}.")
             return True
         
@@ -1444,13 +1457,16 @@ def main(config: DictConfig) -> None:
                 init_omni_scene = False
                 # for the following episodes: if the new scene id is different from the last one, then use reset_scene()
 
-                # ! remember to align with isaac_robot.py
                 # else: only set the task and robot position
                 robot.map.init_categories(mp3dcat.copy())
-                gpt_ans = parse_spatial_instruction(robot.instruction)
-                parsed_instructions = extract_self_methods(gpt_ans)
+                # ! debuging
+                parsed_instructions = ['self.move_forward(3)']
+                # gpt_ans = parse_spatial_instruction(robot.instruction)
+                # parsed_instructions = extract_self_methods(gpt_ans)
+
                 log.info(f"instruction: {robot.instruction}")
                 log.info(f"parsed instructions: {parsed_instructions}")
+
                 robot.eval_helper.add_parsed_instruction(parsed_instructions)
                 skip_flag = 0 # 
                 skipped_i = 0 # [:skipped_i] are skipped
@@ -1464,6 +1480,7 @@ def main(config: DictConfig) -> None:
                 while robot.env.simulation_app.is_running():
                     robot.eval_helper.add_pos(robot.agents.get_world_pose()[0])
                     robot.warm_up(200)
+                    robot.turn(90)
                     #! for debuging
                     # goal_obs = robot.ObstacleMap._xy_to_px(robot.eval_helper.goals[:,:2])
                     # robot.move_to(goal_obs[1],'obs')
