@@ -1,5 +1,5 @@
 import logging
-
+import os
 
 class Logger(object):
     """global logger
@@ -34,6 +34,11 @@ class Logger(object):
         self.log.addHandler(sh)
         # Logging file
         if filename is not None:
+            # 确保日志目录存在
+            log_dir = os.path.dirname(filename)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+            
             th = logging.FileHandler(filename=filename, encoding='utf-8')
             th.setFormatter(format_str)
             self.log.addHandler(th)

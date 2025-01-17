@@ -12,6 +12,7 @@ from vlmaps.vlfm.fog_of_war import reveal_fog_of_war, get_current_angle
 
 from vlmaps.vlfm.base_map import BaseMap
 import os
+from typing import List
 # from depth_camera_filtering import filter_depth
 # from agent_utils.geometry_utils import extract_camera_pos_zyxrot, get_extrinsic_matrix, get_world_points_from_image_coords
 # from agent_utils.img_utils import fill_small_holes
@@ -73,7 +74,68 @@ class ObstacleMap(BaseMap):
         idx = np.random.randint(0, len(free_points))
         return free_points[idx]
     
-
+    def get_forward_pos(self, curr_pos: List[float], curr_angle: float, meters: float) -> List[float]:
+        '''
+        优化版本的 get_forward_pos，使用向量化操作提升性能
+        
+        Args:
+            curr_pos: 在 xyz 坐标系中的当前位置
+            curr_angle_deg: 在 xyz 坐标系中的角度(度)
+            meters: 前进距离(米)
+        
+        Returns:
+            List[float]: 新位置坐标 [i, j]
+        '''
+        i, j = curr_pos
+        rad = curr_angle
+        pix = int(meters * self.pixels_per_meter)
+        
+        # 计算方向向量
+        cos_rad = np.cos(rad)
+        sin_rad = np.sin(rad)
+        
+        # 生成路径上的所有点
+        steps = np.arange(pix)
+        path_i = i + steps * cos_rad
+        path_j = j + steps * sin_rad
+        
+        # 将坐标转换为整数
+        path_i = path_i.astype(np.int32)
+        path_j = path_j.astype(np.int32)
+        
+        # 确保所有坐标都在地图范围内
+        mask = (
+            (path_i >= 0) & 
+            (path_i < self._map.shape[0]) & 
+            (path_j >= 0) & 
+            (path_j < self._map.shape[1])
+        )
+        
+        if not np.any(mask):
+            return [i, j]  # 如果所有点都超出范围，返回当前位置
+        
+        # 获取有效路径点
+        valid_i = path_i[mask]
+        valid_j = path_j[mask]
+        
+        # 检查路径上的障碍物
+        obstacles = self._map[valid_i, valid_j]
+        obstacle_indices = np.where(obstacles == 1)[0]
+        
+        if len(obstacle_indices) > 0:
+            # 找到第一个障碍物前的位置
+            first_obstacle = obstacle_indices[0]
+            if first_obstacle > 0:
+                # 返回障碍物前0.1米的位置
+                safe_index = max(0, first_obstacle - int(0.1 / self.pixels_per_meter))
+                return [valid_i[safe_index], valid_j[safe_index]]
+            return [i, j]  # 如果第一个点就是障碍物，返回当前位置
+        
+        # 如果没有障碍物，返回目标位置
+        target_i = i + pix * cos_rad
+        target_j = j + pix * sin_rad
+        return [target_i, target_j]
+    
     def clear_robot_surrounding(self, robot_pos, robot_radius, num_points=36):
         '''
         input: 

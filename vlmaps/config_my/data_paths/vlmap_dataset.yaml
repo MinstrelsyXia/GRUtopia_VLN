@@ -1,5 +1,5 @@
 habitat_scene_dir: ""
 # vlmaps_data_dir: "/ssd/share/vlmap/vlmaps_dataset/5LpN3gDmAk7_1"
 # test_file_save_dir: "/ssd/xiaxinyuan/code/w61-grutopia/logs/5LpN3gDmAk7_1"
-vlmaps_data_dir: "/ssd/xiaxinyuan/code/w61-grutopia/logs"
-test_file_save_dir: "/ssd/xiaxinyuan/code/w61-grutopia/logs"
+vlmaps_data_dir: "/ssd/xiaxinyuan/code/w61-grutopia/logs_docker"
+test_file_save_dir: "/ssd/xiaxinyuan/code/w61-grutopia/logs_docker"

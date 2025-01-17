@@ -3,6 +3,7 @@ defaults:
   - map_config: vlmap_dataset
   - params: issacsim_test
   - vln_config: docker
+  
   - _self_
 nav:
   valid_range: 1
@@ -23,3 +24,11 @@ find_frontier_type: vlmap # or closest
 episode_file: vlmaps/docker/test/0.txt
 last_scan_file: vlmaps/docker/last_scan_0.txt
 resume_scan: null
+
+hydra:
+  job_logging:
+    root:
+      level: ERROR
+  hydra_logging:
+    root:
+      level: ERROR

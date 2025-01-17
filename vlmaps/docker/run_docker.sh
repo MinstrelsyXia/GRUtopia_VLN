@@ -18,7 +18,7 @@ sudo docker run -it --network host \
   -v /ssd/xiaxinyuan/checkpoints/ViT-B-32.pt:/root/.cache/clip/ViT-B-32.pt:ro  \
   -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:ro \
   -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
-  -v /ssd/xiaxinyuan/code/w61-grutopia/logs_docker:/isaac-sim/GRUtopia/logs:rw \
+  -v /ssd/xiaxinyuan/code/w61-grutopia/logs_docker:/isaac-sim/GRUtopia/logs_docker:rw \
   -v /ssd/xiaxinyuan/code/w61-grutopia:/isaac-sim/GRUtopia:rw \
   -v /ssd/xiaxinyuan/assets:/isaac-sim/GRUtopia/assets:ro \
   -v ${CACHE_ROOT}/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
