@@ -51,12 +51,13 @@ if __name__ == "__main__":
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
-    ckpt_name="ckpt.cma"
-    name = '20250114_eval_cma'
+    ckpt_name="ckpt.seq2seq"
+    name = '20250120_eval_seq2seq'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list=[]
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
-    ckpt_to_load = f"{project_path}/data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth"
+    # ckpt_to_load = f"{project_path}/data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth"
+    ckpt_to_load = f"{project_path}/data/checkpoints/CMA_habitat_SOTA/converted/Seq2Seq_DA_converted.pth"
     sim_config = SimulatorConfig(sim_cfg_file)
     args_dict = {
         "datasets":{
@@ -151,6 +152,13 @@ if __name__ == "__main__":
         "use_pbar":False,
     }
 
+    # For Seq2Seq models
+    seq2seq_eval_config = eval_config.copy()
+    seq2seq_eval_config['MODEL']['policy_name'] = 'Seq2SeqPolicy'
+    seq2seq_eval_config['MODEL']['INSTRUCTION_ENCODER']['bidirectional'] = False
+    seq2seq_eval_config['MODEL']['SEQ2SEQ']= {}
+    seq2seq_eval_config['MODEL']['SEQ2SEQ']['use_prev_action'] = False
+
     env = DiscreteEvalSingleScanEnv(
         sim_config,
         scene_asset_path,
@@ -159,9 +167,12 @@ if __name__ == "__main__":
         headless,
         dataloader,
         Config(eval_config),
+        # Config(seq2seq_eval_config),
         lmdb_path,
         ckpt_name,
     )
+
+    # env.eval()
     
     monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
     monitor_thread.start()
