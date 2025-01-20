@@ -179,7 +179,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         
     if config.MODEL.policy_name in ['CMA_DP_ImgMultiPatch_Policy', 'DP_noRNN_Policy']:
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
-    elif config.MODEL.policy_name == 'CMA_Policy':
+    elif config.MODEL.policy_name in ['CMA_Policy', 'Seq2SeqPolicy']:
         trainer_init = cma_trainer.DaggerCMATrainer
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
     trainer = trainer_init(config, sim_config, logger)
