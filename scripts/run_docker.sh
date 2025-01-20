@@ -1,5 +1,5 @@
-NAME=w61_zhaohui_00
-sudo docker run -d --name ${NAME} -it --rm --gpus='"device=0"' --network host \
+NAME=w61_seq2seq_valid
+sudo docker run -d --name ${NAME} -it --rm --gpus='"device=5"' --network host \
      -e "ACCEPT_EULA=Y" \
      -e "PRIVACY_CONSENT=Y" \
      -e "WEBUI_HOST=${WEBUI_HOST}" \
@@ -16,7 +16,9 @@ sudo docker run -d --name ${NAME} -it --rm --gpus='"device=0"' --network host \
      -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:rw \
      -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
      -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:rw \
-     w61_grutopia:v0.3
+     -v /ssd/wangliuyi/code/GRUtopia/data:/isaac-sim/GRUtopia/data:rw \
+     -v /ssd/wangliuyi/code/GRUtopia/assets:/isaac-sim/GRUtopia/assets:rw \
+     w61_grutopia:v0.4
 
 # enter the docker
 docker exec -it ${NAME} /bin/bash

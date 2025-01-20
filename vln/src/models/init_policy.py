@@ -20,6 +20,9 @@ def get_policy(policy_name):
     elif policy_name == 'DP_noRNN_Policy':
         from vln.src.models.dp_policy_noRNN import CMA_DP_noRNN_Net
         return CMA_DP_noRNN_Net
+    elif policy_name == 'Seq2SeqPolicy':
+        from vln.src.models.seq2seq_policy import Seq2SeqNet
+        return Seq2SeqNet
     else:
         raise ValueError(f"Policy {policy_name} not found")
 
