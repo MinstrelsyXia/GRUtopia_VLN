@@ -21,9 +21,9 @@ def print_actions(actions):
         print(f"[{index}]==>{describe_action(action)}")
 
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
-lmdb_path_0507 = project_path + '/data/sample_episodes/20250110_dagger/sample_data.lmdb'
+lmdb_path_0507 = project_path + '/data/sample_episodes/20250120_dagger/sample_data.lmdb'
 env_0508 = lmdb.open(lmdb_path_0507, readonly=True, lock=False)
-id=6
+id=4
 key = f"{id}".encode()
 with env_0508.begin() as txn:
     value = txn.get(key)
