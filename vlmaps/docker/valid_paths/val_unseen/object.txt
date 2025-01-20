@@ -1,0 +1,36 @@
+x8F5xyUWy9e,42,7,Go straight past the pool. Walk between the bar and chairs.  Stop when you get to the corner of the bar.  That's where you will wait. 
+x8F5xyUWy9e,42,9,Go forward one meter
+Go to the chairs
+Go to the steps
+Go to the endtable
+Go to the tan door. 
+zsNo4HB9uLZ,62,13,Walk passed the dining table and continue towards the kitchen. Walk through the kitchen passed the counters and stove and stop near the sink. 
+2azQ1b91cZZ,161,43,Go into the kitchen area. Turn left. Take the first right into the dining area. Walk past the dining table. Stop left of the tall lamp with a white lampshade. 
+QUCTc6BB5sX,307,98,Walk to the oven, turn left, walk to the lattice gate, turn right, enter the office, wait at the desk. 
+X7HyMhZNoso,407,112,Walk to the other side of the patio and enter the building through the sliding glass doors turn right and wait in the dining area. 
+zsNo4HB9uLZ,635,155,TURN SLIGHTLY TO THE RIGHT AND WALK THROUGH THE DOOR TOWARDS THE BUTLERS PANTRY, WALK FORWARD INTO THE KITCHEN, AT THE END OF THE KITCHEN COUNTER TURN LEFT TOWARDS THE HALL,  WALK FORWARD THROUGH THE OPEN DOOR TO THE SINK. 
+2azQ1b91cZZ,657,160,TURN COMPLETELY AROUND UNTIL YOU FACE AN OPEN DOOR WITH A WINDOW TO THE LEFT AND A PATIO TO THE RIGHT, WALK FORWARD THOUGH THE DOOR AND INTO A DINNING ROOM, TURN LEFT AND WALK TO THE END OF THE DINNING TABLE, YOU WILL BE FACING AN OPEN DOOR, WALK THOUGH THE OPEN DOOR INTO A WIDE HALLWAY. 
+2azQ1b91cZZ,657,161,Go to the 4 panel window
+Go to the gold rug
+Go to the white rug
+Go to the third chair on the left
+Go to the electrical receptacle. 
+2azQ1b91cZZ,657,162,Go towards a dining area passing an area open to the outside to your right, and pass the dining table. Walk towards three sets of doors, and stop before reaching them. 
+2azQ1b91cZZ,668,166,Go forward by the windows, and then stop by the lamp. 
+QUCTc6BB5sX,788,192,Walk through breakfast nook. Walk past kitchen. Walk past thermostat. Wait at exercise ball. 
+zsNo4HB9uLZ,992,249,Walk past beige rug. Walk past butler's pantry. Make left after eye chart. Wait at gold polka dot picture frame. 
+8194nk5LbLH,1141,289,Go right around the counter and turn left. Continue until you are at the end of the second orange couch. 
+8194nk5LbLH,1141,291,Turn left and walk past the counter top. Turn left and walk forward. Stop by the last stool and the counter. 
+EU6Fwq7SyZv,1195,316,Walk up the stairs and go straight. Stop next to the recliner that is next to the fireplace. 
+EU6Fwq7SyZv,1195,318,Go up the stairs. Go left toward the couch and walk past it to the chair next to the fireplace. 
+EU6Fwq7SyZv,1345,347,Continue up the stairs, walk towards the sitting area, go straight passed the table on the left. stop by the double doors. 
+EU6Fwq7SyZv,1345,348,Go up the stairs and take a left. Walk towards the couch and chairs in the sitting area. Walk through the sitting area and stop in front of the first door to the balcony on your left. 
+8194nk5LbLH,1382,350,Turn around on the stairs and go down them.  Then go past the couch, veer to the right and towards the kitchen.  Stop and wait by the big counter. 
+8194nk5LbLH,1382,351,Walk down the stairs towards and past the atrium.  Head towards the kitchen and wait in the dining area. 
+X7HyMhZNoso,1473,370,Move through the kitchen with the square table to your right. Continue moving forward to the staircase just after the refrigerator. Walk up the stairs and stop 18 inches before the end of the stair railing to your right. 
+X7HyMhZNoso,1478,375,Go up the stairs. Turn right and go toward the slatted door. Turn right and enter the living area. 
+EU6Fwq7SyZv,1567,388,Turn around where you stand and walk around to chair to your left and continue forward to the end of the wood counter to your right. Turn slightly to your right and walk past the pillar that is between the lamp and the stairs going down.  Stop between the pillar and the stairs. 
+EU6Fwq7SyZv,1567,389,Walk next to the first white chair on its right side, walk straight towards the older floral chair, take a right towards the stairs and stop. 
+2azQ1b91cZZ,1581,395,Walk past the sitting area to the fireplace. Wait in front of the fireplace. 
+2azQ1b91cZZ,1581,396,Walk to the front of the fireplace. 
+EU6Fwq7SyZv,1775,442,Walk on into the kitchen and turn to the right.  Walk past the staircase, behind the chairs.  Walk to the right of the pillar.  Stop and wait by the footstool. 

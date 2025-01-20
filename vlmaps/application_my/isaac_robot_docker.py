@@ -386,7 +386,7 @@ class IsaacSimLanguageRobot(LangRobot):
             get_grad=True
             )
         
-    def too_many_steps(self,max_step = 15000):
+    def too_many_steps(self,max_step = 20000):
         if self.step > max_step:
             log.info(f"Too many steps: {self.step}, exiting.")
             raise TooManySteps("Too many steps")
@@ -575,6 +575,7 @@ class IsaacSimLanguageRobot(LangRobot):
         self.eval_helper.add_action_func(f"Step:{self.step}: enter test_movement with action {action_name}")
         prev_step = self.step
         self.subgoal = extract_parameters(action_name)
+
         while True:
             try:
                 self.map.load_3d_map()
@@ -605,6 +606,8 @@ class IsaacSimLanguageRobot(LangRobot):
                     found = self.explore(action_name) # update occupancy map, semantic map
                     if found == True:
                         break
+                    else:
+                        raise TooManySteps
             except NameError as e:
                 print(f"Instruction GPT parsed {action_name} doesn't exist: {e}, following next instruction")
                 break
@@ -870,6 +873,7 @@ class IsaacSimLanguageRobot(LangRobot):
                     raise EarlyFound(f"Goal {goal} is reached early")
 
         return True
+    
     def move_forward(self, meters: float):
         self._set_nav_curr_pose()
         self.eval_helper.add_action_func(f"Step:{self.step}: move forward {meters}")
