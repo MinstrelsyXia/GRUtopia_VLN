@@ -19,7 +19,7 @@ class RotateController(BaseController):
         self.goal_orientation: np.ndarray = None
         self.threshold: float = None
 
-        self.rotation_speed = config.rotation_speed if config.rotation_speed is not None else 4.0
+        self.rotation_speed = config.rotation_speed if config.rotation_speed is not None else 3.0
         self.threshold = config.threshold if config.threshold is not None else 0.02
 
         super().__init__(config=config, robot=robot, scene=scene)
@@ -39,7 +39,7 @@ class RotateController(BaseController):
     def forward(self,
                 start_orientation: np.ndarray,
                 goal_orientation: np.ndarray,
-                rotation_speed: float = 4,
+                rotation_speed: float = 3,
                 threshold: float = 0.02) -> ArticulationAction:
         self.goal_orientation = goal_orientation
         self.threshold = threshold
