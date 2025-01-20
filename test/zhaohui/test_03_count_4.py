@@ -26,7 +26,7 @@ def get_split_map():
 
 ranks =list(range(0,8))
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
-name = '20250110_dagger'
+name = '20250120_dagger'
 
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, readonly=True, lock=False)
