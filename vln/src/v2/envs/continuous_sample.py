@@ -61,20 +61,25 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
             self.update_timestamp()
             obs = self.env.step(actions=env_action, add_rgb_subframes=False, render=False)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+            if self.step % 200 == 0:
+                log.info(f"[step:{self.step}][robot_position:{robot_position}]")
             self.step += 1
             finish_state = get_action_state(obs, 'move_along_path')
             if self.step > self.max_step:
                 fail_reason = "max_step"
+                log.info(fail_reason)
                 break
             if self.step % 20 == 0:
                 robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
                 is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
                 if is_fall:
                     fail_reason = "fall"
+                    log.info(fail_reason)
                     break
                 is_stuck = stuck_checker.check_robot_stuck(robot_position, robot_rotation, cur_iter=self.step, max_iter=2500, threshold=0.2)
                 if is_stuck:
                     fail_reason = "stuck"
+                    log.info(fail_reason)
                     break
         if fail_reason is not None:
             return False, fail_reason
@@ -157,7 +162,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
                     break
-                map_info = self.get_global_map(robot_height=1.55,)
+                map_info = self.get_global_map(robot_height=1.55, dilation_iterations=2)
                 camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
                 
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
@@ -193,7 +198,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
                 if not action_success:
                     finish = True
                     result = fail_reason
-                    break
+                    continue
                 current_point_index += 1
                 if current_point_index == len(nav_path) - 1:
                     finish = True
