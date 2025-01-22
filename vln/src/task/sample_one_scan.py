@@ -6,9 +6,8 @@ import sys
 from vln.src.v2.envs.discrete_sample_dagger import DiscreteSampleDaggerSingleScanEnv
 from vln.src.v2.dataloader.sample import SamplePathKeyDataloader
 from grutopia.core.config import SimulatorConfig
-from vln.src.dataset.data_utils_multi_env import load_scene_usd
+from vln.src.v2.util.common import load_scene_usd
 from vln.src.v2.envs.env_factory import get_env_by_config
-from vln.src.utils.utils import Config
 import numpy as np
 import sys
 from vln.src.v2.util.common_log_util import common_logger as log
@@ -77,13 +76,7 @@ if __name__ == "__main__":
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
     ckpt_to_load = f"{project_path}/data/checkpoints/20250113_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger01/ckpts/ckpt.20.pth"
     sim_config = SimulatorConfig(sim_cfg_file)
-    args_dict = {
-        "datasets":{
-            "mp3d_data_dir":mp3d_data_dir,
-            "base_data_dir":base_data_dir,
-        }
-    }
-    scene_asset_path = load_scene_usd(Config(args_dict), scan)
+    scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
     dataloader=SamplePathKeyDataloader(
         base_data_dir,
         split_data_types,

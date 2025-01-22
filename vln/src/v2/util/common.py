@@ -5,6 +5,7 @@ import math
 import os
 import json
 from collections import defaultdict
+from grutopia.core.util.container import is_in_container
 
 def create_robot_mask(
     topdown_global_map_camera,
@@ -160,7 +161,7 @@ def load_data(
                 remaining_count+=1
                 trajectory_list.append(item['trajectory_id'])
                 new_data[scan].append(item)
-        log.info(f"filter_same_trajectory remain: [ {remaining_count} / {total_count} ]")
+        log.info(f"[split:{split}]filter_same_trajectory remain: [ {remaining_count} / {total_count} ]")
         data = new_data
         new_data = defaultdict(list)
 
@@ -174,7 +175,37 @@ def load_data(
                     continue
                 remaining_count+=1
                 new_data[scan].append(item)
-        log.info(f"filter_stairs remain: [ {remaining_count} / {total_count} ]")
+        log.info(f"[split:{split}]filter_stairs remain: [ {remaining_count} / {total_count} ]")
         data = new_data
 
     return data
+
+def load_scene_usd(mp3d_data_dir, scan):
+    ''' Load scene USD based on the scan
+    '''
+    find_flag = False
+    for root, dirs, files in os.walk(os.path.join(mp3d_data_dir, scan)):
+        target_file_name = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
+        for file in files:
+            if file == target_file_name:
+                scene_usd_path = os.path.join(root, file)
+                find_flag = True
+                break
+        if find_flag:
+            break
+    if not find_flag:
+        log.error("Scene USD not found for scan %s", scan)
+        return None
+    return scene_usd_path
+
+def reset_topdown_camera(robot):
+    import omni.isaac.core.utils.numpy.rotations as rot_utils
+    if 'topdown_camera_500' in robot.sensors:
+        orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+        robot_pos = robot.isaac_robot.get_world_pose()[0]
+        robot.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
+    
+    if 'topdown_camera_50' in robot.sensors:
+        orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+        robot_pos = robot.isaac_robot.get_world_pose()[0]
+        robot.sensors['topdown_camera_50']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)

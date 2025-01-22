@@ -7,7 +7,7 @@
     "image" : "w61_grutopia:v0.3",
     "total_rank": 8,
     "retry_list":[],
-    "flash":false,
+    "flash":true,
     "device_map" : {
         "0":["0"],
         "1":["1"]
