@@ -8,12 +8,11 @@ from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
 from vln.src.v2.util.common import (
     check_robot_fall, 
     describe_action, 
-    get_action_state,
-    check_is_on_track
+    reset_topdown_camera
 )
-from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.v2.util.data_collector import DataCollector
 import numpy as np
+import math
 
 class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
     
@@ -40,34 +39,36 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
         self.max_step = max_step
         self.robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
 
+    def get_new_position_and_rotation(self, action):
+        from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
+        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+        roll, pitch, yaw = quat_to_euler_angles(robot_rotation)
+        if action == 1: # forward
+            dx = 0.25 * math.cos(yaw)
+            dy = 0.25 * math.sin(yaw)
+            new_robot_position = robot_position + [dx,dy,0]
+            new_robot_rotation = robot_rotation
+        elif action == 2: #left
+            new_robot_position = robot_position
+            new_yaw = yaw + (math.pi / 12)
+            new_robot_rotation = euler_angles_to_quat(np.array([roll,pitch,new_yaw]))
+        elif action == 3: #right
+            new_robot_position = robot_position
+            new_yaw = yaw - (math.pi / 12)
+            new_robot_rotation = euler_angles_to_quat(np.array([roll,pitch,new_yaw]))
+        else:
+            new_robot_position = robot_position
+            new_robot_rotation = robot_rotation
+        return new_robot_position,new_robot_rotation
+
     def execute_one_action(
         self,
         action,
-        stuck_checker,
     ):
-        finish_state = False
-        fail_reason = None
-        while not finish_state:
-            self.update_timestamp()
-            obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
-            robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-            self.step += 1
-            finish_state = get_action_state(obs, 'move_by_descrete')
-            if self.step > self.max_step:
-                fail_reason = "max_step"
-                break
-            if self.step % 20 == 0:
-                robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-                is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
-                if is_fall:
-                    fail_reason = "fall"
-                    break
-                is_stuck = stuck_checker.check_robot_stuck(robot_position, robot_rotation, cur_iter=self.step, max_iter=2500, threshold=0.2)
-                if is_stuck:
-                    fail_reason = "stuck"
-                    break
-        if fail_reason is not None:
-            return False, fail_reason
+        new_robot_position,new_robot_rotation = self.get_new_position_and_rotation(action)
+        self.reset_robot(new_robot_position,new_robot_rotation)
+        reset_topdown_camera(self.robot)
+        self.env.step(actions=[{'h1':{'stand_still': []}}], render=True)
         return True, 'success'
 
     def sample(self):
@@ -123,7 +124,6 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
                 data_collector.save_data('fast_fall')
                 log.info(f"[scan:{scan}][path:{trajectory_id}] finish[step:0] result: fast_fall")
                 continue
-            stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
 
             finish = False
             result = None
@@ -153,12 +153,12 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
                     break
-                map_info = self.get_global_map(robot_height=1.55,)
+                map_info = self.get_global_map(robot_height=1.55, dilation_iterations=2)
                 camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
                 
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
                 # path_plan
-                action_list, real_points, find_flag, reason = plan_and_get_actions_discrete(
+                action_list, _, find_flag, reason = plan_and_get_actions_discrete(
                     map_info=map_info,
                     robot_position=robot_position,
                     robot_rotation=robot_rotation,
@@ -178,7 +178,6 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
                 
                 action_index = 0
                 for action in action_list:
-                    env_action = [{'h1': {'move_by_descrete': [action]}}]
                     data_collector.collect_observation_by_env(
                         env=self.env,
                         step=self.step,
@@ -187,21 +186,11 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
                         robot_pose=self.task.get_robot_poses_without_offset(),
                     )
                     data_collector.collect_action(action)
-                    action_success, fail_reason = self.execute_one_action(env_action,stuck_checker)
+                    action_success, fail_reason = self.execute_one_action(action)
                     log.info(f"[scan:{scan}][path:{path_key}] finish one action[step:{self.step}][ {action_index + 1} / {len(action_list)} ][result:{fail_reason}] {describe_action(action)}")
                     if not action_success:
                         finish = True
                         result = fail_reason
-                        break
-                    robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-                    is_on_track = check_is_on_track(
-                        robot_position=robot_position,
-                        robot_rotation=robot_rotation,
-                        action=action,
-                        action_index=action_index,
-                        real_points=real_points,
-                    )
-                    if not is_on_track:
                         break
                     action_index +=1
                 if action_index == len(action_list):

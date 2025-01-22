@@ -92,10 +92,35 @@ def get_env_by_config(
     task_type = config["task_type"]
     flash = config["flash"]
     if task_type == 'eval':
+        name=config["name"]
+        ckpt_to_load = config["ckpt_to_load"]
+        eval_config = get_eval_config(PROJECT_ROOT_PATH,ckpt_to_load)
+        ckpt_file_name = ckpt_to_load.split('/')[-1]
+        ckpt_name=f"{name}_{ckpt_file_name}"
         if flash:
-            return DiscreteFlashEvalSingleScanEnv()
+            return DiscreteFlashEvalSingleScanEnv(
+                sim_config=sim_config,
+                scene_asset_path=scene_asset_path,
+                start_position=start_position,
+                start_rotation=start_rotation,
+                headless=headless,
+                dataloader=dataloader,
+                eval_config=eval_config,
+                lmdb_path=dataloader.lmdb_path,
+                ckpt_name=ckpt_name,
+            )
         else:
-            return DiscreteEvalSingleScanEnv()
+            return DiscreteEvalSingleScanEnv(
+                sim_config=sim_config,
+                scene_asset_path=scene_asset_path,
+                start_position=start_position,
+                start_rotation=start_rotation,
+                headless=headless,
+                dataloader=dataloader,
+                eval_config=eval_config,
+                lmdb_path=dataloader.lmdb_path,
+                ckpt_name=ckpt_name,
+            )
     elif task_type == 'sample':
         sample_type = config["sample_type"]
         if sample_type =='continuous':
@@ -109,7 +134,14 @@ def get_env_by_config(
             )
         else:
             if flash:
-               return DiscreteFlashSampleSingleScanEnv()
+               return DiscreteFlashSampleSingleScanEnv(
+                    sim_config=sim_config,
+                    scene_asset_path=scene_asset_path,
+                    start_position=start_position,
+                    start_rotation=start_rotation,
+                    headless=headless,
+                    dataloader=dataloader,
+               )
             else:
                 dagger_percentage = 0
                 if 'dagger_percentage' in config:

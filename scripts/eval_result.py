@@ -60,7 +60,7 @@ if __name__ == "__main__":
             with database_read.begin() as txn:
                 value = txn.get(data_key.encode())
                 if value is None:
-                    print(f"[key:{data_key}] value is None ")
+                    # print(f"[key:{data_key}] value is None ")
                     continue
                 value = msgpack_numpy.unpackb(value)
             data_list.append(value)
@@ -94,6 +94,9 @@ if __name__ == "__main__":
             total_success += success
             total_spl += spl
         print(f"############[{split}]#############")
+        if count == 0:
+            print(f"############[count == 0,skip]#############")
+            continue
         print(f"TL = {total_TL} / {count} = {round((total_TL / count),2)}")
         print(f"NE = {total_NE} / {count} = {round((total_NE / count),2)}")
         print(f"osr = {total_osr} / {count} = {round((total_osr / count),2)}")
