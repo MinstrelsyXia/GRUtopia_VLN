@@ -3,7 +3,7 @@ import importlib
 from grutopia.core.env import BaseEnv
 from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.v2.util.common import check_robot_fall, describe_action, get_action_state
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 
 class Statistic_Info:
     def __init__(

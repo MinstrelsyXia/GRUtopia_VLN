@@ -1,7 +1,7 @@
 from .base import BaseSingleScanEnv
 from grutopia.core.config import SimulatorConfig
 from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 from vln.src.v2.util import progress_log_util
 from vln.src.v2.util.eval import(
     get_obs,

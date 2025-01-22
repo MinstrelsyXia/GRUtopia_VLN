@@ -87,7 +87,7 @@ if __name__ == "__main__":
                     continue
             with database.begin(write=True) as txn:
                 txn.put(key, value)
-            print(f"{desc} done!")
+            print(f"{desc} [key:{id}] done!")
         print(f"#############################数据合并完成#############################")
         sub_database.close()
     database.close()

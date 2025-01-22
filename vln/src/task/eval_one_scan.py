@@ -10,7 +10,8 @@ from vln.src.dataset.data_utils_multi_env import load_scene_usd
 from vln.src.utils.utils import Config
 import numpy as np
 import sys
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
+from vln.src.v2.util import common_log_util 
 import json
 from vln import PROJECT_ROOT_PATH
 
@@ -66,6 +67,7 @@ if __name__ == "__main__":
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
     name = config["name"]
+    common_log_util.init(name,rank)
     ckpt_file_name = config["ckpt_to_load"].split('/')[-1]
     ckpt_name=f"{name}_{ckpt_file_name}"
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
