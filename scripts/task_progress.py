@@ -7,6 +7,8 @@ import lmdb
 import msgpack_numpy
 from vln.src.dataset.data_utils_multi_env import load_gather_data
 from vln.src.utils.utils import Config
+from vln.src.v2.util.eval import generate_eval_key
+
 
 def get_split_map(
     project_path,
@@ -31,9 +33,6 @@ def get_split_map(
                 path_key = f"{trajectory_id}_{episode_id}"
                 split_map[path_key] = split_data_type
     return split_map
-
-def generate_eval_key(ckpt_name, path_key):
-    return f"eval_{ckpt_name}_{path_key}"
 
 def count_one_rank(
     database_read,
