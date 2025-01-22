@@ -166,8 +166,8 @@ if __name__ == "__main__":
         start_rotation,
         headless,
         dataloader,
-        Config(eval_config),
-        # Config(seq2seq_eval_config),
+        # Config(eval_config),
+        Config(seq2seq_eval_config),
         lmdb_path,
         ckpt_name,
     )

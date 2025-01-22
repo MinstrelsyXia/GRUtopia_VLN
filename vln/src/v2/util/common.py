@@ -1,16 +1,11 @@
 import numpy as np
 from scipy.ndimage import binary_dilation
-<<<<<<< HEAD
-from grutopia.core.util.log import log
-import math
-=======
 from vln.src.v2.util.common_log_util import common_logger as log
 import math
 import os
 import json
 from collections import defaultdict
 from grutopia.core.util.container import is_in_container
->>>>>>> spring_festival_2025
 
 def create_robot_mask(
     topdown_global_map_camera,
@@ -119,9 +114,6 @@ def check_is_on_track(
         if yaw_diff > math.pi / 6:
             log.info(f"[yaw_diff: {round(yaw_diff * (180 / math.pi))} 度 > 30 度] replanning")
             return False
-<<<<<<< HEAD
-    return True
-=======
     return True
 
 def has_stairs(item, height_threshold = 0.3):
@@ -217,4 +209,3 @@ def reset_topdown_camera(robot):
         orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
         robot_pos = robot.isaac_robot.get_world_pose()[0]
         robot.sensors['topdown_camera_50']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
->>>>>>> spring_festival_2025
