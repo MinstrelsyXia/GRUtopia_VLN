@@ -4,7 +4,11 @@ from vln.src.models.utils.feature_extract import extract_instruction_tokens
 from vln.src.utils.utils import batch_obs
 from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
 from vln.src.v2.util.common import check_is_on_track
+<<<<<<< HEAD
 from grutopia.core.util.log import log
+=======
+from vln.src.v2.util.common_log_util import common_logger as log
+>>>>>>> spring_festival_2025
 import numpy as np
 import torch
 import time
@@ -135,6 +139,7 @@ class DiscreteDaggerController:
         need_path_plan = self.if_need_path_plan()
         if not need_path_plan:
             self.planner_action_index += 1
+<<<<<<< HEAD
             return self.planner_action_list[self.planner_action_index]
         goal = self.nav_path[current_point_index + 1]
         map_info = self.context.get_global_map(robot_height=1.55)
@@ -142,6 +147,15 @@ class DiscreteDaggerController:
         robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
         height, width = self.context.topdown_global_map_camera._camera._resolution
         action_list, real_points, find_flag = plan_and_get_actions_discrete(
+=======
+            return self.planner_action_list[self.planner_action_index], None
+        goal = self.nav_path[current_point_index + 1]
+        map_info = self.context.get_global_map(robot_height=1.55, dilation_iterations=2)
+        camera_pose = self.context.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
+        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+        height, width = self.context.topdown_global_map_camera._camera._resolution
+        action_list, real_points, find_flag, reason = plan_and_get_actions_discrete(
+>>>>>>> spring_festival_2025
             map_info=map_info,
             robot_position=robot_position,
             robot_rotation=robot_rotation,
@@ -153,12 +167,20 @@ class DiscreteDaggerController:
             path_planner=self.path_planner,
         )
         if not find_flag or len(action_list) == 0:
+<<<<<<< HEAD
             return None
+=======
+            return None, reason
+>>>>>>> spring_festival_2025
         self.planner_action_list = action_list
         self.planner_real_point_list = real_points
         self.planner_action_index = 0
         
+<<<<<<< HEAD
         return self.planner_action_list[0]
+=======
+        return self.planner_action_list[0], reason
+>>>>>>> spring_festival_2025
 
     def get_next_action(
         self,
@@ -171,6 +193,7 @@ class DiscreteDaggerController:
             self.change_mode_if_needed()
         policy_action, rgb, depth = self.get_next_action_by_policy()
         if self.mode == 1:
+<<<<<<< HEAD
             planner_action = self.get_next_action_by_planner(current_point_index)
             self.prev_action = planner_action
             self.total_planner_count +=1
@@ -179,6 +202,16 @@ class DiscreteDaggerController:
             self.prev_action = policy_action
             self.total_policy_count +=1
             return policy_action, 'policy', rgb, depth
+=======
+            planner_action, reason = self.get_next_action_by_planner(current_point_index)
+            self.prev_action = planner_action
+            self.total_planner_count +=1
+            return planner_action,'planner', rgb, depth, reason
+        else:
+            self.prev_action = policy_action
+            self.total_policy_count +=1
+            return policy_action, 'policy', rgb, depth, None
+>>>>>>> spring_festival_2025
     
     def report(self):
         total = self.total_policy_count + self.total_planner_count

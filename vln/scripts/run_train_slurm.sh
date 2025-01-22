@@ -1,15 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=cmaFlash         # 作业名称
-#SBATCH --output=logs/%x_%j.out          # 标准输出文件路径 (%j 会被替换为作业ID)
-#SBATCH --error=logs/%x_%j.err           # 标准错误文件路径
-#SBATCH --gres=gpu:4                 # GPU请求
-#SBATCH --cpus-per-task=24            # 每个任务的CPU核心数
+#SBATCH --job-name=cmaDaggerTrain         # 作业名称
+#SBATCH --output=logs/%j_%x.out          # 标准输出文件路径
+#SBATCH --error=logs/%j_%x.err           # 标准错误文件路径
+#SBATCH --gres=gpu:1                 # GPU请求
+#SBATCH --cpus-per-task=6            # 每个任务的CPU核心数
 #SBATCH --partition=smartbot              # 使用GPU分区
 #SBATCH --mem=128G                     # 总内存分配
 
 # 创建日志目录
 mkdir -p logs
 
+module load anaconda/2024.02
+module unload tensorboard
 source activate grutopia_train
 
 export MAGNUM_LOG=quiet

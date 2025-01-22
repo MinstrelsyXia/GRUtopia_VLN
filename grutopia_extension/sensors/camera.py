@@ -3,7 +3,6 @@ from typing import Dict
 import numpy as np
 import omni.replicator.core as rep
 from omni.isaac.sensor import Camera as i_Camera
-from pxr import Usd, UsdGeom
 
 from grutopia.core.robot.robot import BaseRobot, Scene
 from grutopia.core.robot.robot_model import SensorModel
@@ -11,47 +10,6 @@ from grutopia.core.robot.sensor import BaseSensor
 from grutopia.core.util import log
 
 import carb.settings
-
-class FineCamera(i_Camera):
-
-    def get_render_product(self):
-        return self._render_product
-
-    def get_view_matrix_ros(self):
-        """3D points in World Frame -> 3D points in Camera Ros Frame
-
-        Returns:
-            np.ndarray: the view matrix that transforms 3d points in the world frame to 3d points in the camera axes
-                        with ros camera convention.
-        """
-        R_U_TRANSFORM = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
-        width, height = self.get_resolution()
-        rp = rep.create.render_product(self.prim_path, resolution=(width, height))
-        _camera_params = rep.annotators.get('CameraParams')
-        _camera_params.attach(rp)
-        camera_params = _camera_params.get_data()
-        try:
-            world_w_cam_u_T = self._backend_utils.transpose_2d(
-                self._backend_utils.convert(
-                    np.linalg.inv(camera_params['cameraViewTransform'].reshape(4, 4)),
-                    dtype='float32',
-                    device=self._device,
-                    indexed=True,
-                ))
-        except np.linalg.LinAlgError:
-            world_w_cam_u_T = self._backend_utils.transpose_2d(
-                self._backend_utils.convert(
-                    UsdGeom.Imageable(self.prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default()),
-                    dtype='float32',
-                    device=self._device,
-                    indexed=True,
-                ))
-        r_u_transform_converted = self._backend_utils.convert(R_U_TRANSFORM,
-                                                              dtype='float32',
-                                                              device=self._device,
-                                                              indexed=True)
-        return self._backend_utils.matmul(r_u_transform_converted, self._backend_utils.inverse(world_w_cam_u_T))
-
 
 @BaseSensor.register('Camera')
 class Camera(BaseSensor):
@@ -85,7 +43,7 @@ class Camera(BaseSensor):
         log.debug('name            : ' + self.config.name)
         log.debug(f'size            : {self.size}')
 
-        camera = FineCamera(prim_path=prim_path, resolution=self.size)
+        camera = i_Camera(prim_path=prim_path, resolution=self.size)
         carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False) # !!!
 
         return camera

@@ -4,7 +4,7 @@ pandas
 ftfy
 regex
 clip
-transformers
+transformers==4.28.1
 lmdb
 diffusers==0.21.4
 huggingface-hub==0.25.2
@@ -21,3 +21,8 @@ pydantic==1.9.0
 scipy
 
 # pip install -e vln/src/models/diffusion_policy
+
+# for navid
+accelerate==0.21.0
+sentencepiece==0.1.99
+timm==0.6.13

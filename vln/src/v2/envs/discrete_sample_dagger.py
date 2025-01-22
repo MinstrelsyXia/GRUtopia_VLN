@@ -1,18 +1,14 @@
 from vln.src.v2.envs.discrete_sample import DiscreteSampleSingleScanEnv
 from grutopia.core.config import SimulatorConfig
 from vln.src.v2.dataloader.sample import SamplePathKeyDataloader
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 from vln.src.v2.util import progress_log_util
 from vln.src.v2.util.discrete_planner import AStarDiscretePlanner
-from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
-from vln.src.v2.util.common import check_robot_fall, describe_action, get_action_state
+from vln.src.v2.util.common import check_robot_fall, describe_action
 from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.v2.util.data_collector import DataCollector
 from vln.src.models.init_policy import initialize_policy
-from vln.src.v2.util.eval import get_obs
 from vln.src.v2.util.discrete_dagger_controller import DiscreteDaggerController
-from vln.src.models.utils.feature_extract import extract_instruction_tokens
-from vln.src.utils.utils import batch_obs
 import numpy as np
 import torch
 
@@ -150,10 +146,12 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
                     dagger_controller.report()
                     break
 
-                action, action_type, rgb, depth = dagger_controller.get_next_action(current_point_index)
+                action, action_type, rgb, depth, reason = dagger_controller.get_next_action(current_point_index)
                 if action is None:
                     finish = True
                     result = 'path planning'
+                    if reason is not None:
+                        result = reason
                     continue
                 
                 env_action = [{'h1': {'move_by_descrete': [action]}}]

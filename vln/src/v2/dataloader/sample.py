@@ -19,7 +19,7 @@ class SamplePathKeyDataloader(BasePathKeyDataloader):
             base_data_dir=base_data_dir,
             split_data_types=split_data_types,
             robot_offset=robot_offset,
-            filter_same_trajectory=False,
+            filter_same_trajectory=True,
             revise_data=True,
         )
         self.rank = rank

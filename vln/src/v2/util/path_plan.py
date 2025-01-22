@@ -1,5 +1,5 @@
 import time
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 import math
 import matplotlib
 matplotlib.use('Agg')
@@ -92,7 +92,7 @@ def plan_and_get_actions_discrete(
     start_pixel = world_to_pixel(robot_position,camera_pose,aperture,width,height)
     goal_pixel = world_to_pixel(goal,camera_pose,aperture,width,height)
     start_time = time.time()
-    points,actions, find_flag = path_planner.planning(
+    points,actions, find_flag, reason = path_planner.planning(
         start_pixel[0], 
         start_pixel[1],
         goal_pixel[0], 
@@ -103,7 +103,7 @@ def plan_and_get_actions_discrete(
     end_time = time.time()
     log.info(f"path_planning 耗时：{(end_time - start_time)} s")
     if not find_flag:
-        return [], [], find_flag
+        return [], [], find_flag, reason
     real_points = get_real_points(yaw,points,actions,camera_pose,aperture,width,height)
     # file_name = f"path_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg" 
     # vis_nav_path(
@@ -113,4 +113,45 @@ def plan_and_get_actions_discrete(
     #     map_info, 
     #     img_save_path=os.path.join('/ssd/zhaohui/workspace/w61_grutopia_0107/test/zhaohui/', file_name)
     # )
-    return actions, real_points, find_flag
+    return actions, real_points, find_flag, reason
+
+def plan_and_get_actions_continuous(
+    map_info,
+    robot_position, 
+    goal, 
+    camera_pose,
+    aperture, 
+    width, 
+    height, 
+    path_planner
+):  
+    start_pixel = world_to_pixel(robot_position,camera_pose,aperture,width,height)
+    goal_pixel = world_to_pixel(goal,camera_pose,aperture,width,height)
+    start_time = time.time()
+    points, find_flag, reason = path_planner.planning(
+        start_pixel[0], 
+        start_pixel[1],
+        goal_pixel[0], 
+        goal_pixel[1],
+        obs_map=map_info,
+    )
+    end_time = time.time()
+    log.info(f"path_planning 耗时：{(end_time - start_time)} s")
+    # file_name = f"path_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg" 
+    # vis_nav_path(
+    #     start_pixel, 
+    #     goal_pixel, 
+    #     points, 
+    #     occupancy_map, 
+    #     img_save_path=os.path.join('/ssd/zhaohui/workspace/w61_grutopia_1207/test/zhaohui/', file_name)
+    # )
+    if find_flag:
+        transfer_paths = []
+        for node in points:
+            world_coords = pixel_to_world(node,camera_pose,aperture,width,height)
+            transfer_paths.append([world_coords[0], world_coords[1], robot_position[2]])
+    else:
+        transfer_paths = None
+    if transfer_paths is not None and len(transfer_paths)>1:
+        transfer_paths.pop(0)
+    return transfer_paths, find_flag, reason
