@@ -51,6 +51,11 @@ if __name__ == "__main__":
         required=True,
         help="cfg_file",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False
+    )
     args = parser.parse_args()
     rank = args.rank
     scan = args.scan
@@ -105,18 +110,23 @@ if __name__ == "__main__":
         dataloader,
     )
     
-    monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
-    monitor_thread.start()
-
-    try:
-        log.info("env.eval()")
+    if args.debug:
+        log.info("DEBUG MODE")
         env.eval()
-        env.stop()
-    except Exception as e:
-        error_message = traceback.format_exc()
-        log.error(error_message)
-    except KeyboardInterrupt:
-        log.info("Program stopped by user.")
-    finally:
-        log.info("Program terminated.")
-        os.kill(os.getpid(), 9) 
+
+    else:
+        monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
+        monitor_thread.start()
+
+        try:
+            log.info("env.eval()")
+            env.eval()
+            env.stop()
+        except Exception as e:
+            error_message = traceback.format_exc()
+            log.error(error_message)
+        except KeyboardInterrupt:
+            log.info("Program stopped by user.")
+        finally:
+            log.info("Program terminated.")
+            os.kill(os.getpid(), 9) 

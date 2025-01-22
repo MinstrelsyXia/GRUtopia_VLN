@@ -1,10 +1,6 @@
 from enum import Enum
 import math
-<<<<<<< HEAD
-from grutopia.core.util.log import log
-=======
 from vln.src.v2.util.common_log_util import common_logger as log
->>>>>>> spring_festival_2025
 import numpy as np
 
 class AStarDiscretePlanner:
@@ -65,11 +61,7 @@ class AStarDiscretePlanner:
         d = w * math.hypot(n1.x - n2.x, n1.y - n2.y)
         return d
 
-<<<<<<< HEAD
-    def verify_node(self, node):
-=======
     def verify_node(self, node, obs_map):
->>>>>>> spring_festival_2025
         px = self.calc_grid_position(node.x, self.min_x)
         py = self.calc_grid_position(node.y, self.min_y)
 
@@ -83,11 +75,7 @@ class AStarDiscretePlanner:
             return False
 
         # collision check
-<<<<<<< HEAD
-        if self.obstacle_map[node.x][node.y] == 255:
-=======
         if obs_map[node.x][node.y] == 255:
->>>>>>> spring_festival_2025
             return False
 
         return True
@@ -193,10 +181,7 @@ class AStarDiscretePlanner:
             s_y: start y position [m]
             gx: goal x position [m]
             gy: goal y position [m]
-<<<<<<< HEAD
-=======
             min_final_meter: 像素点的个数(0.25米差不多是 6 个像素)
->>>>>>> spring_festival_2025
 
         output:
             rx: x position list of the final path
@@ -213,25 +198,14 @@ class AStarDiscretePlanner:
                                self.calc_xy_index(sy, self.min_y), 0.0, -1, angle)
         goal_node = self.Node(self.calc_xy_index(gx, self.min_x),
                               self.calc_xy_index(gy, self.min_y), 0.0, -1, 0)
-<<<<<<< HEAD
-
-        if obs_map[goal_node.x, goal_node.y] == 255:
-            log.warning("Goal is in the obstacle.")
-            return [], [], False
-=======
         reason = None
         if obs_map[goal_node.x, goal_node.y] == 255:
             reason = 'goal_in_obstacle'
             return [], [], False, reason
->>>>>>> spring_festival_2025
 
         open_set, closed_set = dict(), dict()
         open_set[self.calc_grid_index(start_node)] = start_node
         motions = self.get_motions(yaw)
-<<<<<<< HEAD
-        self.obstacle_map = obs_map
-=======
->>>>>>> spring_festival_2025
         cost_map = np.where(obs_map == 0, 240, obs_map)
         cost_map = np.where(cost_map == 2, 0, cost_map)
 
@@ -239,11 +213,7 @@ class AStarDiscretePlanner:
         while step < self.max_step:
             step += 1
             if len(open_set) == 0:
-<<<<<<< HEAD
-                log.info("Path Planning failed! Open set is empty..")
-=======
                 reason = 'open_set_empty'
->>>>>>> spring_festival_2025
                 break
 
             c_id = min(open_set,key=lambda o: open_set[o].cost)
@@ -279,11 +249,7 @@ class AStarDiscretePlanner:
                 next_node.cost = current.cost + next_cost + obs_cost
                 n_id = self.calc_grid_index(next_node)
                 # If the node is not safe, do nothing
-<<<<<<< HEAD
-                if not self.verify_node(next_node):
-=======
                 if not self.verify_node(next_node, obs_map):
->>>>>>> spring_festival_2025
                     continue
                 if n_id in closed_set:
                     continue
@@ -295,18 +261,10 @@ class AStarDiscretePlanner:
                         open_set[n_id] = next_node
         find_flag = True
         if step == self.max_step:
-<<<<<<< HEAD
-            log.info("Cannot find path. Return the path to the nearest node")
-=======
             reason = 'plan_max_step'
->>>>>>> spring_festival_2025
             goal_node = current
             find_flag = False
         actions = []
         points, actions = self.calc_final_path_and_actions(goal_node, closed_set)
         
-<<<<<<< HEAD
-        return points, actions, find_flag
-=======
         return points, actions, find_flag, reason
->>>>>>> spring_festival_2025
