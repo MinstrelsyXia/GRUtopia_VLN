@@ -100,12 +100,12 @@ def get_env_by_config(
         sample_type = config["sample_type"]
         if sample_type =='continuous':
             return ContinuousSampleSingleScanEnv(
-                sim_config,
-                scene_asset_path,
-                start_position,
-                start_rotation,
-                headless,
-                dataloader,
+                sim_config=sim_config,
+                scene_asset_path=scene_asset_path,
+                start_position=start_position,
+                start_rotation=start_rotation,
+                headless=headless,
+                dataloader=dataloader,
             )
         else:
             if flash:
@@ -118,22 +118,22 @@ def get_env_by_config(
                     ckpt_to_load = config["ckpt_to_load"]
                     eval_config = get_eval_config(PROJECT_ROOT_PATH,ckpt_to_load)
                     return DiscreteSampleDaggerSingleScanEnv(
-                        sim_config,
-                        scene_asset_path,
-                        start_position,
-                        start_rotation,
-                        headless,
-                        dataloader,
-                        eval_config,
-                        dagger_percentage,
+                        sim_config=sim_config,
+                        scene_asset_path=scene_asset_path,
+                        start_position=start_position,
+                        start_rotation=start_rotation,
+                        headless=headless,
+                        dataloader=dataloader,
+                        eval_config=eval_config,
+                        policy_probability=dagger_percentage,
                     )
                 else:
                     return DiscreteSampleSingleScanEnv(
-                        sim_config,
-                        scene_asset_path,
-                        start_position,
-                        start_rotation,
-                        headless,
-                        dataloader,
+                        sim_config=sim_config,
+                        scene_asset_path=scene_asset_path,
+                        start_position=start_position,
+                        start_rotation=start_rotation,
+                        headless=headless,
+                        dataloader=dataloader,
                     )
                 
