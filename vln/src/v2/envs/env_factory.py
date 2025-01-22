@@ -78,7 +78,21 @@ def get_eval_config(
         },
         "use_pbar":False,
     }
-    return Config(eval_config)
+
+    seq2seq_eval_config = eval_config.copy()
+    seq2seq_eval_config['MODEL']['policy_name'] = 'Seq2SeqPolicy'
+    seq2seq_eval_config['MODEL']['INSTRUCTION_ENCODER']['bidirectional'] = False
+    seq2seq_eval_config['MODEL']['SEQ2SEQ']= {}
+    seq2seq_eval_config['MODEL']['SEQ2SEQ']['use_prev_action'] = False
+
+    if 'CMA' in ckpt_to_load:
+        return_config = Config(eval_config)
+    elif 'Seq2Seq' in ckpt_to_load:
+        return_config = Config(seq2seq_eval_config)
+    else:
+        print(f"ckpt_to_load:{ckpt_to_load}")
+        return_config = Config(eval_config)
+    return return_config
 
 def get_env_by_config(
     config,
