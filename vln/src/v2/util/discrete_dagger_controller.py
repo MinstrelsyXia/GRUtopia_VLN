@@ -135,7 +135,7 @@ class DiscreteDaggerController:
         need_path_plan = self.if_need_path_plan()
         if not need_path_plan:
             self.planner_action_index += 1
-            return self.planner_action_list[self.planner_action_index]
+            return self.planner_action_list[self.planner_action_index], None
         goal = self.nav_path[current_point_index + 1]
         map_info = self.context.get_global_map(robot_height=1.55, dilation_iterations=2)
         camera_pose = self.context.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
