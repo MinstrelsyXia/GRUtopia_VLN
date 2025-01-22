@@ -4,10 +4,7 @@ import msgpack_numpy
 from vln.src.v2.util.eval import(
     generate_eval_key
 )
-<<<<<<< HEAD
-=======
 from vln.src.v2.dataloader.data_reviser import skip_list
->>>>>>> spring_festival_2025
 
 class EvalPathKeyDataloader(BasePathKeyDataloader):
     def __init__(
@@ -27,10 +24,7 @@ class EvalPathKeyDataloader(BasePathKeyDataloader):
             split_data_types=split_data_types,
             robot_offset=robot_offset,
             filter_same_trajectory=False,
-<<<<<<< HEAD
-=======
             revise_data=True,
->>>>>>> spring_festival_2025
         )
         self.rank = rank
         self.lmdb_path = lmdb_path
@@ -39,11 +33,7 @@ class EvalPathKeyDataloader(BasePathKeyDataloader):
         self.retry_list = retry_list
         # 获取当前 rank 需要 eval 的数据
         key = f"eval_rank_{self.rank}"
-<<<<<<< HEAD
-        database = lmdb.open(f"{self.lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
-=======
         database = lmdb.open(f"{self.lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, readonly=True, lock=False)
->>>>>>> spring_festival_2025
         with database.begin() as txn:
             value = txn.get(key.encode())
             if value is None:
@@ -60,12 +50,9 @@ class EvalPathKeyDataloader(BasePathKeyDataloader):
         # 根据完成情况进行过滤
         filtered_target_path_key_list = []
         for path_key in target_path_key_list:
-<<<<<<< HEAD
-=======
             trajectory_id = path_key.split('_')[0]
             if int(trajectory_id) in skip_list:
                 continue
->>>>>>> spring_festival_2025
             eval_key = generate_eval_key(ckpt_name=self.ckpt_name,path_key=path_key)
             with database.begin() as txn:
                 value = txn.get(eval_key.encode())
