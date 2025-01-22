@@ -24,6 +24,7 @@ class EvalPathKeyDataloader(BasePathKeyDataloader):
             split_data_types=split_data_types,
             robot_offset=robot_offset,
             filter_same_trajectory=False,
+            revise_data=True,
         )
         self.rank = rank
         self.lmdb_path = lmdb_path

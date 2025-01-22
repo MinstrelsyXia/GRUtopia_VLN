@@ -4,6 +4,8 @@ from vln.src.v2.envs.continuous_sample import ContinuousSampleSingleScanEnv
 from vln.src.v2.envs.discrete_flash_sample import DiscreteFlashSampleSingleScanEnv
 from vln.src.v2.envs.discrete_sample import DiscreteSampleSingleScanEnv
 from vln.src.v2.envs.discrete_sample_dagger import DiscreteSampleDaggerSingleScanEnv
+from vln import PROJECT_ROOT_PATH
+from vln.src.utils.utils import Config
 
 def get_eval_config(
     project_path,
@@ -76,7 +78,7 @@ def get_eval_config(
         },
         "use_pbar":False,
     }
-    return eval_config
+    return Config(eval_config)
 
 def get_env_by_config(
     config,
@@ -109,9 +111,29 @@ def get_env_by_config(
             if flash:
                return DiscreteFlashSampleSingleScanEnv()
             else:
-                dagger_percentage = config["dagger_percentage"]
+                dagger_percentage = 0
+                if 'dagger_percentage' in config:
+                    dagger_percentage = config["dagger_percentage"]
                 if dagger_percentage > 0:
-                    return DiscreteSampleDaggerSingleScanEnv()
+                    ckpt_to_load = config["ckpt_to_load"]
+                    eval_config = get_eval_config(PROJECT_ROOT_PATH,ckpt_to_load)
+                    return DiscreteSampleDaggerSingleScanEnv(
+                        sim_config,
+                        scene_asset_path,
+                        start_position,
+                        start_rotation,
+                        headless,
+                        dataloader,
+                        eval_config,
+                        dagger_percentage,
+                    )
                 else:
-                    return DiscreteSampleSingleScanEnv()
+                    return DiscreteSampleSingleScanEnv(
+                        sim_config,
+                        scene_asset_path,
+                        start_position,
+                        start_rotation,
+                        headless,
+                        dataloader,
+                    )
                 

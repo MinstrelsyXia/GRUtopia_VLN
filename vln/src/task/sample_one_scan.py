@@ -11,7 +11,8 @@ from vln.src.v2.envs.env_factory import get_env_by_config
 from vln.src.utils.utils import Config
 import numpy as np
 import sys
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
+from vln.src.v2.util import common_log_util 
 from vln import PROJECT_ROOT_PATH
 import json
 
@@ -69,6 +70,7 @@ if __name__ == "__main__":
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
     name = config["name"]
+    common_log_util.init(name,rank)
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list = config["retry_list"]
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'

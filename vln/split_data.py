@@ -2,35 +2,14 @@ import argparse
 from vln import PROJECT_ROOT_PATH
 import sys
 import os
-from vln.src.dataset.data_utils_multi_env import load_gather_data
+from vln.src.v2.util.common import load_data
 from vln.src.utils.utils import Config
 import os
 import lmdb
 import msgpack_numpy
 import json
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--cfg_file",
-        type=str,
-        required=True,
-        help="cfg_file",
-    )
-    args = parser.parse_args()
-    cfg_file = args.cfg_file
-    print(f"cfg_file:{cfg_file}")
-
-    project_path = PROJECT_ROOT_PATH
-    cfg_file_path = f"{project_path}/{cfg_file}"
-    if not os.path.exists(cfg_file_path):
-        print(f"{cfg_file_path} not exist")
-        sys.exit()
-    with open(cfg_file_path, 'r') as file:
-        config = json.load(file)
-    print(f"config:{config}")
-
+def split_data(config):
     split_number = config["total_rank"]
     task_type = config["task_type"]
     name = config["name"]
@@ -49,19 +28,14 @@ if __name__ == "__main__":
         print(f"unknown task_type:{task_type}")
         sys.exit()
     
-    base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-    lmdb_path = project_path + f'/data/sample_episodes/{name}'
+    base_data_dir = f'{PROJECT_ROOT_PATH}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    lmdb_path = PROJECT_ROOT_PATH + f'/data/sample_episodes/{name}'
 
     #获取所有数据
-    args_dict = {
-        "datasets":{
-            "base_data_dir":base_data_dir
-        }
-    }
     path_key_map = {}
     count=0
     for split_data_type in split_data_types:
-        data_map, _ = load_gather_data(Config(args_dict), split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True)
+        data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True)
         for scan,path_list in data_map.items():
             path_key_list = []
             for path in path_list:
@@ -115,3 +89,24 @@ if __name__ == "__main__":
             txn.put(key, value)
             print(f"finish [key:{key}]")
     database.close()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--cfg_file",
+        type=str,
+        required=True,
+        help="cfg_file",
+    )
+    args = parser.parse_args()
+    cfg_file = args.cfg_file
+    print(f"cfg_file:{cfg_file}")
+
+    cfg_file_path = f"{PROJECT_ROOT_PATH}/{cfg_file}"
+    if not os.path.exists(cfg_file_path):
+        print(f"{cfg_file_path} not exist")
+        sys.exit()
+    with open(cfg_file_path, 'r') as file:
+        config = json.load(file)
+    print(f"config:{config}")
+    split_data(config)

@@ -2,6 +2,8 @@ import logging
 import os
 from dataclasses import dataclass
 import time
+from vln.src.v2.util.common_log_util import get_name
+from vln import PROJECT_ROOT_PATH
 
 progress_logger = logging.getLogger('progress_logger')
 progress_logger.setLevel(logging.INFO)
@@ -32,9 +34,10 @@ def init(scan, path_count,rank=0):
     global PROGRESS
     global INITED
     PROGRESS = ProgressInfo(scan,path_count)
-    if not os.path.exists('logs/progress/'):
-        os.makedirs('logs/progress/')
-    file_handler = logging.FileHandler(f'logs/progress/scan_{scan}_rank_{rank}.log')
+    log_dir = f"{PROJECT_ROOT_PATH}/logs/{get_name()}/progress/"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    file_handler = logging.FileHandler(f'{log_dir}/scan_{scan}_rank_{rank}.log')
     file_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s')
     file_handler.setFormatter(formatter)

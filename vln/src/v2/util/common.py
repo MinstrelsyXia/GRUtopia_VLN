@@ -1,7 +1,10 @@
 import numpy as np
 from scipy.ndimage import binary_dilation
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 import math
+import os
+import json
+from collections import defaultdict
 
 def create_robot_mask(
     topdown_global_map_camera,
@@ -111,3 +114,67 @@ def check_is_on_track(
             log.info(f"[yaw_diff: {round(yaw_diff * (180 / math.pi))} 度 > 30 度] replanning")
             return False
     return True
+
+def has_stairs(item, height_threshold = 0.3):
+    has_stairs = False
+    if 'stair' in item['instruction']['instruction_text']:
+        latest_height = item['reference_path'][0][-1]
+        for index in range(1, len(item['reference_path'])):
+            position = item['reference_path'][index]
+            if abs(position[-1] - latest_height) >= height_threshold:
+                has_stairs = True
+                break
+            else:
+                latest_height = position[-1]
+    return has_stairs
+
+def different_height(item):
+    different_height = False
+    paths = item['reference_path']
+    for path_idx in range(len(paths)-1):
+        if abs(paths[path_idx+1][2] - paths[path_idx][2]) > 0.3:
+            different_height = True
+            break
+    return different_height
+
+def load_data(
+    dataset_root_dir, 
+    split, 
+    filter_same_trajectory=True, 
+    filter_stairs=True, 
+):
+    with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
+        data = json.load(f)
+    new_data = defaultdict(list)
+
+    # filter_same_trajectory
+    if filter_same_trajectory:
+        total_count = 0
+        remaining_count = 0
+        trajectory_list = []
+        for scan, data_item in data.items():
+            for item in data_item:
+                total_count +=1
+                if item['trajectory_id'] in trajectory_list:
+                    continue
+                remaining_count+=1
+                trajectory_list.append(item['trajectory_id'])
+                new_data[scan].append(item)
+        log.info(f"filter_same_trajectory remain: [ {remaining_count} / {total_count} ]")
+        data = new_data
+        new_data = defaultdict(list)
+
+    if filter_stairs:
+        total_count = 0
+        remaining_count = 0
+        for scan, data_item in data.items():
+            for item in data_item:
+                total_count +=1
+                if has_stairs(item) or different_height(item):
+                    continue
+                remaining_count+=1
+                new_data[scan].append(item)
+        log.info(f"filter_stairs remain: [ {remaining_count} / {total_count} ]")
+        data = new_data
+
+    return data
