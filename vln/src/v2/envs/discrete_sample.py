@@ -1,9 +1,7 @@
 from .base import BaseSingleScanEnv
 from grutopia.core.config import SimulatorConfig
 from vln.src.v2.dataloader.sample import SamplePathKeyDataloader
-import time
-import sys
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 from vln.src.v2.util import progress_log_util
 from vln.src.v2.util.discrete_planner import AStarDiscretePlanner
 from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
@@ -15,7 +13,6 @@ from vln.src.v2.util.common import (
 )
 from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.v2.util.data_collector import DataCollector
-import math
 import numpy as np
 
 class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
@@ -42,11 +39,6 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
         self.aperture = aperture
         self.max_step = max_step
         self.robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
-        self.timestamp = time.time()
-
-    def update_timestamp(self):
-        self.timestamp = time.time()
-        sys.stdout.flush()
 
     def execute_one_action(
         self,
@@ -78,9 +70,6 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             return False, fail_reason
         return True, 'success'
 
-
-
-
     def sample(self):
         self.load_scan_and_robot()
         height, width = self.topdown_global_map_camera._camera._resolution
@@ -98,7 +87,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
         scan = self.dataloader.target_scan
 
         progress_log_util.init(scan, len(sample_path_key_list), rank=self.dataloader.rank)
-        progress_log_util.progress_logger.info(f"start eval scan: {scan}, total_path:{len(sample_path_key_list)}")
+        progress_log_util.progress_logger.info(f"start sample scan: {scan}, total_path:{len(sample_path_key_list)}")
 
         for path_key in sample_path_key_list:
             split = path_key_split[path_key]
@@ -164,12 +153,12 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
                     break
-                map_info = self.get_global_map(robot_height=1.55,)
+                map_info = self.get_global_map(robot_height=1.55, dilation_iterations=2)
                 camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
                 
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
                 # path_plan
-                action_list, real_points, find_flag = plan_and_get_actions_discrete(
+                action_list, real_points, find_flag, reason = plan_and_get_actions_discrete(
                     map_info=map_info,
                     robot_position=robot_position,
                     robot_rotation=robot_rotation,
@@ -183,6 +172,8 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                 if not find_flag or action_list is None or len(action_list) == 0:
                     finish = True
                     result = 'path planning'
+                    if reason is not None:
+                        result = reason
                     continue
                 
                 action_index = 0

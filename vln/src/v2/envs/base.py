@@ -5,6 +5,8 @@ from vln.src.v2.util.common import(
     create_robot_mask,
     freemap_to_accupancy_map,
 )
+import time
+import sys
 
 class BaseSingleScanEnv:
     def __init__(
@@ -24,6 +26,11 @@ class BaseSingleScanEnv:
         self.task = None
         self.robot = None
         self.isaac_robot = None
+        self.timestamp = time.time()
+
+    def update_timestamp(self):
+        self.timestamp = time.time()
+        sys.stdout.flush()
 
     def load_scan_and_robot(self):
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path

@@ -879,11 +879,12 @@ class CMA_DP_Net(nn.Module):
 
         if self.config.EVAL.ACTION == 'xyyaw' or self.config.EVAL.ACTION == 'speed':
             actions = []
+            output_stop = False
             # un_actions = un_actions_nocumsum.detach().cpu().numpy()
             for idx in range(un_actions_nocumsum[0].shape[0]):
                 if stop_mode in ['progress', 'stop_progress']:
                     if stop_mode == 'stop_progress':
-                        stop_flag = stop_pm_pred[0].item() > self.config.EVAL.stop_pm_threshold
+                        stop_flag = stop_pm_pred[0].item() > self.config.EVAL.continuous_stop_pm_threshold
                     else:
                         stop_flag = pm_pred[0].item() > self.config.EVAL.pm_threshold
                     M_stops = 3
@@ -901,9 +902,13 @@ class CMA_DP_Net(nn.Module):
                         if consecutive_stops or stop_flag:
                             # Only stop if we have 4 consecutive stop actions and progress monitor threshold is met
                             actions.append("STOP")
+                            output_stop = True
                             continue
                 actions.append(un_actions[0][idx]) 
             
+            if output_stop:
+                # once stop, the action should be stop
+                actions[0] = "STOP"
             actions = [actions]
         elif self.config.EVAL.ACTION == 'descrete':
             # 0: stop, 1: move forward, 2: turn left, 3: turn right
