@@ -1,8 +1,8 @@
 {
-    "name" : "20250123_height1.75_seed0_0507",
+    "name" : "20250122_seq2seq_eval",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250111_cma_height1.75/ckpts/ckpt.44_converted.pth",
-    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
+    "ckpt_to_load" : "data/checkpoints/Seq2Seq_habitat_sota/Seq2Seq_DA_converted.pth",
+    "eval_cfg_file": "vln/configs/train/seq2seq_eval.yaml",
     "image" : "w61_grutopia:v0.4",
     "total_rank": 8,
     "retry_list":[],

@@ -12,7 +12,7 @@ NUM_ENVIRONMENTS: 4
 TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
 EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
-EVAL_CKPT_PATH_DIR: data/checkpoints/CMA_habitat_SOTA/converted/Seq2Seq_DA_converted.pth
+EVAL_CKPT_PATH_DIR: data/checkpoints/Seq2Seq_habitat_sota/Seq2Seq_DA_converted.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
@@ -96,7 +96,7 @@ IL:
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: true
-  ckpt_to_load: none
+  ckpt_to_load: data/checkpoints/Seq2Seq_habitat_sota/Seq2Seq_DA_converted.pth
   load_from_pretrain: false
 
   camera_name: 'pano_camera_0'
@@ -162,7 +162,7 @@ MODEL:
     cnn_type: "VlnResnetDepthEncoder"
     output_size: 128
     backbone: "resnet50"
-    ddppo_checkpoint: "data/ddppo-models/gibson-4plus-mp3d-train-val-test-resnet50.pth"
+    ddppo_checkpoint: "data/ddppo-models/gibson-2plus-resnet50.pth"
     trainable: False
   
   STATE_ENCODER:
