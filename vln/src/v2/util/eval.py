@@ -6,7 +6,6 @@ from vln.src.v2.util.common import (
     check_robot_fall, 
     describe_action, 
     get_action_state,
-    reset_topdown_camera,
     get_new_position_and_rotation
 )
 from vln.src.v2.util.common_log_util import common_logger as log
@@ -45,23 +44,6 @@ class Statistic_Info:
         self.shortest_to_goal_distance = shortest_to_goal_distance
         self.success_distance = success_distance
     
-    def _update_states(
-        self,
-        step,
-        robot_position, 
-        robot_rotation,
-        instruction,
-    ):
-        if step % self.step_interval != 0:
-            return
-        # outputs_dict = get_obs(self.env,instruction,robot_position,robot_rotation)
-        # for idx in range(len(outputs_dict)):
-            # self.stack_rgb[idx].push(outputs_dict[idx]["rgb"])
-            # self.stack_depth[idx].push(outputs_dict[idx]["depth"])
-            # self.prev_globalgps[idx].push(outputs_dict[idx]["globalgps"])
-            # self.prev_globalyaw[idx].push(outputs_dict[idx]["global_rotation"][-1])
-        self.pred_traj_list[0].append(robot_position)
-
     def compute_metrics(
         self, 
         robot_position, 
@@ -229,14 +211,6 @@ class ActionExecutor:
                     reason = desc
                     log.warning(f"Current action has been interrupted by {reason}.")
                     break
-            
-            if not finish_state:
-                self.statistic_info._update_states(
-                    step=step,
-                    robot_position=robot_position,
-                    robot_rotation=robot_rotation,
-                    instruction=self.instruction,
-                )
         return dones, reason
 
     def env_step(
@@ -258,16 +232,7 @@ class ActionExecutor:
         
         robot_position, robot_rotation = self.isaac_robot.get_world_pose()
         outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation)
-        if action_name == 'move_to_point':
-            self.statistic_info.pred_traj_list[0].extend(actions[0]['h1']['move_to_point'])
-        
-        self.statistic_info._update_states(
-            step=self.statistic_info.step_interval,
-            robot_position=robot_position, 
-            robot_rotation=robot_rotation,
-            instruction=self.instruction,
-        )
-        
+        self.statistic_info.pred_traj_list[0].append(robot_position)
         infos = self.statistic_info.compute_metrics(robot_position=robot_position,fail_reason=reason)
         
         if action_name == 'move_by_descrete':
@@ -289,10 +254,12 @@ class FlashActionExecutor:
         task, 
         statistic_info:Statistic_Info,
         context,
+        total_max_step,
     ):
         # 执行 step 用到的工具类
         self.env=env
         self.task=task
+        self.total_max_step = total_max_step
         # 统计信息
         self.statistic_info = statistic_info
         # 可以优化掉的变量
@@ -308,8 +275,8 @@ class FlashActionExecutor:
         robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
         new_robot_position, new_robot_rotation = get_new_position_and_rotation(robot_position, robot_rotation,action)
         self.context.reset_robot(new_robot_position,new_robot_rotation)
-        reset_topdown_camera(self.context.robot)
         self.env.step(actions=[{'h1':{'stand_still': []}}], render=True)
+        self.statistic_info.sim_step += 1
         self.statistic_info.current_path_length += np.linalg.norm(new_robot_position[:2] - robot_position[:2])
 
     def env_step(
@@ -323,17 +290,13 @@ class FlashActionExecutor:
             dones = [True]
         else:
             self._execute_action(action)
+            if self.statistic_info.sim_step > self.total_max_step:
+                dones = [True]
+                reason = 'exceed_total_max_step'
         
         robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
         outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation)
-        
-        self.statistic_info._update_states(
-            step=self.statistic_info.step_interval,
-            robot_position=robot_position, 
-            robot_rotation=robot_rotation,
-            instruction=self.instruction,
-        )
-        
+        self.statistic_info.pred_traj_list[0].append(robot_position)
         infos = self.statistic_info.compute_metrics(robot_position=robot_position,fail_reason=reason)
         log.info(f"[descrete][step:{self.statistic_info.sim_step}] 完成动作:{describe_action(action)},距离目标 {round(infos[0]['NE'],2)} 米")
         return {
