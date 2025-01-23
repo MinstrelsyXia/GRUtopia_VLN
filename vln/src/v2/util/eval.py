@@ -287,51 +287,18 @@ class FlashActionExecutor:
         self, 
         env:BaseEnv, 
         task, 
-        stuck_checker:StuckChecker,
-        robot,
-
-        per_action_max_step,
-        total_max_step,
-        robot_ankle_height,
-
         statistic_info:Statistic_Info,
         context,
     ):
         # 执行 step 用到的工具类
         self.env=env
         self.task=task
-        self.stuck_checker = stuck_checker
-        self.robot = robot
-        self.isaac_robot = self.robot.isaac_robot
-
-        # 执行 step 需要的配置信息
-        self.per_action_max_step=per_action_max_step
-        self.total_max_step = total_max_step
-        self.robot_ankle_height = robot_ankle_height
         # 统计信息
         self.statistic_info = statistic_info
         # 可以优化掉的变量
         self.instruction = self.statistic_info.path_data['instruction']
         # 进程 stuck 检查使用
         self.context = context
-
-    def _check_max_steps(self, step):
-        if step > self.per_action_max_step:
-            return True, 'exceed_per_action_max_step'
-        if self.statistic_info.sim_step > self.total_max_step:
-            return True, 'exceed_total_max_step'
-        return False, ''
-
-    def _check_fall_and_stuck(self,robot_position,robot_rotation,step):
-        is_stuck = self.stuck_checker.check_robot_stuck(robot_position, robot_rotation, cur_iter=step, max_iter=2500, threshold=0.2)
-        robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-        is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
-
-        if is_stuck or is_fall:
-            reason = 'fall' if is_fall else 'stuck'
-            log.warning(f"Current action has been interrupted by {reason}.")
-            return [True], reason
-        return [False], ''
 
     def _execute_action(
         self,
@@ -357,7 +324,7 @@ class FlashActionExecutor:
         else:
             self._execute_action(action)
         
-        robot_position, robot_rotation = self.isaac_robot.get_world_pose()
+        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
         outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation)
         
         self.statistic_info._update_states(

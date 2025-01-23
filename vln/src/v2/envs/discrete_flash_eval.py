@@ -13,7 +13,6 @@ from vln.src.models.utils.feature_extract import extract_instruction_tokens
 import torch
 from vln.src.utils.utils import batch_obs
 import numpy as np
-from vln.src.v2.util.stuck_checker import StuckChecker
 import lmdb
 import msgpack_numpy
 from vln.src.models.init_policy import initialize_policy
@@ -103,7 +102,6 @@ class DiscreteFlashEvalSingleScanEnv(BaseSingleScanEnv):
             self.reset_robot(start_position, start_rotation)
             self.warm_up(240)
 
-            stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
             # map_info = self.topdown_snapshot()
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation)
@@ -162,13 +160,6 @@ class DiscreteFlashEvalSingleScanEnv(BaseSingleScanEnv):
                 executor = FlashActionExecutor(
                     env=self.env, 
                     task=self.task, 
-                    stuck_checker=stuck_checker,
-                    robot=self.robot,
-
-                    per_action_max_step=self.per_action_max_step,
-                    total_max_step=self.max_step,
-                    robot_ankle_height=robot_ankle_height,
-
                     statistic_info=statistic_info,
                     context=self,
                 )
