@@ -1,7 +1,7 @@
 from .base import BaseSingleScanEnv
 from grutopia.core.config import SimulatorConfig
 from vln.src.v2.dataloader.sample import SamplePathKeyDataloader
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 from vln.src.v2.util import progress_log_util
 from vln.src.v2.util.discrete_planner import AStarDiscretePlanner
 from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
@@ -153,7 +153,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
                     break
-                map_info = self.get_global_map(robot_height=1.55,)
+                map_info = self.get_global_map(robot_height=1.55, dilation_iterations=2)
                 camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
                 
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()

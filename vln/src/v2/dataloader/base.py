@@ -1,6 +1,4 @@
-from vln.src.dataset.data_utils_multi_env import load_gather_data
-import numpy as np
-from vln.src.utils.utils import Config
+from vln.src.v2.util.common import load_data
 from vln.src.v2.dataloader.data_reviser import revise_one_data, skip_list
 
 class BasePathKeyDataloader:
@@ -16,13 +14,8 @@ class BasePathKeyDataloader:
         self.path_key_scan = {}
         self.path_key_split = {}
 
-        args_dict = {
-            "datasets":{
-                "base_data_dir":base_data_dir,
-            }
-        }
         for split_data_type in split_data_types:
-            load_data_map, _ = load_gather_data(Config(args_dict), split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True)
+            load_data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True)
             for scan, path_list in load_data_map.items():
                 for path in path_list:
                     trajectory_id = path['trajectory_id']

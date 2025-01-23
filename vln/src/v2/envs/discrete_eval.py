@@ -1,7 +1,7 @@
 from .base import BaseSingleScanEnv
 from grutopia.core.config import SimulatorConfig
 from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 from vln.src.v2.util import progress_log_util
 from vln.src.v2.util.eval import(
     get_obs,
@@ -14,8 +14,6 @@ import torch
 from vln.src.utils.utils import batch_obs
 import numpy as np
 from vln.src.v2.util.stuck_checker import StuckChecker
-import time
-import sys
 import lmdb
 import msgpack_numpy
 from vln.src.models.init_policy import initialize_policy
@@ -48,7 +46,6 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         #TODO:
         self.per_action_max_step=1500
         self.max_step=25000
-        self.timestamp = time.time()
         self.lmdb_path = lmdb_path
         self.ckpt_name = ckpt_name
         policy, _, _, _ = initialize_policy(
@@ -61,9 +58,6 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         )
         self.policy = policy
 
-    def update_timestamp(self):
-        self.timestamp = time.time()
-        sys.stdout.flush()
 
     def topdown_snapshot(self):
         map_info = self.get_global_map(
@@ -110,7 +104,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
             self.warm_up(240)
 
             stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
-            map_info = self.topdown_snapshot()
+            # map_info = self.topdown_snapshot()
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation)
             observations = extract_instruction_tokens(
@@ -223,7 +217,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
 
-                    info['ext_info']=map_info
+                    # info['ext_info']=map_info
         
                     database_write = lmdb.open(f"{self.lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
                     with database_write.begin(write=True) as txn:
@@ -234,7 +228,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     stats_episodes[path_key] = info
                     spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
                     mean_spl = np.mean(list(spl_dict.values()))
-                    log.info(f"Average SPL: {mean_spl}")
+                    log.info(f"Average SPL: {mean_spl}, result:{result}")
                     break
         
         progress_log_util.report()

@@ -4,6 +4,7 @@ import sys
 import os
 import docker
 import json
+from vln.split_data import split_data
 
 client = docker.from_env()
 
@@ -14,9 +15,9 @@ def get_container_by_name(name):
         return None
 
 def stop_if_exist(name):
-    contianer = get_container_by_name(name)
-    if contianer is not None:
-        contianer.stop()
+    container = get_container_by_name(name)
+    if container is not None:
+        container.stop()
         print(f"stop container {name}")
 
 def run_container(
@@ -24,7 +25,8 @@ def run_container(
     rank=0, 
     gpus=['0'],
     image="w61_grutopia:v0.4",
-    cfg_file="vln/configs/v2/eval.json"
+    cfg_file="vln/configs/v2/eval.json",
+    log_dir="logs",
 ):
     name = f"{name_prefix}_{rank:02}"
     stop_if_exist(name)
@@ -39,7 +41,7 @@ def run_container(
     command +=f" --rank {rank}"
     command +=f" --cfg_file {cfg_file}"
     
-    command +=f" >> rank.{rank:02}.log"
+    command +=f" >> {log_dir}/rank.{rank:02}.log"
     command +=" && tail -f /dev/null"
 
     container = client.containers.run(
@@ -78,6 +80,23 @@ def run_container(
     print(f"finish start container {name}")
     return container
 
+def init(config):
+    # 初始化日志
+    name = config["name"]
+    log_dir = f"logs/{name}/rank"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    # 如果没有分配任务，就进行分配
+    lmdb_path = PROJECT_ROOT_PATH + f'/data/sample_episodes/{name}/sample_data.lmdb'
+    if not os.path.exists(lmdb_path):
+        split_data(config)
+    return log_dir
+
+def start_health_check(cfg_file):
+    command = f"nohup python {PROJECT_ROOT_PATH}/scripts/health_check.py --cfg_file {cfg_file} &"
+    os.system(command)
+    print('健康检查进程已启动')
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -100,6 +119,7 @@ if __name__ == "__main__":
     print(f"config:{config}")
     device_map = config["device_map"]
     name = config["name"]
+    log_dir = init(config)
     for rank, gpus in device_map.items():
         container = run_container(
             name_prefix=name, 
@@ -107,5 +127,6 @@ if __name__ == "__main__":
             gpus=gpus,
             image=config["image"],
             cfg_file=cfg_file,
+            log_dir=log_dir,
         )
-    
+    start_health_check(cfg_file)

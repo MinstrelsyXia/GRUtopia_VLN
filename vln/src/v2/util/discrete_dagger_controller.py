@@ -4,7 +4,7 @@ from vln.src.models.utils.feature_extract import extract_instruction_tokens
 from vln.src.utils.utils import batch_obs
 from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
 from vln.src.v2.util.common import check_is_on_track
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 import numpy as np
 import torch
 import time
@@ -135,9 +135,9 @@ class DiscreteDaggerController:
         need_path_plan = self.if_need_path_plan()
         if not need_path_plan:
             self.planner_action_index += 1
-            return self.planner_action_list[self.planner_action_index]
+            return self.planner_action_list[self.planner_action_index], None
         goal = self.nav_path[current_point_index + 1]
-        map_info = self.context.get_global_map(robot_height=1.55)
+        map_info = self.context.get_global_map(robot_height=1.55, dilation_iterations=2)
         camera_pose = self.context.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
         robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
         height, width = self.context.topdown_global_map_camera._camera._resolution

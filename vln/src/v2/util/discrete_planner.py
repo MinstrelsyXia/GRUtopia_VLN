@@ -1,6 +1,6 @@
 from enum import Enum
 import math
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 import numpy as np
 
 class AStarDiscretePlanner:

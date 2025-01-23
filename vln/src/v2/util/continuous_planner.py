@@ -1,7 +1,7 @@
 
 import math
 from shapely.geometry import LineString
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 
 class AStarPlanner:
     def __init__(

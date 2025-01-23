@@ -6,14 +6,15 @@ import sys
 from vln.src.v2.envs.discrete_sample_dagger import DiscreteSampleDaggerSingleScanEnv
 from vln.src.v2.dataloader.sample import SamplePathKeyDataloader
 from grutopia.core.config import SimulatorConfig
-from vln.src.dataset.data_utils_multi_env import load_scene_usd
+from vln.src.v2.util.common import load_scene_usd
 from vln.src.v2.envs.env_factory import get_env_by_config
-from vln.src.utils.utils import Config
 import numpy as np
 import sys
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
+from vln.src.v2.util import common_log_util 
 from vln import PROJECT_ROOT_PATH
 import json
+import traceback
 
 def check_process_stuck(env:DiscreteSampleDaggerSingleScanEnv):
     index = 0
@@ -22,11 +23,11 @@ def check_process_stuck(env:DiscreteSampleDaggerSingleScanEnv):
         current_time = time.time()
         duration = round(current_time - env.timestamp,2)
         if  duration > 300:
-            print("5分钟时间戳未更新,杀死进程")
+            log.info("5分钟时间戳未更新,杀死进程")
             os.kill(os.getpid(), 9) 
         else:
             if index % 60 == 0:
-                print(f"check_process_stuck 存活[{env.timestamp}]")
+                log.info(f"check_process_stuck 存活[{env.timestamp}]")
         sys.stdout.flush()
         time.sleep(1)
 
@@ -57,7 +58,7 @@ if __name__ == "__main__":
     project_path = PROJECT_ROOT_PATH
     cfg_file_path = f"{project_path}/{cfg_file}"
     if not os.path.exists(cfg_file_path):
-        print(f"{cfg_file_path} not exist")
+        log.info(f"{cfg_file_path} not exist")
         sys.exit()
     with open(cfg_file_path, 'r') as file:
         config = json.load(file)
@@ -69,18 +70,13 @@ if __name__ == "__main__":
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
     name = config["name"]
+    common_log_util.init(name,rank)
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list = config["retry_list"]
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
     ckpt_to_load = f"{project_path}/data/checkpoints/20250113_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger01/ckpts/ckpt.20.pth"
     sim_config = SimulatorConfig(sim_cfg_file)
-    args_dict = {
-        "datasets":{
-            "mp3d_data_dir":mp3d_data_dir,
-            "base_data_dir":base_data_dir,
-        }
-    }
-    scene_asset_path = load_scene_usd(Config(args_dict), scan)
+    scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
     dataloader=SamplePathKeyDataloader(
         base_data_dir,
         split_data_types,
@@ -115,12 +111,14 @@ if __name__ == "__main__":
     monitor_thread.start()
 
     try:
-        print("env.sample()")
+        log.info("env.sample()")
         env.sample()
         env.stop()
-        os.kill(os.getpid(), 9) 
+    except Exception as e:
+        error_message = traceback.format_exc()
+        log.error(error_message)
     except KeyboardInterrupt:
-        print("Program stopped by user.")
+        log.info("Program stopped by user.")
     finally:
-        monitor_thread.join()
-        print("Program terminated.")
+        log.info("Program terminated.")
+        os.kill(os.getpid(), 9) 

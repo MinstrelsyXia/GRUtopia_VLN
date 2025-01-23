@@ -1,7 +1,11 @@
 import numpy as np
 from scipy.ndimage import binary_dilation
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 import math
+import os
+import json
+from collections import defaultdict
+from grutopia.core.util.container import is_in_container
 
 def create_robot_mask(
     topdown_global_map_camera,
@@ -111,3 +115,134 @@ def check_is_on_track(
             log.info(f"[yaw_diff: {round(yaw_diff * (180 / math.pi))} 度 > 30 度] replanning")
             return False
     return True
+
+def has_stairs(item, height_threshold = 0.3):
+    has_stairs = False
+    if 'stair' in item['instruction']['instruction_text']:
+        latest_height = item['reference_path'][0][-1]
+        for index in range(1, len(item['reference_path'])):
+            position = item['reference_path'][index]
+            if abs(position[-1] - latest_height) >= height_threshold:
+                has_stairs = True
+                break
+            else:
+                latest_height = position[-1]
+    return has_stairs
+
+def different_height(item):
+    different_height = False
+    paths = item['reference_path']
+    for path_idx in range(len(paths)-1):
+        if abs(paths[path_idx+1][2] - paths[path_idx][2]) > 0.3:
+            different_height = True
+            break
+    return different_height
+
+def load_data(
+    dataset_root_dir, 
+    split, 
+    filter_same_trajectory=True, 
+    filter_stairs=True, 
+):
+    with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
+        data = json.load(f)
+    new_data = defaultdict(list)
+
+    # filter_same_trajectory
+    if filter_same_trajectory:
+        total_count = 0
+        remaining_count = 0
+        trajectory_list = []
+        for scan, data_item in data.items():
+            for item in data_item:
+                total_count +=1
+                if item['trajectory_id'] in trajectory_list:
+                    continue
+                remaining_count+=1
+                trajectory_list.append(item['trajectory_id'])
+                new_data[scan].append(item)
+        log.info(f"[split:{split}]filter_same_trajectory remain: [ {remaining_count} / {total_count} ]")
+        data = new_data
+        new_data = defaultdict(list)
+
+    if filter_stairs:
+        total_count = 0
+        remaining_count = 0
+        for scan, data_item in data.items():
+            for item in data_item:
+                total_count +=1
+                if has_stairs(item) or different_height(item):
+                    continue
+                remaining_count+=1
+                new_data[scan].append(item)
+        log.info(f"[split:{split}]filter_stairs remain: [ {remaining_count} / {total_count} ]")
+        data = new_data
+
+    return data
+
+def load_scene_usd(mp3d_data_dir, scan):
+    ''' Load scene USD based on the scan
+    '''
+    find_flag = False
+    for root, dirs, files in os.walk(os.path.join(mp3d_data_dir, scan)):
+        target_file_name = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
+        for file in files:
+            if file == target_file_name:
+                scene_usd_path = os.path.join(root, file)
+                find_flag = True
+                break
+        if find_flag:
+            break
+    if not find_flag:
+        log.error("Scene USD not found for scan %s", scan)
+        return None
+    return scene_usd_path
+
+def reset_topdown_camera(robot):
+    import omni.isaac.core.utils.numpy.rotations as rot_utils
+    if 'topdown_camera_500' in robot.sensors:
+        orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+        robot_pos = robot.isaac_robot.get_world_pose()[0]
+        robot.sensors['topdown_camera_500']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
+    
+    if 'topdown_camera_50' in robot.sensors:
+        orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
+        robot_pos = robot.isaac_robot.get_world_pose()[0]
+        robot.sensors['topdown_camera_50']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
+
+def get_new_position_and_rotation(robot_position, robot_rotation, action):
+    from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
+    roll, pitch, yaw = quat_to_euler_angles(robot_rotation)
+    if action == 1: # forward
+        dx = 0.25 * math.cos(yaw)
+        dy = 0.25 * math.sin(yaw)
+        new_robot_position = robot_position + [dx,dy,0]
+        new_robot_rotation = robot_rotation
+    elif action == 2: #left
+        new_robot_position = robot_position
+        new_yaw = yaw + (math.pi / 12)
+        new_robot_rotation = euler_angles_to_quat(np.array([roll,pitch,new_yaw]))
+    elif action == 3: #right
+        new_robot_position = robot_position
+        new_yaw = yaw - (math.pi / 12)
+        new_robot_rotation = euler_angles_to_quat(np.array([roll,pitch,new_yaw]))
+    else:
+        new_robot_position = robot_position
+        new_robot_rotation = robot_rotation
+    return new_robot_position,new_robot_rotation
+
+def set_seed(seed):
+    import random
+    import torch
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = False
+    from omni.isaac.core.utils.torch.maths import set_seed
+    set_seed(seed,torch_deterministic=True)
+    import omni.isaac.core.utils.torch as torch_utils
+    torch_utils.set_seed(seed)
+    import omni.replicator.core as rep
+    rep.set_global_seed(seed)
