@@ -106,7 +106,15 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
             stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
             # map_info = self.topdown_snapshot()
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation)
+
+            if 'sub_instruction' in data:
+                sub_instr = data['sub_instruction']
+                sub_instr_tokens = data['sub_instruction_tokens']
+            else:
+                sub_instr = None
+                sub_instr_tokens = None
+
+            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation, sub_instr, sub_instr_tokens)
             observations = extract_instruction_tokens(
                 observations, 
                 #TODO:
