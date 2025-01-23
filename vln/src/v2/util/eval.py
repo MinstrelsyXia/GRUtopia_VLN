@@ -281,7 +281,7 @@ def norm_depth(depth_info, min_depth=0, max_depth=10):
     depth_info = (depth_info - min_depth) / (max_depth - min_depth)
     return depth_info
 
-def get_obs(env, instruction,robot_position,robot_rotation):
+def get_obs(env, instruction,robot_position,robot_rotation, sub_instr=None, sub_instr_tokens=None):
     obs = env.get_observations(add_rgb_subframes=True)
     obs_data = {}
     obs_data['globalgps'] = None
@@ -292,6 +292,12 @@ def get_obs(env, instruction,robot_position,robot_rotation):
     obs_data['instruction'] = instruction['instruction_text']
     if "instruction_tokens" in instruction:
         obs_data['instruction_tokens'] = instruction['instruction_tokens']
+    
+    # For MLANet
+    if sub_instr is not None:
+        # obs_data['sub_instruction'] = sub_instr
+        obs_data['sub_instruction'] = sub_instr_tokens
+
     obs_data['step'] = 0
     cur_obs = obs['vln_0']["h1_0"]['pano_camera_0']
     rgb_info = cur_obs['rgba'][..., :3]
