@@ -4,6 +4,7 @@ import numpy as np
 from vln.src.v2.util.common import(
     create_robot_mask,
     freemap_to_accupancy_map,
+    set_seed,
 )
 import time
 import sys
@@ -31,12 +32,13 @@ class BaseSingleScanEnv:
     def update_timestamp(self):
         self.timestamp = time.time()
         sys.stdout.flush()
-
+    
     def load_scan_and_robot(self):
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path
         self.sim_config.config.tasks[0].robots[0].position = self.start_position
         self.sim_config.config.tasks[0].robots[0].orientation = self.start_rotation
         self.env = BaseEnv(self.sim_config, headless=self.headless, webrtc=False)
+        set_seed(0)
         self.task = self.env._runner.current_tasks[list(self.env._runner.current_tasks.keys())[0]]
         self.robot = self.task.robots[list(self.task.robots.keys())[0]]
         self.isaac_robot = self.robot.isaac_robot

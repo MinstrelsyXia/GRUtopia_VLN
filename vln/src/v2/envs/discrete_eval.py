@@ -228,7 +228,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     stats_episodes[path_key] = info
                     spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
                     mean_spl = np.mean(list(spl_dict.values()))
-                    log.info(f"Average SPL: {mean_spl}")
+                    log.info(f"Average SPL: {mean_spl}, result:{result}")
                     break
         
         progress_log_util.report()
