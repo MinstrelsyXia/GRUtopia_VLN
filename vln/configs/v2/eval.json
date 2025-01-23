@@ -1,12 +1,12 @@
 {
-    "name" : "20250123_MLANet_eval",
+    "name" : "20250123_height1.75_seed0_0507",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/mla/converted/mla_best_ppo_converted.pth",
-    "eval_cfg_file": "vln/configs/train/mla_eval.yaml",
+    "ckpt_to_load" : "data/checkpoints/20250111_cma_height1.75/ckpts/ckpt.44_converted.pth",
+    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
     "image" : "w61_grutopia:v0.4",
     "total_rank": 8,
     "retry_list":[],
-    "flash":true,
+    "flash": false,
     "device_map" : {
         "0":["0"],
         "1":["1"],

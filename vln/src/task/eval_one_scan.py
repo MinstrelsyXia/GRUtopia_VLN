@@ -69,8 +69,8 @@ if __name__ == "__main__":
         config = json.load(file)
     headless = True
     split_data_types = ['val_unseen','val_seen']
-    # base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-    base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_FSASub' # !!! This is for MLANet
+    base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    # base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_FSASub' # !!! This is for MLANet
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
     name = config["name"]
@@ -83,8 +83,8 @@ if __name__ == "__main__":
     ckpt_to_load = config["ckpt_to_load"]
     sim_config = SimulatorConfig(sim_cfg_file)
     # !!! For MLANet
-    sim_config.config.tasks[0].robots[0].sensor_params[2].size=(224,224) # pano_camera_0
-    sim_config.config_dict['tasks'][0]['robots'][0]['sensor_params'][2]['size']=(224,224)
+    # sim_config.config.tasks[0].robots[0].sensor_params[2].size=(224,224) # pano_camera_0
+    # sim_config.config_dict['tasks'][0]['robots'][0]['sensor_params'][2]['size']=(224,224)
     scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
     dataloader=EvalPathKeyDataloader(
         base_data_dir,
