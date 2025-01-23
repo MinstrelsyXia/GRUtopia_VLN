@@ -15,9 +15,9 @@ def get_container_by_name(name):
         return None
 
 def stop_if_exist(name):
-    contianer = get_container_by_name(name)
-    if contianer is not None:
-        contianer.stop()
+    container = get_container_by_name(name)
+    if container is not None:
+        container.stop()
         print(f"stop container {name}")
 
 def run_container(
@@ -92,6 +92,11 @@ def init(config):
         split_data(config)
     return log_dir
 
+def start_health_check(cfg_file):
+    command = f"nohup python {PROJECT_ROOT_PATH}/scripts/health_check.py --cfg_file {cfg_file} &"
+    os.system(command)
+    print('健康检查进程已启动')
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -124,4 +129,4 @@ if __name__ == "__main__":
             cfg_file=cfg_file,
             log_dir=log_dir,
         )
-    
+    start_health_check(cfg_file)

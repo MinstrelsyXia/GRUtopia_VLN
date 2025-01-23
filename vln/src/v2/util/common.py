@@ -209,3 +209,40 @@ def reset_topdown_camera(robot):
         orientation_quat = rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True)
         robot_pos = robot.isaac_robot.get_world_pose()[0]
         robot.sensors['topdown_camera_50']._camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2]+0.75],orientation_quat)
+
+def get_new_position_and_rotation(robot_position, robot_rotation, action):
+    from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
+    roll, pitch, yaw = quat_to_euler_angles(robot_rotation)
+    if action == 1: # forward
+        dx = 0.25 * math.cos(yaw)
+        dy = 0.25 * math.sin(yaw)
+        new_robot_position = robot_position + [dx,dy,0]
+        new_robot_rotation = robot_rotation
+    elif action == 2: #left
+        new_robot_position = robot_position
+        new_yaw = yaw + (math.pi / 12)
+        new_robot_rotation = euler_angles_to_quat(np.array([roll,pitch,new_yaw]))
+    elif action == 3: #right
+        new_robot_position = robot_position
+        new_yaw = yaw - (math.pi / 12)
+        new_robot_rotation = euler_angles_to_quat(np.array([roll,pitch,new_yaw]))
+    else:
+        new_robot_position = robot_position
+        new_robot_rotation = robot_rotation
+    return new_robot_position,new_robot_rotation
+
+def set_seed(seed):
+    import random
+    import torch
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = False
+    from omni.isaac.core.utils.torch.maths import set_seed
+    set_seed(seed,torch_deterministic=True)
+    import omni.isaac.core.utils.torch as torch_utils
+    torch_utils.set_seed(seed)
+    import omni.replicator.core as rep
+    rep.set_global_seed(seed)

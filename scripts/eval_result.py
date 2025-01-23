@@ -63,6 +63,7 @@ if __name__ == "__main__":
                     # print(f"[key:{data_key}] value is None ")
                     continue
                 value = msgpack_numpy.unpackb(value)
+            value['path_key']=path_key
             data_list.append(value)
         count=len(data_list)
         print(f"[split:{split}] 总共获取数据 {count} 条")
@@ -71,6 +72,9 @@ if __name__ == "__main__":
         total_osr = 0
         total_success = 0
         total_spl = 0
+        reason_map = {
+            "reach_goal":0
+        }
 
         for data in data_list:
             # TL Trajectory Length (TL) - 轨迹总长度 (0)
@@ -93,6 +97,17 @@ if __name__ == "__main__":
             total_osr += osr
             total_success += success
             total_spl += spl
+
+            ret_type=data['fail_reason']
+            if ret_type == '':
+                ret_type = 'success'
+            if ret_type not in reason_map:
+                reason_map[ret_type] = 1
+            else:
+                reason_map[ret_type] = reason_map[ret_type] + 1
+            if success > 0:
+                reason_map['reach_goal']= reason_map['reach_goal'] + 1
+
         print(f"############[{split}]#############")
         if count == 0:
             print(f"############[count == 0,skip]#############")
@@ -102,5 +117,8 @@ if __name__ == "__main__":
         print(f"osr = {total_osr} / {count} = {round((total_osr / count),2)}")
         print(f"success = {total_success} / {count} = {round((total_success / count),2)}")
         print(f"spl = {total_spl} / {count} = {round((total_spl / count),2)}")
+        print("detail:")
+        for k,v in reason_map.items():
+            print(f"[{k}]:{v}")
         print(f"##########################")
     database_read.close()
