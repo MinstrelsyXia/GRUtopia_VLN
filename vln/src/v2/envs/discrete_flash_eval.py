@@ -42,9 +42,7 @@ class DiscreteFlashEvalSingleScanEnv(BaseSingleScanEnv):
         #TODO:
         self.device = torch.device("cuda", 0)
         self.eval_config = eval_config
-        #TODO:
-        self.per_action_max_step=1500
-        self.max_step=25000
+        self.max_step=500
         self.lmdb_path = lmdb_path
         self.ckpt_name = ckpt_name
         policy, _, _, _ = initialize_policy(
@@ -83,7 +81,6 @@ class DiscreteFlashEvalSingleScanEnv(BaseSingleScanEnv):
         scan = self.dataloader.target_scan
         progress_log_util.init(scan, len(eval_path_key_list), rank=self.dataloader.rank)
         progress_log_util.progress_logger.info(f"start eval scan: {scan}, total_path:{len(eval_path_key_list)}")
-        robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
 
         self.policy.eval()
         for path_key in eval_path_key_list:
@@ -162,6 +159,7 @@ class DiscreteFlashEvalSingleScanEnv(BaseSingleScanEnv):
                     task=self.task, 
                     statistic_info=statistic_info,
                     context=self,
+                    total_max_step=self.max_step,
                 )
                 outputs = executor.env_step(action)
                 outputs_dict = outputs['outputs_dict']
@@ -209,7 +207,7 @@ class DiscreteFlashEvalSingleScanEnv(BaseSingleScanEnv):
                     stats_episodes[path_key] = info
                     spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
                     mean_spl = np.mean(list(spl_dict.values()))
-                    log.info(f"Average SPL: {mean_spl}")
+                    log.info(f"Average SPL: {mean_spl}, result:{result}")
                     break
         
         progress_log_util.report()
