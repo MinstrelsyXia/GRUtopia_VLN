@@ -5,8 +5,9 @@ import os
 import json
 import lmdb
 import msgpack_numpy
-from vln.src.dataset.data_utils_multi_env import load_gather_data
-from vln.src.utils.utils import Config
+from vln.src.v2.util.common import load_data
+from vln.src.v2.util.eval import generate_eval_key
+
 
 def get_split_map(
     project_path,
@@ -15,15 +16,9 @@ def get_split_map(
 ):
     split_map={}
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-    mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
-    args_dict = {
-        "datasets":{
-            "mp3d_data_dir":mp3d_data_dir,
-            "base_data_dir":base_data_dir,
-        }
-    }
+
     for split_data_type in split_data_types:
-        load_data_map, _ = load_gather_data(Config(args_dict), split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True)
+        load_data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True)
         for scan,path_list in load_data_map.items():
             for path in path_list:
                 trajectory_id = path['trajectory_id']
@@ -31,9 +26,6 @@ def get_split_map(
                 path_key = f"{trajectory_id}_{episode_id}"
                 split_map[path_key] = split_data_type
     return split_map
-
-def generate_eval_key(ckpt_name, path_key):
-    return f"eval_{ckpt_name}_{path_key}"
 
 def count_one_rank(
     database_read,

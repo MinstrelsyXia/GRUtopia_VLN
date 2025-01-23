@@ -3,7 +3,7 @@ from grutopia.core.config import SimulatorConfig
 from vln.src.v2.dataloader.sample import SamplePathKeyDataloader
 from vln.src.v2.util.continuous_planner import AStarPlanner
 from vln.src.v2.util import progress_log_util
-from grutopia.core.util.log import log
+from vln.src.v2.util.common_log_util import common_logger as log
 from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.v2.util.data_collector import DataCollector
 from vln.src.v2.util.common import check_robot_fall,get_action_state
