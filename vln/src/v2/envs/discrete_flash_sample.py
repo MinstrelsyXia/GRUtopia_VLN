@@ -8,7 +8,8 @@ from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
 from vln.src.v2.util.common import (
     check_robot_fall, 
     describe_action, 
-    reset_topdown_camera
+    reset_topdown_camera,
+    get_new_position_and_rotation
 )
 from vln.src.v2.util.data_collector import DataCollector
 import numpy as np
@@ -39,33 +40,12 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
         self.max_step = max_step
         self.robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
 
-    def get_new_position_and_rotation(self, action):
-        from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
-        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-        roll, pitch, yaw = quat_to_euler_angles(robot_rotation)
-        if action == 1: # forward
-            dx = 0.25 * math.cos(yaw)
-            dy = 0.25 * math.sin(yaw)
-            new_robot_position = robot_position + [dx,dy,0]
-            new_robot_rotation = robot_rotation
-        elif action == 2: #left
-            new_robot_position = robot_position
-            new_yaw = yaw + (math.pi / 12)
-            new_robot_rotation = euler_angles_to_quat(np.array([roll,pitch,new_yaw]))
-        elif action == 3: #right
-            new_robot_position = robot_position
-            new_yaw = yaw - (math.pi / 12)
-            new_robot_rotation = euler_angles_to_quat(np.array([roll,pitch,new_yaw]))
-        else:
-            new_robot_position = robot_position
-            new_robot_rotation = robot_rotation
-        return new_robot_position,new_robot_rotation
-
     def execute_one_action(
         self,
         action,
     ):
-        new_robot_position,new_robot_rotation = self.get_new_position_and_rotation(action)
+        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+        new_robot_position,new_robot_rotation = get_new_position_and_rotation(robot_position,robot_rotation,action)
         self.reset_robot(new_robot_position,new_robot_rotation)
         reset_topdown_camera(self.robot)
         self.env.step(actions=[{'h1':{'stand_still': []}}], render=True)

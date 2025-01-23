@@ -2,7 +2,13 @@ import numpy as np
 import importlib
 from grutopia.core.env import BaseEnv
 from vln.src.v2.util.stuck_checker import StuckChecker
-from vln.src.v2.util.common import check_robot_fall, describe_action, get_action_state
+from vln.src.v2.util.common import (
+    check_robot_fall, 
+    describe_action, 
+    get_action_state,
+    reset_topdown_camera,
+    get_new_position_and_rotation
+)
 from vln.src.v2.util.common_log_util import common_logger as log
 
 class Statistic_Info:
@@ -275,6 +281,101 @@ class ActionExecutor:
             "infos": infos,
             "reason": reason,
         }
+
+class FlashActionExecutor:
+    def __init__(
+        self, 
+        env:BaseEnv, 
+        task, 
+        stuck_checker:StuckChecker,
+        robot,
+
+        per_action_max_step,
+        total_max_step,
+        robot_ankle_height,
+
+        statistic_info:Statistic_Info,
+        context,
+    ):
+        # 执行 step 用到的工具类
+        self.env=env
+        self.task=task
+        self.stuck_checker = stuck_checker
+        self.robot = robot
+        self.isaac_robot = self.robot.isaac_robot
+
+        # 执行 step 需要的配置信息
+        self.per_action_max_step=per_action_max_step
+        self.total_max_step = total_max_step
+        self.robot_ankle_height = robot_ankle_height
+        # 统计信息
+        self.statistic_info = statistic_info
+        # 可以优化掉的变量
+        self.instruction = self.statistic_info.path_data['instruction']
+        # 进程 stuck 检查使用
+        self.context = context
+
+    def _check_max_steps(self, step):
+        if step > self.per_action_max_step:
+            return True, 'exceed_per_action_max_step'
+        if self.statistic_info.sim_step > self.total_max_step:
+            return True, 'exceed_total_max_step'
+        return False, ''
+
+    def _check_fall_and_stuck(self,robot_position,robot_rotation,step):
+        is_stuck = self.stuck_checker.check_robot_stuck(robot_position, robot_rotation, cur_iter=step, max_iter=2500, threshold=0.2)
+        robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
+        is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+
+        if is_stuck or is_fall:
+            reason = 'fall' if is_fall else 'stuck'
+            log.warning(f"Current action has been interrupted by {reason}.")
+            return [True], reason
+        return [False], ''
+
+    def _execute_action(
+        self,
+        action,
+    ):
+        self.context.update_timestamp()
+        robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+        new_robot_position, new_robot_rotation = get_new_position_and_rotation(robot_position, robot_rotation,action)
+        self.context.reset_robot(new_robot_position,new_robot_rotation)
+        reset_topdown_camera(self.context.robot)
+        self.env.step(actions=[{'h1':{'stand_still': []}}], render=True)
+        self.statistic_info.current_path_length += np.linalg.norm(new_robot_position[:2] - robot_position[:2])
+
+    def env_step(
+        self,
+        action, 
+    ):
+        '''step in isaac-sim until the action has finished'''
+        dones = [False]
+        reason = ''
+        if action == 0:
+            dones = [True]
+        else:
+            self._execute_action(action)
+        
+        robot_position, robot_rotation = self.isaac_robot.get_world_pose()
+        outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation)
+        
+        self.statistic_info._update_states(
+            step=self.statistic_info.step_interval,
+            robot_position=robot_position, 
+            robot_rotation=robot_rotation,
+            instruction=self.instruction,
+        )
+        
+        infos = self.statistic_info.compute_metrics(robot_position=robot_position,fail_reason=reason)
+        log.info(f"[descrete][step:{self.statistic_info.sim_step}] 完成动作:{describe_action(action)},距离目标 {round(infos[0]['NE'],2)} 米")
+        return {
+            "outputs_dict": outputs_dict,
+            "dones": dones,
+            "infos": infos,
+            "reason": reason,
+        }
+
 
 def norm_depth(depth_info, min_depth=0, max_depth=10):
     depth_info[depth_info > max_depth] = max_depth

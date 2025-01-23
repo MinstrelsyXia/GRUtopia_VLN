@@ -6,7 +6,7 @@ from vln.src.v2.util import progress_log_util
 from vln.src.v2.util.eval import(
     get_obs,
     Statistic_Info,
-    ActionExecutor,
+    FlashActionExecutor,
     generate_eval_key
 )
 from vln.src.models.utils.feature_extract import extract_instruction_tokens
@@ -158,18 +158,8 @@ class DiscreteFlashEvalSingleScanEnv(BaseSingleScanEnv):
                 with torch.no_grad():
                     actions, rnn_states = self.policy(batch)
                 prev_actions.copy_(actions)
-                if self.eval_config.EVAL.ACTION == 'descrete':
-                    for bs_i, a in enumerate(actions):
-                        if a == 0:
-                            log.info(f"[split:{split}][scan:{scan}][trajectory_id_episode_id: {path_key}][stop!!!]")
-                            action = [
-                                {'h1': {'stop': ['stop']}}
-                            ]
-                        else:
-                            action = [
-                                {'h1': {'move_by_descrete': [a.item()]}}
-                            ]
-                executor = ActionExecutor(
+                action = actions[0].item()
+                executor = FlashActionExecutor(
                     env=self.env, 
                     task=self.task, 
                     stuck_checker=stuck_checker,
@@ -182,7 +172,7 @@ class DiscreteFlashEvalSingleScanEnv(BaseSingleScanEnv):
                     statistic_info=statistic_info,
                     context=self,
                 )
-                outputs = executor.env_step(actions = action)
+                outputs = executor.env_step(action)
                 outputs_dict = outputs['outputs_dict']
                 dones = outputs['dones']
                 info = outputs['infos'][0]
