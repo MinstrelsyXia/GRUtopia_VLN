@@ -126,16 +126,11 @@ if __name__ == "__main__":
     print(f"device_map:{device_map}")
     init_timestamp(name, device_map)
     
-    time_interval = 30 * 60 # 默认30分钟
+    time_interval = 10 * 60 # 默认10分钟
 
     while True:
         logger.info(f"开始休眠 {time_interval} s")
         time.sleep(time_interval)
-
-        # 所有 container 都被 kill 的情况下，停止该任务
-        if not any_container_exist(name,device_map):
-            logger.info("未找到任何 container ,健康检查结束")
-            sys.exit()
 
         # 停止任务完成的 container
         for rank, _ in device_map.items():
@@ -154,3 +149,9 @@ if __name__ == "__main__":
                 stop_container_if_exist(config, rank)
                 start_contianer_with_retry(config, rank, cfg_file)
                 logger.info(f"[rank:{rank}] 容器重启完成")
+        
+        # 所有 container 都被 kill 的情况下，停止该任务
+        time.sleep(10)
+        if not any_container_exist(name,device_map):
+            logger.info("未找到任何 container ,健康检查结束")
+            sys.exit()

@@ -5,7 +5,6 @@ import os
 import docker
 import json
 from vln.split_data import split_data
-from docker.client import DockerClient
 import traceback
 import logging
 import time
