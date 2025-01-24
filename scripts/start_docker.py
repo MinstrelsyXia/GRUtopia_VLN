@@ -93,7 +93,7 @@ def init(config):
     return log_dir
 
 def start_health_check(cfg_file):
-    command = f"nohup python {PROJECT_ROOT_PATH}/scripts/health_check.py --cfg_file {cfg_file} &"
+    command = f"nohup python {PROJECT_ROOT_PATH}/scripts/health_check.py --cfg_file {cfg_file} > /dev/null 2>&1 &"
     os.system(command)
     print('健康检查进程已启动')
 
