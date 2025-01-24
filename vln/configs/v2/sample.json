@@ -1,13 +1,13 @@
 {
-    "name" : "sample_0121",
+    "name" : "sample_0124",
     "task_type" : "sample",
-    "sample_type":"discrete",
-    "dagger_percentage":0.2,
+    "sample_type":"continuous",
+    "dagger_percentage":0,
     "ckpt_to_load" : "data/checkpoints/20250113_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger01/ckpts/ckpt.20.pth",
     "image" : "w61_grutopia:v0.3",
-    "total_rank": 8,
+    "total_rank": 1000,
     "retry_list":[],
-    "flash":true,
+    "flash":false,
     "device_map" : {
         "0":["0"],
         "1":["1"]

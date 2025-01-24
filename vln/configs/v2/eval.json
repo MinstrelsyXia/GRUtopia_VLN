@@ -1,13 +1,14 @@
 {
-    "name" : "eval_0122",
+    "name" : "eval_0124",
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/20250111_cma_height1.75/ckpts/ckpt.44_converted.pth",
     "image" : "w61_grutopia:v0.3",
-    "total_rank": 1,
+    "total_rank": 100,
     "retry_list":[],
     "flash":true,
     "device_map" : {
-        "0":["5"]
+        "0":["0"],
+        "1":["1"]
     },
     "merge_config" : {
         "data_0508":[1]

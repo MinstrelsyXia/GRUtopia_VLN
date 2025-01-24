@@ -246,3 +246,9 @@ def set_seed(seed):
     torch_utils.set_seed(seed)
     import omni.replicator.core as rep
     rep.set_global_seed(seed)
+
+def norm_depth(depth_info, min_depth=0, max_depth=10):
+    depth_info[depth_info > max_depth] = max_depth
+    depth_info = (depth_info - min_depth) / (max_depth - min_depth)
+    return depth_info
+
