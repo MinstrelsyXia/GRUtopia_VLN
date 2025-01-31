@@ -121,6 +121,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 bert_tokenizer=None,
                 is_clip_long=False
             )
+
             observations = batch_obs(observations, self.device)
             observations["steps"] = torch.from_numpy(np.array([0])).to(self.device)
             env_nums = 1
@@ -204,7 +205,9 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     bert_tokenizer=None,
                     is_clip_long=False
                 )
+                outputs_dict[0]['sub_instruction'] = sub_instr_tokens
                 observations = batch_obs(outputs_dict, self.device)
+
                 observations["steps"] = torch.from_numpy(np.array([0])).to(self.device)
                 not_done_masks = torch.tensor(
                     [[0] if done else [1] for done in dones],
