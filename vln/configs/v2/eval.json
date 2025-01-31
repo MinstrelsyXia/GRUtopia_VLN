@@ -1,8 +1,15 @@
 {
+<<<<<<< HEAD
     "name" : "20250129_cma_controllerSample_ckptDagger02_epoch10_evalFlash",
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/20250121_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger02/ckpts/ckpt.10.pth",
     "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
+=======
+    "name" : "20250122_seq2seq_eval",
+    "task_type" : "eval",
+    "ckpt_to_load" : "data/checkpoints/Seq2Seq_habitat_sota/Seq2Seq_DA_converted.pth",
+    "eval_cfg_file": "vln/configs/train/seq2seq_eval.yaml",
+>>>>>>> 407926f0427a731009aed7b24ba27f951cd30ac2
     "image" : "w61_grutopia:v0.4",
     "total_rank": 8,
     "retry_list":[],
