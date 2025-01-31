@@ -61,7 +61,6 @@ if __name__ == "__main__":
     rank = args.rank
     scan = args.scan
     cfg_file = args.cfg_file
-    task = args.task
     project_path = PROJECT_ROOT_PATH
     cfg_file_path = f"{project_path}/{cfg_file}"
     if not os.path.exists(cfg_file_path):
