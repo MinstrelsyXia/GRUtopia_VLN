@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 定义配置文件路径
-CONFIG_FILE="vln/configs/v2/eval.json"
+CONFIG_FILE="vln/configs/v2/sample.json"
 
 # 显示使用方法
 usage() {
@@ -11,6 +11,7 @@ usage() {
     echo "  --start         启动任务"
     echo "  --progress      查看任务进展"
     echo "  --stop          停止任务"
+    echo "  --eval          评估任务"
     echo "  --help          显示此帮助信息"
     echo "  --config        指定配置文件路径 (默认: $CONFIG_FILE)"
 }
@@ -31,6 +32,8 @@ while [ "$1" != "" ]; do
         --progress )     python scripts/task_progress.py --cfg_file "$CONFIG_FILE"
                          ;;
         --stop )         python scripts/stop_docker.py --cfg_file "$CONFIG_FILE"
+                         ;;
+        --eval )         python scripts/eval_result.py --cfg_file "$CONFIG_FILE"
                          ;;
         --config )       shift
                          CONFIG_FILE=$1
