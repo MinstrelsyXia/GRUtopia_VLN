@@ -112,11 +112,11 @@ if __name__ == "__main__":
         if count == 0:
             print(f"############[count == 0,skip]#############")
             continue
-        print(f"TL = {total_TL} / {count} = {round((total_TL / count),2)}")
-        print(f"NE = {total_NE} / {count} = {round((total_NE / count),2)}")
-        print(f"osr = {total_osr} / {count} = {round((total_osr / count),2)}")
-        print(f"success = {total_success} / {count} = {round((total_success / count),2)}")
-        print(f"spl = {total_spl} / {count} = {round((total_spl / count),2)}")
+        print(f"TL = {total_TL} / {count} = {round((total_TL / count),4)}")
+        print(f"NE = {total_NE} / {count} = {round((total_NE / count),4)}")
+        print(f"osr = {total_osr} / {count} = {round((total_osr / count),4)}")
+        print(f"success = {total_success} / {count} = {round((total_success / count),4)}")
+        print(f"spl = {total_spl} / {count} = {round((total_spl / count),4)}")
         print("detail:")
         for k,v in reason_map.items():
             print(f"[{k}]:{v}")
