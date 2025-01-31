@@ -51,10 +51,17 @@ if __name__ == "__main__":
         required=True,
         help="cfg_file",
     )
+    parser.add_argument(
+        "--debug",
+        action='store_true',
+        default=False,
+        help="debug",
+    )
     args = parser.parse_args()
     rank = args.rank
     scan = args.scan
     cfg_file = args.cfg_file
+    task = args.task
     project_path = PROJECT_ROOT_PATH
     cfg_file_path = f"{project_path}/{cfg_file}"
     if not os.path.exists(cfg_file_path):
@@ -74,7 +81,7 @@ if __name__ == "__main__":
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list = config["retry_list"]
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
-    ckpt_to_load = f"{project_path}/data/checkpoints/20250113_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger01/ckpts/ckpt.20.pth"
+    ckpt_to_load = config["ckpt_to_load"]
     sim_config = SimulatorConfig(sim_cfg_file)
     scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
     dataloader=SamplePathKeyDataloader(
@@ -106,19 +113,23 @@ if __name__ == "__main__":
         headless,
         dataloader,
     )
-    
-    monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
-    monitor_thread.start()
 
-    try:
-        log.info("env.sample()")
+    if args.debug:
         env.sample()
-        env.stop()
-    except Exception as e:
-        error_message = traceback.format_exc()
-        log.error(error_message)
-    except KeyboardInterrupt:
-        log.info("Program stopped by user.")
-    finally:
-        log.info("Program terminated.")
-        os.kill(os.getpid(), 9) 
+    
+    else:
+        monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
+        monitor_thread.start()
+
+        try:
+            log.info("env.sample()")
+            env.sample()
+            env.stop()
+        except Exception as e:
+            error_message = traceback.format_exc()
+            log.error(error_message)
+        except KeyboardInterrupt:
+            log.info("Program stopped by user.")
+        finally:
+            log.info("Program terminated.")
+            os.kill(os.getpid(), 9) 

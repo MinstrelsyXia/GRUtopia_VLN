@@ -1,12 +1,12 @@
 {
-    "name" : "20250123_height1.75_seed0_0507",
+    "name" : "20250129_cma_controllerSample_ckptDagger02_epoch10_evalFlash",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250111_cma_height1.75/ckpts/ckpt.44_converted.pth",
+    "ckpt_to_load" : "data/checkpoints/20250121_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger02/ckpts/ckpt.10.pth",
     "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
     "image" : "w61_grutopia:v0.4",
     "total_rank": 8,
     "retry_list":[],
-    "flash": false,
+    "flash": true,
     "device_map" : {
         "0":["0"],
         "1":["1"],
