@@ -110,16 +110,18 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
             if 'sub_instruction' in data:
                 sub_instr = data['sub_instruction']
                 sub_instr_tokens = data['sub_instruction_tokens']
+                max_instr_len = 100
             else:
                 sub_instr = None
                 sub_instr_tokens = None
-
+                max_instr_len = 200
             observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation, sub_instr, sub_instr_tokens)
             observations = extract_instruction_tokens(
                 observations, 
                 #TODO:
                 bert_tokenizer=None,
-                is_clip_long=False
+                is_clip_long=False,
+                max_instr_len=max_instr_len
             )
 
             observations = batch_obs(observations, self.device)
@@ -199,11 +201,16 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 statistic_info = executor.statistic_info
                 statistic_info.policy_step +=1
 
+                if 'sub_instruction' in data: # MLANet
+                    max_instr_len = 100
+                else:
+                    max_instr_len = 200
                 outputs_dict = extract_instruction_tokens(
                     outputs_dict,
                     #TODO: 
                     bert_tokenizer=None,
-                    is_clip_long=False
+                    is_clip_long=False,
+                    max_instr_len=max_instr_len
                 )
                 outputs_dict[0]['sub_instruction'] = sub_instr_tokens
                 observations = batch_obs(outputs_dict, self.device)

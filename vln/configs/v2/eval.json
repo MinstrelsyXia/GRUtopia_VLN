@@ -1,5 +1,5 @@
 {
-    "name" : "20250131_MLANet_eval",
+    "name" : "20250202_MLANet_eval_maxInstr100",
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/mla/converted/mla_best_ppo_converted.pth",
     "eval_cfg_file": "vln/configs/train/mla_eval.yaml",
