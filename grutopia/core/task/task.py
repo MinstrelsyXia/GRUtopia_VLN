@@ -78,6 +78,7 @@ class BaseTask(OmniBaseTask, ABC):
                 action_registry = omni.kit.actions.core.get_action_registry()
                 # switches to camera lighting
                 action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
+                # set_lighting_mode_stage is not helpful
                 action.execute()
 
         # load robots
@@ -95,6 +96,16 @@ class BaseTask(OmniBaseTask, ABC):
     def set_up_scene(self, scene: Scene) -> None:
         self._scene = scene
         self.load()
+
+    def cleanup(self) -> None:
+        """Called before calling a reset() on the world to removed temporary objects that were added during
+        simulation for instance.
+        """
+        log.info("================ cleanup task ==================")
+        for robot in self.robots.values():
+            # Using try here because we want to ignore all exceptions
+            for sensor in robot.sensors.values():
+                sensor.reset()
 
     def get_observations(self,add_rgb_subframes=False) -> Dict[str, Any]:
         """

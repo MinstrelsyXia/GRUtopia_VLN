@@ -196,10 +196,9 @@ class CamOccupancyMap:
             self.ax.text(4, 11, text_info, fontsize=10, ha='center', va='bottom', wrap=True)
         self.ax.set_title('Top-down RGB Image')
 
-    #! un used
-    def update_windows_head(self, robot_pos, text_info=None, mode="save"):
-        rgb_data = self.get_camera_data(["rgba"])["rgba"]
-        self.issac_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
+    def update_windows_head(self, robot_pos, text_info=None, mode="show"):
+        rgb_data = self.get_camera_data()["rgba"]
+        # self.topdown_camera.set_world_pose([robot_pos[0], robot_pos[1], robot_pos[2] + 0.8])
         self.image_display.set_data(rgb_data)  # Update the image data
         if text_info is not None:
             self.ax.text(0.5, 0.01, text_info, fontsize=10, ha='left', va='bottom', wrap=True)
@@ -211,6 +210,7 @@ class CamOccupancyMap:
         elif mode == 'save':
             img_save_path = self.args.log_image_dir + "/window_topdown_image.png"
             self.window_fig.savefig(img_save_path, bbox_inches='tight')
+            print(f"Window topdown image saved at {img_save_path}")
 
     def close_windows_head(self):
         plt.close('all')  # Close all figures
@@ -314,6 +314,7 @@ class CamOccupancyMap:
         data_info = self.get_camera_data()
         rgb = np.array(data_info["rgba"])
         depth = np.array(data_info["depth"])
+        
         # normals = np.array(data_info["normals"])
 
         # Generate free map using normal vectors and depth information
@@ -334,10 +335,11 @@ class CamOccupancyMap:
             flat_surface_mask = np.ones_like(depth, dtype=bool)
 
         # Generate mask for depth within the acceptable range
-        depth_mask = (depth >= min_height) & (depth < max_height)
+        depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
+        # add constraints to allow the door to be free
 
         # robot_mask
-        robot_mask = self.create_robot_mask()
+        robot_mask = self.create_robot_mask(mask_size=30)
 
         # Combine masks to determine free space
         free_map = np.zeros_like(depth, dtype=int)
