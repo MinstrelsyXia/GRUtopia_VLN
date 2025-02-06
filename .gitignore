@@ -148,12 +148,20 @@ work_dirs/
 # grutopia assets
 /asset
 /assets
+assets/
 
 # user scripts
-/scripts
+# /scripts
 
 # sphinx build dir
 docs/en/_build
 
 # Log
 logs/
+<<<<<<< HEAD
+=======
+
+# vln data
+data/
+/data
+>>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
