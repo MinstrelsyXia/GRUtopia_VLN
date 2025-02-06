@@ -57,6 +57,8 @@ def load_data(args, split):
     dataset_root_dir = args.datasets.base_data_dir
     total_scans = []
     load_data = []
+    if split == None:
+        return [], []
     with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
         data = json.load(f)
         for item in data["episodes"]:

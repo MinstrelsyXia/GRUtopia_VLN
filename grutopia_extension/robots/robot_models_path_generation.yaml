@@ -110,7 +110,8 @@ robots:
     type: "Camera"
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
-    type: "Camera"
+    #! changed!
+    type: "Camera_3dgs"
     prim_path: "torso_link/h1_pano_camera_0"
   - name: "topdown_camera_50"
     type: "Camera"
@@ -324,6 +325,7 @@ robots:
     type: "Camera"
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
+    # type: "Camera"
     type: "Camera_3dgs"
     prim_path: "torso_link/h1_pano_camera_0"
   - name: "topdown_camera_50"
