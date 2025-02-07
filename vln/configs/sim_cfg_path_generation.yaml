@@ -53,7 +53,7 @@ tasks:
       enable: false
       size: [256, 256]
     - name: "h1_pano_camera_debug"
-      enable: false
+      enable: True
       size: [256, 256]
     - name: "topdown_camera_50"
       enable: true

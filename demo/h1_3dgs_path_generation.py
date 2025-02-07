@@ -42,6 +42,7 @@ class sixth_floor_scene:
         self.lego_editable = True
 
         sim_config = SimulatorConfig(sim_config_path) #! scene_usd is empty!
+        self.sim_config = sim_config
         self.env = BaseEnv(sim_config, headless=True, webrtc=False)
         self.env.reset()
         
@@ -61,6 +62,21 @@ class sixth_floor_scene:
         print("Create preset light at /World/light")
         self.task_name = self.env.config.tasks[0].name
         self.robot_name = self.env.config.tasks[0].robots[0].name
+        self.init_agents()
+    
+    def init_agents(self):
+        '''call after self.init_env'''
+        self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
+        self.agent_last_pose = None
+        self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
+        self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
+
+        # self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
+    
+    def set_agent_pose(self, position, rotation):
+        self.agents.set_world_pose(position, rotation)
+    def get_agent_pose(self):
+        return self.agents.get_world_pose()
 
 
 json_path = "thirdparty/landmark_isaacsim_interaction/json_configs/multi_model_sixthfloor.json"
@@ -71,15 +87,21 @@ save_dir = os.path.join(img_path, "sixth_floor")
 rgb_save_dir = os.path.join(save_dir, "rgb")
 depth_save_dir = os.path.join(save_dir, "depth")
 pcd_save_dir = os.path.join(save_dir, "pcd")
+debug_rgb_save_dir = os.path.join(save_dir, "debug_rgb")
+pano_rgb_save_dir = os.path.join(save_dir, "pano_rgb")
 os.makedirs(rgb_save_dir, exist_ok=True)
 os.makedirs(depth_save_dir, exist_ok=True)
 os.makedirs(pcd_save_dir, exist_ok=True)
+os.makedirs(debug_rgb_save_dir, exist_ok=True)
+os.makedirs(pano_rgb_save_dir, exist_ok=True)
 
 ### load data
 my_world = sixth_floor_scene(json_path=json_path, sim_config_path=file_path, device_number=device_number)
 my_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['pano_camera_0']
+debug_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['h1_pano_camera_debug']
+pano_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['topdown_camera_50']
 my_camera.set_renderer(my_world.lego_xform_list,my_world.lego_gs_root,my_world.lego_name_list,my_world.lego_device_number,my_world.lego_editable)
-
+pano_camera.set_renderer(my_world.lego_xform_list,my_world.lego_gs_root,my_world.lego_name_list,my_world.lego_device_number,my_world.lego_editable)
 
 from omegaconf import DictConfig
 # from vlmaps.vlmaps.robot.lang_robot import LangRobot
@@ -87,19 +109,29 @@ from omegaconf import DictConfig
 
 ### create a robot:
 # path = [(1.0, 0.0, 0.0), (1.0, 1.0, 0.0), (3.0, 4.0, 0.0)]
-episode_path = '/ssd/xiaxinyuan/dataset/3dgs_trajectory_h1/s8pcm_glb/data.json'
+episode_path = '/ssd/xiaxinyuan/code/w61-grutopia/path_generation/test.json'
 data = json.load(open(episode_path, 'r'))
-path = data['camera_trajectory']
+path = np.array(data['camera_trajectory'])
+path[:,2] += 0.1
 i = 0
 
 actions = {'h1_0': {'move_along_path': [path]}}
 from omni.isaac.core.utils.rotations import euler_angles_to_quat, quat_to_euler_angles
 from omni.isaac.core.utils.transformations import get_relative_transform
 
+# set inito robot pose:
+init_position = path[0]
+init_orientation = data['camera_init_orientation']
+init_orientation = quat_to_euler_angles(init_orientation)
+orientation = [0, 0, init_orientation[2]]
+init_orientation = euler_angles_to_quat(orientation)
+my_world.set_agent_pose(init_position, init_orientation)
+
 while my_world.env.simulation_app.is_running():
     i += 1
     env_actions = []
-    env_actions.append(actions)
+    # env_actions.append(actions)
+    env_actions.append({'h1_0': {'stand_still': []}})
     obs = my_world.env.step(actions=env_actions)
     # warm up steps:
     if i < 100:
@@ -122,13 +154,20 @@ while my_world.env.simulation_app.is_running():
         depth = data['depth']
         pcd = data['pointcloud']
         # rgb_save = np.transpose(rgb, (1, 2, 0))  # 转换为 [H,W,3]
-        
+        pano_data = pano_camera.get_data(add_rgb_subframes=True, render=True, gs3d=True)
+        pano_rgb = pano_data['rgb']
+        # pano_depth = pano_data['depth']
+        # pano_pcd = pano_data['pointcloud']
         # use torchvision to save image
         torchvision.utils.save_image(torch.tensor(rgb), rgb_save_path)
         torchvision.utils.save_image(torch.tensor(depth), depth_save_path)
         pcd_o3d = o3d.geometry.PointCloud()
         pcd_o3d.points = o3d.utility.Vector3dVector(pcd)
+        pano_rgb_save_path = os.path.join(pano_rgb_save_dir, f"{i}.png")
         o3d.io.write_point_cloud(pcd_save_path, pcd_o3d)
+        torchvision.utils.save_image(torch.tensor(pano_rgb), pano_rgb_save_path)
+        
+
 
 my_world.env.simulation_app.close()
 
