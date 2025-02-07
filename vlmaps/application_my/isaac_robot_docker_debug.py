@@ -252,17 +252,7 @@ class IsaacSimLanguageRobot(LangRobot):
         self.env = BaseEnv(sim_config, headless=headless, webrtc=False)
     
     
-    def init_agents(self):
-        '''call after self.init_env'''
-        self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
-        self.agent_last_pose = None
-        self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
-        self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
 
-        self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
-    
-    def set_agent_pose(self, position, rotation):
-        self.agents.set_world_pose(position, rotation)
     
     def reset_sim_scene(self,scan):
         # reset scene without restart app

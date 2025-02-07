@@ -5,7 +5,7 @@ robots:
   # usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
   # usd_path: "/ssd/huangwensi/GRUtopia/assets/robots/h1/h1.usd"
   # usd_path: "assets/robots/h1/h1_invisible_1121.usd"
-  usd_path: "assets/robots/h1/test.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
 
   gains: [0.0, 0.0]
   controllers:
@@ -114,7 +114,7 @@ robots:
     type: "Camera_3dgs"
     prim_path: "torso_link/h1_pano_camera_0"
   - name: "topdown_camera_50"
-    type: "Camera"
+    type: "Camera_3dgs"
     prim_path: "topdown_camera_50"
   - name: "topdown_camera_500"
     type: "Camera"
