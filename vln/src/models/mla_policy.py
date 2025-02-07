@@ -232,6 +232,11 @@ class MLANet(nn.Module):
         self.depth_features = None
         self.sub_features = None
 
+        # Determine
+        self.action_distribution = CategoricalNet(
+            self.output_size, self.num_actions
+        )
+
     @property
     def hidden_size(self) -> int:
         return self._hidden_size

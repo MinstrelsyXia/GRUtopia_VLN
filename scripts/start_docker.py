@@ -24,7 +24,7 @@ def run_container(
     name_prefix="test", 
     rank=0, 
     gpus=['0'],
-    image="w61_grutopia:v0.4",
+    image="w61_grutopia:v0.5",
     cfg_file="vln/configs/v2/eval.json",
     log_dir="logs",
 ):
