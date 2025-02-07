@@ -150,7 +150,7 @@ MODEL:
     embedding_size: 200
     hidden_size: 128
     rnn_type: "LSTM"
-    final_state_only: True
+    final_state_only: False
     bidirectional: True
 
   RGB_ENCODER:

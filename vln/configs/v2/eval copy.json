@@ -1,12 +1,12 @@
 {
-    "name" : "20250202_MLANet_eval_maxInstr100",
+    "name" : "20250129_cma_flash_controllerEval",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/mla/converted/mla_best_ppo_converted.pth",
-    "eval_cfg_file": "vln/configs/train/mla_eval.yaml",
-    "image" : "w61_grutopia:v0.5",
+    "ckpt_to_load" : "data/checkpoints/20250121_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger02/ckpts/ckpt.10.pth",
+    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
+    "image" : "w61_grutopia:v0.4",
     "total_rank": 8,
     "retry_list":[],
-    "flash": false,
+    "flash": true,
     "device_map" : {
         "0":["0"],
         "1":["1"],
