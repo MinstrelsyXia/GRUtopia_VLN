@@ -168,7 +168,11 @@ class CMADataset(torch.utils.data.IterableDataset):
                     packed_data = txn.get(key.encode())
                     
                     data_to_load = msgpack_numpy.unpackb(packed_data, raw=False)
-                    data = data_to_load['episode_data']
+                    try:
+                        data = data_to_load['episode_data']
+                    except KeyError:
+                        print(f"KeyError: {key}")
+                        continue
                     finish_status = data_to_load['finish_status']
                     fail_reason = data_to_load['fail_reason']
                     # Filter the empty data 
