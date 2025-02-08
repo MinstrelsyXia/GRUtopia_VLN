@@ -57,13 +57,20 @@ def load_data(args, split, dataset_root_dir=None, is_fsa_dataset=False):
     if is_fsa_dataset:
         # for MLANet
         dataset_file = os.path.join(dataset_root_dir, f"{split}", f"{split}_sub.json.gz")
+        ori_dataset_file = os.path.join("data/datasets/R2R_VLNCE_v1-3_preprocessed", f"{split}", f"{split}.json.gz") # MLANet sub数据集里的start_rotation和v1-3_processed里的不一样
+        with gzip.open(ori_dataset_file, 'rt', encoding='utf-8') as f:
+            ori_data = json.load(f)
+            ori_data = ori_data["episodes"]
     else:
         dataset_file = os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz")
     with gzip.open(dataset_file, 'rt', encoding='utf-8') as f:
         data = json.load(f)
-        for item in data["episodes"]:
+        for idx, item in enumerate(data["episodes"]):
             item["original_start_position"] = copy.copy(item["start_position"])
-            item["original_start_rotation"] = copy.copy(item["start_rotation"])
+            if is_fsa_dataset:
+                item["original_start_rotation"] = copy.copy(ori_data[idx]["start_rotation"])
+            else:
+                item["original_start_rotation"] = copy.copy(item["start_rotation"])
             item["start_position"] = [item["original_start_position"][0], -item["original_start_position"][2], item["original_start_position"][1]]
             item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][2], -item["original_start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
             item["start_rotation"] = transform_rotation_z_90degrees(item["start_rotation"])

@@ -133,4 +133,8 @@ if __name__ == "__main__":
     # gather_eval_data(dataset_gather.data['val_seen'], val_seen_sample_dataset_file, 'val_seen')
 
     '''3. Check the dataset'''
-    # load_json_gz('/ssd/wangliuyi/code/w61_grutopia/data/datasets/R2R_VLNCE_FSASub/val_seen/val_seen_sub.json.gz')
+    # mlanet_data = load_json_gz('/ssd/wangliuyi/code/w61_grutopia/data/datasets/R2R_VLNCE_FSASub/val_seen/val_seen_sub.json.gz')
+    # mlanet_gt_data = load_json_gz('/ssd/wangliuyi/code/w61_grutopia/data/datasets/R2R_VLNCE_FSASub/val_seen/val_seen.json.gz')
+    # ori_data = load_json_gz('data/datasets/R2R_VLNCE_v1-3_preprocessed/val_seen/val_seen.json.gz')
+    # corrected_data = load_json_gz('data/datasets/R2R_VLNCE_v1-3_corrected/val_seen/val_seen.json.gz')
+    print(1)
