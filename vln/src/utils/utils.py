@@ -580,7 +580,8 @@ def batch_obs(
 
     for obs in observations:
         for sensor in obs:
-            batch[sensor].append(torch.as_tensor(obs[sensor]))
+            if obs[sensor] is not None:
+                batch[sensor].append(torch.as_tensor(obs[sensor]))
 
     batch_t: TensorDict = TensorDict()
 

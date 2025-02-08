@@ -142,10 +142,16 @@ def load_data(
     dataset_root_dir, 
     split, 
     filter_same_trajectory=True, 
-    filter_stairs=True, 
+    filter_stairs=True,
+    load_eval_subset=False,
 ):
-    with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
-        data = json.load(f)
+    if load_eval_subset and split != 'train':
+        # only load the eval data (collect successfully)
+        with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_PReval_gather_data.json"), 'r') as f:
+            data = json.load(f)
+    else:
+        with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
+            data = json.load(f)
     new_data = defaultdict(list)
 
     # filter_same_trajectory
