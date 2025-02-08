@@ -1,9 +1,9 @@
 {
-    "name" : "20250129_cma_flash_controllerEval",
+    "name" : "20250209_cma_dagger03_eval",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250106_cma_pm_train_torchGPU1_bs2_lr2.5e-4_flash/ckpts/ckpt.70.pth",
+    "ckpt_to_load" : "data/checkpoints/20250208_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger03/ckpts/ckpt.10.pth",
     "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
-    "image" : "w61_grutopia:v0.5",
+    "image" : "w61_grutopia:v0.4",
     "total_rank": 8,
     "retry_list":[],
     "flash": false,

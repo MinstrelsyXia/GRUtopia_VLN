@@ -43,6 +43,29 @@ class BaseSingleScanEnv:
         self.robot = self.task.robots[list(self.task.robots.keys())[0]]
         self.isaac_robot = self.robot.isaac_robot
         self.topdown_global_map_camera = self.robot.sensors['topdown_camera_500']
+
+        # update light positions
+        self.update_light_positions(self.start_position)
+    
+    def update_light_positions(self, target_pos):
+        import omni.usd
+        from pxr import Gf, UsdGeom
+        stage = omni.usd.get_context().get_stage()
+        
+        # 更新向下光源位置
+        disk_1_prim = stage.GetPrimAtPath("/World/disk_1")
+        if disk_1_prim.IsValid():
+            xformable = UsdGeom.Xformable(disk_1_prim)
+            xformable.ClearXformOpOrder()  # 清除现有变换
+            xformable.AddTranslateOp().Set(Gf.Vec3f(target_pos[0], target_pos[1], target_pos[2]+1.5))
+        
+        # 更新向上光源位置
+        disk_2_prim = stage.GetPrimAtPath("/World/disk_2")
+        if disk_2_prim.IsValid():
+            xformable = UsdGeom.Xformable(disk_2_prim)
+            xformable.ClearXformOpOrder()  # 清除现有变换
+            xformable.AddTranslateOp().Set(Gf.Vec3f(target_pos[0], target_pos[1], target_pos[2]+1.5))
+            # xformable.AddRotateXYZOp().Set(Gf.Vec3d(180, 0, 0))  # 绕X轴旋转180度,使灯光朝上
     
     def reset_robot(
         self,
