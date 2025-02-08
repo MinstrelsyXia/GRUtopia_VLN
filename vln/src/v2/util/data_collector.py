@@ -2,21 +2,18 @@ import os
 import numpy as np
 import lmdb
 import msgpack_numpy
+from vln.src.v2.util.common import norm_depth
+from vln.src.v2.util.eval import generate_eval_key
+import time
 
 class DataCollector:
-    def __init__(self, lmdb_path, key, instruction):
+    def __init__(self, lmdb_path, rank):
         if not os.path.exists(lmdb_path):
             os.makedirs(lmdb_path)
         self.lmdb_path = lmdb_path
-        self.key = key
+        self.rank = rank
         self.episode_total_data = []
         self.actions = []
-        self.instruction = instruction
-
-    def norm_depth(self, depth_info, min_depth=0, max_depth=10):
-        depth_info[depth_info > max_depth] = max_depth
-        depth_info = (depth_info - min_depth) / (max_depth - min_depth)
-        return depth_info
     
     def collect_observation(self, rgb, depth ,step , process, camera_pose, robot_pose):
         from omni.isaac.core.utils.rotations import quat_to_euler_angles
@@ -49,7 +46,7 @@ class DataCollector:
         cur_obs = obs['vln_0']['h1_0']['pano_camera_0']
         rgb = cur_obs['rgba'][..., :3]
         depth = cur_obs['depth']
-        depth = self.norm_depth(depth)
+        depth = norm_depth(depth)
         self.collect_observation(rgb, depth, step , process, camera_pose, robot_pose)
 
     def collect_action(self, action):
@@ -106,23 +103,39 @@ class DataCollector:
         
         return collate_data
 
-    def save_data(self, result):
+    def get_timestamp(self):
+        data={
+            "timestamp":time.time()
+        }
+        return msgpack_numpy.packb(data, use_bin_type=True)
+
+    def save_sample_data(self, key, result, instruction):
         finish_flag = result
         if result != 'success':
             finish_flag = 'fail'
         lmdb_file = os.path.join(self.lmdb_path, "sample_data.lmdb")
         database = lmdb.open(lmdb_file, map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
         with database.begin(write=True) as txn:
-            encode_key = self.key.encode()
+            encode_key = key.encode()
             episode_datas = self.merge_data(self.episode_total_data, self.actions)
             data_to_store = {
                 'episode_data': episode_datas,
                 'finish_status': finish_flag,
                 'fail_reason': result,
-                'instruction': self.instruction,
+                'instruction': instruction,
             }
             serialized_data = msgpack_numpy.packb(data_to_store, use_bin_type=True)
             txn.put(encode_key, serialized_data)
+            txn.put(f"timestamp_rank_{self.rank}".encode(), self.get_timestamp())
         database.close()
         self.episode_total_data = []
         self.actions = []
+    
+    def save_eval_result(self, ckpt_name, path_key, info):
+        database_write = lmdb.open(f"{self.lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
+        with database_write.begin(write=True) as txn:
+            key_write = generate_eval_key(ckpt_name, path_key).encode()
+            value_write = msgpack_numpy.packb(info, use_bin_type=True)
+            txn.put(key_write, value_write)
+            txn.put(f"timestamp_rank_{self.rank}".encode(), self.get_timestamp())
+        database_write.close()

@@ -6,7 +6,8 @@ from vln.src.v2.util.common import (
     check_robot_fall, 
     describe_action, 
     get_action_state,
-    get_new_position_and_rotation
+    get_new_position_and_rotation,
+    norm_depth,
 )
 from vln.src.v2.util.common_log_util import common_logger as log
 
@@ -305,12 +306,6 @@ class FlashActionExecutor:
             "infos": infos,
             "reason": reason,
         }
-
-
-def norm_depth(depth_info, min_depth=0, max_depth=10):
-    depth_info[depth_info > max_depth] = max_depth
-    depth_info = (depth_info - min_depth) / (max_depth - min_depth)
-    return depth_info
 
 def get_obs(env, instruction,robot_position,robot_rotation, sub_instr=None, sub_instr_tokens=None):
     obs = env.get_observations(add_rgb_subframes=True)
