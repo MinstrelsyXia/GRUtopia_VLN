@@ -7,16 +7,14 @@ from vln.src.v2.util.eval import(
     get_obs,
     Statistic_Info,
     ActionExecutor,
-    generate_eval_key
 )
 from vln.src.models.utils.feature_extract import extract_instruction_tokens
 import torch
 from vln.src.utils.utils import batch_obs
 import numpy as np
 from vln.src.v2.util.stuck_checker import StuckChecker
-import lmdb
-import msgpack_numpy
 from vln.src.models.init_policy import initialize_policy
+from vln.src.v2.util.data_collector import DataCollector
 
 class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
     
@@ -85,6 +83,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         progress_log_util.init(scan, len(eval_path_key_list), rank=self.dataloader.rank)
         progress_log_util.progress_logger.info(f"start eval scan: {scan}, total_path:{len(eval_path_key_list)}")
         robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+        data_collector = DataCollector(self.dataloader.lmdb_path,self.dataloader.rank)
 
         self.policy.eval()
         for path_key in eval_path_key_list:
@@ -218,13 +217,11 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     )
 
                     # info['ext_info']=map_info
-        
-                    database_write = lmdb.open(f"{self.lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
-                    with database_write.begin(write=True) as txn:
-                        key_write = generate_eval_key(ckpt_name=self.ckpt_name,path_key=path_key).encode()
-                        value_write = msgpack_numpy.packb(info, use_bin_type=True)
-                        txn.put(key_write, value_write)
-                    database_write.close()
+                    data_collector.save_eval_result(
+                        ckpt_name=self.ckpt_name, 
+                        path_key=path_key, 
+                        info=info
+                    )
                     stats_episodes[path_key] = info
                     spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
                     mean_spl = np.mean(list(spl_dict.values()))
