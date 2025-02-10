@@ -14,6 +14,7 @@ images/
 results/
 logs/
 logs_docker/
+*.hdf5
 tmp/
 tmp2/
 logs_docker_1213/

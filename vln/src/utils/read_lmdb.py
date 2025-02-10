@@ -76,6 +76,10 @@ class LmdbReader:
         rgb_data = episode_data['episode_data']['camera_info']['pano_camera_0']['rgb']
         for frame in rgb_data:
             # Convert the frame to a PIL image and then to a NumPy array
+            # numpy_image = (frame * 255).clip(0, 255).astype(np.uint8)
+            # # from rgb to bgr
+            # numpy_image = cv2.cvtColor(numpy_image, cv2.COLOR_RGB2BGR) 
+            # frames.append(numpy_image)
             pil_image = Image.fromarray(frame)
             # save the image
 
@@ -256,7 +260,7 @@ class LmdbReader:
 #                 data_collector.save_episode_images(episode_data, key=key, output_dir='logs/images')
 
 if __name__ == '__main__':
-    mode = 'save_video'
+    mode = 'xxy'
     use_pid = False
     
     pid_lmdb_path = 'data/sample_episodes/20241207_sample_episodes/sample_data.lmdb'
@@ -314,3 +318,13 @@ if __name__ == '__main__':
             os.makedirs(output_video_dir, exist_ok=True)
             for ep_info in success_lmdb_data:
                 data_collector.save_episode_video(episode_data=ep_info[1], key=ep_info[0], output_dir=output_video_dir, use_pid=use_pid)
+    elif mode == 'xxy':
+        lmdb_path = 'data/sixth_floor/20241115_sample_episodes/sample_data.lmdb'
+        split = 'sixth_floor'
+        dataset_root_dir = '"path_generation/path_generaton/output/"'
+        data_collector = LmdbReader(lmdb_path)
+        path_id = '0'
+        episode_data = data_collector.read_episode_data(path_id)
+        ## save to the video
+        if episode_data is not None:
+            data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)

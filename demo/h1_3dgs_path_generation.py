@@ -72,6 +72,8 @@ class sixth_floor_scene:
         self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
 
         # self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
+        self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
+        self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))
     
     def set_agent_pose(self, position, rotation):
         self.agents.set_world_pose(position, rotation)
@@ -149,17 +151,17 @@ while my_world.env.simulation_app.is_running():
         # depth = obs[my_world.task_name][my_world.robot_name]['pano_camera_0']['depth']
         # pcd = obs[my_world.task_name][my_world.robot_name]['pano_camera_0']['pointcloud']
         # rgb_save = np.transpose(rgb, (1, 2, 0))  # 转换为 [H,W,3]
-        data = my_camera.get_data(add_rgb_subframes=True, render=True, gs3d=True)
-        rgb = data['rgb']
+        data = my_camera.get_data(add_rgb_subframes=True, render=True)
+        rgb = data['rgba']
         depth = data['depth']
         pcd = data['pointcloud']
-        # rgb_save = np.transpose(rgb, (1, 2, 0))  # 转换为 [H,W,3]
-        pano_data = pano_camera.get_data(add_rgb_subframes=True, render=True, gs3d=True)
-        pano_rgb = pano_data['rgb']
+        rgb_save = np.transpose(rgb, (2, 0, 1))  # 转换为 [H,W,3]
+        pano_data = pano_camera.get_data(add_rgb_subframes=True, render=True)
+        pano_rgb = pano_data['rgba']
         # pano_depth = pano_data['depth']
         # pano_pcd = pano_data['pointcloud']
         # use torchvision to save image
-        torchvision.utils.save_image(torch.tensor(rgb), rgb_save_path)
+        torchvision.utils.save_image(torch.tensor(rgb_save), rgb_save_path)
         torchvision.utils.save_image(torch.tensor(depth), depth_save_path)
         pcd_o3d = o3d.geometry.PointCloud()
         pcd_o3d.points = o3d.utility.Vector3dVector(pcd)
@@ -260,8 +262,6 @@ class Generate_Obstacle_Map(IsaacSimLanguageRobot):
         self.init_cam_occunpancy_map(robot_prim=self.agents.prim_path, start_point=init_position)
         self.init_occupancy_map()
 
-
-
     def setup_scene(self):
         """
         Setup the simulator, load scene data and prepare
@@ -351,10 +351,6 @@ def main(config: DictConfig) -> None:
                 # 确保父目录存在
                 os.makedirs(os.path.dirname(config.last_scan_file), exist_ok=True)
                 
-                # 写入文件
-                with open(config.last_scan_file, 'w') as f:
-                    f.write(str(episode_id))
-                log.info(f"Successfully wrote scan {episode_id} to {config.last_scan_file}")
             except Exception as e:
                 log.error(f"Unexpected error while writing file: {e}")
             # sys.exit(1)

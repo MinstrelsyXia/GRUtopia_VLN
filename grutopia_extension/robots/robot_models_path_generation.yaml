@@ -67,7 +67,7 @@ robots:
     rotation_speed: 2.0
     threshold: 0.15
     sub_controllers:
-    - name: move_to_point
+    - name: move_to_point_by_pid
   - name: "rotate"
     type: RotateController
     rotation_speed: 2.0
@@ -99,6 +99,19 @@ robots:
     threshold: 0.1
     sub_controllers:
     - name: oracle_move_to_point
+  - name: move_to_point_by_pid
+    type: PIDSpeedController
+    max_forward_speed: 2.0
+    max_rotation_speed: 4.0
+    threshold: 0.15
+    Kp_linear: 1.5
+    Ki_linear: 0.0
+    Kd_linear: 0.01
+    Kp_angular: 2.5
+    Ki_angular: 0.0
+    Kd_angular: 0.05
+    sub_controllers:
+    - name: move_by_speed
   sensors:
   - name: "camera"
     type: "Camera"
@@ -107,7 +120,7 @@ robots:
     type: "Camera"
     prim_path: "torso_link/Camera"
   - name: "tp_pointcloud"
-    type: "Camera"
+    type: "Camera_3dgs"
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
     #! changed!
@@ -322,17 +335,17 @@ robots:
     type: "Camera"
     prim_path: "torso_link/Camera"
   - name: "tp_pointcloud"
-    type: "Camera"
+    type: "Camera_3dgs"
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
     # type: "Camera"
     type: "Camera_3dgs"
     prim_path: "torso_link/h1_pano_camera_0"
   - name: "topdown_camera_50"
-    type: "Camera"
+    type: "Camera_3dgs"
     prim_path: "topdown_camera_50"
   - name: "topdown_camera_500"
-    type: "Camera"
+    type: "Camera_3dgs"
     prim_path: "topdown_camera_500"
   - name: "h1_pano_camera_debug"
     type: "Camera"

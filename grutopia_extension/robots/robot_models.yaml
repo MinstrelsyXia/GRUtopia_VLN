@@ -1,18 +1,12 @@
 # Developer only. User read-only.
 robots:
 - type: "HumanoidRobot"
-<<<<<<< HEAD
   # usd_path: "GRUtopia/assets/robots/h1/h1_vln_pano_cameras.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
   # usd_path: "/ssd/huangwensi/GRUtopia/assets/robots/h1/h1.usd"
   # usd_path: "assets/robots/h1/h1_invisible_1121.usd"
   usd_path: "assets/robots/h1/test.usd"
 
-=======
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
-  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
-  # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
   gains: [0.0, 0.0]
   controllers:
   - name: "move_by_speed"
@@ -113,11 +107,7 @@ robots:
     type: "Camera"
     prim_path: "torso_link/Camera"
   - name: "tp_pointcloud"
-<<<<<<< HEAD
-    type: "Camera"
-=======
     type: "RepCamera"
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
     type: "Camera"
@@ -156,11 +146,7 @@ robots:
 
 
 - type: "HumanoidRobotVLNEval"
-<<<<<<< HEAD
   usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_500.usd"
-=======
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
@@ -269,12 +255,8 @@ robots:
     rotation_speed: 2.0
     threshold: 0.15
     sub_controllers:
-<<<<<<< HEAD
-    - name: move_to_point
-=======
     # - name: move_to_point
     - name: move_to_point_by_pid
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
   - name: "rotate"
     type: RotateController
     rotation_speed: 2.0

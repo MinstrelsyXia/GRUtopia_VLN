@@ -4,7 +4,7 @@ simulator:
   rendering_interval: 10
 
 tasks:
-- type: "SingleInferenceTask"
+- type: "VLNTask"
   name: "vln"
   scene_asset_path: null
   scene_scale: [1, 1, 1]
@@ -25,6 +25,7 @@ tasks:
     - name: "move_to_point"
     - name: "move_along_path"
     - name: "rotate"
+    - name: "move_to_point_by_pid"
     sensor_params:
     - name: "pano_camera_0"
       enable: true
@@ -53,7 +54,7 @@ tasks:
       enable: false
       size: [256, 256]
     - name: "h1_pano_camera_debug"
-      enable: True
+      enable: false
       size: [256, 256]
     - name: "topdown_camera_50"
       enable: true
