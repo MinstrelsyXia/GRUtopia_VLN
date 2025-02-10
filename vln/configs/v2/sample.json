@@ -1,11 +1,11 @@
 {
-    "name" : "20250131_cma_Dagger02_epoch10_Dagger_sample03",
+    "name" : "20250208_light_controller_resample",
     "task_type" : "sample",
     "sample_type":"discrete",
-    "dagger_percentage":0.3,
+    "dagger_percentage":0.0,
     "ckpt_to_load" : "data/checkpoints/20250121_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger02/ckpts/ckpt.10.pth",
     "image" : "w61_grutopia:v0.4",
-    "total_rank": 8,
+    "total_rank": 16,
     "retry_list":[],
     "flash": false,
     "device_map" : {
@@ -19,6 +19,6 @@
         "7":["7"]
     },
     "merge_config" : {
-        "data_0508":[1]
+        "data_0508":[8,9,10,11,12,13,14,15]
     }
 }

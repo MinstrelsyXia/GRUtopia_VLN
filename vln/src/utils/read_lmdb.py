@@ -71,6 +71,8 @@ class LmdbReader:
     def save_episode_video(self, episode_data, key, output_dir, use_pid=False):
         """Save the episode video to a file."""
         frames = []
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
         
         # Collect frames from episode data
         rgb_data = episode_data['episode_data']['camera_info']['pano_camera_0']['rgb']
@@ -227,7 +229,7 @@ if __name__ == '__main__':
     
     pid_lmdb_path = 'data/sample_episodes/20241207_sample_episodes/sample_data.lmdb'
     # original_lmdb_path = '/data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
-    original_lmdb_path = 'data/sample_episodes/20241216_sample_episodes_descrete_flash/sample_data.lmdb'
+    original_lmdb_path = 'data/sample_episodes/20250208_light_controller_resample/sample_data.lmdb'
 
     val_seen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_seen/sample_data.lmdb'
     val_unseen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_unseen/sample_data.lmdb'
@@ -253,8 +255,8 @@ if __name__ == '__main__':
         #         data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)
 
         '''2. Load the target path_id'''
-        # all_keys = data_collector.read_all_keys()
-        path_id = '109'
+        all_keys = data_collector.read_all_keys()
+        path_id = '4'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
         if episode_data is not None:
