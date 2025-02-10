@@ -1,11 +1,13 @@
+name:  "20241115_sample_episodes"
+
 datasets:
   base_data_dir: "../VLN/VLNCE/R2R_VLNCE_v1-3"
   mp3d_data_dir: "../Matterport3D/data/v1/scans"
   mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
   mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
   splits:
-    - envdrop
-    # - train
+    # - envdrop
+    - train
     # - val_seen
     # - val_unseen
     # - test
@@ -13,6 +15,7 @@ datasets:
 settings:
   mode: "sample_episodes_multiprocess"
   # mode: "sample_episodes_reset_scans" # sample_episodes_reset_scans
+  # mode: "sample_episodes_reset_scans_with_assigned_path"
   batch_size: 1
   action: "move_along_path"
   # action: "oracle_move_along_path"
@@ -25,16 +28,21 @@ settings:
     - rgba
     - depth
     - camera_params
-  max_step: 20000
+  max_step: 25000
   force_sample: false
-  force_sample_scan: false
+  force_sample_scan: true
   filter_stairs: true
   sample_env_flow: true # allow the env flow
-  num_workers: 3
+  num_workers: 4
   max_episodes_per_scan: 100
 
 sample_episodes:
-  step_interval: 40
+  step_interval: 80
+  save_form: "lmdb" # thread / lmdb
+  recollect_failure: true # recollect failed episodes
+  only_recollect_path_planning_fail: true
+
+  docker_nums: 1 # number of docker containers
 
 robots:
   - name: "CylinderRobot"
@@ -48,7 +56,7 @@ maps:
   agent_radius: 0.25 # Robot's radius (original: 0.25)
   voxel_size: 0.1  # Size of a voxel (original: 0.05)
   add_dilation: true # Add dilation to the map
-  dilation_iterations: 2 # Number of dilation iterations
+  dilation_iterations: 4 # Number of dilation iterations
   quadtree_config:
     width: 50 # Quadtree map size
     height: 50
@@ -59,7 +67,7 @@ maps:
   global_topdown_config:
     width: 500
     height: 500
-    aperture: 500
+    aperture: 150
     camera_transform_height: 0.8
     voxel_size: 0.1
     

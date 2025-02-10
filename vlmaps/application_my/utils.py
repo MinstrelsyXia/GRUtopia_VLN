@@ -324,7 +324,7 @@ def downsample_pc(pc, depth_sample_rate):
     INput: points:(N,3); rate:downsample rate:int
     Output: downsampled_points:(N/rate,3)
     '''
-    # np.random.seed(42)
+    np.random.seed(42)
     shuffle_mask = np.arange(pc.shape[0])
     np.random.shuffle(shuffle_mask)
     shuffle_mask = shuffle_mask[::depth_sample_rate]

@@ -17,15 +17,15 @@ mkdir -p ${LOG_DIR}
 
 
 # GPU ID 列表
-# GPU_LIST=( "1" "2" "3" "4" "5" "6" "7")
-NUM_GPUS=6
-GPU_LIST=( "1" "2" "4" "5" "6" "7")
+GPU_LIST=( "5" "6" "7" "8")
+NUM_GPUS=4
+# GPU_LIST=( "1" "2" "4" "5" "6" "7")
 SPLITS=("val_unseen")
 OUTPUT_DIR="multi_gpu_list_$NUM_GPUS"  # 相对路径，例如: multi_gpu_list_val_unseen_7
 EXPERIMENTS_PER_GPU=1
 BASE_CONTAINER_NAME="isaac-sim-xxy"
 IMAGE_NAME="xxy_new:3.4"
-FILE_NAME="valid_paths/val_unseen/object_id_1213.txt"
+FILE_NAME="valid_paths/val_unseen/object_id.txt"
 
 
 # 数据集拆分

@@ -144,6 +144,12 @@ class BaseEnv:
         return self._simulation_app
     
     def reset_env(self):
-        # tasks = self.runner._world._current_tasks
+        tasks = self.runner._world._current_tasks.values()
+        print(tasks)
+        for task in tasks:
+            task.cleanup()
+            for robot in task.robots.values():
+                for sensor in robot.sensors.values():
+                    sensor.reset()
         # self.runner._world._current_tasks['h1_locomotion_0'].robots['h1_0'].sensors['camera'].__del__() # !!!!
         self.runner._world.clear()

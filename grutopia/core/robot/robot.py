@@ -48,12 +48,14 @@ class BaseRobot:
 
     def apply_action(self, action: dict):
         """Apply actions of controllers to robot.
-
+        
         Args:
             action (dict): action dict.
               key: controller name.
               value: corresponding action array.
         """
+
+        print("actually no action applied")
         raise NotImplementedError()
 
     def get_obs(self, add_rgb_subframes=False) -> dict:
