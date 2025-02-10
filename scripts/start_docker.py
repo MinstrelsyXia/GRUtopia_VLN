@@ -5,8 +5,27 @@ import os
 import docker
 import json
 from vln.split_data import split_data
+import traceback
+import logging
+import time
 
 client = docker.from_env()
+logger = logging.getLogger('health_check_logger')
+logger.setLevel(logging.INFO)
+
+def init_logger(name,logger):
+    log_dir = f"{PROJECT_ROOT_PATH}/logs/{name}/"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    file_name = "health_check.log" 
+    file_handler = logging.FileHandler(f'{log_dir}/{file_name}')
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 def get_container_by_name(name):
     try:
@@ -14,23 +33,62 @@ def get_container_by_name(name):
     except docker.errors.NotFound:
         return None
 
-def stop_if_exist(name):
-    container = get_container_by_name(name)
-    if container is not None:
-        container.stop()
-        print(f"stop container {name}")
-
-def run_container(
-    name_prefix="test", 
-    rank=0, 
-    gpus=['0'],
-    image="w61_grutopia:v0.5",
-    cfg_file="vln/configs/v2/eval.json",
-    log_dir="logs",
+def stop_container_if_exist(
+    config,
+    rank
 ):
-    name = f"{name_prefix}_{rank:02}"
-    stop_if_exist(name)
-    print(f"begin to start container {name}")
+    rank=int(rank)
+    name=config['name']
+    container_name = f"{name}_{rank:02}"
+    container = get_container_by_name(container_name)
+    if container is None:
+        return
+    retry_count=3
+    index=0
+    while index < retry_count:
+        index +=1
+        try:
+            container.stop()
+            logger.info(f"[rank:{rank}] 容器停止成功")
+            return
+        except Exception as e:
+            error_message = traceback.format_exc()
+            logger.info(error_message)
+            logger.info(f"[rank:{rank}] 容器停止失败,休眠 10 秒后重试,剩余重试次数:{retry_count - index}")
+            time.sleep(10)
+
+def start_contianer_with_retry(
+    config,
+    rank,
+    cfg_file,
+):
+    retry_count=3
+    index=0
+    while index < retry_count:
+        index +=1
+        try:
+            start_container(config,rank,cfg_file)
+            logger.info(f"[rank:{rank}] 容器启动成功")
+            return
+        except Exception as e:
+            error_message = traceback.format_exc()
+            logger.info(error_message)
+            logger.info(f"[rank:{rank}] 容器启动失败,休眠 10 秒后重试,剩余重试次数:{retry_count - index}")
+            time.sleep(10)
+
+def start_container(
+    config,
+    rank,
+    cfg_file,
+):  
+    rank = int(rank)
+    name_prefix = config['name']
+    log_dir = f"logs/{name_prefix}/rank"
+    device_map = config["device_map"]
+    gpus = device_map[str(rank)]
+    image=config["image"]
+    container_name = f"{name_prefix}_{rank:02}"
+    logger.info(f"begin to start container {container_name}")
     
     WEBUI_HOST = os.environ.get('WEBUI_HOST','')
     CACHE_ROOT = os.environ.get('CACHE_ROOT','')
@@ -46,7 +104,7 @@ def run_container(
 
     container = client.containers.run(
         detach=True,
-        name=name,
+        name=container_name,
         tty=True,
         stdin_open=True,
         auto_remove=True,
@@ -77,10 +135,10 @@ def run_container(
             '/ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:rw',
         ],
     )
-    print(f"finish start container {name}")
+    logger.info(f"finish start container {container_name}")
     return container
 
-def init(config):
+def split_data_if_needed(config):
     # 初始化日志
     name = config["name"]
     log_dir = f"logs/{name}/rank"
@@ -90,10 +148,9 @@ def init(config):
     lmdb_path = PROJECT_ROOT_PATH + f'/data/sample_episodes/{name}/sample_data.lmdb'
     if not os.path.exists(lmdb_path):
         split_data(config)
-    return log_dir
 
 def start_health_check(cfg_file):
-    command = f"nohup python {PROJECT_ROOT_PATH}/scripts/health_check.py --cfg_file {cfg_file} &"
+    command = f"nohup python {PROJECT_ROOT_PATH}/scripts/health_check.py --cfg_file {cfg_file} > /dev/null 2>&1 &"
     os.system(command)
     print('健康检查进程已启动')
 
@@ -119,14 +176,9 @@ if __name__ == "__main__":
     print(f"config:{config}")
     device_map = config["device_map"]
     name = config["name"]
-    log_dir = init(config)
-    for rank, gpus in device_map.items():
-        container = run_container(
-            name_prefix=name, 
-            rank=int(rank), 
-            gpus=gpus,
-            image=config["image"],
-            cfg_file=cfg_file,
-            log_dir=log_dir,
-        )
+    init_logger(name,logger)
+    split_data_if_needed(config)
+    for rank, _ in device_map.items():
+        stop_container_if_exist(config,rank)
+        start_contianer_with_retry(config, rank, cfg_file)
     start_health_check(cfg_file)

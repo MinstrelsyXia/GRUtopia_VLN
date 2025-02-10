@@ -115,8 +115,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
             )
             data_collector = DataCollector(
                 lmdb_path=self.dataloader.lmdb_path,
-                key=str(trajectory_id),
-                instruction=data['instruction']['instruction_text'],
+                rank = self.dataloader.rank,
             )
             start_position = data['start_position']
             start_rotation = data['start_rotation']
@@ -131,7 +130,11 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
                     step_count=0,
                     result = 'fast_fall',
                 )
-                data_collector.save_data('fast_fall')
+                data_collector.save_sample_data(
+                    key=str(trajectory_id),
+                    result='fast_fall',
+                    instruction=data['instruction']['instruction_text'],
+                )
                 log.info(f"[scan:{scan}][path:{trajectory_id}] finish[step:0] result: fast_fall")
                 continue
             stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
@@ -155,7 +158,11 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
                         distance = np.linalg.norm(robot_position[:2] - nav_path[-1][:2])
                         distance_str = f"{round(distance, 2)}"
                     log.info(f"[scan:{scan}][path:{trajectory_id}] finish[step:{self.step}] result:{result}, distance:{distance_str} m")
-                    data_collector.save_data(result)
+                    data_collector.save_sample_data(
+                        key=str(trajectory_id),
+                        result=result,
+                        instruction=data['instruction']['instruction_text'],
+                    )
                     progress_log_util.trace_end(
                         trajectory_id = path_key,
                         step_count=self.step,
