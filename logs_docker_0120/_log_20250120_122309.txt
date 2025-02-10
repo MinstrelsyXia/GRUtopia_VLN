@@ -1,0 +1,60 @@
+[2025-01-20 12:23:09,958][INFO] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1431] -: Is in container: True
+[2025-01-20 12:23:09,959][INFO] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1431] -: Is in container: True
+[2025-01-20 12:23:09,961][INFO] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1431] -: Is in container: True
+[2025-01-20 12:23:09,962][ERROR] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1512] -: Unexpected error: [Errno 2] No such file or directory: '../VLN/VLNCE/R2R_VLNCE_v1-3/val_unseen/val_unseen.json.gz'
+[2025-01-20 12:23:09,963][ERROR] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1512] -: Unexpected error: [Errno 2] No such file or directory: '../VLN/VLNCE/R2R_VLNCE_v1-3/val_unseen/val_unseen.json.gz'
+[2025-01-20 12:23:09,963][ERROR] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1513] -: Traceback: Traceback (most recent call last):
+  File "/isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py", line 1435, in main
+    robot = IsaacSimLanguageRobot(config, sim_config, vln_config=vln_config, split=split)
+  File "/isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py", line 126, in __init__
+    self.data, self._scans = load_data(vln_config, split)
+  File "/isaac-sim/GRUtopia/vln/src/dataset/data_utils.py", line 60, in load_data
+    with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
+  File "/isaac-sim/kit/python/lib/python3.10/gzip.py", line 58, in open
+    binary_file = GzipFile(filename, gz_mode, compresslevel)
+  File "/isaac-sim/kit/python/lib/python3.10/gzip.py", line 174, in __init__
+    fileobj = self.myfileobj = builtins.open(filename, mode or 'rb')
+FileNotFoundError: [Errno 2] No such file or directory: '../VLN/VLNCE/R2R_VLNCE_v1-3/val_unseen/val_unseen.json.gz'
+
+[2025-01-20 12:23:09,963][ERROR] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1513] -: Traceback: Traceback (most recent call last):
+  File "/isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py", line 1435, in main
+    robot = IsaacSimLanguageRobot(config, sim_config, vln_config=vln_config, split=split)
+  File "/isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py", line 126, in __init__
+    self.data, self._scans = load_data(vln_config, split)
+  File "/isaac-sim/GRUtopia/vln/src/dataset/data_utils.py", line 60, in load_data
+    with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
+  File "/isaac-sim/kit/python/lib/python3.10/gzip.py", line 58, in open
+    binary_file = GzipFile(filename, gz_mode, compresslevel)
+  File "/isaac-sim/kit/python/lib/python3.10/gzip.py", line 174, in __init__
+    fileobj = self.myfileobj = builtins.open(filename, mode or 'rb')
+FileNotFoundError: [Errno 2] No such file or directory: '../VLN/VLNCE/R2R_VLNCE_v1-3/val_unseen/val_unseen.json.gz'
+
+[2025-01-20 12:23:09,965][ERROR] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1512] -: Unexpected error: [Errno 2] No such file or directory: '../VLN/VLNCE/R2R_VLNCE_v1-3/val_unseen/val_unseen.json.gz'
+[2025-01-20 12:23:09,965][ERROR] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1513] -: Traceback: Traceback (most recent call last):
+  File "/isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py", line 1435, in main
+    robot = IsaacSimLanguageRobot(config, sim_config, vln_config=vln_config, split=split)
+  File "/isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py", line 126, in __init__
+    self.data, self._scans = load_data(vln_config, split)
+  File "/isaac-sim/GRUtopia/vln/src/dataset/data_utils.py", line 60, in load_data
+    with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
+  File "/isaac-sim/kit/python/lib/python3.10/gzip.py", line 58, in open
+    binary_file = GzipFile(filename, gz_mode, compresslevel)
+  File "/isaac-sim/kit/python/lib/python3.10/gzip.py", line 174, in __init__
+    fileobj = self.myfileobj = builtins.open(filename, mode or 'rb')
+FileNotFoundError: [Errno 2] No such file or directory: '../VLN/VLNCE/R2R_VLNCE_v1-3/val_unseen/val_unseen.json.gz'
+
+[2025-01-20 12:23:10,038][INFO] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1431] -: Is in container: True
+[2025-01-20 12:23:10,042][ERROR] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1512] -: Unexpected error: [Errno 2] No such file or directory: '../VLN/VLNCE/R2R_VLNCE_v1-3/val_unseen/val_unseen.json.gz'
+[2025-01-20 12:23:10,043][ERROR] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1513] -: Traceback: Traceback (most recent call last):
+  File "/isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py", line 1435, in main
+    robot = IsaacSimLanguageRobot(config, sim_config, vln_config=vln_config, split=split)
+  File "/isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py", line 126, in __init__
+    self.data, self._scans = load_data(vln_config, split)
+  File "/isaac-sim/GRUtopia/vln/src/dataset/data_utils.py", line 60, in load_data
+    with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
+  File "/isaac-sim/kit/python/lib/python3.10/gzip.py", line 58, in open
+    binary_file = GzipFile(filename, gz_mode, compresslevel)
+  File "/isaac-sim/kit/python/lib/python3.10/gzip.py", line 174, in __init__
+    fileobj = self.myfileobj = builtins.open(filename, mode or 'rb')
+FileNotFoundError: [Errno 2] No such file or directory: '../VLN/VLNCE/R2R_VLNCE_v1-3/val_unseen/val_unseen.json.gz'
+
