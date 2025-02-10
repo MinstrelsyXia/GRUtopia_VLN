@@ -1,0 +1,199 @@
+zsNo4HB9uLZ,15,1,Exit the bedroom and turn left. Walk straight passing the gray couch and stop near the rug. 
+zsNo4HB9uLZ,15,2,Walk out of the bedroom through the open door into the hallway. Turn the corner and walk into the dining area. Pass the dining table and walk  into the living room area towards the television. Stop near the chair and open sliding doors to outside. 
+zsNo4HB9uLZ,15,3,Go out of the room you're in.  Turn left.  Go poast the dining room and into the living room.  Wait right by the coffee table. 
+x8F5xyUWy9e,42,8,Walk across the room and wait at the far end of the bar. 
+2azQ1b91cZZ,57,10,Walk into the living room and keep walking straight past the living room. Then walk into the entrance under the balcony. Wait in the entrance to the other room. 
+2azQ1b91cZZ,57,11,Walk across the floor and wait the archway. 
+2azQ1b91cZZ,57,12,Move forward to the doorway on the opposite side of the hall.  Stop in the archway. 
+zsNo4HB9uLZ,62,14,Move to the far left corner of the table
+Proceed to the doorway to your right
+walk into the kitchen with the stove on your right
+proceed forward until the fridge is on your left
+proceed forward once more until there is a small sink on your left and shelves on your right. 
+zsNo4HB9uLZ,62,15,Walk straight past the table and turn right to go between the kitchen counters and walk straight past the refrigerator into the pantry and stop halfway between the two shelves on the right. 
+TbHJrupSAjP,104,22,Walk past the bed, through the doorway.  You'll go past the top of the stairs and a mirror.  Keep going, through the white door.  You'll be in a bedroom.  Stop and wait just inside that room. 
+TbHJrupSAjP,104,23,Leave the bathroom, and bedroom and go into the hall. Walk straight down the hall and enter the bedroom across from the starting room. Stop in the doorway to this bedroom. 
+TbHJrupSAjP,104,24,Walk from bathroom into bedroom. Walk out of bedroom into hallway. Walk into bedroom. Wait next to open bedroom door. 
+zsNo4HB9uLZ,122,25,Walk through the small room with a lounge chair and dresser. Turn the corner and walk passed the sink. Walk into the kitchen area through the door on the other end. Stop near the long wooden dining table with pictures on the wall next to it. 
+zsNo4HB9uLZ,122,26,Turn around 180 degrees.  Go down the hallway to the right.  Walk through the kitchen, past the island and stop as soon as you reach the table. 
+zsNo4HB9uLZ,122,27,Walk past closet doors. Walk through kitchen. Wait at dining room table. 
+zsNo4HB9uLZ,138,37,Turn right and walk straight until you are standing in a bedroom door, then stop. 
+zsNo4HB9uLZ,138,38,Go straight past the bed and into the hallway. Enter the bedroom straight ahead and wait there. 
+zsNo4HB9uLZ,138,39,Walk past the bed and move straight until you have pasts through 3 doorways. 
+zsNo4HB9uLZ,155,40,Walk into the kitchen area. Walk by the sink and oven. Walk straight into the hallway. turn right into the little room. Turn left and walk into the bedroom. Stop by the corner of the bed. 
+zsNo4HB9uLZ,155,41,Walk through the kitchen between the sink and the stove. and down the hall.  Turn right before the bathroom.  Go into the bedroom. 
+zsNo4HB9uLZ,155,42,Walk towards the kitchen area. Keep walking along the kitchen area towards the doorway. Turn right and exit the kitchen area walking across the small living room area and into the bedroom to you left. 
+2azQ1b91cZZ,161,44,Walk down the hallway through the arched doorway. Walk into the kitchen area. Walk through the doorway into teh dining room area passing by the stove. Walk into the living room are towards the fireplace stopping near the couches. 
+2azQ1b91cZZ,161,45,Walk down the hallway and walk into the kitchen and take a left at the island counter into the hallway and take a right into the dining room and walk through the dining room into the living room and stop nest to the edge of the couch  behind the end table. 
+X7HyMhZNoso,162,46,Finish climbing the stairs and walk straight through the doorway in front of you.  You'll be a bedroom at that point.  Turn right and walk across the room next to the bed to the doorway on your right.  Turn right and walk though the closet into the bathroom.  Stop in front of the toilet in the bathroom. 
+X7HyMhZNoso,162,47,Turn left and continue up the stairs.  Go straight through to the bedroom, turn to the right and walk past the bed.  Turn right again and go through the closet.  Continue straight, into the bathroom.  Wait right there, in front of the mirror. 
+X7HyMhZNoso,162,48,Go up the stairs and straight forward through the doorway. Turn right, move forward, and enter the doorway on the right. Move forward into the bathroom and stop in front of the toilet. 
+QUCTc6BB5sX,173,49,Walk through the kitchen passed the sink and around the corner out into the hallway. Walk into the arched entry well to the left of the stairwell. Continue into the room with the armchair and bed. 
+QUCTc6BB5sX,173,50,Turn left and then turn right. Turn left and walk into the bedroom and wait there. 
+QUCTc6BB5sX,173,51,Facing the refrigerator walk straight between the counters, and take a right. Past the counters, in the hall take a  left and go down the hallway and go forward. Keep going straight, into the bedroom at the end of the hallway. In the room walk forward to the rug and stop once you are on the rug. 
+zsNo4HB9uLZ,175,52,Take a right at the large clock and travel straight through the kitchen, when you see the thermostat on the wall you are right next to the washroom. 
+zsNo4HB9uLZ,175,53,Exit the living room and turn right into the kitchen. Turn left at the end of the counter and wait in the room across the hallway slightly to the left. 
+zsNo4HB9uLZ,175,54,Turn around and go out of the room towards the clock.  Turn right and go down the hall past the kitchen counter.  At the end of the kitchen counter turn left and go past the kitchen to the hall and go slight left and straight through the door. 
+2azQ1b91cZZ,214,61,Walk out of the bathroom passed the sink and shower. Walk down the hallway through the arch ed entry and circular tiled room. Turn and walk into the bedroom with hanging curtains wooden bed frame. 
+2azQ1b91cZZ,214,62,Exit the bathroom and go right, then turn left at the big clock and go into the bedroom and wait next to the bed. 
+2azQ1b91cZZ,214,63,Exit the bathroom, and take a right turn. Keep walking to the place with a clock hanging on the wall, and then make a hard left into a bedroom. Wait at the bedroom. 
+QUCTc6BB5sX,239,67,Face the walkway with a kitchen counter with bar stools on the right and large windows on the other side and walk past them towards a large dining table  Turn to the sitting area and stop. 
+QUCTc6BB5sX,239,68,Walk straight past the kitchen area and bar stools until you reach a formal dining table.  Walk into the room with the sofa on the right and stop by the glass table. 
+QUCTc6BB5sX,239,69,Walk through the kitchen, enter the dining room, walk to the doorway to the right of the dining room table, wait at the glass table. 
+2azQ1b91cZZ,254,70,Go through living room, through the door on the to the right, through the den, through the dining to, to the outdoor foyer. Stop before going outside. 
+2azQ1b91cZZ,254,71,Walk to the right of the coutch and through the doors to the tan couch  Pass through the dining room and wait outside. 
+2azQ1b91cZZ,254,72,leave sitting room and head towards the kitchen, turn right at living room and enter. walk through living room to dinning room and enter. Turn left and head to front door. Exit the house and stop on porch. 
+zsNo4HB9uLZ,260,73,Turn around and go past the dining area, turn to the right and past the couch.  Then go down the hall way a little bit and then turn left into the living room.  Stop right there and wait. 
+zsNo4HB9uLZ,260,74,Face towards the outside patio table, and go just past the breakfast bar counter that is to the right.   Turn right, in  front of the countertop, and follow it all the way down to the other end.  Walk through the hallway until you see a familyroom just to the left. Wait there. 
+zsNo4HB9uLZ,260,75,turn hard left toward dinning area. walk past kitchen towards the living room. turn right by couch and walk down hallway and turn left  and go into the lounge. 
+2azQ1b91cZZ,267,79,Exit the bathroom and walk down the hall to the second doorway on your left.  Turn left and enter the room through that doorway. 
+2azQ1b91cZZ,267,80,Walk out of the bathroom past the sink and shower. Walk through the arched doorway down the hall with the throw rug. Walk into the room with wooden closet doors and two ceiling lamps. 
+2azQ1b91cZZ,267,81,Leave the bathroom and walk straight into the hallway. Go straight and enter the office in the second door on your left. 
+zsNo4HB9uLZ,280,85,Go past a display case, through a hallway with an eye chart, into the waiting area, and stop in front of a light beige couch with six pillows. 
+zsNo4HB9uLZ,280,86,Walk down the hall and make a left at the end and stop at the first room on the right. Wait in the entryway of the room with the two couches. 
+zsNo4HB9uLZ,280,87,walk straight to to the end of the hall, turn left into living room, stop at the couch. 
+QUCTc6BB5sX,300,94,Walk forward, take a left around the corner and walk all the way to the end of the hallway, and stop at the door before the bedroom. 
+QUCTc6BB5sX,300,95,Walk toward the big wall of windows. Turn hard left and continue passed the kitchen. Stop when you reach the room in front of you. 
+QUCTc6BB5sX,300,96,Walk towards the french doors and turn left. Walk past the kitchen area. Go to the end of the hallway and wait in the archway near the painting. 
+QUCTc6BB5sX,307,97,Walk towards the hallway to the left of the refrigerator. Keep walking straight and wait by the wooden table with some white appliances to the right. 
+QUCTc6BB5sX,307,99,Walk through the kitchen and into the hallway on the left by the refrigerator. And wait in the room across the hall. 
+x8F5xyUWy9e,312,100,Exit massage room, turn left, go down the steps, walk to the pool, climb up to steps and stop beside the plants. 
+x8F5xyUWy9e,312,101,exit room walk through double doors stop on top step of hottub. 
+x8F5xyUWy9e,312,102,leave massage room, turn left, head down the stairs into lobby area, move forward until you stop at edge of spa. 
+X7HyMhZNoso,407,113,With the windows on your right walk forward between the windows and the patio couch walk forward towards the table and into the living room through the sliding glass doors and take a  right into the dining room stopping just past the wall on the left next to the door. 
+X7HyMhZNoso,407,114,Walk past outdoor living room. Make right at outdoor dining. Walk to chair in tv room. Wait at threshold to dining room. 
+EU6Fwq7SyZv,482,127,Turn around 180 degrees.  Go through the open door to the loft.  Once through the doorway, turn to the left and walk towards the far side of the loft.  Stop once you are just past the opening to the stairs. 
+EU6Fwq7SyZv,482,128,Turn around and leave the bathroom.  Go into the bedroom.  Turn left and go down the hallway to the left.  You'll stop by the big cabinet on the left. 
+EU6Fwq7SyZv,482,129,Go into the bedroom to the right of the sink.  Turn left, and walk forward and stand in front of the railing about halfway between the two upstairs rooms. 
+zsNo4HB9uLZ,548,136,Turn left and head towards the hall way. Continue straight until the door is in your path. 
+zsNo4HB9uLZ,548,137,Walk down the tiled floor passed the kitchen counter. Continue passed the living room area and into the hallway ahead. Continue walking ahead towards the front door of the home with wall art hanging up. 
+zsNo4HB9uLZ,548,138,Walk down the hallway and wait near the end, next to the mirror and side table. 
+2azQ1b91cZZ,552,139,GO slightly to the right and walk past the table.  You'll go into the other room, turn right and then past the big diadem circle tile, past the stairs, and then to the right.  Enter the hallway by the mirror and wait. 
+2azQ1b91cZZ,552,140,Walk through the doorway to the right of the dining room table then go through the doorway by the flower pot.  Take the doorway directly left of the staircase and wait there. 
+2azQ1b91cZZ,552,141,Turn right. Go forward. Turn right at doorway. Go forward. Turn right again. Go forward and stop. 
+QUCTc6BB5sX,573,142,Walk forward with the cabinets on the left into the hallway. In the hallway take a left and walk past the console table on your right. Walk through the hallway until you enter the clearing, and stop just past the entry behind you. 
+QUCTc6BB5sX,573,143,Walk into the hallway and turn left at the telephone.  Walk down the hall and stop at the intersection. 
+QUCTc6BB5sX,573,144,Go through the door on the right, then turn left and walk down the hallway. Walk just past the table and then stop. 
+zsNo4HB9uLZ,635,154,With the sink at your back walk out of the bathroom and into the hallway and into the pantry across from the bathroom and straight into the kitchen and at the end of the kitchen take a left into the closet with the sink stopping next to the tall cabinet on the left. 
+zsNo4HB9uLZ,635,156,Leave the bathroom.  Go through the door straight across the hall walk straight through the kitchen.  Turn left at the end of the bar turn left again and go in the room to the right stand in between the closet and the sink. 
+zsNo4HB9uLZ,659,163,Turn right and go into the hallway.  Turn left and go down the hall.  When you get to a doorway, turn right and go towards the entrance door.  Stop by the entrance table and mirror. 
+zsNo4HB9uLZ,659,164,Walk out of the bedroom and straight down the hallway and take a left down the corridor off the hallway and take a right into the hallway with the gray wall and stop and the edge of the table closest to you when you enter. 
+zsNo4HB9uLZ,659,165,Exit the bedroom. Walk straight past the bathroom, then turn left. Walk straight toward the wall until you have to turn. Turn right and wait by the table. 
+2azQ1b91cZZ,668,167,Go through the doorway, past the dining table, and through the doorway into the large lobby area, waiting here. 
+2azQ1b91cZZ,668,168,Walk through double doors into the house. Continue around the dining table and through the entry way to the next room. Walk up to the couch and armchairs surrounding a coffee table. 
+TbHJrupSAjP,697,172,Walk to the right of the stairs. Continue past and to the right of the stairs that go down. Turn right and stop in the doorway of the double glass doors. 
+TbHJrupSAjP,697,173,At the bottom of the stairs take a left and go down the hallway. Continue down the hall and take your first right into the art room. Stop once you are past the door in the art room. 
+TbHJrupSAjP,697,174,Walk past the set of stairs and through the hallway. Walk down the hallway passed the next set of stairs also and follow the banister through the hall. Walk into the room at the end of the hall that has a blackboard on the wall and large letters above. 
+QUCTc6BB5sX,705,175,Go to the right past the shelf with the vase, through the arched door towards the sink, through the next door, and into the excersise room, and wait. 
+QUCTc6BB5sX,705,176,Go straight and then turn to the right and go to the bathroom door.  Go through the doorway and walk through the bathroom to the other door.  You will then be in a gym.  Stop when you get into this room and wait. 
+QUCTc6BB5sX,705,177,With the bench on your left walk forward in the hall and take a right into the kitchen area and take a left into the bathroom and a right into the work out room stopping in front of the door on your right. 
+2azQ1b91cZZ,721,178,go trough the doorway and take a hard left then walk straight towards the archway and then keep going until you are under the archway and then stop. 
+2azQ1b91cZZ,721,179,Walk through the arched entry way that leads into the tiled room with a mosaic floor. Walk through the arched entry way to the left of the stairs. Continue down the tiled hall through the open door ahead into the bedroom with red bedsrpread. 
+2azQ1b91cZZ,721,180,Go straight through the doorway.  Go to the left and then left again till you see the star burst pattern on the floor  Go through the bedroom doorway and stop when you get to the bed.  Wait there. 
+QUCTc6BB5sX,788,190,Walk past the kitchen and go behind the couch and take a right into the fitness room. Stop next to the treadmill. 
+QUCTc6BB5sX,788,191,Leave sitting room to living room, turn right around couch, turn left and follow couch turn slight right into exercise room and stop by treadmill. 
+x8F5xyUWy9e,807,199,Walk through the doorway, take a left through the 2nd doorway, stop right before the plant on the right side. 
+x8F5xyUWy9e,807,200,Walk to the open door. Make a sharp right turn around the corner and walk through the open door into the room with grey tile. 
+x8F5xyUWy9e,807,201,Walk through open door and through hall, stop at bottom of stairs. 
+QUCTc6BB5sX,834,208,Walk to the left, going towards the right arch at the back of the room. Walk through to the next room and stop when you're at the rug in front of the dining set. 
+QUCTc6BB5sX,834,209,Walk out of the living room past the couches. Go straight into the dining room and a stop behind the second chair on the left. 
+QUCTc6BB5sX,834,210,Walk past the white couch on the left. Go through the entryway and past the oval table. Stop at the rectangular table. 
+2azQ1b91cZZ,878,214,Walk through the open door into the hallway. Move diagonally to the right to the archway next to the bureau and wall mirror. Walk down the small arched corridor and enter the bedroom with a fireplace. Wait by the bed on the left and the open door on the right. 
+2azQ1b91cZZ,878,215,Walk through the doorway into the hall.  Cross the hall and enter the door to the right of the Curtis Wilson Cost painting that is hanging on the wall. Walk past the drawers and shelves and wait. 
+2azQ1b91cZZ,878,216,Go forward through an archway towards the console table, and veer right to an open doorway, and go through it. Wait there. 
+X7HyMhZNoso,909,217,Walk out of bedroom and turn left into hall. Walk down to end of hall and turn left into bedroom. Wait there. 
+X7HyMhZNoso,909,218,Leave the bedroom and take a left in the hallway. Go straight and go into the room that is the second on the left. Stop in the doorway to the room. 
+X7HyMhZNoso,909,219,Exit the room, turn left and walk into the farthest room on the left. Wait by the entrance of the bedroom. 
+X7HyMhZNoso,955,226,Leave the bedroom and take a right in the hall, and walk straight. Take a left into the third entry way on your left and enter the bedroom. Stop in the doorway to the bedroom. 
+X7HyMhZNoso,955,227,Go through the door way and down the hallway, turning left at the end looking into a bedroom with a gray throw on the bed. 
+X7HyMhZNoso,955,228,Start at the bedroom door. Go out into the hallway. Turn right. Walk past a bathroom on the left. Go into the bedroom door at the end of the hallway on the left. 
+x8F5xyUWy9e,957,229,Walk through doorway towards the tub, turn left and walk towards the bar, right before the bar turn left, walk up the stairs and walk through the first door on the right, stop right before the table. 
+x8F5xyUWy9e,957,230,Enter the pool room, walk up the steps on the left and into the room on the right. Wait next to the massage table. 
+x8F5xyUWy9e,957,231,Walk out of the sauna into the pool room and take a left. Walk towards the bar and take a left going up the stairs into the hallway. Go up the next part of the stairs and take at the first right into the massage room. Stop just inside the doorway on the right. 
+QUCTc6BB5sX,969,238,Walk down the hall towards the living room and pass the living room. Go straight passing the kitchen and stop next to the console table in the hall. 
+QUCTc6BB5sX,969,239,Follow the hallway to the end with the archway. Go through the archway and stop. 
+QUCTc6BB5sX,969,240,Walk down the hallway and past the end table. Walk straight across the hallway past the pots. Walk straight and stop next to the end table. 
+zsNo4HB9uLZ,992,247,walk straight to hallway on right. turn right and follow hallway, at the end of hallway turn slight left and enter living room. Stop at couch. 
+zsNo4HB9uLZ,992,248,go straight and make a sharp left then go towards the living room where you will see a photo frame of the nyc skyline. 
+TbHJrupSAjP,1035,256,Leave the bedroom and take a right. Enter the bedroom at the end of the hall and stop in the doorway. 
+TbHJrupSAjP,1035,257,Please go out from the bed. To take right and enter into the other bedroom with light and dog. 
+TbHJrupSAjP,1035,258,Go out of the bedroom into the hall  Go to the bedroom door to the right  Face the bed. 
+2azQ1b91cZZ,1039,262,Leave the bedroom and take a right in the hallway Go down the hall and enter the bathroom first on your left. Stop in the doorway to the bathroom. 
+2azQ1b91cZZ,1039,263,Walk around the right side of the bed and leave the bedroom. Make a right and walk down the hallway until you get to the second window then turn left and wait in the bathroom. 
+2azQ1b91cZZ,1039,264,Exit the bedroom, turn right, walk down the hall to the bathroom across from the second window, enter the bathroom, wait at the sink. 
+2azQ1b91cZZ,1041,265,Walk towards oven and turn right through doorway. Go down hallway and turn left  and wait at bathroom. 
+2azQ1b91cZZ,1041,266,Walk across the kitchen between the cabinets and island. Go throught the archway to the right of the oven. Walk past the first door to the second one. Stop in this doorway to the bathroom. 
+2azQ1b91cZZ,1041,267,Walk towards the ovens and into the hallway on the right of the oven. Enter the second door on your left and go into the bathroom. Stop inside the doorway to the bathroom. 
+2azQ1b91cZZ,1070,271,Go down the stairs and take a right and stop in the hallway before you are under the star chandelier. 
+2azQ1b91cZZ,1070,272,Move down the stairs and make a sharp right, turning right at the first available opportunity to continue in that direction, through the marbled opening to the next room. Move down that short hallway and stop at the edge of the circular room there. 
+2azQ1b91cZZ,1070,273,Continue down the stairs.  You'll see a big starburst tile on the floor, turn right and go into the first doorway on the right.  There will be a big mirror in the room.  You'll stop and wait just inside this room. 
+2azQ1b91cZZ,1108,277,turn to your right and go down the hallway and take a right into the first doorway and then stop right next to the chair. 
+2azQ1b91cZZ,1108,278,Walk passed kitchen and turn right. Turn left into room passed table and chairs. Wait behind white couch. 
+2azQ1b91cZZ,1108,279,Walk down the hallway passed the chairs and counters. Continue down the hallway, passed the kitchen Enter the room on the right and walk passed the table and chairs. Walk toward the couch. 
+8194nk5LbLH,1141,290,Exit the kitchen, enter the living room, wait between the pink couch and kitchen island. 
+TbHJrupSAjP,1189,307,Walk out the shower and through the first doorway on the left. Walk through the doorway directly to the left of dresser, walk through the room and through the first doorway that leads to the stairs. Stop right before the staircase that leads downstairs. 
+TbHJrupSAjP,1189,308,Leave the bathroom and go into the bedroom. Leave the bedroom and go into the hallway. Stop at the edge of the table under the mirror in the hall. 
+TbHJrupSAjP,1189,309,Exit the bathroom, enter the bedroom, exit the bedroom to the hallway, wait at the top of the stairs. 
+EU6Fwq7SyZv,1195,317,Walk up the stairs.  Walk forward through living room, past the wooden support pole.  Stop in front of the chair and futon. 
+TbHJrupSAjP,1285,331,Walk through the hall ahead past the glass door and the painting on the wall. Walk through the door near the painting and into the next hallway. Walk around the banister rails to the staircase. Walk down the first few stairs. 
+TbHJrupSAjP,1285,332,Turn right and walk through both doorways. Keep walking and wait at the top of the stairs. 
+TbHJrupSAjP,1285,333,Exit the bathroom and enter the hallway. Walk forward until you reach the end of the banister on your right. Turn to the right. Once again, turn to your right and descend two stair steps then stop and wait in the middle of the second step. 
+QUCTc6BB5sX,1310,334,Walk out of the fitness room and take a left.  Go forward into the kitchen and walk towards the doors at the end. Stop once you are out of the kitchen and standing on the tile floor. 
+QUCTc6BB5sX,1310,335,Leave the exercise room and walk left on the wood floor.  Continue straight past the sofas and through the kitchen.  Stop at the first bar stool near the potted plant on the counter. 
+QUCTc6BB5sX,1310,336,Turn around and exit the exercise room. Turn left and walk across the wooden hallway. Walk across the kitchen towards the doors the exit the house. Wait there. 
+TbHJrupSAjP,1317,337,Make a right at the top of the stairs and go into the bedroom then make a left. Make another left to leave the bedroom then make a slight right and go to the doorway of the room to the right of the closet and wait. 
+TbHJrupSAjP,1317,338,Walk into the bedroom on the right of the stairs. Take a left before you reach the bed and wlk straight into the bathroom. Stop outside of the little room with the toilet. 
+TbHJrupSAjP,1317,339,Go straight into the bedroom, walk towards the bed, turn left, go straight towards the glass shower, stop in the doorway to the bathroom. 
+2azQ1b91cZZ,1326,340,walk towards the pool table, exit the room through the interior double doors, walk straight through the sitting area, walk into the arch way and stop inside of it. 
+2azQ1b91cZZ,1326,341,Take a right after the pool table and take your first left and walk into the room and wait in between the two rooms. 
+2azQ1b91cZZ,1326,342,Walk past the pool table and walk into the room with the fireplace. With the fireplace on your right walk down the walkway and stop at the end before you enter the next room. 
+Z6MFQCViBuw,1335,343,Walk all the way across the room. Stop by the doorway. 
+Z6MFQCViBuw,1335,344,With the desk on your left walk forward and out of this room. In the next room stop on the red rug just outside of the doorway you just left. 
+Z6MFQCViBuw,1335,345,Walk on the pink carpet past the marble bust and stop in the doorway to the next room. 
+EU6Fwq7SyZv,1345,346,Walk up the stairs, turn left and walk straight towards the windows right after the living room furniture, stop right in front of windows. 
+8194nk5LbLH,1382,349,Go down the stairs and straight down the hall. Veer right into the living room and walk into the kitchen. In the kitchen stop behind the chair on the right at the first black table. 
+zsNo4HB9uLZ,1383,352,Walk out of the dining room and into the door between the dining room and kitchen. In the hall take a right into a bedroom and stop outside of the closet door. 
+zsNo4HB9uLZ,1383,353,Walk over the kitchen counter, turn left,  walk ahead till wall, turn right, walk to the closet room, wait at front. 
+zsNo4HB9uLZ,1383,354,Walk past the couch and turn left. Walk into the hall and turn right. Walk into the bedroom and stop by the closet. 
+TbHJrupSAjP,1397,355,Walk up the stairs and turn right. Walk into the bedroom and turn left. Walk to the left of the bed and turn left into the closet. Turn right and walk into the room with the toilet and stop. 
+TbHJrupSAjP,1397,356,Go upstairs, turn right, walk into the bedroom, walk towards the night stand on the left side of the bed, turn left, walk towards the white rug, while facing the closet turn right into  the second door, stop in front of the toilet. 
+TbHJrupSAjP,1397,357,Walk up the stairs and take a right. Walk into the bedroom and take a left . Take another left at the night stand and walk out of the bedroom. Wait by the toilet in the second door on the right. 
+TbHJrupSAjP,1399,358,Walk forward and turn right, exiting the room. Continue forward and turn right, walking past the mirror and side table. Enter the bedroom and turn left. Turn left again and wait inside the doorway. 
+TbHJrupSAjP,1399,359,Walk out of the bedroom and into the hall. Take a right in the hall past the stairs and enter the room. Take a left before the bed and take a left into the closet. Stop in the doorway to the closet. 
+TbHJrupSAjP,1399,360,Walk out of the room and turn right. Turn right at the stairs and walk into the bedroom. Turn left and take another left at the nightstand. Wait in the doorway next to the nightstand. 
+zsNo4HB9uLZ,1431,367,Walk out of the closet and take a right out of the room. Take a left and walk towards the living room. Stop nest to the rug in front of the couch next to the patio door. 
+zsNo4HB9uLZ,1431,368,Exit the closet and walk to your right out of the bedroom. Walk to your left past the kitchen and into the living area. Wait in the living room just to the left of the grey area rug. 
+zsNo4HB9uLZ,1431,369,Turn around and walk out of the closet and take a right and walk out of the bedroom. Take a left and walk strauight. Wait in front of the couch. 
+X7HyMhZNoso,1473,371,Walk through the dining room and kitchen air to the short flight of stairs. Walk up the short flight of stairs. Wait by the door at the top of the stairs. 
+X7HyMhZNoso,1473,372,Walk past the dining room table and towards the kitchen. Go up the first set of stairs to the left of the kitchen. Stop at the top of the stairs next to the white door. 
+X7HyMhZNoso,1478,373,Leave the bathroom and go up the stairs. At the top of the stairs take a right, and another right into the living room. Stop next to the coffee table. 
+X7HyMhZNoso,1478,374,Walk up the three stairs and turn right. Walk towards the living room and turn right. Wait by the coffee table. 
+EU6Fwq7SyZv,1567,390,Walk through the living room in front of the couch and take a right. Stop on the wooden slatted floor next to the railing. 
+Z6MFQCViBuw,1574,391,Walk into the dining room and go back to the door across the room. Go through the door and wait. 
+Z6MFQCViBuw,1574,392,Turn around and walk across the dining room area. Enter the leftmost doorway. Wait by the glass sign on the left. 
+Z6MFQCViBuw,1574,393,Walk towards large red table and chairs. Go slightly right, pass through doorway. 
+2azQ1b91cZZ,1581,394,Move to the right towards the open doorway and continue forward to the fireplace. Wait near the fireplace. 
+zsNo4HB9uLZ,1660,415,Go down the hallway past the mirror.  Turn left at the picture with the letters. Step through the doorway into the kitchen. 
+zsNo4HB9uLZ,1660,416,Turn around and walk down the hallway. Turn left at the eye exam. Turn right to enter the kitchen. Stop at the sink. 
+zsNo4HB9uLZ,1660,417,Walk forward down the hall past the table on the left. Continue going forward to you reach the open doorway to the left. Turn left and walk forward, stop in front of the doorway to the bathroom. Turn right and enter that hallway stop and wait in front of the sink on your right. 
+QUCTc6BB5sX,1678,427,Walk out of the room and down the hallway. Walk past the kitchen and stop outside of the door to the dining room. 
+QUCTc6BB5sX,1678,428,Turn left and exit the room. Keep walking along the hall past the kitchen area. Wait by the doorway to the dining table area. 
+QUCTc6BB5sX,1678,429,Turn 90 degrees to the left.
+Walk through the doorway and down the hall.
+Pass through the archway, still walking straight.
+Keep straight throught the kithchen along the bar.
+Stop outside of the dinning room doorway. 
+Z6MFQCViBuw,1679,430,Go straight into the dining room. Walk through the door on the right on the wall straight ahead. Stop in the doorway. 
+Z6MFQCViBuw,1679,431,Move towards the table and down the hallway, with the table to your left. You'll be walking off the wood floor and on a red path. End promptly before the doorway where there is wood storage to the left hand size with a dark urn on top. 
+Z6MFQCViBuw,1679,432,Walk out through the door. Follow the red carpet to the right of the table. Stop in the next doorway. 
+QUCTc6BB5sX,1690,433,Go to the hallway, take a right, and at the intersection take a left, stopping at the bar. 
+QUCTc6BB5sX,1690,434,Turn around. Walk past the table on the right. Walk to the right out of the room. Turn left and walk towards the kitchen. Stop before the breakfast bar in the kitchen. 
+QUCTc6BB5sX,1690,435,Go past the circle of chairs toward the door. Turn right and go into the hallway. Turn left to go into the kitchen. 
+zsNo4HB9uLZ,1720,439,Turn around and walk through the door into the hallway. Turn left and go forward and stop next to the bed. Then turn left and go into the bathroom. 
+zsNo4HB9uLZ,1720,440,Leave the closet and take a left. Take another left and walk along the bed and take a left into the bathroom. Stop in front of the sink. 
+zsNo4HB9uLZ,1720,441,Take a left and exit the closet. Take a left into the bedroom. Take another left into the bathroom and wait there. 
+EU6Fwq7SyZv,1775,443,Walk through the kitchen area past the dinner table and stove. Walk past the stairwell and into the living room area. Continue past the cushioned armchairs and stop near the fireplace with statues on the mantle. 
+EU6Fwq7SyZv,1775,444,Turn right and walk towards the living room area. Walk towards the fireplace and wait by the stool and table. 
+2azQ1b91cZZ,1803,448,Walk down the hall. Stop under the hanging light in the hallway. 
+2azQ1b91cZZ,1803,449,Turn and walk down the hallway until you reach the 4th door to the right. This is the door right before entering the kitchen. Stop so you are in the hallway centered on the door. 
+2azQ1b91cZZ,1803,450,Walk into the arched hallway near the native american paintings on the wall. Walk past the doorway to the laundry room and down the hall past the candles on the wall. Continue to the open arched entry at the end of the hall. 
