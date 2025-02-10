@@ -107,7 +107,7 @@ robots:
     type: "Camera"
     prim_path: "torso_link/Camera"
   - name: "tp_pointcloud"
-    type: "Camera"
+    type: "RepCamera"
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
     type: "Camera"
@@ -255,7 +255,8 @@ robots:
     rotation_speed: 2.0
     threshold: 0.15
     sub_controllers:
-    - name: move_to_point
+    # - name: move_to_point
+    - name: move_to_point_by_pid
   - name: "rotate"
     type: RotateController
     rotation_speed: 2.0
@@ -302,7 +303,11 @@ robots:
     - name: move_by_speed
   - name: "move_along_speeds"
     type: MoveAlongSpeedsController
+<<<<<<< HEAD
     steps_per_speed: 50
+=======
+    steps_per_speed: 80
+>>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     sub_controllers:
     - name: move_by_speed
   - name: "move_by_descrete"
@@ -324,6 +329,15 @@ robots:
     type: "Camera"
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
+<<<<<<< HEAD
+    type: "Camera_3dgs"
+    prim_path: "torso_link/h1_pano_camera_0"
+  - name: "topdown_camera_50"
+    type: "Camera"
+    prim_path: "topdown_camera_50"
+  - name: "topdown_camera_500"
+    type: "Camera"
+=======
     type: "Camera"
     prim_path: "torso_link/h1_pano_camera_0"
   - name: "topdown_camera_50"
@@ -331,6 +345,7 @@ robots:
     prim_path: "topdown_camera_50"
   - name: "topdown_camera_500"
     type: "Camera"
+>>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     prim_path: "topdown_camera_500"
   - name: "h1_pano_camera_debug"
     type: "Camera"

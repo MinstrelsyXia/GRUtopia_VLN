@@ -76,6 +76,8 @@ def vis_one_path(args, vln_envs):
     # get the specific path
     vln_envs = vln_envs[args.split]
     data_item = vln_envs.init_one_path(args.path_id)
+    if data_item is None:
+        return # not found the path
     env = vln_envs.env
     
     paths = data_item['reference_path']
@@ -99,7 +101,8 @@ def vis_one_path(args, vln_envs):
     else:
         actions = {'h1': {action_name: []}}
 
-    topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) 
+    topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan'])
+    
     while env.simulation_app.is_running():
         i += 1
         reset_flag = False
@@ -114,7 +117,7 @@ def vis_one_path(args, vln_envs):
             agent_action_state = {'finished': True}
             continue
         
-        if i % 10 == 0:
+        if i % 80 == 0:
             print(i)
             if vln_config.settings.check_and_reset_robot:
                 # topdown_map = vln_envs.GlobalTopdownMap(args, data_item['scan']) 
@@ -132,7 +135,7 @@ def vis_one_path(args, vln_envs):
                     
             if vln_config.windows_head:
                 # show the topdown camera
-                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0])
+                vln_envs.cam_occupancy_map_local.update_windows_head(robot_pos=vln_envs.agents.get_world_pose()[0], mode='save')
 
         if i % 100 == 0:
             print(i)
@@ -381,6 +384,11 @@ def sample_episodes(args, vln_envs_all, data_camera_list):
     env.simulation_app.close()
 
 def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None, scan=None, is_app_up=False):
+    # 在函数开始处添加FPS计算相关变量
+    frame_count = 0
+    fps_start_time = time.time()
+    fps_print_interval = 100  # 每100帧打印一次FPS
+    
     # Init the variables
     action_name = vln_config.settings.action
     topdown_maps = {}
@@ -492,10 +500,20 @@ def sample_episodes_single_scan(args, vln_envs_all, data_camera_list, split=None
 
         start_time = time.time()
         while env.simulation_app.is_running():
+            # FPS计算
+            frame_count += 1
+            if frame_count % fps_print_interval == 0:
+                current_time = time.time()
+                fps = fps_print_interval / (current_time - fps_start_time)
+                log.info(f"FPS: {fps:.2f}")
+                fps_start_time = current_time
+            
             max_step = 500 if args.debug else args.settings.max_step
             if i >= max_step:
-                # if i >= 2: # !!! debug
-                log.warning(f"Scan: {scan}, Path_id: {path_id}. Exceed the maximum steps: {max_step}")
+                # 在退出循环前计算平均FPS
+                total_time = time.time() - fps_start_time
+                avg_fps = frame_count / total_time
+                log.info(f"Average FPS: {avg_fps:.2f}")
                 break
 
             i += 1

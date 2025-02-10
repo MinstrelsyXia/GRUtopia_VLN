@@ -27,6 +27,7 @@ except:
 
 from grutopia.core.util.log import log
 from grutopia.core.env import BaseEnv
+from grutopia.core.util.container import is_in_container
 
 from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
 
@@ -51,12 +52,14 @@ def transform_rotation_z_90degrees(rotation):
     ]
     return revised_rotation
     
-def load_data(args, split):
+def load_data(args, split, dataset_root_dir=None):
     ''' Load data based on VLN-CE
     '''
-    dataset_root_dir = args.datasets.base_data_dir
+    dataset_root_dir = args.datasets.base_data_dir if dataset_root_dir is None else dataset_root_dir
     total_scans = []
     load_data = []
+    if split == None:
+        return [], []
     with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
         data = json.load(f)
         for item in data["episodes"]:
@@ -103,16 +106,11 @@ def load_scene_usd(args, scan):
     '''
     find_flag = False
     for root, dirs, files in os.walk(os.path.join(args.datasets.mp3d_data_dir, scan)):
+        target_file_name = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
         for file in files:
-            # if 'fix_holes_ver2' in file:
-            #     scene_usd_path = os.path.join(root,file)
-            #     find_flag = True
-            #     break
             # if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
-            target_file = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
-            if file == target_file:
+            if file == target_file_name:
                 scene_usd_path = os.path.join(root, file)
-                # scene_usd_path = '/ssd/wangliuyi/code/Matterport3D/data/v1/scans/V2XKFyX4ASd/matterport_mesh/04d3f2105168491db767ad1fe7bc39df/fix_holes_ver2.usd'
                 find_flag = True
                 break
         if find_flag:
@@ -428,6 +426,7 @@ class VLNDataLoader(Dataset):
                     save_img_flag = True
                 elif data == 'pointcloud':
                     save_img_flag = False
+                    #save_img_flag = True
                 if save_imgs and save_img_flag:
                     save_dir = os.path.join(self.args.log_image_dir, "obs")
                     if not os.path.exists(save_dir):
@@ -610,7 +609,7 @@ class VLNDataLoader(Dataset):
         '''
         camera_list = []
         for camera in self.args.camera_list:
-            if 'debug' not in camera and 'topdown' not in camera:
+            if 'debug' not in camera and 'topdown' not in camera and 'pointcloud' not in camera:
                 camera_list.append(camera)
         pointclouds, _, _ = self.process_pointcloud(camera_list)
         robot_ankle_z = self.get_robot_bottom_z()
@@ -721,6 +720,7 @@ class VLNDataLoader(Dataset):
         ''' Reset the robot's pose
         '''
         self.agents.set_world_pose(position, rotation)
+        self.agents.set_world_velocity(np.zeros(6))
         self.agent_last_pose = position
         self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
         self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))
