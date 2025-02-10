@@ -34,8 +34,96 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
 sys.path.append(ISSAC_SIM_DIR)
 
-from parser import process_args
+from vln.parser import process_args
 
+########### sixth floor ###################
+import json
+import torch
+import torchvision
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
+import numpy as np
+import hydra
+import traceback
+#! after sim setup is finished
+import open3d as o3d
+
+from grutopia.core.env import BaseEnv
+from grutopia.core.config import SimulatorConfig
+from grutopia.core.util.log import log
+import cv2
+class sixth_floor_scene:
+    def __init__(self, json_path, sim_config_path, device_number):
+
+        self.json_path = json_path
+        self.device_number = device_number
+        with open(self.json_path, "r") as json_file:
+            lego_json_config = json.load(json_file)
+
+        self.lego_usd_root = lego_json_config["usd_model_root"]
+        self.lego_gs_root = lego_json_config["gs_model_root"]
+        self.lego_name_list = lego_json_config["model_list"]
+        self.lego_device_number = 0
+        self.lego_editable = True
+
+        sim_config = SimulatorConfig(sim_config_path) #! scene_usd is empty!
+        self.sim_config = sim_config
+        self.env = BaseEnv(sim_config, headless=True, webrtc=False)
+        self.env.reset()
+        
+        self.lego_xform_list = [] 
+        from omni.isaac.core.prims import XFormPrim
+        from omni.isaac.core.utils.prims import create_prim
+        from omni.isaac.core.utils.prims import get_prim_at_path
+        for lego_name in self.lego_name_list:
+            create_prim(usd_path=os.path.join(self.lego_usd_root, lego_name["usd_name"]), 
+                        prim_path="/World/" + lego_name["isaac_name"], 
+                        position=lego_name["init_position"], 
+                        orientation=lego_name["init_orientation"],
+                        scale=lego_name["init_scale"])
+            self.lego_xform_list.append(XFormPrim("/World/" + lego_name["isaac_name"]))
+            print("Create preset usd at /World/" + lego_name["isaac_name"])
+        create_prim("/World/light", "DistantLight")
+        print("Create preset light at /World/light")
+        self.task_name = self.env.config.tasks[0].name
+        self.robot_name = self.env.config.tasks[0].robots[0].name
+        self.init_agents()
+    
+    def init_agents(self):
+        '''call after self.init_env'''
+        self.agents = self.env._runner.current_tasks[self.task_name].robots[self.robot_name].isaac_robot
+        self.agent_last_pose = None
+        self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
+        self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
+
+        # self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
+    
+    def set_agent_pose(self, position, rotation):
+        self.agents.set_world_pose(position, rotation)
+    def get_agent_pose(self):
+        return self.agents.get_world_pose()
+
+    def set_paths(self):
+        json_path = "thirdparty/landmark_isaacsim_interaction/json_configs/multi_model_sixthfloor.json"
+        img_path = "thirdparty/landmark_isaacsim_interaction/rendered_imgs/"
+        file_path = '/ssd/xiaxinyuan/code/w61-grutopia/vln/configs/sim_cfg_path_generation.yaml'
+        device_number = 0
+        save_dir = os.path.join(img_path, "sixth_floor")
+        rgb_save_dir = os.path.join(save_dir, "rgb")
+        depth_save_dir = os.path.join(save_dir, "depth")
+        pcd_save_dir = os.path.join(save_dir, "pcd")
+        debug_rgb_save_dir = os.path.join(save_dir, "debug_rgb")
+        pano_rgb_save_dir = os.path.join(save_dir, "pano_rgb")
+        os.makedirs(rgb_save_dir, exist_ok=True)
+        os.makedirs(depth_save_dir, exist_ok=True)
+        os.makedirs(pcd_save_dir, exist_ok=True)
+        os.makedirs(debug_rgb_save_dir, exist_ok=True)
+        os.makedirs(pano_rgb_save_dir, exist_ok=True)
+
+
+########### end sixth floor ###########################
 
 
 
@@ -59,6 +147,8 @@ def build_dataset():
                             filter_same_trajectory=True)
     camera_list = [x.name for x in sim_config.config.tasks[0].robots[0].sensor_params if x.enable]
     if 'sample_episodes' in vln_config.settings.mode:
+        data_camera_list = vln_config.settings.sample_camera_list
+    elif 'sixth_floor' in vln_config.settings.mode:
         data_camera_list = vln_config.settings.sample_camera_list
     else:
         data_camera_list = None
@@ -119,7 +209,6 @@ def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_c
         # pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
     
     processes = []
-            
     for task_idx in range(num_workers):
         tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
         process = mp.Process(target=process_wrapper, args=tasks[task_idx])
@@ -240,7 +329,7 @@ def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, sp
         if i < warm_step:
             if 'oracle' in action_name:
                 init_actions['h1'][action_name][1]['current_step'] = i
-            obs = env.step(actions=env_actions)
+            obs = env.step(actions=env_actions,render=False, add_rgb_subframes=False)
             
             if i % 50 == 0:
                 # break
@@ -479,3 +568,5 @@ if __name__ == "__main__":
         for scan, path_id in data.items():
             log.info(f"***Start with Scan: {scan}***")
             sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split=vln_config.split, assigned_scan=scan)
+    elif vln_config.settings.mode == "sixth_floor":
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list,assigned_split = 'sixth_floor', assigned_scan='0')

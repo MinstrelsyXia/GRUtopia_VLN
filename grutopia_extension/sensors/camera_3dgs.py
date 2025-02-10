@@ -202,7 +202,7 @@ class Camera_3dgs(BaseSensor):
         
         return points_world
     
-    def get_data(self, add_rgb_subframes=False, render=False, gs3d=False):
+    def get_data(self, add_rgb_subframes=False, render=False):
         """获取相机数据，包括RGB、深度图和点云"""
         # if self has no attribute lego_xform_list, then return empty data
         if not hasattr(self, 'lego_xform_list'):
@@ -211,22 +211,25 @@ class Camera_3dgs(BaseSensor):
             rgb = {}
             depth = {}
             pc= {}
-            if gs3d == True:
+            if add_rgb_subframes == True:
                 # torch.cuda.empty_cache()
                 cam_transform_matrix = get_relative_transform(get_prim_at_path(self._camera.prim_path), get_prim_at_path("/World"))
                 # with torch.no_grad():   
                 self.scgs_renderer.update_editing_package(*get_xform_list_pose(self.lego_xform_list))
                 scgs_rendering = self.scgs_renderer.minicam_render(cam_transform_matrix)
                 rgb = scgs_rendering['render'].detach().cpu().numpy()
+                rgb = np.transpose(rgb, (1, 2, 0))  # shape [H,W,3]
+                rgb = (rgb * 255).astype(np.uint8)
+                rgb = rgb[:, :, ::-1]  # BGR to RGB
                 depth = scgs_rendering['depth'].detach().cpu().numpy()[0]    # shape：（H，W）
                 # pc = self.get_pc(depth,cam_transform_matrix)
-                pc = self._camera.get_pointcloud()
+            pc = self._camera.get_pointcloud()
                 # pc[:,2] = -pc[:,2]
                 # 利用cam_transform_matrix，将pc转换到世界坐标系
                 # pc = self.create_pointcloud_from_rgbd(depth, cam_transform_matrix)
             
             return {
-                'rgb': rgb,
+                'rgba': rgb,
                 'depth': depth,
                 'pointcloud': pc,
                 # 'pointcloud': self.depth_to_pointcloud(render_results['depth'])  # 如果需要点云
@@ -245,7 +248,9 @@ class Camera_3dgs(BaseSensor):
         del self._camera
         self._camera = self.create_camera()
         self.sensor_init()
-######### setup sim ###########
+    
+    def get_world_pose(self):
+        return self._camera.get_world_pose()
 
 
 

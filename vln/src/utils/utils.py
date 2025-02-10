@@ -4,7 +4,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 from grutopia.core.util.log import log
-
+import torch
 from typing import (
     Any,
     DefaultDict,
@@ -15,7 +15,7 @@ from typing import (
     Tuple,
     Union,
 )
-
+from yacs.config import CfgNode
 from vln.src.utils.tensor_dict import TensorDict
 
 def euler_angles_to_quat(angles, degrees=False):
@@ -663,7 +663,7 @@ def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl, i
     video_writer.release()
     print(f"Save video to {video_path}")
 
-class Config(yacs.config.CfgNode):
+class Config(CfgNode):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, new_allowed=True)
 
