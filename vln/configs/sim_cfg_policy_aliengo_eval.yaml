@@ -1,0 +1,60 @@
+simulator:
+  physics_dt: 1/200
+  rendering_dt: 1/200
+  rendering_interval: 10
+
+tasks:
+- type: "VLNTask"
+  name: "vln"
+  scene_asset_path: ""
+  scene_scale: [1, 1, 1]
+  env_num: 1
+  offset_size: 100.0
+  light_on: true
+  robots:
+  - name: aliengo
+    prim_path: "/World/aliengo"
+    type: "AliengoRobot"
+    position: [0, 0, 0]
+    scale: [1, 1, 1]
+    orientation: [0,0,0,0]
+    robot_height: 0.40 # for get free_map
+    ankle_height: 0.0758
+    fall_height_threshold: 0.04
+    aperture: 200
+    controller_params:
+    - name: "move_by_speed"
+    - name: "joint_controller"
+    - name: "move_to_point"
+    - name: "move_along_path"
+    - name: "rotate"
+    - name: "move_with_keyboard"
+    # - name: "web_chat"
+    - name: "stand_still"
+    - name: "oracle_move_to_point"
+    - name: "oracle_move_along_path"
+    - name: "move_to_point_by_pid"
+    - name: "move_along_speeds"
+    - name: "move_by_descrete"
+    sensor_params:
+    - name: "camera"
+      enable: false
+      size: [640, 480]
+    - name: "tp_camera"
+      enable: false
+      size: [640, 480]
+    - name: "pano_camera_0"
+      enable: true
+      size: [256, 256]
+    - name: "topdown_camera_50"
+      enable: true
+      size: [500, 500]
+    - name: "topdown_camera_500"
+      enable: true
+      size: [500, 500]
+    - name: "tp_pointcloud"
+      enable: True
+      size: [64, 64]
+      camera_config:
+        - no_rgb
+        - point_cloud

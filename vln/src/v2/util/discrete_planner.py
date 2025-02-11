@@ -268,3 +268,43 @@ class AStarDiscretePlanner:
         points, actions = self.calc_final_path_and_actions(goal_node, closed_set)
         
         return points, actions, find_flag, reason
+
+    
+    def visualize_map(self, obs_map, start_node, goal_node, points=None, save_path='logs/path_planning.jpg'):
+        """
+        可视化地图、起点、终点和路径
+        
+        参数:
+            obs_map: 障碍物地图
+            start_node: 起始节点
+            goal_node: 目标节点
+            points: 可选，路径点列表
+        """
+        import matplotlib.pyplot as plt
+        
+        # 创建图形
+        plt.figure(figsize=(10, 10))
+        
+        # 显示障碍物地图
+        plt.imshow(obs_map.T, cmap='gray', origin='lower')
+        
+        # 绘制起点（绿色星形）
+        plt.plot(start_node.x, start_node.y, 'g*', markersize=15, label='start point')
+        
+        # 绘制终点（红色星形）
+        plt.plot(goal_node.x, goal_node.y, 'r*', markersize=15, label='goal point')
+        
+        # 如果有路径点，绘制路径
+        if points is not None:
+            path_x = [p[0] for p in points]
+            path_y = [p[1] for p in points]
+            plt.plot(path_x, path_y, 'b-', linewidth=2, label='path')
+        
+        plt.grid(True)
+        plt.legend()
+        plt.title('path planning')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        plt.close()

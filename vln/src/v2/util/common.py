@@ -58,6 +58,41 @@ def freemap_to_accupancy_map(
             occupancy_map[expanded_ob_mask&(np.logical_or(occupancy_map==0,occupancy_map==2))] = 255 - i*10
     return occupancy_map
 
+def visualize_freemap(freemap, occupancy_map=None, save_path=None):
+    """可视化freemap和occupancy map（如果提供）
+    
+    Args:
+        freemap: 原始的freemap数组
+        occupancy_map: 可选的occupancy map数组
+        save_path: 可选的保存路径。如果提供，图像将保存到该路径
+    """
+    import matplotlib.pyplot as plt
+    
+    if occupancy_map is not None:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        # 显示freemap
+        ax1.imshow(freemap, cmap='gray')
+        ax1.set_title('Freemap')
+        ax1.axis('off')
+        
+        # 显示occupancy map
+        im = ax2.imshow(occupancy_map, cmap='viridis')
+        ax2.set_title('Occupancy Map')
+        ax2.axis('off')
+        plt.colorbar(im, ax=ax2)
+    else:
+        plt.figure(figsize=(6, 5))
+        plt.imshow(freemap, cmap='gray')
+        plt.title('Freemap')
+        plt.axis('off')
+    
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
 def check_robot_fall(robot_position, robot_rotation, robots_bottom_z, pitch_threshold=35, roll_threshold=15, height_threshold=0.5):
     from omni.isaac.core.utils.rotations import quat_to_euler_angles
     roll, pitch, yaw = quat_to_euler_angles(robot_rotation, degrees=True)

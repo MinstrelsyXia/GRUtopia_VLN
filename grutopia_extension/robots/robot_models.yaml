@@ -357,12 +357,12 @@ robots:
     prim_path: "torso_link/h1_pano_camera_315"
 
 - type: "AliengoRobot"
-  usd_path: "assets/robots/aliengo_vln_camera.usd"
+  usd_path: "assets/robots/aliengo/aliengo_vln_camera.usd"
   gains: [0., 0., 0., 0.]
   controllers:
   - name: "move_by_speed" 
     type: AliengoMoveBySpeedController
-    policy_weights_path: assets/policy/aliengo_loco_model_4000.pt
+    policy_weights_path: assets/policy/weights/aliengo_loco_model_4000.pt
     joint_names:
     - FL_hip_joint
     - FR_hip_joint
