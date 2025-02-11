@@ -223,9 +223,9 @@ data_item, data_scan, start_position, start_rotation = load_data(base_data_dir+f
 find_flag = False
 for root, dirs, files in os.walk(mp3d_data_dir+f"/{data_scan}"):
     for file in files:
-        # target_file = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
-        # if file == target_file:
-        if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
+        target_file = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
+        if file == target_file:
+            # if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
             scene_usd_path = os.path.join(root, file)
             find_flag = True
             break
