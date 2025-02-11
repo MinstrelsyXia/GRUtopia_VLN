@@ -26,10 +26,10 @@ wheels/
 MANIFEST
 
 outputs/
-logs/
-logs_docker/
-logs_docker_0120/
-logs_docker_test/
+logs*/
+tmp*/
+*.jpg
+api_key/
 .auto-run-docker/
 vlmaps/vlmaps/lseg/checkpoints/
 # PyInstaller

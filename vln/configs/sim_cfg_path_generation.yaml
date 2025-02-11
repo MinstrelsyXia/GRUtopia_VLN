@@ -36,7 +36,8 @@ tasks:
     sensor_params:
     - name: "pano_camera_0"
       enable: true
-      size: [256,256]
+      # size: [256,256]
+      size: [640,480]
       camera_config:
         - point_cloud
     - name: "pano_camera_45"

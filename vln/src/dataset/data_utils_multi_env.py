@@ -335,7 +335,7 @@ class VLNDataLoader(Dataset):
             self.lego_usd_root = lego_json_config["usd_model_root"]
             self.lego_gs_root = lego_json_config["gs_model_root"]
             self.lego_name_list = lego_json_config["model_list"]
-            self.lego_device_number = 4
+            self.lego_device_number = 0
             self.lego_editable = True
             self.env = BaseEnv(sim_config, headless=True, webrtc=False)
             self.env.reset()
@@ -363,10 +363,14 @@ class VLNDataLoader(Dataset):
         self.tasks = self.env._runner.current_tasks
         self.robot_names = [list(task.robots.keys())[0] for task in self.tasks.values()]
         self.task_names = list(self.tasks.keys())
+        sensor_idx = 0
+        device_number = torch.cuda.device_count()
         for task_name, robot_name in zip(self.task_names,self.robot_names):
             for sensor_name, sensor in self.tasks[task_name].robots[robot_name].sensors.items():
+                lego_device_number = sensor_idx % device_number
                 if sensor.config.type=='Camera_3dgs' and sensor.config.enable==True:
-                    sensor.set_renderer(self.lego_xform_list, self.lego_gs_root, self.lego_name_list, self.lego_device_number, self.lego_editable)
+                    sensor.set_renderer(self.lego_xform_list, self.lego_gs_root, self.lego_name_list, lego_device_number, self.lego_editable)
+                    sensor_idx +=1
     def init_robots(self):
         '''call after self.init_env'''
         self.tasks = self.env._runner.current_tasks

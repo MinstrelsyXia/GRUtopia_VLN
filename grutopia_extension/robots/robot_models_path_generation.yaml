@@ -112,7 +112,7 @@ robots:
     rotation_speed: 2.0
     threshold: 0.15
     sub_controllers:
-    - name: move_to_point
+    - name: move_to_point_by_pid
   - name: "rotate"
     type: RotateController
     rotation_speed: 2.0
