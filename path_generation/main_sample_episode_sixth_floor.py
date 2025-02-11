@@ -41,9 +41,6 @@ import json
 import torch
 import torchvision
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
-
 import numpy as np
 import hydra
 import traceback

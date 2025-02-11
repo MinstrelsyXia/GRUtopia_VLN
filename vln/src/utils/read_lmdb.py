@@ -224,7 +224,7 @@ class LmdbReader:
         return data, scan
 
 if __name__ == '__main__':
-    mode = 'save_video'
+    mode = 'sixth_floor'
     use_pid = False
     
     pid_lmdb_path = 'data/sample_episodes/20241207_sample_episodes/sample_data.lmdb'
@@ -282,4 +282,13 @@ if __name__ == '__main__':
             os.makedirs(output_video_dir, exist_ok=True)
             for ep_info in success_lmdb_data:
                 data_collector.save_episode_video(episode_data=ep_info[1], key=ep_info[0], output_dir=output_video_dir, use_pid=use_pid)
+    elif mode == 'sixth_floor':
+        lmdb_path = 'data/sixth_floor/20241115_sample_episodes/sample_data.lmdb'
+        data_collector = LmdbReader(lmdb_path)
+        all_keys = data_collector.read_all_keys()
+        path_id = '0'
+        episode_data = data_collector.read_episode_data(path_id)
+        ## save to the video
+        if episode_data is not None:
+            data_collector.save_episode_video(episode_data, key=path_id, output_dir='data/sixth_floor/20241115_sample_episodes', use_pid=use_pid)
 
