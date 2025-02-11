@@ -1,8 +1,0 @@
-[2025-01-20 12:25:51,127][INFO] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1431] -: Is in container: True
-[2025-01-20 12:25:51,243][INFO] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1431] -: Is in container: True
-[2025-01-20 12:25:51,304][INFO] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1431] -: Is in container: True
-[2025-01-20 12:25:51,323][INFO] /isaac-sim/GRUtopia/vlmaps/application_my/isaac_robot_docker.py[line:1431] -: Is in container: True
-[2025-01-20 12:25:51,468][INFO] /isaac-sim/GRUtopia/vln/src/dataset/data_utils.py[line:78] -: Loaded data with a total of 1839 items from val_unseen
-[2025-01-20 12:25:51,481][INFO] /isaac-sim/GRUtopia/vln/src/dataset/data_utils.py[line:78] -: Loaded data with a total of 1839 items from val_unseen
-[2025-01-20 12:25:51,579][INFO] /isaac-sim/GRUtopia/vln/src/dataset/data_utils.py[line:78] -: Loaded data with a total of 1839 items from val_unseen
-[2025-01-20 12:25:51,581][INFO] /isaac-sim/GRUtopia/vln/src/dataset/data_utils.py[line:78] -: Loaded data with a total of 1839 items from val_unseen

@@ -1,12 +1,9 @@
 # Developer only. User read-only.
 robots:
 - type: "HumanoidRobot"
-  # usd_path: "GRUtopia/assets/robots/h1/h1_vln_pano_cameras.usd"
-  # usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
-  # usd_path: "/ssd/huangwensi/GRUtopia/assets/robots/h1/h1.usd"
-  # usd_path: "assets/robots/h1/h1_invisible_1121.usd"
-  usd_path: "assets/robots/h1/test.usd"
-
+  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
+  # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
   gains: [0.0, 0.0]
   controllers:
   - name: "move_by_speed"
@@ -146,7 +143,7 @@ robots:
 
 
 - type: "HumanoidRobotVLNEval"
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_500.usd"
+  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
@@ -303,11 +300,7 @@ robots:
     - name: move_by_speed
   - name: "move_along_speeds"
     type: MoveAlongSpeedsController
-<<<<<<< HEAD
-    steps_per_speed: 50
-=======
     steps_per_speed: 80
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     sub_controllers:
     - name: move_by_speed
   - name: "move_by_descrete"
@@ -329,15 +322,6 @@ robots:
     type: "Camera"
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
-<<<<<<< HEAD
-    type: "Camera_3dgs"
-    prim_path: "torso_link/h1_pano_camera_0"
-  - name: "topdown_camera_50"
-    type: "Camera"
-    prim_path: "topdown_camera_50"
-  - name: "topdown_camera_500"
-    type: "Camera"
-=======
     type: "Camera"
     prim_path: "torso_link/h1_pano_camera_0"
   - name: "topdown_camera_50"
@@ -345,7 +329,6 @@ robots:
     prim_path: "topdown_camera_50"
   - name: "topdown_camera_500"
     type: "Camera"
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     prim_path: "topdown_camera_500"
   - name: "h1_pano_camera_debug"
     type: "Camera"

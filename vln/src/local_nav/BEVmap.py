@@ -11,16 +11,14 @@ import json
 
 from grutopia.core.util.log import log
 
-from vln.src.local_nav.path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
-import copy
+from .path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
 class BEVMap:
     def __init__(self, args, robot_init_pose=(0, 0, 0)):
         self.args = args
         
         self.step_time = 0
         # Attributes for occupancy_map
-        # quadtree_config = args.maps.quadtree_config
-        quadtree_config = copy.deepcopy(args.maps.quadtree_config) # ! 淺拷貝改成深拷貝，防止改變config内容
+        quadtree_config = args.maps.quadtree_config
         self.voxel_size = args.maps.voxel_size  # Resolution to present the map
         quadtree_config.width, quadtree_config.height = int(quadtree_config.width/self.voxel_size), int(quadtree_config.height/self.voxel_size)
         self.quadtree_config = quadtree_config
@@ -110,9 +108,6 @@ class BEVMap:
 
                 point_within_robot_z = point_to_consider[(point_to_consider[:,2]>=(robot_bottom_z+self.robot_z[0])) & (point_to_consider[:,2]<=(robot_bottom_z+self.robot_z[1]))].astype(int) # points that are within the robot's height range (occupancy)
 
-                # ploted_downsampled_cloud = np.asarray(pcd.voxel_down_sample(voxel_size=self.voxel_size*20).points)
-
-                # self.save_point_cloud_image(ploted_downsampled_cloud, temp_path="temp_pc_image.png")
                 unique_data_0 = np.unique(point_within_robot_z[:, :2], axis=0)
                 unique_data_all = np.unique(point_to_consider[:, :2], axis=0).astype(int)
                 unique_data_1 = np.array(list(set(map(tuple, unique_data_all)) - set(map(tuple, unique_data_0)))).astype(int) # points that are not within the robot's height range (free)

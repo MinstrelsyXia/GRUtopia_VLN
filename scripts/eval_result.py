@@ -8,12 +8,12 @@ import argparse
 from vln.src.v2.util.eval import generate_eval_key
 from vln.src.v2.util.common import load_data
 
-def get_split_map(project_path):
+def get_split_map(project_path, load_eval_subset=False):
     split_map={}
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
     split_data_types=['val_unseen','val_seen']
     for split_data_type in split_data_types:
-        load_data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=False, filter_stairs=True)
+        load_data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=False, filter_stairs=True, load_eval_subset=load_eval_subset)
         path_key_list=[]
         for scan,path_list in load_data_map.items():
             for path in path_list:
@@ -34,24 +34,31 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     cfg_file = args.cfg_file
-    print(f"cfg_file:{cfg_file}")
+    
+    # 创建日志文件
+    log_content = []
+    def log_print(content):
+        print(content)
+        log_content.append(str(content))
+
+    log_print(f"cfg_file:{cfg_file}")
 
     project_path = PROJECT_ROOT_PATH
     cfg_file_path = f"{project_path}/{cfg_file}"
     if not os.path.exists(cfg_file_path):
-        print(f"{cfg_file_path} not exist")
+        log_print(f"{cfg_file_path} not exist")
         sys.exit()
     with open(cfg_file_path, 'r') as file:
         config = json.load(file)
-    print(f"config:{config}")
+    log_print(f"config:{config}")
     name = config["name"]
-    print(f"name:{name}")
+    log_print(f"name:{name}")
     ckpt_file_name = config["ckpt_to_load"].split('/')[-1]
     ckpt_name=f"{name}_{ckpt_file_name}"
-    print(f"ckpt_name:{ckpt_name}")
+    log_print(f"ckpt_name:{ckpt_name}")
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, readonly=True, lock=False)
-    split_map = get_split_map(project_path)
+    split_map = get_split_map(project_path, load_eval_subset=config["load_eval_subset"])
 
     for split,path_key_list in split_map.items():
         data_list = []
@@ -66,7 +73,7 @@ if __name__ == "__main__":
             value['path_key']=path_key
             data_list.append(value)
         count=len(data_list)
-        print(f"[split:{split}] 总共获取数据 {count} 条")
+        log_print(f"[split:{split}] 总共获取数据 {count} 条")
         total_TL = 0
         total_NE = 0
         total_osr = 0
@@ -108,17 +115,23 @@ if __name__ == "__main__":
             if success > 0:
                 reason_map['reach_goal']= reason_map['reach_goal'] + 1
 
-        print(f"############[{split}]#############")
+        log_print(f"############[{split}]#############")
         if count == 0:
-            print(f"############[count == 0,skip]#############")
+            log_print(f"############[count == 0,skip]#############")
             continue
-        print(f"TL = {total_TL} / {count} = {round((total_TL / count),2)}")
-        print(f"NE = {total_NE} / {count} = {round((total_NE / count),2)}")
-        print(f"osr = {total_osr} / {count} = {round((total_osr / count),2)}")
-        print(f"success = {total_success} / {count} = {round((total_success / count),2)}")
-        print(f"spl = {total_spl} / {count} = {round((total_spl / count),2)}")
-        print("detail:")
+        log_print(f"TL = {total_TL} / {count} = {round((total_TL / count),4)}")
+        log_print(f"NE = {total_NE} / {count} = {round((total_NE / count),4)}")
+        log_print(f"osr = {total_osr} / {count} = {round((total_osr / count),4)}")
+        log_print(f"success = {total_success} / {count} = {round((total_success / count),4)}")
+        log_print(f"spl = {total_spl} / {count} = {round((total_spl / count),4)}")
+        log_print("detail:")
         for k,v in reason_map.items():
-            print(f"[{k}]:{v}")
-        print(f"##########################")
+            log_print(f"[{k}]:{v}")
+        log_print(f"##########################")
+    
+    # 将日志内容写入文件
+    log_file_path = os.path.join(lmdb_path, 'eval.log')
+    with open(log_file_path, 'w') as f:
+        f.write('\n'.join(log_content))
+    
     database_read.close()
