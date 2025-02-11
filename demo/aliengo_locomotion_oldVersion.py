@@ -2,7 +2,7 @@ from grutopia.core.config import SimulatorConfig
 from grutopia.core.env import BaseEnv
 from grutopia.core.util.container import is_in_container
 
-file_path = './GRUtopia/demo/configs/aliengo_locomotion.yaml'
+file_path = 'demo/configs/aliengo_locomotion.yaml'
 sim_config = SimulatorConfig(file_path)
 
 headless = False
