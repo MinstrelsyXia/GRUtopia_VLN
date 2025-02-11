@@ -1,7 +1,7 @@
 # Developer only. User read-only.
 robots:
 - type: "HumanoidRobot"
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_200.usd"
+  usd_path: "assets/robots/h1_vln_pano_pointcloud_200.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
   gains: [0.0, 0.0]
@@ -357,15 +357,12 @@ robots:
     prim_path: "torso_link/h1_pano_camera_315"
 
 - type: "AliengoRobot"
-  usd_path: "assets/robots/aliengo/aliengo_vln_camera.usd"
-  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
-  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
-  # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
-  gains: [0.0, 0.0]
+  usd_path: "assets/robots/aliengo_vln_camera.usd"
+  gains: [0., 0., 0., 0.]
   controllers:
   - name: "move_by_speed" 
     type: AliengoMoveBySpeedController
-    policy_weights_path: assets/policy/weights/aliengo_loco_model_4000.pt
+    policy_weights_path: assets/policy/aliengo_loco_model_4000.pt
     joint_names:
     - FL_hip_joint
     - FR_hip_joint
@@ -478,35 +475,10 @@ robots:
     prim_path: "logo_link/Camera_pointcloud"
   - name: "pano_camera_0"
     type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_0"
+    prim_path: "trunk/vln_camera_0"
   - name: "topdown_camera_50"
     type: "Camera"
     prim_path: "topdown_camera_50"
   - name: "topdown_camera_500"
     type: "Camera"
     prim_path: "topdown_camera_500"
-  - name: "h1_pano_camera_debug"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_debug"
-
-  - name: "pano_camera_45"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_45"
-  - name: "pano_camera_90"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_90"
-  - name: "pano_camera_135"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_135"
-  - name: "pano_camera_180"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_180"
-  - name: "pano_camera_225"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_225"
-  - name: "pano_camera_270"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_270"
-  - name: "pano_camera_315"
-    type: "Camera"
-    prim_path: "torso_link/h1_pano_camera_315"
