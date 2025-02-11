@@ -181,4 +181,6 @@ if __name__ == "__main__":
     for rank, _ in device_map.items():
         stop_container_if_exist(config,rank)
         start_contianer_with_retry(config, rank, cfg_file)
+        #!!! only start one container for test
+        break
     start_health_check(cfg_file)

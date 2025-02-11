@@ -9,6 +9,7 @@ from vln.src.v2.util.common import(
 import time
 import sys
 import json
+import os
 class BaseSingleScanEnv:
     def __init__(
             self,
@@ -37,15 +38,15 @@ class BaseSingleScanEnv:
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path
         self.sim_config.config.tasks[0].robots[0].position = self.start_position
         self.sim_config.config.tasks[0].robots[0].orientation = self.start_rotation
-        if 'sixth_floor' in self.args.settings.mode:
-            self.json_path = self.args.datasets.scene_config_file
+        if self.dataloader.target_scan == 'sixth_floor':
+            self.json_path = self.dataloader.scene_config_file
             with open(self.json_path, "r") as json_file:
                 lego_json_config = json.load(json_file)
 
             self.lego_usd_root = lego_json_config["usd_model_root"]
             self.lego_gs_root = lego_json_config["gs_model_root"]
             self.lego_name_list = lego_json_config["model_list"]
-            self.lego_device_number = 0
+            self.lego_device_number = -1
             self.lego_editable = True
             self.env = BaseEnv(self.sim_config, headless=True, webrtc=False)
             self.env.reset()

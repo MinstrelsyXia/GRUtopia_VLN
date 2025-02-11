@@ -146,7 +146,7 @@ def get_env_by_config(
                 lmdb_path=dataloader.lmdb_path,
                 ckpt_name=ckpt_name,
             )
-    elif task_type == 'sample':
+    elif task_type == 'sample' or task_type == 'sixth_floor':
         sample_type = config["sample_type"]
         if sample_type =='continuous':
             return ContinuousSampleSingleScanEnv(

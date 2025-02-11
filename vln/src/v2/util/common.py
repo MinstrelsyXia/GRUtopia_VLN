@@ -9,11 +9,6 @@ from grutopia.core.util.container import is_in_container
 import gzip
 import copy
 
-try:
-    from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
-except:
-    pass
-from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
 
 def create_robot_mask(
     topdown_global_map_camera,

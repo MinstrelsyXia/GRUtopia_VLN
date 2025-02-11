@@ -70,19 +70,24 @@ if __name__ == "__main__":
         config = json.load(file)
     
     headless = True
-    split_data_types = ['train']
+    # split_data_types = ['train']
+    split_data_types = ['sixth_floor']
     project_path = PROJECT_ROOT_PATH
-    base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    # base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    base_data_dir = f'{project_path}/path_generation/path_generaton/output'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
-    robot_offset = np.array([0.   , 0.   , 1.05])
+    robot_offset = np.array([0.   , 0.   , 0.4])
     name = config["name"]
     common_log_util.init(name,rank)
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list = config["retry_list"]
-    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
+    
+    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_path_generation.yaml'
     ckpt_to_load = config["ckpt_to_load"]
     sim_config = SimulatorConfig(sim_cfg_file)
     scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
+    if 'scene_config_file' in config:
+        scene_config_file = config['scene_config_file']
     dataloader=SamplePathKeyDataloader(
         base_data_dir,
         split_data_types,
@@ -91,6 +96,7 @@ if __name__ == "__main__":
         lmdb_path,
         scan,
         retry_list,
+        scene_config_file = scene_config_file,
     )
     sample_path_key_list = dataloader.sample_path_key_list
     if len(sample_path_key_list) == 0:
