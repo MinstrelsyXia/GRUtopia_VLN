@@ -82,6 +82,24 @@ start_rotation = np.array(path_zero["start_rotation"])
 sim_config.config.tasks[0].robots[0].position = start_position
 sim_config.config.tasks[0].robots[0].orientation = start_rotation
 env = BaseEnv(sim_config, headless=headless, webrtc=False)
+from pxr import Gf, UsdLux, UsdGeom
+import omni.usd
+stage = omni.usd.get_context().get_stage()
+distant_light = UsdLux.DistantLight.Define(stage, "/World/distant_light")
+distant_light.CreateIntensityAttr(1000)
+distant_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+
+up_disk_light = UsdLux.DiskLight.Define(stage, "/World/up_disk_light")
+up_disk_light.CreateIntensityAttr(10000)
+up_disk_light.CreateRadiusAttr(50.0)
+up_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+UsdGeom.Xformable(up_disk_light).AddRotateXYZOp().Set(Gf.Vec3f(180.0, 0.0, 0.0))
+
+down_disk_light = UsdLux.DiskLight.Define(stage, "/World/down_disk_light")
+down_disk_light.CreateIntensityAttr(10000)
+down_disk_light.CreateRadiusAttr(50.0)
+down_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+
 the_task = env._runner.current_tasks[list(env._runner.current_tasks.keys())[0]]
 the_robot = the_task.robots[list(the_task.robots.keys())[0]]
 the_isaac_robot = the_robot.isaac_robot
@@ -92,6 +110,13 @@ for path in filtered_path_list:
     start_position = np.array(path["start_position"])
     start_rotation = np.array(path["start_rotation"])
     print(f"11111111{start_position}")
+    up_disk_light_op = UsdGeom.Xformable(up_disk_light).AddTranslateOp()
+    up_disk_light_op.Set(Gf.Vec3f(start_position[0],  start_position[1],   start_position[2]))
+    up_disk_light_op.Set(Gf.Vec3f(start_position[0],  start_position[1],   start_position[2]))
+    down_disk_light_op = UsdGeom.Xformable(down_disk_light).AddTranslateOp()
+    down_disk_light_op.Set(Gf.Vec3f(start_position[0],  start_position[1],   start_position[2]))
+    down_disk_light_op.Set(Gf.Vec3f(start_position[0],  start_position[1],   start_position[2]))
+
     the_task.set_single_robot_poses_without_offset(start_position, start_rotation)
     the_isaac_robot.set_world_velocity(np.zeros(6))
     the_isaac_robot.set_joint_velocities(np.zeros(len(the_isaac_robot.dof_names)))

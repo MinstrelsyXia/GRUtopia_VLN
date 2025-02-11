@@ -23,6 +23,7 @@ def init(name='default',rank='0'):
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     common_logger.addHandler(file_handler)
+    common_logger.disabled=False
 
 
 def get_name():
