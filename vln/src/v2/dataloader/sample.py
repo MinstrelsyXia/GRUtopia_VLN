@@ -13,6 +13,7 @@ class SamplePathKeyDataloader(BasePathKeyDataloader):
         target_scan,
         retry_list,
         target_trajectory = None,
+        scene_config_file = None,
     ):
         # 加载所有数据
         super().__init__(
@@ -26,6 +27,7 @@ class SamplePathKeyDataloader(BasePathKeyDataloader):
         self.lmdb_path = lmdb_path
         self.target_scan = target_scan
         self.retry_list = retry_list
+        self.scene_config_file = scene_config_file
         # 获取当前 rank 需要 eval 的数据
         key = f"sample_rank_{self.rank}"
         database = lmdb.open(f"{self.lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, readonly=True, lock=False)

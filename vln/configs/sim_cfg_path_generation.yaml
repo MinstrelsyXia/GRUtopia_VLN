@@ -26,10 +26,17 @@ tasks:
     - name: "move_along_path"
     - name: "rotate"
     - name: "move_to_point_by_pid"
+    - name: "stand_still"
+    - name: "oracle_move_to_point"
+    - name: "oracle_move_along_path"
+    - name: "move_to_point_by_pid"
+    - name: "move_by_speed_vln"
+    - name: "move_along_speeds"
+    - name: "move_by_descrete"
     sensor_params:
     - name: "pano_camera_0"
       enable: true
-      size: [640, 480]
+      size: [256,256]
       camera_config:
         - point_cloud
     - name: "pano_camera_45"

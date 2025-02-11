@@ -126,10 +126,14 @@ class Camera_3dgs(BaseSensor):
     def set_renderer(self, lego_xform_list ,lego_gs_root,lego_name_list,lego_device_number,lego_editable):
         self.lego_xform_list = lego_xform_list
                 # Initialize 3DGS renderer
+        if lego_device_number <0:
+            self.device_number = torch.cuda.device_count() - 1
+        else:
+            self.device_number = lego_device_number
         self.scgs_renderer = MultiModelSCGSRenderer(
             model_root=lego_gs_root,
             model_name_list=lego_name_list,
-            device_number=lego_device_number,
+            device_number=self.device_number,
             editable=lego_editable
         )
         focal_length = self._camera.get_focal_length()*1000
