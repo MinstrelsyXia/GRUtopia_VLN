@@ -42,23 +42,25 @@ class BaseSingleScanEnv:
         distant_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
 
         up_disk_light = UsdLux.DiskLight.Define(stage, "/World/up_disk_light")
-        up_disk_light.CreateIntensityAttr(10000)
+        up_disk_light.CreateIntensityAttr(5000)
         up_disk_light.CreateRadiusAttr(50.0)
         up_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
         UsdGeom.Xformable(up_disk_light).AddRotateXYZOp().Set(Gf.Vec3f(180.0, 0.0, 0.0))
         self.up_disk_light = up_disk_light
+        self.up_disk_light_position = UsdGeom.Xformable(self.up_disk_light).AddTranslateOp()
         
         down_disk_light = UsdLux.DiskLight.Define(stage, "/World/down_disk_light")
-        down_disk_light.CreateIntensityAttr(10000)
+        down_disk_light.CreateIntensityAttr(5000)
         down_disk_light.CreateRadiusAttr(50.0)
         down_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
         self.down_disk_light = down_disk_light
+        self.down_disk_light_position = UsdGeom.Xformable(self.down_disk_light).AddTranslateOp()
 
     
     def reset_light_position(self, position):
-        from pxr import Gf, UsdGeom
-        UsdGeom.Xformable(self.up_disk_light).AddTranslateOp().Set(Gf.Vec3f(position[0],  position[1],   position[2]))
-        UsdGeom.Xformable(self.down_disk_light).AddTranslateOp().Set(Gf.Vec3f(position[0],  position[1],   position[2]))
+        from pxr import Gf
+        self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2]-1))
+        self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2]+1))
     
 
     def load_scan_and_robot(self):

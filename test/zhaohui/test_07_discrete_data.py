@@ -53,7 +53,7 @@ if __name__ == "__main__":
     # name = '20250207_sample_discrete'
     lmdb_path_0507 = project_path + f'/data/sample_episodes/{name}/sample_data.lmdb'
     database = lmdb.open(lmdb_path_0507, readonly=True, lock=False)
-    id=67
+    id=290
     key = f"{id}".encode()
     with database.begin() as txn:
         value = txn.get(key)
