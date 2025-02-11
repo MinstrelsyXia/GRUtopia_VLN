@@ -1,17 +1,7 @@
-<<<<<<< HEAD
-# FROM nvcr.io/nvidia/isaac-sim:2023.1.1
-FROM nvcr.io/nvidia/isaac-sim:4.0.0
-
-RUN export https_proxy=https://xiaxinyuan:OE6gf5X1v0JkSjKDOoUsVZhCdBbf0mdwfWO2kvWSlKj9L0Jwcfb9ff7snMkk@blsc-proxy.pjlab.org.cn:13128
-
-RUN export http_proxy=https://xiaxinyuan:OE6gf5X1v0JkSjKDOoUsVZhCdBbf0mdwfWO2kvWSlKj9L0Jwcfb9ff7snMkk@blsc-proxy.pjlab.org.cn:13128
-
-=======
 FROM nvcr.io/nvidia/isaac-sim:4.0.0
 
 RUN export https_proxy=https://wangliuyi:MMEvaNwnm0hCez6rxGqbDvlUkdXuhXrGFDA44IZesLRlpxCEA8a6umUYgOG3@blsc-proxy.pjlab.org.cn:13128
 RUN export http_proxy=https://wangliuyi:MMEvaNwnm0hCez6rxGqbDvlUkdXuhXrGFDA44IZesLRlpxCEA8a6umUYgOG3@blsc-proxy.pjlab.org.cn:13128
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
 
 RUN mv /etc/apt/sources.list /etc/apt/sources.list.bak
 RUN echo "deb https://repo.huaweicloud.com/ubuntu jammy main restricted \
@@ -53,11 +43,6 @@ RUN bash -c "cd ../ && \
     bash ./docker_install_req.sh"
 
 RUN bash -c "cd ../ && \
-<<<<<<< HEAD
-    chmod +x ./GRUtopia/webui_start.sh && \
-    cp ./GRUtopia/webui_start.sh . && \
-=======
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     sed 's/^\$python_exe/#\$python_exe/g' ./python.sh > python.env.init && \
     echo 'source /isaac-sim/.venv/bin/activate' >> /root/.bashrc && \
     echo ' . /isaac-sim/python.env.init' >> /root/.bashrc && \

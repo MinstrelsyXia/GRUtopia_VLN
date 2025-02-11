@@ -51,6 +51,11 @@ if __name__ == "__main__":
         required=True,
         help="cfg_file",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False
+    )
     args = parser.parse_args()
     rank = args.rank
     scan = args.scan
@@ -65,6 +70,7 @@ if __name__ == "__main__":
     headless = True
     split_data_types = ['val_unseen','val_seen']
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    # base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_FSASub' # !!! This is for MLANet
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
     name = config["name"]
@@ -76,6 +82,11 @@ if __name__ == "__main__":
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
     ckpt_to_load = config["ckpt_to_load"]
     sim_config = SimulatorConfig(sim_cfg_file)
+    
+    # !!! For MLANet
+    # sim_config.config.tasks[0].robots[0].sensor_params[2].size=(224,224) # pano_camera_0
+    # sim_config.config_dict['tasks'][0]['robots'][0]['sensor_params'][2]['size']=(224,224)
+
     scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
     dataloader=EvalPathKeyDataloader(
         base_data_dir,
@@ -103,20 +114,26 @@ if __name__ == "__main__":
         start_rotation,
         headless,
         dataloader,
+        eval_cfg_file=config["eval_cfg_file"]
     )
     
-    monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
-    monitor_thread.start()
-
-    try:
-        log.info("env.eval()")
+    if args.debug:
+        log.info("DEBUG MODE")
         env.eval()
-        env.stop()
-    except Exception as e:
-        error_message = traceback.format_exc()
-        log.error(error_message)
-    except KeyboardInterrupt:
-        log.info("Program stopped by user.")
-    finally:
-        log.info("Program terminated.")
-        os.kill(os.getpid(), 9) 
+
+    else:
+        monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))
+        monitor_thread.start()
+
+        try:
+            log.info("env.eval()")
+            env.eval()
+            env.stop()
+        except Exception as e:
+            error_message = traceback.format_exc()
+            log.error(error_message)
+        except KeyboardInterrupt:
+            log.info("Program stopped by user.")
+        finally:
+            log.info("Program terminated.")
+            os.kill(os.getpid(), 9) 

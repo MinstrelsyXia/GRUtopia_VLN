@@ -27,6 +27,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             dataloader:SamplePathKeyDataloader,
             aperture=200,
             max_step=25000,
+            update_light=False
         ):
         super().__init__(
             sim_config=sim_config,
@@ -40,6 +41,8 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
         self.max_step = max_step
         self.robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
 
+        self.update_light = update_light
+
     def execute_one_action(
         self,
         action,
@@ -49,6 +52,11 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
         fail_reason = None
         while not finish_state:
             self.update_timestamp()
+            # update light
+            if self.update_light:
+                robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                self.update_light_positions(robot_position) #TODO: 解决部分z轴照不到光的问题
+
             obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             self.step += 1

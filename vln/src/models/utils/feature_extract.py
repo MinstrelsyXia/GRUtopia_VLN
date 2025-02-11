@@ -6,6 +6,7 @@ def extract_instruction_tokens(
     observations: List[Dict],
     bert_tokenizer = None,
     is_clip_long=False,
+    max_instr_len=200
 ) -> Dict[str, Any]:
     """Extracts instruction tokens from an instruction sensor if the tokens
     exist and are in a dict structure.
@@ -17,7 +18,7 @@ def extract_instruction_tokens(
             observations[i]['instruction'] = observations[i]['instruction_tokens']
             # pad to 200
             instr = torch.tensor(observations[i]['instruction'])
-            observations[i]['instruction'] = torch.nn.functional.pad(instr, (0, 200 - instr.shape[0]), "constant", 0)
+            observations[i]['instruction'] = torch.nn.functional.pad(instr, (0, max_instr_len - instr.shape[0]), "constant", 0)
         else:
             # use bert tokenizer
             if is_clip_long:

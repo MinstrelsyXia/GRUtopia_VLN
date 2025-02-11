@@ -34,14 +34,10 @@ from grutopia.core.util.log import log
 from grutopia.core.env import BaseEnv
 from grutopia.core.util.container import is_in_container
 
-from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
+from vln.src.utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
 
 from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
 from ..local_nav.BEVmap import BEVMap
-
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 def transform_rotation_z_90degrees(rotation):
     ''' 沿着z轴旋转90度
@@ -76,36 +72,6 @@ def load_data(args, split):
             if "reference_path" in item.keys():
                 for path in item["reference_path"]:
                     item["c_reference_path"].append([path[0], -path[2], path[1]])
-                item["reference_path"] = item["c_reference_path"]
-                del item["c_reference_path"]
-            load_data.append(item)
-            total_scans.append(item["scan"])
-
-    log.info(f"Loaded data with a total of {len(load_data)} items from {split}")
-    return load_data, list(set(total_scans))
-
-def load_sixth_floor_data(args, split):
-    ''' Load data based on VLN-CE
-    '''
-    dataset_root_dir = args.datasets.base_data_dir
-    total_scans = []
-    load_data = []
-    with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
-        data = json.load(f)
-        for item in data["episodes"]:
-            item["original_start_position"] = copy.copy(item["start_position"])
-            item["original_start_rotation"] = copy.copy(item["start_rotation"])
-            item["start_position"] = [item["original_start_position"][0], item["original_start_position"][1], item["original_start_position"][2]] # unchanged
-            init_orientation = item['original_start_rotation']
-            init_orientation = quat_to_euler_angles(init_orientation)
-            orientation = [0, 0, init_orientation[2]]
-            init_orientation = euler_angles_to_quat(orientation)
-            item['start_rotation'] = init_orientation
-            item["scan"] = item["scene_id"]
-            item["c_reference_path"] = []
-            if "reference_path" in item.keys():
-                for path in item["reference_path"]:
-                    item["c_reference_path"].append([path[0], path[1], path[2]])
                 item["reference_path"] = item["c_reference_path"]
                 del item["c_reference_path"]
             load_data.append(item)
@@ -278,8 +244,6 @@ class VLNDataLoader(Dataset):
         for split in splits:
             if "sample_episodes" in args.settings.mode or policy_eval:
                 data, _ = load_gather_data(args, split, filter_same_trajectory=filter_same_trajectory, filter_stairs=args.settings.filter_stairs, load_eval=load_eval)
-            elif "sixth_floor" in args.settings.mode:
-                data, _ = load_sixth_floor_data(args, split)
             else:
                 data, _ = load_data(args, split)
             self.data[split] = data
@@ -301,12 +265,6 @@ class VLNDataLoader(Dataset):
                         item["start_position"] += self.robot_offset
                         for i, path in enumerate(item["reference_path"]):
                             item["reference_path"][i] += self.robot_offset
-        elif "sixth_floor" in args.settings.mode:
-            for split in self.splits:
-                for item in self.data[split]:
-                    item["start_position"] += self.robot_offset
-                    for i, path in enumerate(item["reference_path"]):
-                        item["reference_path"][i] += self.robot_offset
         else:
             for split in self.splits:
                 for split, item in self.data.items():
@@ -327,46 +285,9 @@ class VLNDataLoader(Dataset):
         
     def init_env(self, sim_config, headless=False):
         '''init env''' 
-        if 'sixth_floor' in self.args.settings.mode:
-            self.json_path = self.args.datasets.scene_config_file
-            with open(self.json_path, "r") as json_file:
-                lego_json_config = json.load(json_file)
-
-            self.lego_usd_root = lego_json_config["usd_model_root"]
-            self.lego_gs_root = lego_json_config["gs_model_root"]
-            self.lego_name_list = lego_json_config["model_list"]
-            self.lego_device_number = 4
-            self.lego_editable = True
-            self.env = BaseEnv(sim_config, headless=True, webrtc=False)
-            self.env.reset()
-            self.lego_xform_list = [] 
-            from omni.isaac.core.prims import XFormPrim
-            from omni.isaac.core.utils.prims import create_prim
-            from omni.isaac.core.utils.prims import get_prim_at_path
-            for lego_name in self.lego_name_list:
-                create_prim(usd_path=os.path.join(self.lego_usd_root, lego_name["usd_name"]), 
-                            prim_path="/World/" + lego_name["isaac_name"], 
-                            position=lego_name["init_position"], 
-                            orientation=lego_name["init_orientation"],
-                            scale=lego_name["init_scale"])
-                self.lego_xform_list.append(XFormPrim("/World/" + lego_name["isaac_name"]))
-                print("Create preset usd at /World/" + lego_name["isaac_name"])
-            create_prim("/World/light", "DistantLight")
-            print("Create preset light at /World/light")
-            # init camera renderer
-            self.set_3dgs_Cameras_renderer()
-        else:
-            self.env = BaseEnv(sim_config, headless=headless, webrtc=False)
+        self.env = BaseEnv(sim_config, headless=headless, webrtc=False)
         # self.init_env_manager()
-    def set_3dgs_Cameras_renderer(self):
-        '''set 3dgs Cameras renderer'''
-        self.tasks = self.env._runner.current_tasks
-        self.robot_names = [list(task.robots.keys())[0] for task in self.tasks.values()]
-        self.task_names = list(self.tasks.keys())
-        for task_name, robot_name in zip(self.task_names,self.robot_names):
-            for sensor_name, sensor in self.tasks[task_name].robots[robot_name].sensors.items():
-                if sensor.config.type=='Camera_3dgs' and sensor.config.enable==True:
-                    sensor.set_renderer(self.lego_xform_list, self.lego_gs_root, self.lego_name_list, self.lego_device_number, self.lego_editable)
+    
     def init_robots(self):
         '''call after self.init_env'''
         self.tasks = self.env._runner.current_tasks
@@ -444,10 +365,7 @@ class VLNDataLoader(Dataset):
         self.scan_success_path_id_list = []
     
     def allocate_data(self, split, scan, path_id=None):
-        if split == 'sixth_floor':
-            self.scan_data = self.data[split]
-        else:
-            self.scan_data = self.data[split][scan]
+        self.scan_data = self.data[split][scan]
         self.sim_config.config.tasks[0].env_num = self.env_num = min(len(self.scan_data), self.env_num)
         self.init_env_manager() # update env_num according to the data length
 

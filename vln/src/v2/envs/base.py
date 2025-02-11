@@ -8,7 +8,7 @@ from vln.src.v2.util.common import(
 )
 import time
 import sys
-
+import json
 class BaseSingleScanEnv:
     def __init__(
             self,
@@ -37,13 +37,51 @@ class BaseSingleScanEnv:
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path
         self.sim_config.config.tasks[0].robots[0].position = self.start_position
         self.sim_config.config.tasks[0].robots[0].orientation = self.start_rotation
-        self.env = BaseEnv(self.sim_config, headless=self.headless, webrtc=False)
+        if 'sixth_floor' in self.args.settings.mode:
+            self.json_path = self.args.datasets.scene_config_file
+            with open(self.json_path, "r") as json_file:
+                lego_json_config = json.load(json_file)
+
+            self.lego_usd_root = lego_json_config["usd_model_root"]
+            self.lego_gs_root = lego_json_config["gs_model_root"]
+            self.lego_name_list = lego_json_config["model_list"]
+            self.lego_device_number = 0
+            self.lego_editable = True
+            self.env = BaseEnv(self.sim_config, headless=True, webrtc=False)
+            self.env.reset()
+            self.lego_xform_list = [] 
+            from omni.isaac.core.prims import XFormPrim
+            from omni.isaac.core.utils.prims import create_prim
+            from omni.isaac.core.utils.prims import get_prim_at_path
+            for lego_name in self.lego_name_list:
+                create_prim(usd_path=os.path.join(self.lego_usd_root, lego_name["usd_name"]), 
+                            prim_path="/World/" + lego_name["isaac_name"], 
+                            position=lego_name["init_position"], 
+                            orientation=lego_name["init_orientation"],
+                            scale=lego_name["init_scale"])
+                self.lego_xform_list.append(XFormPrim("/World/" + lego_name["isaac_name"]))
+                print("Create preset usd at /World/" + lego_name["isaac_name"])
+            create_prim("/World/light", "DistantLight")
+            print("Create preset light at /World/light")
+            # init camera renderer
+            self.set_3dgs_Cameras_renderer()
+        else:
+            self.env = BaseEnv(self.sim_config, headless=self.headless, webrtc=False)
         set_seed(0)
         self.task = self.env._runner.current_tasks[list(self.env._runner.current_tasks.keys())[0]]
         self.robot = self.task.robots[list(self.task.robots.keys())[0]]
         self.isaac_robot = self.robot.isaac_robot
         self.topdown_global_map_camera = self.robot.sensors['topdown_camera_500']
-    
+
+    def set_3dgs_Cameras_renderer(self):
+        '''set 3dgs Cameras renderer'''
+        self.tasks = self.env._runner.current_tasks
+        self.robot_names = [list(task.robots.keys())[0] for task in self.tasks.values()]
+        self.task_names = list(self.tasks.keys())
+        for task_name, robot_name in zip(self.task_names,self.robot_names):
+            for sensor_name, sensor in self.tasks[task_name].robots[robot_name].sensors.items():
+                if sensor.config.type=='Camera_3dgs' and sensor.config.enable==True:
+                    sensor.set_renderer(self.lego_xform_list, self.lego_gs_root, self.lego_name_list, self.lego_device_number, self.lego_editable)
     def reset_robot(
         self,
         position,

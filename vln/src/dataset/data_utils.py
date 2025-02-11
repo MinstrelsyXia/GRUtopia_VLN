@@ -34,10 +34,6 @@ from ..utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_re
 from ..local_nav.pointcloud import generate_pano_pointcloud_local, pc_to_local_pose
 from ..local_nav.BEVmap import BEVMap
 
-def is_in_container():
-    """检查是否在容器中运行"""
-    return os.path.exists('/.dockerenv')
-
 def transform_rotation_z_90degrees(rotation):
     ''' 沿着z轴旋转90度
     '''
@@ -52,19 +48,29 @@ def transform_rotation_z_90degrees(rotation):
     ]
     return revised_rotation
     
-def load_data(args, split, dataset_root_dir=None):
+def load_data(args, split, dataset_root_dir=None, is_fsa_dataset=False):
     ''' Load data based on VLN-CE
     '''
     dataset_root_dir = args.datasets.base_data_dir if dataset_root_dir is None else dataset_root_dir
     total_scans = []
     load_data = []
-    if split == None:
-        return [], []
-    with gzip.open(os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz"), 'rt', encoding='utf-8') as f:
+    if is_fsa_dataset:
+        # for MLANet
+        dataset_file = os.path.join(dataset_root_dir, f"{split}", f"{split}_sub.json.gz")
+        ori_dataset_file = os.path.join("data/datasets/R2R_VLNCE_v1-3_preprocessed", f"{split}", f"{split}.json.gz") # MLANet sub数据集里的start_rotation和v1-3_processed里的不一样
+        with gzip.open(ori_dataset_file, 'rt', encoding='utf-8') as f:
+            ori_data = json.load(f)
+            ori_data = ori_data["episodes"]
+    else:
+        dataset_file = os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz")
+    with gzip.open(dataset_file, 'rt', encoding='utf-8') as f:
         data = json.load(f)
-        for item in data["episodes"]:
+        for idx, item in enumerate(data["episodes"]):
             item["original_start_position"] = copy.copy(item["start_position"])
-            item["original_start_rotation"] = copy.copy(item["start_rotation"])
+            if is_fsa_dataset:
+                item["original_start_rotation"] = copy.copy(ori_data[idx]["start_rotation"])
+            else:
+                item["original_start_rotation"] = copy.copy(item["start_rotation"])
             item["start_position"] = [item["original_start_position"][0], -item["original_start_position"][2], item["original_start_position"][1]]
             item["start_rotation"] = [-item["original_start_rotation"][3], item["original_start_rotation"][0], item["original_start_rotation"][2], -item["original_start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
             item["start_rotation"] = transform_rotation_z_90degrees(item["start_rotation"])

@@ -29,37 +29,6 @@ parser.add_argument("--test_verbose", action="store_true", default=False)
 parser.add_argument("--wait", action="store_true", default=False)
 args = parser.parse_args()
 
-<<<<<<< HEAD
-file_path = './GRUtopia/demo/configs/h1_vlnce.yaml'
-sim_config = SimulatorConfig(file_path)
-
-def euler_angles_to_quat(angles):
-    """
-    Convert Euler angles (roll, pitch, yaw) to quaternion.
-
-    Args:
-        angles (list or np.array): Euler angles [roll, pitch, yaw] in degrees.
-
-    Returns:
-        np.array: Quaternion [x, y, z, w].
-    """
-    r = R.from_euler('xyz', angles, degrees=True)
-    return r.as_quat()
-
-def quat_to_euler_angles(quat):
-    """
-    Convert quaternion to Euler angles (roll, pitch, yaw).
-
-    Args:
-        quat (list or np.array): Quaternion [x, y, z, w].
-
-    Returns:
-        np.array: Euler angles [roll, pitch, yaw] in degrees.
-    """
-    r = R.from_quat(quat)
-    angles = r.as_euler('xyz', degrees=True)
-    return angles
-=======
 # file_path = './GRUtopia/demo/configs/h1_vlnce.yaml'
 file_path = './demo/configs/h1_locomotion_vlnce.yaml'
 sim_config = SimulatorConfig(file_path)
@@ -90,7 +59,6 @@ sim_config = SimulatorConfig(file_path)
 #     r = R.from_quat(quat)
 #     angles = r.as_euler('xyz', degrees=True)
 #     return angles
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
 
 
 def load_data(file_path, path_id=None, verbose=False):
@@ -106,18 +74,11 @@ def load_data(file_path, path_id=None, verbose=False):
         print(f"Path ID {path_id} is invalid and randomly set a path id")
         target_item = data['episodes'][0]
     scan = target_item['scene_id'].split('/')[1]
-<<<<<<< HEAD
-    start_position = [target_item['start_position'][0], -target_item['start_position'][2], target_item['start_position'][1]+0.7]
-    # start_position = [target_item['start_position'][0]+0.2, -target_item['start_position'][2]+0.2, 1.8]
-    # start_position = [23, -6, 3.3]
-    start_rotation = [-target_item['start_rotation'][3], target_item['start_rotation'][0], target_item['start_rotation'][1], target_item['start_rotation'][2]] # [x,y,z,-w] => [w,x,y,z]
-=======
     start_position = [target_item['start_position'][0], -target_item['start_position'][2], target_item['start_position'][1]+1.05]
     # start_position = [target_item['start_position'][0]+0.2, -target_item['start_position'][2]+0.2, 1.8]
     # start_position = [23, -6, 3.3]
     # start_rotation = [-target_item['start_rotation'][3], target_item['start_rotation'][0], target_item['start_rotation'][1], target_item['start_rotation'][2]] # [x,y,z,-w] => [w,x,y,z]
     start_rotation = [-target_item["start_rotation"][3], target_item["start_rotation"][0], target_item["start_rotation"][2], -target_item["start_rotation"][1]] 
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     # paths = target_item['paths']
     if verbose: 
         log.info(f"Scan: {scan}")
@@ -131,11 +92,7 @@ def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, 
     '''
     current_quaternion = obs['orientation']
     # Convert quaternion to Euler angles (roll, pitch, yaw)
-<<<<<<< HEAD
-    roll, pitch, yaw = quat_to_euler_angles(current_quaternion)
-=======
     roll, pitch, yaw = quat_to_euler_angles(current_quaternion,degrees=True)
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
 
     # Check if the pitch or roll exceeds the thresholds
     if abs(pitch) > pitch_threshold or abs(roll) > roll_threshold:
@@ -161,13 +118,6 @@ def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, 
             initial_rotation_euler = quat_to_euler_angles(initial_rotation)
 
         # randomly sample offset
-<<<<<<< HEAD
-        position_offset = np.array([np.random.uniform(low=-1, high=1), np.random.uniform(low=-1, high=1), 0])
-        rotation_y_offset = np.array([0, np.random.uniform(low=-30, high=30), 0])
-
-        adjust_position = initial_pose + position_offset
-        adjust_rotation = initial_rotation + euler_angles_to_quat(rotation_y_offset)
-=======
         # position_offset = np.array([np.random.uniform(low=-1, high=1), np.random.uniform(low=-1, high=1), 0])
         # rotation_y_offset = np.array([0, np.random.uniform(low=-30, high=30), 0])
 
@@ -175,20 +125,14 @@ def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, 
         adjust_position = initial_pose
         # adjust_rotation = initial_rotation + euler_angles_to_quat(rotation_y_offset)
         adjust_rotation = initial_rotation
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
 
         log.info(f"Target adjust position: {adjust_position}, adjust rotation: {adjust_rotation}")
 
         agent.set_world_pose(position=adjust_position, 
                             orientation=adjust_rotation)
-<<<<<<< HEAD
-        # agent.set_joint_velocities(np.zeros(len(agent.dof_names)))
-        # agent.set_joint_positions(np.zeros(len(agent.dof_names)))
-=======
         agent.set_world_velocity(np.zeros(6))
         agent.set_joint_velocities(np.zeros(len(agent.dof_names)))
         agent.set_joint_positions(np.zeros(len(agent.dof_names)))
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     
     if not is_fall:
         log.info(f"Robot does not fall")
@@ -200,31 +144,18 @@ def check_fall(agent, obs, pitch_threshold=45, roll_threshold=45, adjust=False, 
 def get_sensor_info(step_time, cur_obs, verbose=False):
     # type: rgba, depth, frame
     camera = cur_obs['camera']
-<<<<<<< HEAD
-    tp_camera = cur_obs['tp_camera']
-    camera_whole = cur_obs['camera_whole']
-=======
     # tp_camera = cur_obs['tp_camera']
     # camera_whole = cur_obs['camera_whole']
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
     
     
     camera_rgb = camera['rgba'][...,:3]
     camera_depth = camera['depth']
 
-<<<<<<< HEAD
-    tp_camera_rgb = tp_camera['rgba'][...,:3]
-    tp_camera_depth = tp_camera['depth']
-    
-    camera_whole_rgb = camera_whole['rgba'][...,:3] 
-    camera_whole_depth = camera_whole['depth']
-=======
     # tp_camera_rgb = tp_camera['rgba'][...,:3]
     # tp_camera_depth = tp_camera['depth']
     
     # camera_whole_rgb = camera_whole['rgba'][...,:3] 
     # camera_whole_depth = camera_whole['depth']
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
 
     if verbose:
         image_save_dir = os.path.join(ROOT_DIR, "logs", "images")
@@ -238,19 +169,6 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
         except Exception as e:
             log.error(f"Error in saving camera image: {e}")
 
-<<<<<<< HEAD
-        try:
-            plt.imsave(os.path.join(image_save_dir, f"tpc_rgb_{str(step_time)}.jpg"), tp_camera_rgb)
-            plt.imsave(os.path.join(image_save_dir, f"tpc_depth_{str(step_time)}.jpg"), tp_camera_depth)
-        except Exception as e: 
-            log.error(f"Error in saving third person camera image: {e}")
-        
-        try:
-            plt.imsave(os.path.join(image_save_dir, f"c_whole_rgb_{str(step_time)}.jpg"), camera_whole_rgb)
-            plt.imsave(os.path.join(image_save_dir, f"c_whole_depth_{str(step_time)}.jpg"), camera_whole_depth)
-        except Exception as e:
-            log.error(f"Error in saving whole camera image: {e}")
-=======
         # try:
         #     plt.imsave(os.path.join(image_save_dir, f"tpc_rgb_{str(step_time)}.jpg"), tp_camera_rgb)
         #     plt.imsave(os.path.join(image_save_dir, f"tpc_depth_{str(step_time)}.jpg"), tp_camera_depth)
@@ -262,7 +180,6 @@ def get_sensor_info(step_time, cur_obs, verbose=False):
         #     plt.imsave(os.path.join(image_save_dir, f"c_whole_depth_{str(step_time)}.jpg"), camera_whole_depth)
         # except Exception as e:
         #     log.error(f"Error in saving whole camera image: {e}")
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
         
         
 
@@ -288,17 +205,6 @@ def get_occupancy_map(env):
     # Get dimensions for 2d buffer
     dims = generator.get_dimensions()
     print(1)
-<<<<<<< HEAD
-    
-
-data_item, data_scan, start_position, start_rotation = load_data(sim_config.config_dict['datasets'][0]['base_data_dir']+f"/{args.env}/{args.env}.json.gz", 
-                                                                args.path_id, verbose=args.test_verbose)
-
-find_flag = False
-for root, dirs, files in os.walk(sim_config.config_dict['datasets'][0]['mp3d_data_dir']+f"/{data_scan}"):
-    for file in files:
-        if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
-=======
 
 # if is_in_container():
 #     headless = True
@@ -318,7 +224,6 @@ for root, dirs, files in os.walk(mp3d_data_dir+f"/{data_scan}"):
         # if file.endswith(".usd") and "non_metric" not in file and "isaacsim_" in file:
         target_file = 'fixed_docker.usd' if is_in_container() else 'fixed.usd'
         if file == target_file:
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
             scene_usd_path = os.path.join(root, file)
             find_flag = True
             break
@@ -337,21 +242,12 @@ headless = args.headless
 webrtc = False
 
 env = BaseEnv(sim_config, headless=headless, webrtc=webrtc)
-<<<<<<< HEAD
-
-from llm_agent.utils.utils_omni import get_camera_data, get_face_to_instance_by_2d_bbox
-
-# task_name = env.config.tasks[0].name
-# robot_name = env.config.tasks[0].robots[0].name
-# agent = env._runner.current_tasks[task_name].robots[robot_name].isaac_robot
-=======
 from omni.isaac.core.utils.rotations import quat_to_euler_angles, euler_angles_to_quat
 # from llm_agent.utils.utils_omni import get_camera_data, get_face_to_instance_by_2d_bbox
 
 task_name = env.config.tasks[0].name
 robot_name = env.config.tasks[0].robots[0].name
 agent = env._runner.current_tasks[task_name].robots[robot_name].isaac_robot
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
 # camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['camera']
 # tp_camera = env._runner.current_tasks[task_name].robots[robot_name].sensors['tp_camera']
 # agent.set_world_pose
@@ -369,13 +265,8 @@ while env.simulation_app.is_running():
     if i % 100 == 0:
         # obs = env._runner.get_obs()
         # obs = env.get_observations(data_type=['rgba', 'depth', 'pointcloud', "normals"])
-<<<<<<< HEAD
-        # cur_obs = obs[task_name][robot_name]
-        # is_fall = check_fall(agent, cur_obs, adjust=True, initial_pose=start_position, initial_rotation=start_rotation)
-=======
         cur_obs = obs[task_name][robot_name]
         is_fall = check_fall(agent, cur_obs, adjust=True, initial_pose=start_position, initial_rotation=start_rotation)
->>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e
         # get_sensor_info(i, cur_obs, verbose=args.test_verbose)
         print(i)
 
