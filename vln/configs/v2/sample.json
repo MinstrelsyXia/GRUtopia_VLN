@@ -1,9 +1,9 @@
 {
-    "name" : "20250208_light_controller_resample",
+    "name" : "20250211_sample_origin",
     "task_type" : "sample",
     "sample_type":"discrete",
-    "dagger_percentage":0.0,
-    "ckpt_to_load" : "data/checkpoints/20250121_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger02/ckpts/ckpt.10.pth",
+    "dagger_percentage":0,
+    "ckpt_to_load" : "",
     "image" : "w61_grutopia:v0.4",
     "total_rank": 16,
     "retry_list":[],
