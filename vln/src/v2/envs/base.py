@@ -45,7 +45,7 @@ class BaseSingleScanEnv:
         self.topdown_global_map_camera = self.robot.sensors['topdown_camera_500']
 
         # update light positions
-        self.update_light_positions(self.start_position)
+        # self.update_light_positions(self.start_position)
     
     def update_light_positions(self, target_pos):
         import omni.usd
