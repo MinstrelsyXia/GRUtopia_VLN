@@ -3,7 +3,7 @@
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/20250208_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger03/ckpts/ckpt.10.pth",
     "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
-    "image" : "w61_grutopia:v0.4",
+    "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],
     "flash": true,
