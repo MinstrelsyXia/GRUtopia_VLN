@@ -11,7 +11,7 @@ import grutopia.core.util.gym as gymutil
 import grutopia.core.util.math as math_utils
 from grutopia.core.robot.controller import BaseController
 from grutopia.core.robot.robot import BaseRobot
-from grutopia_extension.configs.controllers import AliengoMoveBySpeedControllerCfg
+# from grutopia_extension.configs.controllers import AliengoMoveBySpeedControllerCfg
 from grutopia_extension.controllers.models.aliengo.actor_critic import ActorCritic
 
 

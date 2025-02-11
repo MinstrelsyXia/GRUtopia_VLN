@@ -28,7 +28,7 @@ i = 0
 move_action = {'move_along_path': [path]}
 rotate_action = {'rotate': [euler_angles_to_quat(np.array([0, 0, np.pi]))]}
 path_finished = False
-actions = {'h1': move_action}
+actions = {'aliengo': move_action}
 
 while env.simulation_app.is_running():
     i += 1
@@ -39,13 +39,13 @@ while env.simulation_app.is_running():
         path_finished = obs[task_name][robot_name]['move_along_path'].get('finished', False)
         if path_finished:
             log.info('start rotate')
-            actions['h1'] = rotate_action
+            actions['aliengo'] = rotate_action
             start_rotate = True
 
     if i % 100 == 0:
         print(i)
-        print('available observations for h1: {}'.format(obs[task_name][robot_name].keys()))
-        print('current position of h1:{}'.format(obs[task_name][robot_name]['position']))
-        print('current orientation of h1: {}'.format(quat_to_euler_angles(obs[task_name][robot_name]['orientation'])))
+        print('available observations for aliengo: {}'.format(obs[task_name][robot_name].keys()))
+        print('current position of aliengo:{}'.format(obs[task_name][robot_name]['position']))
+        print('current orientation of aliengo: {}'.format(quat_to_euler_angles(obs[task_name][robot_name]['orientation'])))
 
 env.simulation_app.close()
