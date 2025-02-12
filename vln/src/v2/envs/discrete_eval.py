@@ -20,6 +20,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
     
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
@@ -31,6 +32,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
             ckpt_name,
         ):
         super().__init__(
+            robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -59,7 +61,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
     def topdown_snapshot(self):
         map_info = self.get_global_map(
-            robot_height=1.55,
+            robot_height=self.robot_height,
         )
         camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
         height, width = self.topdown_global_map_camera._camera._resolution
@@ -162,11 +164,11 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                         if a == 0:
                             log.info(f"[split:{split}][scan:{scan}][trajectory_id_episode_id: {path_key}][stop!!!]")
                             action = [
-                                {'h1': {'stop': ['stop']}}
+                                {self.robot_name: {'stop': ['stop']}}
                             ]
                         else:
                             action = [
-                                {'h1': {'move_by_descrete': [a.item()]}}
+                                {self.robot_name: {'move_by_descrete': [a.item()]}}
                             ]
                 executor = ActionExecutor(
                     env=self.env, 

@@ -12,12 +12,14 @@ import sys
 class BaseSingleScanEnv:
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
             start_rotation,
             headless,
         ):
+        self.robot_name = robot_name
         self.sim_config = sim_config
         self.scene_asset_path = scene_asset_path
         self.start_position = start_position
@@ -28,6 +30,8 @@ class BaseSingleScanEnv:
         self.robot = None
         self.isaac_robot = None
         self.timestamp = time.time()
+        self.fall_height_threshold = self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
+        self.robot_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['robot_height']
 
     def update_timestamp(self):
         self.timestamp = time.time()
@@ -100,7 +104,13 @@ class BaseSingleScanEnv:
         data_info = self.topdown_global_map_camera.get_data()
         depth = np.array(data_info["depth"])
         flat_surface_mask = np.ones_like(depth, dtype=bool)
-        depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
+        if self.robot_name == 'h1':
+            depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
+        elif self.robot_name == 'aliengo':
+            base_height = self.robot.get_robot_base().get_world_pose()[0][2]
+            foot_height = self.robot.get_ankle_height()
+            min_height = base_height - foot_height + 0.125
+            depth_mask = ((depth >= min_height) & (depth < max_height))
         robot_mask = create_robot_mask(self.topdown_global_map_camera)
         free_map = np.zeros_like(depth, dtype=int)
         free_map[flat_surface_mask & depth_mask] = 1
@@ -116,8 +126,8 @@ class BaseSingleScanEnv:
     
     def warm_up(self, step_count):
         for _ in range(step_count - 1):
-            self.env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=False, render=False)
-        self.env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=True, render=True)
+            self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=False, render=False)
+        self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=True, render=True)
     
     def stop(self):
         if(hasattr(self.env, 'simulation_app')):
