@@ -78,8 +78,10 @@ if __name__ == "__main__":
     robot_name = config["robot_name"] # h1 / aliengo
     if robot_name == "aliengo":
         robot_offset = np.array([0.   , 0.   , 0.50])
-    else:
+    elif robot_name == 'h1':
         robot_offset = np.array([0.   , 0.   , 1.05])
+    elif robot_name == 'jetbot':
+        robot_offset = np.array([0.   , 0.   , 0.])
     common_log_util.init(name,rank)
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list = config["retry_list"]

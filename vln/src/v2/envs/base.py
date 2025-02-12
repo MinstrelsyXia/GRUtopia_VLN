@@ -115,6 +115,11 @@ class BaseSingleScanEnv:
             foot_height = self.robot.get_ankle_height()
             min_height = base_height - foot_height + 0.125
             depth_mask = ((depth >= min_height) & (depth < max_height))
+        elif robot_name == 'jetbot':
+            base_height = self.robot.get_robot_base().get_world_pose()[0][2]
+            foot_height = self.robot.get_ankle_height()
+            min_height = base_height - foot_height + 0.35 # 0.35 for scale: 5. 0.21 for scale: 1
+            depth_mask = ((depth >= min_height) & (depth < max_height))
         robot_mask = create_robot_mask(self.topdown_global_map_camera)
         free_map = np.zeros_like(depth, dtype=int)
         free_map[flat_surface_mask & depth_mask] = 1
@@ -126,13 +131,14 @@ class BaseSingleScanEnv:
             voxel_size=voxel_size,
             agent_radius=agent_radius,
         )
-        # visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
+        visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
         return accupancy_map
     
     def warm_up(self, step_count):
         for _ in range(step_count - 1):
             self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=False, render=False)
-        self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=True, render=True)
+        obs = self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=True, render=True)
+        return obs
     
     def stop(self):
         if(hasattr(self.env, 'simulation_app')):
