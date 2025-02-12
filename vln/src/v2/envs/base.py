@@ -104,7 +104,7 @@ class BaseSingleScanEnv:
         elif robot_name == 'aliengo':
             base_height = self.robot.get_robot_base().get_world_pose()[0][2]
             foot_height = self.robot.get_ankle_height()
-            min_height = base_height - foot_height + 0.15
+            min_height = base_height - foot_height + 0.16
             depth_mask = ((depth >= min_height) & (depth < max_height))
         robot_mask = create_robot_mask(self.topdown_global_map_camera)
         free_map = np.zeros_like(depth, dtype=int)
@@ -117,6 +117,7 @@ class BaseSingleScanEnv:
             voxel_size=voxel_size,
             agent_radius=agent_radius,
         )
+        # visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
         return accupancy_map
     
     def warm_up(self, step_count):
