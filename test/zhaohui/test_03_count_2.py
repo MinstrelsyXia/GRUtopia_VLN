@@ -27,10 +27,10 @@ def get_split_map():
                 split_map[path_key] = split_data_type
     return split_map
 
-ranks =list(range(0,8))
-ckpt_name="ckpt.cma"
-project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
-name = '20250114_eval_cma'
+ranks =list(range(0,4))
+ckpt_name="navid-7b.0"
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0115'
+name = '20250114_eval_navid'
 # split = 'val_seen'
 # split = 'val_unseen'
 split = ''

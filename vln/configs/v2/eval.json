@@ -1,8 +1,8 @@
 {
-    "name" : "20250211_distLight_cma_sota",
+    "name" : "20250212_navid_distLight_reEval",
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth",
-    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
+    "eval_cfg_file": "vln/configs/train/navid_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],

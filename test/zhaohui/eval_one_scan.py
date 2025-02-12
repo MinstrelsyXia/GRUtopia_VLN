@@ -4,6 +4,7 @@ import os
 import threading
 import sys
 from vln.src.v2.envs.discrete_eval import DiscreteEvalSingleScanEnv
+from vln.src.v2.envs.navid_discrete_eval import NavidDiscreteEvalSingleScanEnv
 from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
 from grutopia.core.config import SimulatorConfig
 from vln.src.dataset.data_utils_multi_env import load_scene_usd
@@ -12,7 +13,7 @@ import numpy as np
 import sys
 from grutopia.core.util.log import log
 
-def check_process_stuck(env:DiscreteEvalSingleScanEnv):
+def check_process_stuck(env:NavidDiscreteEvalSingleScanEnv):
     index = 0
     while True:
         index+=1
@@ -48,16 +49,15 @@ if __name__ == "__main__":
     headless = True
     split_data_types = ['val_unseen','val_seen']
     project_path = '/isaac-sim/GRUtopia'
-    base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    base_data_dir = f'{project_path}/../VLN/VLNCE/R2R_VLNCE_v1-3_corrected'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
     robot_offset = np.array([0.   , 0.   , 1.05])
-    ckpt_name="ckpt.seq2seq"
-    name = '20250120_eval_seq2seq'
+    ckpt_name="navid-7b.0"
+    name = '20250114_eval_navid'
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list=[]
-    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
-    # ckpt_to_load = f"{project_path}/data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth"
-    ckpt_to_load = f"{project_path}/data/checkpoints/CMA_habitat_SOTA/converted/Seq2Seq_DA_converted.pth"
+    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_navid_eval.yaml'
+    ckpt_to_load = f"{project_path}/data/checkpoints/navid/navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split"
     sim_config = SimulatorConfig(sim_cfg_file)
     args_dict = {
         "datasets":{
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         "fp16":False,
         "seed":0,
         "MODEL":{
-            "policy_name":"CMA_Policy",
+            "policy_name":"Navid_Policy",
             "ablate_instruction":False,
             "ablate_depth":False,
             "ablate_rgb":False,
@@ -172,6 +172,8 @@ if __name__ == "__main__":
         ckpt_name,
     )
 
+    # env.eval()
+    
     # env.eval()
     
     monitor_thread = threading.Thread(target=check_process_stuck, args=(env,))

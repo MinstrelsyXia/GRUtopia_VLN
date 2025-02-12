@@ -26,6 +26,8 @@ class Statistic_Info:
         self.policy_step = 0
         # sim step 执行次数
         self.sim_step = 0
+        # rotation 连续旋转次数
+        self.continuous_rotation_count = 0
         # 目前已经移动的长度
         self.current_path_length = 0
         self.step_interval = step_interval
@@ -137,6 +139,7 @@ class ActionExecutor:
         per_action_max_step,
         total_max_step,
         robot_ankle_height,
+        max_rotation_count,
 
         statistic_info:Statistic_Info,
         context,
@@ -152,6 +155,7 @@ class ActionExecutor:
         self.per_action_max_step=per_action_max_step
         self.total_max_step = total_max_step
         self.robot_ankle_height = robot_ankle_height
+        self.max_rotation_count = max_rotation_count
         # 统计信息
         self.statistic_info = statistic_info
         # 可以优化掉的变量
@@ -176,18 +180,36 @@ class ActionExecutor:
             log.warning(f"Current action has been interrupted by {reason}.")
             return [True], reason
         return [False], ''
+    
+    def _check_max_rotation_count(self, action):
+        is_action_rotate = (action == 2 or action == 3)
+        if is_action_rotate:
+            self.statistic_info.continuous_rotation_count += 1
+        else:
+            self.statistic_info.continuous_rotation_count = 0
+        if self.statistic_info.continuous_rotation_count > self.max_rotation_count:
+            return True, 'exceed_max_rotation_count'
+        return False, ''
 
     def _execute_action(
         self,
         action, 
         action_name, 
         check_fall_and_stuck,
+        check_max_rotation_count=False,
     ):
         finish_state = False
         step = 0
         dones = [False]
         reason = ''
         prev_position, _ = self.task.get_robot_poses_without_offset()
+        if check_max_rotation_count:
+            over_max_rotation_count, desc = self._check_max_rotation_count(action[0]['h1'][action_name][0])
+            if over_max_rotation_count:
+                reason = desc
+                log.warning(f"Current action has been interrupted by {reason}.")
+                return [True], reason
+        
         while not finish_state:
             self.context.update_timestamp()
             obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
@@ -229,6 +251,7 @@ class ActionExecutor:
                 action = actions, 
                 action_name=action_name,  
                 check_fall_and_stuck=True,
+                check_max_rotation_count=True
             )
         
         robot_position, robot_rotation = self.isaac_robot.get_world_pose()
