@@ -256,7 +256,7 @@ if __name__ == '__main__':
 
         '''2. Load the target path_id'''
         all_keys = data_collector.read_all_keys()
-        path_id = '2397'
+        path_id = '5884'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
         if episode_data is not None:
