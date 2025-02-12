@@ -17,6 +17,7 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
 
     def __init__(
         self,
+        robot_name,
         sim_config:SimulatorConfig,
         scene_asset_path,
         start_position,
@@ -29,6 +30,7 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
         policy_probability=0.2,
     ):
         super().__init__(
+            robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -103,7 +105,7 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
             self.warm_up(240)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
             if is_fall:
                 progress_log_util.trace_end(
                     trajectory_id = path_key,
@@ -161,7 +163,7 @@ class DiscreteSampleDaggerSingleScanEnv(DiscreteSampleSingleScanEnv):
                         result = reason
                     continue
                 
-                env_action = [{'h1': {'move_by_descrete': [action]}}]
+                env_action = [{self.robot_name: {'move_by_descrete': [action]}}]
                 data_collector.collect_observation(
                     rgb=rgb,
                     depth=depth,

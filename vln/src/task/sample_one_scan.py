@@ -68,13 +68,17 @@ if __name__ == "__main__":
     project_path = PROJECT_ROOT_PATH
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
-    robot_offset = np.array([0.   , 0.   , 1.05])
     name = config["name"]
+    robot_name = config["robot_name"] # h1 / aliengo
+    if robot_name == "aliengo":
+        robot_offset = np.array([0.   , 0.   , 0.50])
+    else:
+        robot_offset = np.array([0.   , 0.   , 1.05])
     common_log_util.init(name,rank)
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list = config["retry_list"]
-    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
-    ckpt_to_load = f"{project_path}/data/checkpoints/20250113_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger01/ckpts/ckpt.20.pth"
+    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_{robot_name}_eval.yaml'
+    ckpt_to_load = config["ckpt_to_load"]
     sim_config = SimulatorConfig(sim_cfg_file)
     scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
     dataloader=SamplePathKeyDataloader(

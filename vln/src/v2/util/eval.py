@@ -158,6 +158,8 @@ class ActionExecutor:
         self.instruction = self.statistic_info.path_data['instruction']
         # 进程 stuck 检查使用
         self.context = context
+        self.fall_height_threshold = self.context.fall_height_threshold
+        self.robot_name = self.context.robot_name
 
     def _check_max_steps(self, step):
         if step > self.per_action_max_step:
@@ -169,7 +171,7 @@ class ActionExecutor:
     def _check_fall_and_stuck(self,robot_position,robot_rotation,step):
         is_stuck = self.stuck_checker.check_robot_stuck(robot_position, robot_rotation, cur_iter=step, max_iter=2500, threshold=0.2)
         robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-        is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+        is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
 
         if is_stuck or is_fall:
             reason = 'fall' if is_fall else 'stuck'
@@ -221,7 +223,7 @@ class ActionExecutor:
         '''step in isaac-sim until the action has finished'''
         dones = [False]
         reason = ''
-        action_name = list(actions[0]['h1'].keys())[0]
+        action_name = list(actions[0][self.robot_name].keys())[0]
         if action_name == 'stop' or len(actions) == 0:
             dones = [True]
         else:
@@ -237,7 +239,7 @@ class ActionExecutor:
         infos = self.statistic_info.compute_metrics(robot_position=robot_position,fail_reason=reason)
         
         if action_name == 'move_by_descrete':
-            action_list = actions[0]['h1']['move_by_descrete']
+            action_list = actions[0][self.robot_name]['move_by_descrete']
             for one_action in action_list:
                 log.info(f"[descrete][step:{self.statistic_info.sim_step}] 完成动作:{describe_action(one_action)},距离目标 {round(infos[0]['NE'],2)} 米")
 
@@ -267,6 +269,7 @@ class FlashActionExecutor:
         self.instruction = self.statistic_info.path_data['instruction']
         # 进程 stuck 检查使用
         self.context = context
+        self.robot_name = self.context.robot_name
 
     def _execute_action(
         self,
@@ -276,7 +279,7 @@ class FlashActionExecutor:
         robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
         new_robot_position, new_robot_rotation = get_new_position_and_rotation(robot_position, robot_rotation,action)
         self.context.reset_robot(new_robot_position,new_robot_rotation)
-        self.env.step(actions=[{'h1':{'stand_still': []}}], render=True)
+        self.env.step(actions=[{self.robot_name:{'stand_still': []}}], render=True)
         self.statistic_info.sim_step += 1
         self.statistic_info.current_path_length += np.linalg.norm(new_robot_position[:2] - robot_position[:2])
 
