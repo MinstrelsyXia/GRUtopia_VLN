@@ -1,6 +1,6 @@
 {
-    "name" : "20250211_aliengo_descrete_sample",
-    "robot_name": "aliengo",
+    "name" : "20250211_jetbot_descrete_sample",
+    "robot_name": "jetbot",
     "task_type" : "sample",
     "sample_type":"discrete",
     "dagger_percentage":0.0,

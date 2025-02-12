@@ -12,19 +12,18 @@ tasks:
   offset_size: 100.0
   light_on: false
   robots:
-  - name: aliengo
-    prim_path: "/World/aliengo"
-    type: "AliengoRobot"
+  - name: jetbot
+    prim_path: "/World/jetbot"
+    type: "JetbotRobot"
     position: [0, 0, 0]
-    scale: [1, 1, 1]
+    scale: [5, 5, 5] # the original robot is too small
     orientation: [0,0,0,0]
-    robot_height: 0.40 # for get free_map
+    robot_height: 1.20 # for get free_map
     ankle_height: 0.0758
-    fall_height_threshold: 0.04
+    fall_height_threshold: -1
     aperture: 200
     controller_params:
     - name: "move_by_speed"
-    - name: "joint_controller"
     - name: "move_to_point"
     - name: "move_along_path"
     - name: "rotate"
@@ -38,10 +37,7 @@ tasks:
     - name: "move_by_descrete"
     sensor_params:
     - name: "camera"
-      enable: false
-      size: [640, 480]
-    - name: "tp_camera"
-      enable: false
+      enable: true
       size: [640, 480]
     - name: "pano_camera_0"
       enable: true
@@ -52,9 +48,3 @@ tasks:
     - name: "topdown_camera_500"
       enable: true
       size: [500, 500]
-    - name: "tp_pointcloud"
-      enable: True
-      size: [64, 64]
-      camera_config:
-        - no_rgb
-        - point_cloud

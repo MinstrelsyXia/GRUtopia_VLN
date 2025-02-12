@@ -119,7 +119,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             start_position = data['start_position']
             start_rotation = data['start_rotation']
             self.reset_robot(start_position, start_rotation)
-            self.warm_up(240)
+            obs = self.warm_up(240)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
             is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
@@ -206,6 +206,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                         robot_name=self.robot_name,
                     )
                     data_collector.collect_action(action)
+                    robot_position_0, robot_rotation_0 = self.task.get_robot_poses_without_offset() # !!! debug
                     action_success, fail_reason = self.execute_one_action(env_action,stuck_checker)
                     log.info(f"[scan:{scan}][path:{path_key}] finish one action[step:{self.step}][ {action_index + 1} / {len(action_list)} ][result:{fail_reason}] {describe_action(action)}")
                     if not action_success:
@@ -213,6 +214,14 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                         result = fail_reason
                         break
                     robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                    # !!! debug !!!
+                    from omni.isaac.core.utils.rotations import quat_to_euler_angles
+                    _, _, ori_yaw = quat_to_euler_angles(robot_rotation_0)
+                    _, _, new_yaw = quat_to_euler_angles(robot_rotation)
+                    ori_yaw = np.rad2deg(ori_yaw)
+                    new_yaw = np.rad2deg(new_yaw)
+                    print(f"ori_yaw: {ori_yaw}, new_yaw: {new_yaw}")
+                    
                     is_on_track = check_is_on_track(
                         robot_position=robot_position,
                         robot_rotation=robot_rotation,
