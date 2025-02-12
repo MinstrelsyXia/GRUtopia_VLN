@@ -1,12 +1,12 @@
 {
-    "name" : "20250211_jetbot_descrete_sample",
-    "robot_name": "jetbot",
+    "name" : "20250212_aliengo_descrete_slurm_test",
+    "robot_name": "h1",
     "task_type" : "sample",
     "sample_type":"discrete",
     "dagger_percentage":0.0,
-    "ckpt_to_load" : "data/checkpoints/20250121_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger02/ckpts/ckpt.10.pth",
+    "ckpt_to_load" : "data/checkpoints/habitat_sota/CMA_PM_DA_Aug_converted.pth",
     "image" : "w61_grutopia:v0.4",
-    "total_rank": 16,
+    "total_rank": 8,
     "retry_list":[],
     "flash": false,
     "device_map" : {
