@@ -126,7 +126,7 @@ class BaseSingleScanEnv:
             voxel_size=voxel_size,
             agent_radius=agent_radius,
         )
-        visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
+        # visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
         return accupancy_map
     
     def warm_up(self, step_count):
