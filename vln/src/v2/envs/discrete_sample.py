@@ -153,6 +153,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                             process=current_point_index / len(nav_path),
                             camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
                             robot_pose=self.task.get_robot_poses_without_offset(),
+                            robot_name=self.robot_name
                         )
                         data_collector.collect_action([0])
                         robot_position, _ = self.isaac_robot.get_world_pose()
