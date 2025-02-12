@@ -73,7 +73,7 @@ if __name__ == "__main__":
     split_data_types = ['train']
     project_path = PROJECT_ROOT_PATH
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-    mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
+    mp3d_data_dir = f"{project_path}/data/Matterport3D/data/v1/scans" # !!! convert rel path to abs path for allowing rel texture path inside the usd
     name = config["name"]
     robot_name = config["robot_name"] # h1 / aliengo
     if robot_name == "aliengo":

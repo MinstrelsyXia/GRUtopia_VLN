@@ -37,7 +37,7 @@ class DescreteController(BaseController):
             self.current_steps = 0
         
         self.current_steps += 1
-        scaler = 1 / self.robot.get_robot_scale()[0]
+        scaler = 1 / self.robot.get_robot_scale()[0] # TODO: for jetbot 
         
         # Define actions:
         # 0: stop
@@ -48,25 +48,21 @@ class DescreteController(BaseController):
             return self.sub_controllers[0].forward(
                 forward_speed=0.0,
                 rotation_speed=0.0,
-                scaler=scaler
             )
         elif action == 1:
             return self.sub_controllers[0].forward(
                 forward_speed=self.forward_speed,
                 rotation_speed=0.0,
-                scaler=scaler
             )
         elif action == 2:
             return self.sub_controllers[0].forward(
                 forward_speed=0.0,
                 rotation_speed=self.rotation_speed,
-                scaler=scaler
             )
         elif action == 3:
             return self.sub_controllers[0].forward(
                 forward_speed=0.0,
                 rotation_speed=-self.rotation_speed,
-                scaler=scaler
             )
         else:
             raise ValueError(f"Invalid action: {action}")
