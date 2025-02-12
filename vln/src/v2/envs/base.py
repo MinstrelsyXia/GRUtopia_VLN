@@ -63,8 +63,11 @@ class BaseSingleScanEnv:
     
     def reset_light_position(self, position):
         from pxr import Gf
-        self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2]-1))
-        self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2]+1))
+        raise_light = 1
+        if self.robot_name == 'aliengo':
+           raise_light+= 0.55 
+        self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2] - raise_light))
+        self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2] + raise_light))
     
 
     def load_scan_and_robot(self):
