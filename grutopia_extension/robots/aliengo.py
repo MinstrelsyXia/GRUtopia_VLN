@@ -180,8 +180,10 @@ class AliengoRobot(BaseRobot):
 
         self._robot_base = RigidPrim(prim_path=config.prim_path + '/base', name=config.name + '_base')
         
-        self._robot_right_ankle = RigidPrim(prim_path=config.prim_path + '/RR_foot', name=config.name + 'rr_foot')
-        self._robot_left_ankle = RigidPrim(prim_path=config.prim_path + '/FL_foot', name=config.name + 'fl_foot')
+        self._robot_rr_ankle = RigidPrim(prim_path=config.prim_path + '/RR_foot', name=config.name + 'rr_foot')
+        self._robot_rl_ankle = RigidPrim(prim_path=config.prim_path + '/RL_foot', name=config.name + 'rl_foot')
+        self._robot_fl_ankle = RigidPrim(prim_path=config.prim_path + '/FL_foot', name=config.name + 'fl_foot')
+        self._robot_fr_ankle = RigidPrim(prim_path=config.prim_path + '/FR_foot', name=config.name + 'fr_foot')
 
     def post_reset(self):
         super().post_reset()
@@ -202,7 +204,8 @@ class AliengoRobot(BaseRobot):
         return self._robot_base.get_world_pose()
 
     def get_ankle_height(self):
-        return np.min([self._robot_right_ankle.get_world_pose()[0][2], self._robot_left_ankle.get_world_pose()[0][2]])
+        # return np.min([self._robot_right_ankle.get_world_pose()[0][2], self._robot_left_ankle.get_world_pose()[0][2]])
+        return np.min([self._robot_rr_ankle.get_world_pose()[0][2], self._robot_rl_ankle.get_world_pose()[0][2], self._robot_fl_ankle.get_world_pose()[0][2], self._robot_fr_ankle.get_world_pose()[0][2]])
 
     def apply_action(self, action: dict):
         """

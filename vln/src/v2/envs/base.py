@@ -39,40 +39,48 @@ class BaseSingleScanEnv:
     def update_timestamp(self):
         self.timestamp = time.time()
         sys.stdout.flush()
+
+    def create_light(self):
+        from pxr import Gf, UsdLux, UsdGeom
+        import omni.usd
+        stage = omni.usd.get_context().get_stage()
+        distant_light = UsdLux.DistantLight.Define(stage, "/World/distant_light")
+        distant_light.CreateIntensityAttr(1000)
+        distant_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+
+        up_disk_light = UsdLux.DiskLight.Define(stage, "/World/up_disk_light")
+        up_disk_light.CreateIntensityAttr(5000)
+        up_disk_light.CreateRadiusAttr(50.0)
+        up_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+        UsdGeom.Xformable(up_disk_light).AddRotateXYZOp().Set(Gf.Vec3f(180.0, 0.0, 0.0))
+        self.up_disk_light = up_disk_light
+        self.up_disk_light_position = UsdGeom.Xformable(self.up_disk_light).AddTranslateOp()
+        
+        down_disk_light = UsdLux.DiskLight.Define(stage, "/World/down_disk_light")
+        down_disk_light.CreateIntensityAttr(5000)
+        down_disk_light.CreateRadiusAttr(50.0)
+        down_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+        self.down_disk_light = down_disk_light
+        self.down_disk_light_position = UsdGeom.Xformable(self.down_disk_light).AddTranslateOp()
+
     
+    def reset_light_position(self, position):
+        from pxr import Gf
+        self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2]-1))
+        self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2]+1))
+    
+
     def load_scan_and_robot(self):
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path
         self.sim_config.config.tasks[0].robots[0].position = self.start_position
         self.sim_config.config.tasks[0].robots[0].orientation = self.start_rotation
         self.env = BaseEnv(self.sim_config, headless=self.headless, webrtc=False)
         set_seed(0)
+        self.create_light()
         self.task = self.env._runner.current_tasks[list(self.env._runner.current_tasks.keys())[0]]
         self.robot = self.task.robots[list(self.task.robots.keys())[0]]
         self.isaac_robot = self.robot.isaac_robot
         self.topdown_global_map_camera = self.robot.sensors['topdown_camera_500']
-
-        # update light positions
-        self.update_light_positions(self.start_position)
-    
-    def update_light_positions(self, target_pos):
-        import omni.usd
-        from pxr import Gf, UsdGeom
-        stage = omni.usd.get_context().get_stage()
-        
-        # 更新向下光源位置
-        disk_1_prim = stage.GetPrimAtPath("/World/disk_1")
-        if disk_1_prim.IsValid():
-            xformable = UsdGeom.Xformable(disk_1_prim)
-            xformable.ClearXformOpOrder()  # 清除现有变换
-            xformable.AddTranslateOp().Set(Gf.Vec3f(target_pos[0], target_pos[1], target_pos[2]+1.5))
-        
-        # 更新向上光源位置
-        disk_2_prim = stage.GetPrimAtPath("/World/disk_2")
-        if disk_2_prim.IsValid():
-            xformable = UsdGeom.Xformable(disk_2_prim)
-            xformable.ClearXformOpOrder()  # 清除现有变换
-            xformable.AddTranslateOp().Set(Gf.Vec3f(target_pos[0], target_pos[1], target_pos[2]+1.5))
-            # xformable.AddRotateXYZOp().Set(Gf.Vec3d(180, 0, 0))  # 绕X轴旋转180度,使灯光朝上
     
     def reset_robot(
         self,
@@ -84,6 +92,7 @@ class BaseSingleScanEnv:
         self.isaac_robot.set_joint_velocities(np.zeros(len(self.isaac_robot.dof_names)))
         self.isaac_robot.set_joint_positions(np.zeros(len(self.isaac_robot.dof_names)))
         self.isaac_robot.set_joint_efforts(np.zeros(len(self.isaac_robot.dof_names)))
+        self.reset_light_position(position)
     
     def get_global_map(
         self,
@@ -104,7 +113,7 @@ class BaseSingleScanEnv:
         elif robot_name == 'aliengo':
             base_height = self.robot.get_robot_base().get_world_pose()[0][2]
             foot_height = self.robot.get_ankle_height()
-            min_height = base_height - foot_height + 0.16
+            min_height = base_height - foot_height + 0.125
             depth_mask = ((depth >= min_height) & (depth < max_height))
         robot_mask = create_robot_mask(self.topdown_global_map_camera)
         free_map = np.zeros_like(depth, dtype=int)
@@ -117,7 +126,7 @@ class BaseSingleScanEnv:
             voxel_size=voxel_size,
             agent_radius=agent_radius,
         )
-        # visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
+        visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
         return accupancy_map
     
     def warm_up(self, step_count):
@@ -128,3 +137,5 @@ class BaseSingleScanEnv:
     def stop(self):
         if(hasattr(self.env, 'simulation_app')):
             self.env.simulation_app.close()
+    
+    
