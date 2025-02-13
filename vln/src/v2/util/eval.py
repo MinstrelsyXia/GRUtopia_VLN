@@ -140,7 +140,8 @@ class ActionExecutor:
 
         statistic_info:Statistic_Info,
         context,
-        robot_name='h1'
+        robot_name='h1',
+        fall_height_threshold=0.5
     ):
         # 执行 step 用到的工具类
         self.env=env
@@ -162,6 +163,7 @@ class ActionExecutor:
         
         # robot name
         self.robot_name = robot_name
+        self.fall_height_threshold = fall_height_threshold
 
     def _check_max_steps(self, step):
         if step > self.per_action_max_step:
@@ -173,7 +175,7 @@ class ActionExecutor:
     def _check_fall_and_stuck(self,robot_position,robot_rotation,step):
         is_stuck = self.stuck_checker.check_robot_stuck(robot_position, robot_rotation, cur_iter=step, max_iter=2500, threshold=0.2)
         robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-        is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+        is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
 
         if is_stuck or is_fall:
             reason = 'fall' if is_fall else 'stuck'

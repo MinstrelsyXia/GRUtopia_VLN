@@ -68,7 +68,6 @@ class BaseSingleScanEnv:
         from pxr import Gf
         self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2]-1))
         self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2]+1))
-    
 
     def load_scan_and_robot(self):
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path
