@@ -1,10 +1,11 @@
 {
-    "name" : "20250209_cma_dagger03_eval",
+    "name" : "20250212_random_eval",
+    "robot_name": "h1",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250208_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger03/ckpts/ckpt.10.pth",
+    "ckpt_to_load" : "data/checkpoints/habitat_sota/CMA_PM_DA_Aug_converted.pth",
     "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
     "image" : "w61_grutopia:v0.4",
-    "total_rank": 8,
+    "total_rank": 4,
     "retry_list":[],
     "flash": false,
     "load_eval_subset": false,
@@ -12,11 +13,7 @@
         "0":["0"],
         "1":["1"],
         "2":["2"],
-        "3":["3"],
-        "4":["4"],
-        "5":["5"],
-        "6":["6"],
-        "7":["7"]
+        "3":["3"]
     },
     "merge_config" : {
         "data_0508":[8,9,10,11,12,13,14,15]

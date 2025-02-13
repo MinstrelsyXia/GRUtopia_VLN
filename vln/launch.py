@@ -63,8 +63,12 @@ if __name__ == "__main__":
         sys.exit()
     
     round_count = 0
+    max_round_num = 5
     while True:
         round_count +=1
+        if round_count > max_round_num:
+            print(f"round_count > {max_round_num}, exit")
+            sys.exit()
 
         # 获取该rank 所有需要抓取的数据
         database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, readonly=True, lock=False)
@@ -98,6 +102,6 @@ if __name__ == "__main__":
             stdout_thread.join()
             stderr_thread.join()
             exit_code = process.returncode
-            print(f"[round:{round_count}][scan:{scan}][exit_code:{exit_code}]")
+            print(f"[round:{round_count}][scan:{scan}][exit_code:{exit_code}]") 
                 
         time.sleep(60)
