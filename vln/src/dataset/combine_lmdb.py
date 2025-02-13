@@ -11,11 +11,11 @@ def combine_lmdb(source_lmdb, add_lmdb, target_lmdb, commit_frequency=1000,added
     os.makedirs(os.path.dirname(target_lmdb), exist_ok=True)
     
     # clear all existing contents
-    # with lmdb.open(
-    #     target_lmdb,
-    #     map_size=int(1e12),
-    # ) as target_env, target_env.begin(write=True) as txn:
-    #     txn.drop(target_env.open_db())
+    with lmdb.open(
+        target_lmdb,
+        map_size=int(1e12),
+    ) as target_env, target_env.begin(write=True) as txn:
+        txn.drop(target_env.open_db())
     
     target_env = lmdb.open(target_lmdb, map_size=int(1e12), readonly=False)
     
@@ -28,20 +28,18 @@ def combine_lmdb(source_lmdb, add_lmdb, target_lmdb, commit_frequency=1000,added
         print(f"add_env has {add_length} keys")
 
     txn = target_env.begin(write=True)
-    # with source_env.begin() as source_txn:
-    #     for i, (key, value) in enumerate(tqdm(source_txn.cursor(), desc="source_env", total=last_key)):
-    #         txn.put(key, value)
-    #         if (i+1) % commit_frequency == 0:
-    #             txn.commit()
-    #             txn = target_env.begin(write=True)
+    with source_env.begin() as source_txn:
+        for i, (key, value) in enumerate(tqdm(source_txn.cursor(), desc="source_env", total=last_key)):
+            txn.put(key, value)
+            if (i+1) % commit_frequency == 0:
+                txn.commit()
+                txn = target_env.begin(write=True)
         
-    #     txn.commit()
-    #     txn = target_env.begin(write=True)
+        txn.commit()
+        txn = target_env.begin(write=True)
         
     with add_env.begin() as add_txn:
         for i, (key, value) in enumerate(tqdm(add_txn.cursor(), desc="add_env", total=add_length)):
-            if i < 999:
-                continue
             key_decoded = key.decode('utf-8')
             new_key = f"{key_decoded}{added_prefix}".encode()
             txn.put(new_key, value)
@@ -75,8 +73,8 @@ if __name__ == "__main__":
     mode = 'combine_lmdb'
 
     if mode == 'combine_lmdb':
-        source_lmdb_path = "data/sample_episodes/20250113_descrete_dagger_01/sample_data.lmdb"
-        add_lmdb_path = "data/sample_episodes/20250120_dagger/sample_data.lmdb"
-        target_lmdb_path = "data/sample_episodes/20250121_descrete_dagger_02/sample_data.lmdb"
-        combine_lmdb(source_lmdb_path, add_lmdb_path, target_lmdb_path, added_prefix='_02')
+        source_lmdb_path = "data/sample_episodes/20250121_descrete_dagger_02/sample_data.lmdb"
+        add_lmdb_path = "data/sample_episodes/20250207_sample03_zh/sample_data.lmdb"
+        target_lmdb_path = "data/sample_episodes/20250208_descrete_dagger_03/sample_data.lmdb"
+        combine_lmdb(source_lmdb_path, add_lmdb_path, target_lmdb_path, added_prefix='_03')
 

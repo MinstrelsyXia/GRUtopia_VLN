@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=PRCMAdagger2Train         # 作业名称
+#SBATCH --job-name=DistLight00Train_noLoadWeight         # 作业名称
 #SBATCH --output=logs/%j_%x.out          # 标准输出文件路径
 #SBATCH --error=logs/%j_%x.err           # 标准错误文件路径
 #SBATCH --gres=gpu:1                # GPU请求
