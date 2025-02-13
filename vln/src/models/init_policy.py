@@ -17,6 +17,9 @@ def get_policy(policy_name):
     elif policy_name == "CMA_Policy":
         from vln.src.models.cma_policy import CMANet
         return CMANet
+    elif policy_name == "CMA_CLIP_Policy":
+        from vln.src.models.cma_clip_policy import CMA_CLIP_Net
+        return CMA_CLIP_Net
     elif policy_name == 'DP_noRNN_Policy':
         from vln.src.models.dp_policy_noRNN import CMA_DP_noRNN_Net
         return CMA_DP_noRNN_Net

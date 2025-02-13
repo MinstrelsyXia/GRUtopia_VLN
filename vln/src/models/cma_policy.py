@@ -114,8 +114,8 @@ class CMANet(nn.Module):
         self.depth_linear = nn.Sequential(
             nn.Flatten(),
             nn.Linear(
-                np.prod(self.depth_encoder.output_shape),
-                self.model_config.DEPTH_ENCODER.output_size,
+                np.prod(self.depth_encoder.output_shape), # (192, 4, 4)
+                self.model_config.DEPTH_ENCODER.output_size, # 128
             ),
             nn.ReLU(True),
         )
@@ -230,11 +230,11 @@ class CMANet(nn.Module):
         prev_actions: Tensor,
         masks: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        instruction_embedding = self.instruction_encoder(observations)
-        depth_embedding = self.depth_encoder(observations)
+        instruction_embedding = self.instruction_encoder(observations) # [bs, 256, 200]
+        depth_embedding = self.depth_encoder(observations) # [bs, 192, 4, 4]
         depth_embedding = torch.flatten(depth_embedding, 2) # [bs, 192, 16]
 
-        rgb_embedding = self.rgb_encoder(observations)
+        rgb_embedding = self.rgb_encoder(observations) # [370, 2112, 4, 4]
         rgb_embedding = torch.flatten(rgb_embedding, 2) # [bs, 2112, 16]
 
         prev_actions = self.prev_action_embedding(
@@ -248,8 +248,8 @@ class CMANet(nn.Module):
         if self.model_config.ablate_rgb:
             rgb_embedding = rgb_embedding * 0
 
-        rgb_in = self.rgb_linear(rgb_embedding)
-        depth_in = self.depth_linear(depth_embedding)
+        rgb_in = self.rgb_linear(rgb_embedding) # [bs, 256]
+        depth_in = self.depth_linear(depth_embedding) # [bs, 128]
 
         state_in = torch.cat([rgb_in, depth_in, prev_actions], dim=1)
         rnn_states_out = rnn_states.detach().clone()
@@ -262,8 +262,8 @@ class CMANet(nn.Module):
             masks,
         )
 
-        text_state_q = self.state_q(state)
-        text_state_k = self.text_k(instruction_embedding)
+        text_state_q = self.state_q(state) # [bs, 256]
+        text_state_k = self.text_k(instruction_embedding) # [bs, 256, 200]
         text_mask = (instruction_embedding == 0.0).all(dim=1)
         text_embedding = self._attn(
             text_state_q, text_state_k, instruction_embedding, text_mask
@@ -271,13 +271,13 @@ class CMANet(nn.Module):
 
         rgb_k, rgb_v = torch.split(
             self.rgb_kv(rgb_embedding), self._hidden_size // 2, dim=1
-        )
+        ) # [bs, 256, 16]
         depth_k, depth_v = torch.split(
             self.depth_kv(depth_embedding), self._hidden_size // 2, dim=1
-        )
+        ) # [bs, 256, 16]
 
-        text_q = self.text_q(text_embedding)
-        rgb_embedding = self._attn(text_q, rgb_k, rgb_v)
+        text_q = self.text_q(text_embedding) # text_embedding: [bs, 256]. text_q: [bs, 256]
+        rgb_embedding = self._attn(text_q, rgb_k, rgb_v) # [bs, 256]
         depth_embedding = self._attn(text_q, depth_k, depth_v)
 
         x = torch.cat(
@@ -300,6 +300,7 @@ class CMANet(nn.Module):
             masks, # [B, 512]
         )
 
+        progress_hat = None
         if self.model_config.PROGRESS_MONITOR.use:
             progress_hat = torch.tanh(self.progress_monitor(x))
             progress_loss = F.mse_loss(
@@ -308,7 +309,7 @@ class CMANet(nn.Module):
                 reduction="none",
             )
 
-        return x, rnn_states_out
+        return x, rnn_states_out, progress_hat
 
     def build_distribution(
         self, observations, rnn_states, prev_actions, masks
@@ -319,11 +320,11 @@ class CMANet(nn.Module):
         return self.action_distribution(features)
     
     def forward(self, batch):
-        x, rnn_states_out = self._forward(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+        x, rnn_states_out, progress_hat = self._forward(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
         # distribution = self.action_distribution(x) # This would meet the error when using DataParallel during training "TypeError: 'CustomFixedCategorical' object is not iterable"
         if batch['mode'] == 'train':
             outputs = self.action_distribution(x).logits
         elif batch['mode'] == 'inference':
             outputs = self.action_distribution(x).mode()
-        return outputs, rnn_states_out
+        return outputs, rnn_states_out, progress_hat
 
