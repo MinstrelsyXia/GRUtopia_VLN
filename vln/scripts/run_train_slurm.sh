@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=cmaDaggerTrain         # 作业名称
+#SBATCH --job-name=cmaCLIPTrain         # 作业名称
 #SBATCH --output=logs/%j_%x.out          # 标准输出文件路径
 #SBATCH --error=logs/%j_%x.err           # 标准错误文件路径
-#SBATCH --gres=gpu:1                 # GPU请求
+#SBATCH --gres=gpu:1                # GPU请求
 #SBATCH --cpus-per-task=6            # 每个任务的CPU核心数
 #SBATCH --partition=smartbot              # 使用GPU分区
 #SBATCH --mem=128G                     # 总内存分配
@@ -31,7 +31,7 @@ flags_cma_raw_train="
 
 if [ "$1" == "--train" ]; then
   flags="
-    --exp-config vln/configs/train/cma_dp_train.yaml
+    --exp-config vln/configs/train/cma_dp_w61.yaml
     --run-type train
   "
 elif [ "$1" == "--train_crossGRU" ]; then
@@ -75,6 +75,12 @@ elif [ "$1" == "--preprocess_features" ]; then
 elif [ "$1" == "--train_cma" ]; then
   flags="
     --exp-config vln/configs/train/cma_train.yaml
+    --run-type train
+    --train_quiet
+  "
+elif [ "$1" == "--train_cma_clip" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_clip_train.yaml
     --run-type train
     --train_quiet
   "
