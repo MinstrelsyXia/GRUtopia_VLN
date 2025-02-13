@@ -70,16 +70,21 @@ if __name__ == "__main__":
     headless = True
     split_data_types = ['val_unseen','val_seen']
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-    # base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_FSASub' # !!! This is for MLANet
-    mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
-    robot_offset = np.array([0.   , 0.   , 1.05])
+    mp3d_data_dir = f"{project_path}/data/Matterport3D/data/v1/scans" # !!! convert rel path to abs path for allowing rel texture path inside the usd
     name = config["name"]
+    robot_name = config["robot_name"] # h1 / aliengo
+    if robot_name == "aliengo":
+        robot_offset = np.array([0.   , 0.   , 0.50])
+    elif robot_name == 'h1':
+        robot_offset = np.array([0.   , 0.   , 1.05])
+    elif robot_name == 'jetbot':
+        robot_offset = np.array([0.   , 0.   , 0.])
     common_log_util.init(name,rank)
     ckpt_file_name = config["ckpt_to_load"].split('/')[-1]
     ckpt_name=f"{name}_{ckpt_file_name}"
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list = config["retry_list"]
-    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
+    sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_{robot_name}_eval.yaml'
     ckpt_to_load = config["ckpt_to_load"]
     sim_config = SimulatorConfig(sim_cfg_file)
     

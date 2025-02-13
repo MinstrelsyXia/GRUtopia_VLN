@@ -16,10 +16,13 @@ from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.models.init_policy import initialize_policy
 from vln.src.v2.util.data_collector import DataCollector
 
+import random
+
 class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
     
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
@@ -31,6 +34,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
             ckpt_name,
         ):
         super().__init__(
+            robot_name=robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -165,19 +169,24 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     'prev_actions': prev_actions,
                     'masks': not_done_masks
                 }
-                with torch.no_grad():
-                    actions, rnn_states = self.policy(batch)
+                
+                # 20250212 !!! random eval
+                # with torch.no_grad():
+                #     actions, rnn_states = self.policy(batch)
+                a = random.choice([0, 1, 2, 3])
+                actions = torch.tensor([a])
+                
                 prev_actions.copy_(actions)
                 if self.eval_config.EVAL.ACTION == 'descrete':
                     for bs_i, a in enumerate(actions):
                         if a == 0:
                             log.info(f"[split:{split}][scan:{scan}][trajectory_id_episode_id: {path_key}][stop!!!]")
                             action = [
-                                {'h1': {'stop': ['stop']}}
+                                {self.robot_name: {'stop': ['stop']}}
                             ]
                         else:
                             action = [
-                                {'h1': {'move_by_descrete': [a.item()]}}
+                                {self.robot_name: {'move_by_descrete': [a.item()]}}
                             ]
                 executor = ActionExecutor(
                     env=self.env, 
@@ -191,6 +200,8 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
                     statistic_info=statistic_info,
                     context=self,
+                    
+                    robot_name=self.robot_name
                 )
                 outputs = executor.env_step(actions = action)
                 outputs_dict = outputs['outputs_dict']

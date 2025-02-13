@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 20250212_slurm_test
+#SBATCH -J 20250212_random_eval
 #SBATCH -o slurm_logs/%j_%x.out 
 #SBATCH -e slurm_logs/%j_%x.err 
 #SBATCH -p gpu_4090  
@@ -16,5 +16,15 @@ export PYTHONPATH=$PYTHONPATH:/ailab/user/wangliuyi/.conda/envs/grutopia/bin/pyt
 SAMPLE_CONFIG_FILE="vln/configs/v2/sample.json"
 EVAL_CONFIG_FILE="vln/configs/v2/eval.json"
 
+if [ "$1" == "sample" ]; then
+    CONFIG_FILE=$SAMPLE_CONFIG_FILE
+    echo "Using sample config file: $CONFIG_FILE"
+elif [ "$1" == "eval" ]; then
+    CONFIG_FILE=$EVAL_CONFIG_FILE
+    echo "Using eval config file: $CONFIG_FILE"
+else
+    echo "Invalid argument"
+    exit 1
+fi
 
-python vln/launch.py --rank $1 --cfg_file "$CONFIG_FILE"
+python vln/launch.py --rank $2 --cfg_file "$CONFIG_FILE"
