@@ -79,7 +79,9 @@ class LmdbReader:
         for frame in rgb_data:
             # Convert the frame to a PIL image and then to a NumPy array
             pil_image = Image.fromarray(frame)
-            frames.append(np.array(pil_image))
+            # 将RGB转换为BGR格式
+            bgr_frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            frames.append(bgr_frame)
 
         # Define output video file path
         if use_pid:
@@ -229,7 +231,7 @@ if __name__ == '__main__':
     
     pid_lmdb_path = 'data/sample_episodes/20241207_sample_episodes/sample_data.lmdb'
     # original_lmdb_path = '/data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
-    original_lmdb_path = 'data/sample_episodes/20250211_jetbot_descrete_sample/sample_data.lmdb'
+    original_lmdb_path = 'data/sample_episodes/20250212_aliengo_descrete_slurm_test/sample_data.lmdb'
 
     val_seen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_seen/sample_data.lmdb'
     val_unseen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_unseen/sample_data.lmdb'
@@ -256,7 +258,7 @@ if __name__ == '__main__':
 
         '''2. Load the target path_id'''
         all_keys = data_collector.read_all_keys()
-        path_id = '660'
+        path_id = '593'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
         if episode_data is not None:

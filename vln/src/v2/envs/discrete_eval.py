@@ -118,7 +118,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 sub_instr = None
                 sub_instr_tokens = None
                 max_instr_len = 200
-            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation, sub_instr, sub_instr_tokens)
+            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation, sub_instr, sub_instr_tokens, robot_name=self.robot_name)
             observations = extract_instruction_tokens(
                 observations, 
                 #TODO:
@@ -169,12 +169,8 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     'prev_actions': prev_actions,
                     'masks': not_done_masks
                 }
-                
-                # 20250212 !!! random eval
-                # with torch.no_grad():
-                #     actions, rnn_states = self.policy(batch)
-                a = random.choice([0, 1, 2, 3])
-                actions = torch.tensor([a])
+                with torch.no_grad():
+                    actions, rnn_states = self.policy(batch)
                 
                 prev_actions.copy_(actions)
                 if self.eval_config.EVAL.ACTION == 'descrete':
@@ -201,7 +197,8 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     statistic_info=statistic_info,
                     context=self,
                     
-                    robot_name=self.robot_name
+                    robot_name=self.robot_name,
+                    fall_height_threshold=self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
                 )
                 outputs = executor.env_step(actions = action)
                 outputs_dict = outputs['outputs_dict']
