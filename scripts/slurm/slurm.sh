@@ -1,4 +1,4 @@
-total_ranks=4
+total_ranks=8
 mode=$1 # eval / sample
 
 for ((rank=0; rank<total_ranks; rank++))

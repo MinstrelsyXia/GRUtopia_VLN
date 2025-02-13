@@ -4,7 +4,7 @@
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/habitat_sota/CMA_PM_DA_Aug_converted.pth",
     "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
-    "image" : "w61_grutopia:v0.4",
+    "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],
     "flash": false,

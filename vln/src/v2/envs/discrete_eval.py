@@ -170,7 +170,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     'masks': not_done_masks
                 }
                 with torch.no_grad():
-                    actions, rnn_states = self.policy(batch)
+                    actions, rnn_states, _ = self.policy(batch)
                 
                 prev_actions.copy_(actions)
                 if self.eval_config.EVAL.ACTION == 'descrete':
