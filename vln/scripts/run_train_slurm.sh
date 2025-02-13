@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=DistLight00Train_noLoadWeight         # 作业名称
+#SBATCH --job-name=cmaCLIPTrain         # 作业名称
 #SBATCH --output=logs/%j_%x.out          # 标准输出文件路径
 #SBATCH --error=logs/%j_%x.err           # 标准错误文件路径
 #SBATCH --gres=gpu:1                # GPU请求
@@ -75,6 +75,12 @@ elif [ "$1" == "--preprocess_features" ]; then
 elif [ "$1" == "--train_cma" ]; then
   flags="
     --exp-config vln/configs/train/cma_train.yaml
+    --run-type train
+    --train_quiet
+  "
+elif [ "$1" == "--train_cma_clip" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_clip_train.yaml
     --run-type train
     --train_quiet
   "

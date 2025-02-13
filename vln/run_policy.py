@@ -179,7 +179,7 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         
     if config.MODEL.policy_name in ['CMA_DP_ImgMultiPatch_Policy', 'DP_noRNN_Policy']:
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
-    elif config.MODEL.policy_name == 'CMA_Policy':
+    elif config.MODEL.policy_name in ['CMA_Policy', 'CMA_CLIP_Policy']:
         trainer_init = cma_trainer.DaggerCMATrainer
     elif config.MODEL.policy_name == 'Navid_Policy':
         trainer_init = navid_trainer.NavidTrainer

@@ -162,7 +162,7 @@ class ImageEncoder(torch.nn.Module):
                 image_inputs = image_inputs.permute(0,3,1,2)
                 image_feat = []
                 for image in image_inputs:
-                    image = self.to_pil(image.cpu())
+                    image = self.to_pil(image)
                     image_feat.append(np.array(self.image_processor(image)))
                 image_feat = np.array(image_feat)
                 image_feat = torch.from_numpy(image_feat).to(image_inputs.device)
@@ -265,7 +265,7 @@ class ImageEncoder(torch.nn.Module):
         if self.config.DEPTH.bottleneck == 'resnet':
             outputs = self.embed_depth_resnet(input, return_x_before_fc=return_x_before_fc)
             if return_x_before_fc:
-                outputs = outputs[0] # [bs, 128, 4, 4]
+                outputs = outputs[0] # [bs, 128, 4, 4]. Otherwise, [bs, 192, 4, 4]
         elif self.config.DEPTH.bottleneck == 'TAC':
             outputs = self.embed_depth_TAC(input, fc=False)
         if self.analysis_time:
@@ -289,16 +289,19 @@ class ImageEncoder(torch.nn.Module):
             end_time = time.time()
             print(f"MODEL embed_depth_resnet time: {end_time - start_time}")
             start_time = time.time()
-        if reshape_flag:
-            outputs0 = outputs[0].reshape(BS, -1, *outputs[0].shape[1:])
-            outputs1 = outputs[1].reshape(BS, -1, *outputs[1].shape[1:])
+        if return_x_before_fc:
+            if reshape_flag:
+                outputs0 = outputs[0].reshape(BS, -1, *outputs[0].shape[1:])
+                outputs1 = outputs[1].reshape(BS, -1, *outputs[1].shape[1:])
+            else:
+                outputs0 = outputs[0]
+                outputs1 = outputs[1]
+            if self.analysis_time:
+                end_time = time.time()
+                print(f"MODEL embed_depth_resnet reshape_flag time: {end_time - start_time}")
+            return [outputs0, outputs1]
         else:
-            outputs0 = outputs[0]
-            outputs1 = outputs[1]
-        if self.analysis_time:
-            end_time = time.time()
-            print(f"MODEL embed_depth_resnet reshape_flag time: {end_time - start_time}")
-        return [outputs0, outputs1]
+            return outputs
 
     def embed_depth_TAC(self, depth_batch, fc=False, max_batch_size=500):
         """Embed a batch of depth."""
