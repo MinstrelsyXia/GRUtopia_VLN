@@ -139,10 +139,10 @@ class ActionExecutor:
         per_action_max_step,
         total_max_step,
         robot_ankle_height,
-        max_rotation_count,
 
         statistic_info:Statistic_Info,
         context,
+        max_rotation_count=-1
     ):
         # 执行 step 用到的工具类
         self.env=env
@@ -251,7 +251,7 @@ class ActionExecutor:
                 action = actions, 
                 action_name=action_name,  
                 check_fall_and_stuck=True,
-                check_max_rotation_count=True
+                check_max_rotation_count=False
             )
         
         robot_position, robot_rotation = self.isaac_robot.get_world_pose()

@@ -3,6 +3,7 @@ import time
 import os
 import threading
 import sys
+import shutil
 from vln.src.v2.envs.discrete_eval import DiscreteEvalSingleScanEnv
 from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
 from grutopia.core.config import SimulatorConfig
@@ -67,6 +68,7 @@ if __name__ == "__main__":
         sys.exit()
     with open(cfg_file_path, 'r') as file:
         config = json.load(file)
+
     headless = True
     split_data_types = ['val_unseen','val_seen']
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
@@ -82,6 +84,9 @@ if __name__ == "__main__":
     sim_cfg_file = f'{project_path}/vln/configs/sim_cfg_policy_eval.yaml'
     ckpt_to_load = config["ckpt_to_load"]
     sim_config = SimulatorConfig(sim_cfg_file)
+
+    # copy the cfg_file to the project_path
+    shutil.copy(cfg_file_path, f"{project_path}/data/sample_episodes/{name}")
     
     # !!! For MLANet
     # sim_config.config.tasks[0].robots[0].sensor_params[2].size=(224,224) # pano_camera_0

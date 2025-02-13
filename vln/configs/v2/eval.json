@@ -1,8 +1,8 @@
 {
-    "name" : "20250212_navid_distLight_reEval",
+    "name" : "20250213_cmaDiskLight_loadedWeight_eval",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth",
-    "eval_cfg_file": "vln/configs/train/navid_eval.yaml",
+    "ckpt_to_load" : "data/checkpoints/20250212_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_loadedWeight/ckpts/ckpt.55.pth",
+    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],
