@@ -84,6 +84,8 @@ class CMADataset(torch.utils.data.IterableDataset):
         is_distributed=False,
         rank=0,
         world_size=1,
+        
+        bert_tokenizer=None,
     ):
         super().__init__()
         self.config = config
@@ -114,6 +116,15 @@ class CMADataset(torch.utils.data.IterableDataset):
                 self.lmdb_keys = []
                 while cursor.next():
                     self.lmdb_keys.append(cursor.key().decode())
+        
+        # For CMA-CLIP
+        self.use_clip_encoders = False
+        self.bert_tokenizer = None
+        if self.config.MODEL.policy_name == "CMA_CLIP_Policy":
+            self.use_clip_encoders = True
+            self.is_clip_long = True
+
+            self.bert_tokenizer = bert_tokenizer          
 
     def _create_new_data(self, data, instruction, finish_status, fail_reason):
         """Helper function to create new data entry"""
@@ -204,16 +215,25 @@ class CMADataset(torch.utils.data.IterableDataset):
                         # For dagger dataset, the key is like '999_01', we need to remove the '_01'
                         if '_' in key:
                             key = key.split('_')[0]
-                        instructions = [
-                            self.dataset_data[key][ep_idx]['instruction']['instruction_tokens']
-                            for ep_idx in range(len(self.dataset_data[key]))
-                        ]
+                        if self.use_clip_encoders:
+                            instructions = [
+                                self.dataset_data[key][ep_idx]['instruction']['instruction_text']
+                                for ep_idx in range(len(self.dataset_data[key]))
+                            ]
+                        else:
+                            instructions = [
+                                self.dataset_data[key][ep_idx]['instruction']['instruction_tokens']
+                                for ep_idx in range(len(self.dataset_data[key]))
+                            ]
                         for instruction in instructions:
                             new_data = self._create_new_data(data, instruction, finish_status, fail_reason)
                             new_preload.append(new_data)
                             finish_status_list.append(finish_status)
                             fail_reasons_list.append(fail_reason)
                             lengths.append(len(new_data))
+                        
+                if self.use_clip_encoders:
+                    new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
                 
                 if empty_data_nums > 0:
                     print(f"empty data nums: {empty_data_nums}")
