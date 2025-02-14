@@ -4,6 +4,7 @@ from vln.src.v2.envs.continuous_sample import ContinuousSampleSingleScanEnv
 from vln.src.v2.envs.discrete_flash_sample import DiscreteFlashSampleSingleScanEnv
 from vln.src.v2.envs.discrete_sample import DiscreteSampleSingleScanEnv
 from vln.src.v2.envs.discrete_sample_dagger import DiscreteSampleDaggerSingleScanEnv
+from vln.src.v2.envs.discrete_navid_eval import DiscreteNavidEvalSingleScanEnv
 from vln import PROJECT_ROOT_PATH
 from vln.src.utils.utils import Config
 
@@ -20,7 +21,7 @@ def get_eval_config(
         "fp16":False,
         "seed":0,
         "MODEL":{
-            "policy_name":"CMA_Policy",
+            "policy_name":"Navid_Policy",
             "ablate_instruction":False,
             "ablate_depth":False,
             "ablate_rgb":False,
@@ -112,7 +113,7 @@ def get_env_by_config(
                 ckpt_name=ckpt_name,
             )
         else:
-            return DiscreteEvalSingleScanEnv(
+            return DiscreteNavidEvalSingleScanEnv(
                 robot_name=config["robot_name"],
                 sim_config=sim_config,
                 scene_asset_path=scene_asset_path,

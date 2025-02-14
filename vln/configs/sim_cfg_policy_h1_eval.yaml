@@ -46,7 +46,7 @@ tasks:
       size: [640, 480]
     - name: "pano_camera_0"
       enable: true
-      size: [256, 256]
+      size: [640, 480]
     - name: "topdown_camera_50"
       enable: true
       size: [500, 500]
