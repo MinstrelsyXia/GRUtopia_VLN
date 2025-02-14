@@ -135,10 +135,6 @@ class CMA_CLIP_Net(nn.Module):
         for k,v in self.model_config.CROSS_MODAL_ENCODER.items():
             setattr(cross_modal_config, k, v)
         
-        # if self.model_config.CROSS_MODAL_ENCODER.txt_to_img:
-        #     txt_to_img_cross_encoder_config = copy.deepcopy(cross_modal_config)
-        #     txt_to_img_cross_encoder_config.num_x_layers = self.model_config.CROSS_MODAL_ENCODER.txt_to_img_layer
-        #     self.txt_img_cross_encoder = encoders.VisionLanguageEncoder(txt_to_img_cross_encoder_config)
         self.state_txt_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         self.txt_rgb_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
         self.txt_depth_cross_encoder = encoders.VisionLanguageEncoder(cross_modal_config)
@@ -273,24 +269,6 @@ class CMA_CLIP_Net(nn.Module):
             rnn_states[:, 0 : self.state_encoder.num_recurrent_layers],
             masks,
         )
-
-        # text_state_q = self.state_q(state)
-        # text_state_k = self.text_k(instruction_embedding)
-        # text_mask = (instruction_embedding == 0.0).all(dim=1)
-        # text_embedding = self._attn(
-        #     text_state_q, text_state_k, instruction_embedding, text_mask
-        # )
-
-        # rgb_k, rgb_v = torch.split(
-        #     self.rgb_kv(rgb_embedding), self._hidden_size // 2, dim=1
-        # )
-        # depth_k, depth_v = torch.split(
-        #     self.depth_kv(depth_embedding), self._hidden_size // 2, dim=1
-        # )
-
-        # text_q = self.text_q(text_embedding)
-        # rgb_embedding = self._attn(text_q, rgb_k, rgb_v)
-        # depth_embedding = self._attn(text_q, depth_k, depth_v)
         
         do_self_attn = True
         # 1. Q: state. KV: text.
