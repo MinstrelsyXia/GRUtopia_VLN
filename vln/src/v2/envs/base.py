@@ -112,7 +112,7 @@ class BaseSingleScanEnv:
         elif self.robot_name == 'aliengo':
             base_height = self.robot.get_robot_base().get_world_pose()[0][2]
             foot_height = self.robot.get_ankle_height()
-            min_height = base_height - foot_height + 0.125
+            min_height = base_height - foot_height + 0.05
             depth_mask = ((depth >= min_height) & (depth < max_height))
         robot_mask = create_robot_mask(self.topdown_global_map_camera)
         free_map = np.zeros_like(depth, dtype=int)
