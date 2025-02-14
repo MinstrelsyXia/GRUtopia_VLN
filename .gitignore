@@ -25,6 +25,8 @@ wheels/
 *.egg
 MANIFEST
 
+#! tmp ignore:
+vln/src/real/
 outputs/
 logs*/
 tmp*/

@@ -103,7 +103,7 @@ my_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['
 debug_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['h1_pano_camera_debug']
 pano_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['topdown_camera_50']
 my_camera.set_renderer(my_world.lego_xform_list,my_world.lego_gs_root,my_world.lego_name_list,my_world.lego_device_number,my_world.lego_editable)
-pano_camera.set_renderer(my_world.lego_xform_list,my_world.lego_gs_root,my_world.lego_name_list,my_world.lego_device_number,my_world.lego_editable)
+# pano_camera.set_renderer(my_world.lego_xform_list,my_world.lego_gs_root,my_world.lego_name_list,my_world.lego_device_number,my_world.lego_editable)
 
 from omegaconf import DictConfig
 # from vlmaps.vlmaps.robot.lang_robot import LangRobot
@@ -156,18 +156,19 @@ while my_world.env.simulation_app.is_running():
         depth = data['depth']
         pcd = data['pointcloud']
         rgb_save = np.transpose(rgb, (2, 0, 1))  # 转换为 [H,W,3]
-        pano_data = pano_camera.get_data(add_rgb_subframes=True, render=True)
-        pano_rgb = pano_data['rgba']
+        # pano_data = pano_camera.get_data(add_rgb_subframes=True, render=True)
+        # pano_rgb = pano_data['rgba']
         # pano_depth = pano_data['depth']
         # pano_pcd = pano_data['pointcloud']
         # use torchvision to save image
+        cv2.imwrite(rgb_save_path, rgb_save)
         torchvision.utils.save_image(torch.tensor(rgb_save), rgb_save_path)
         torchvision.utils.save_image(torch.tensor(depth), depth_save_path)
         pcd_o3d = o3d.geometry.PointCloud()
         pcd_o3d.points = o3d.utility.Vector3dVector(pcd)
         pano_rgb_save_path = os.path.join(pano_rgb_save_dir, f"{i}.png")
         o3d.io.write_point_cloud(pcd_save_path, pcd_o3d)
-        torchvision.utils.save_image(torch.tensor(pano_rgb), pano_rgb_save_path)
+        # torchvision.utils.save_image(torch.tensor(pano_rgb), pano_rgb_save_path)
         
 
 
