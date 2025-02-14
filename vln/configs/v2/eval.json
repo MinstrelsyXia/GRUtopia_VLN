@@ -1,7 +1,7 @@
 {
-    "name" : "20250213_cmaDiskLight_loadedWeight_eval",
+    "name" : "20250214_cmaDiskLight_CMACLIP_eval",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250212_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_loadedWeight/ckpts/ckpt.55.pth",
+    "ckpt_to_load" : "data/checkpoints/20250213_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_clipEncoders/ckpts/ckpt.20.pth",
     "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
