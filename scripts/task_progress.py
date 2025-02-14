@@ -125,6 +125,10 @@ if __name__ == "__main__":
         split_data_types=["train"]
         filter_same_trajectory=True
         prefix="sample_rank"
+    elif task_type == 'sixth_floor':
+        split_data_types=['sixth_floor']
+        filter_same_trajectory=True
+        prefix = 'sample_rank'
     else:
         print(f"unknown task_type: {task_type}")
     if len(split_data_types) > 1:

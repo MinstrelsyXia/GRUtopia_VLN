@@ -171,7 +171,19 @@ class AStarDiscretePlanner:
         actions.reverse()
 
         return points, actions
+    def find_nearest_free_node(self, obs_map, goal_node):
+        if obs_map[goal_node.x, goal_node.y] != 255:
+            return goal_node  # Goal node is not in an obstacle
 
+        free_nodes = np.argwhere(obs_map != 255)
+        goal_position = np.array([goal_node.x, goal_node.y])
+
+        distances = np.linalg.norm(free_nodes - goal_position, axis=1)
+        nearest_free_node_index = np.argmin(distances)
+        nearest_free_node = free_nodes[nearest_free_node_index]
+
+        new_goal_node = self.Node(self.calc_xy_index(nearest_free_node[0], self.min_x), self.calc_xy_index(nearest_free_node[1], self.min_y), 0.0, -1, 0)
+        return new_goal_node
     def planning(self, sx, sy, gx, gy, obs_map, yaw, min_final_meter=6) -> tuple[list[tuple[float, float]], bool]:
         """
         A star path search
@@ -201,7 +213,9 @@ class AStarDiscretePlanner:
         reason = None
         if obs_map[goal_node.x, goal_node.y] == 255:
             reason = 'goal_in_obstacle'
-            return [], [], False, reason
+            # return [], [], False, reason
+            new_goal_node = self.find_nearest_free_node(obs_map, goal_node)
+            goal_node = new_goal_node
 
         open_set, closed_set = dict(), dict()
         open_set[self.calc_grid_index(start_node)] = start_node

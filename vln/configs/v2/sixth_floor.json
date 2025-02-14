@@ -6,18 +6,13 @@
     "dagger_percentage":0.0,
     "ckpt_to_load" : "data/checkpoints/20250121_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger02/ckpts/ckpt.10.pth",
     "image" : "w61_grutopia:v0.4",
-    "total_rank": 8,
+    "total_rank": 3,
     "retry_list":[],
     "flash": false,
     "device_map" : {
-        "0":["0"],
-        "1":["1"],
-        "2":["2"],
-        "3":["3"],
-        "4":["4"],
-        "5":["5"],
-        "6":["6"],
-        "7":["7"]
+        "0":["5"],
+        "1":["6"],
+        "2":["7"]
     },
     "merge_config" : {
         "data_0508":[]

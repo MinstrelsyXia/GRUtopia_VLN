@@ -215,14 +215,16 @@ class Camera_3dgs(BaseSensor):
             rgb = {}
             depth = {}
             pc= {}
+            torch.cuda.empty_cache()
             if add_rgb_subframes == True:
-                # torch.cuda.empty_cache()
                 cam_transform_matrix = get_relative_transform(get_prim_at_path(self._camera.prim_path), get_prim_at_path("/World"))
-                # with torch.no_grad():   
-                self.scgs_renderer.update_editing_package(*get_xform_list_pose(self.lego_xform_list))
-                scgs_rendering = self.scgs_renderer.minicam_render(cam_transform_matrix)
+                with torch.no_grad():   
+                    self.scgs_renderer.update_editing_package(*get_xform_list_pose(self.lego_xform_list))
+                    scgs_rendering = self.scgs_renderer.minicam_render(cam_transform_matrix)
+                torch.cuda.empty_cache()
                 rgb = scgs_rendering['render'].detach().cpu().numpy()
                 rgb = np.transpose(rgb, (1, 2, 0))  # shape [H,W,3]
+                rgb = np.clip(rgb, 0, 1)
                 rgb = (rgb * 255).astype(np.uint8)
                 rgb = rgb[:, :, ::-1]  # BGR to RGB
                 depth = scgs_rendering['depth'].detach().cpu().numpy()[0]    # shape：（H，W）
