@@ -12,7 +12,7 @@ NUM_ENVIRONMENTS: 4
 TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
 EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
-EVAL_CKPT_PATH_DIR: data/checkpoints/20250212_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_loadedWeight/ckpts/ckpt.55.pth
+EVAL_CKPT_PATH_DIR: data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
@@ -96,7 +96,7 @@ IL:
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: true
-  ckpt_to_load: data/checkpoints/20250212_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_loadedWeight/ckpts/ckpt.55.pth
+  ckpt_to_load: data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth
   load_from_pretrain: false
 
   camera_name: 'pano_camera_0'
