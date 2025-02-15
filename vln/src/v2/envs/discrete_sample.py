@@ -28,7 +28,8 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             dataloader:SamplePathKeyDataloader,
             aperture=200,
             max_step=25000,
-            update_light=False
+            update_light=False,
+            save_third_person_image=False
         ):
         super().__init__(
             robot_name=robot_name,
@@ -44,6 +45,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
         self.robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
 
         self.update_light = update_light
+        self.save_third_person_image = save_third_person_image
 
     def execute_one_action(
         self,
@@ -115,6 +117,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             data_collector = DataCollector(
                 lmdb_path=self.dataloader.lmdb_path,
                 rank = self.dataloader.rank,
+                save_third_person_image= self.save_third_person_image
             )
             start_position = data['start_position']
             start_rotation = data['start_rotation']

@@ -11,6 +11,7 @@ tasks:
   env_num: 1
   offset_size: 100.0
   light_on: false
+  disk_light_intensity: 300 # default: 5000
   robots:
   - name: h1
     prim_path: "/World/h1"
@@ -53,7 +54,7 @@ tasks:
     - name: "topdown_camera_500"
       enable: true
       size: [500, 500]
-    - name: "h1_pano_camera_debug"
+    - name: "debug_camera"
       enable: false
       size: [640, 480]
     - name: "tp_pointcloud"
@@ -83,18 +84,4 @@ tasks:
     - name: "pano_camera_315"
       enable: false
       size: [256, 256]
-    # - name: "camera_lookdown"
-    #   enable: true
-    #   size: [224, 224]
-    # - name: "camera_front"
-    #   enable: true
-    #   size: [640, 480]
-    # - name: "camera_behind"
-    #   enable: true
-    #   size: [640, 480]
-    # - name: "camera_left"
-    #   enable: true
-    #   size: [640, 480]
-    # - name: "camera_right"
-    #   enable: true
-    #   size: [640, 480]
+

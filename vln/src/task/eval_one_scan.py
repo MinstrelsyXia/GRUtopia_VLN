@@ -92,6 +92,7 @@ if __name__ == "__main__":
 
     # copy the cfg_file to the project_path
     shutil.copy(cfg_file_path, f"{project_path}/data/sample_episodes/{name}")
+    shutil.copy(sim_cfg_file, f"{project_path}/data/sample_episodes/{name}")
     
     # !!! For MLANet
     # sim_config.config.tasks[0].robots[0].sensor_params[2].size=(224,224) # pano_camera_0

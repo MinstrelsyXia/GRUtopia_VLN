@@ -330,7 +330,7 @@ robots:
   - name: "topdown_camera_500"
     type: "Camera"
     prim_path: "topdown_camera_500"
-  - name: "h1_pano_camera_debug"
+  - name: "debug_camera"
     type: "Camera"
     prim_path: "torso_link/h1_pano_camera_debug"
 
@@ -476,6 +476,9 @@ robots:
   - name: "pano_camera_0"
     type: "Camera"
     prim_path: "trunk/vln_camera_0"
+  - name: "debug_camera"
+    type: "Camera"
+    prim_path: "trunk/debug_camera"
   - name: "topdown_camera_50"
     type: "Camera"
     prim_path: "topdown_camera_50"

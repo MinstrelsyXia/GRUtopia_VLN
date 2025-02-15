@@ -1,11 +1,12 @@
 {
-    "name" : "20250212_aliengo_descrete_slurm_test",
+    "name" : "20250215_h1_light300",
     "robot_name": "h1",
     "task_type" : "sample",
     "sample_type":"discrete",
     "dagger_percentage":0.0,
     "ckpt_to_load" : "data/checkpoints/habitat_sota/CMA_PM_DA_Aug_converted.pth",
     "image" : "w61_grutopia:v0.4",
+    "save_third_person_image": false,
     "total_rank": 8,
     "retry_list":[],
     "flash": false,

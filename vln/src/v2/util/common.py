@@ -145,7 +145,9 @@ def check_is_on_track(
     else:
         from omni.isaac.core.utils.rotations import quat_to_euler_angles
         _, _, real_yaw = quat_to_euler_angles(robot_rotation)
-        yaw_diff = abs(real_yaw - real_points[action_index])
+        # 将角度差规范化到 [-π, π] 范围内
+        yaw_diff = (real_yaw - real_points[action_index] + math.pi) % (2 * math.pi) - math.pi
+        yaw_diff = abs(yaw_diff)
         if yaw_diff > math.pi / 6:
             log.info(f"[yaw_diff: {round(yaw_diff * (180 / math.pi))} 度 > 30 度] replanning")
             return False
