@@ -3,7 +3,7 @@
     "robot_name": "h1",
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth",
-    "eval_cfg_file": "vln/configs/train/cma_train.yaml",
+    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],
