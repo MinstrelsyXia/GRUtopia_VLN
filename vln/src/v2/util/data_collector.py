@@ -7,15 +7,16 @@ from vln.src.v2.util.eval import generate_eval_key
 import time
 
 class DataCollector:
-    def __init__(self, lmdb_path, rank):
+    def __init__(self, lmdb_path, rank, save_third_person_image=False):
         if not os.path.exists(lmdb_path):
             os.makedirs(lmdb_path)
         self.lmdb_path = lmdb_path
         self.rank = rank
         self.episode_total_data = []
         self.actions = []
+        self.save_third_person_image = save_third_person_image # for visualize
     
-    def collect_observation(self, rgb, depth ,step , process, camera_pose, robot_pose):
+    def collect_observation(self, rgb, depth ,step , process, camera_pose, robot_pose, third_person_rgb=None):
         from omni.isaac.core.utils.rotations import quat_to_euler_angles
         episode_data = {
             'camera_info': {},
@@ -32,6 +33,10 @@ class DataCollector:
             'orientation': c_quat.tolist(),
             'yaw': c_yaw
         }
+        if self.save_third_person_image:
+            episode_data['camera_info']['third_person_camera'] = {
+                'rgb': third_person_rgb,
+            }
         r_pos, r_quat = robot_pose[0], robot_pose[1]
         _,_, r_yaw = quat_to_euler_angles(r_quat)
         episode_data['robot_info'] = {
@@ -47,7 +52,13 @@ class DataCollector:
         rgb = cur_obs['rgba'][..., :3]
         depth = cur_obs['depth']
         depth = norm_depth(depth)
-        self.collect_observation(rgb, depth, step , process, camera_pose, robot_pose)
+
+        if self.save_third_person_image:
+            third_person_rgb = obs['vln_0'][f'{robot_name}_0']['debug_camera']['rgba'][..., :3]
+        else:
+            third_person_rgb = None
+
+        self.collect_observation(rgb, depth, step , process, camera_pose, robot_pose, third_person_rgb)
 
     def collect_action(self, action):
         self.actions.append(action)
@@ -74,10 +85,11 @@ class DataCollector:
                     }
                 
                 camera_info_dict[camera]["rgb"].append(info["rgb"])
-                camera_info_dict[camera]["depth"].append(info["depth"])
-                camera_info_dict[camera]["position"].append(info["position"])
-                camera_info_dict[camera]["orientation"].append(info["orientation"])
-                camera_info_dict[camera]["yaw"].append(info["yaw"])
+                if camera != 'third_person_camera':
+                    camera_info_dict[camera]["depth"].append(info["depth"])
+                    camera_info_dict[camera]["position"].append(info["position"])
+                    camera_info_dict[camera]["orientation"].append(info["orientation"])
+                    camera_info_dict[camera]["yaw"].append(info["yaw"])
 
             robot_info_list["position"].append(episode_data["robot_info"]["position"])
             robot_info_list["orientation"].append(episode_data["robot_info"]["orientation"])

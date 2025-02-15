@@ -199,6 +199,7 @@ def get_env_by_config(
                         start_rotation=start_rotation,
                         headless=headless,
                         dataloader=dataloader,
-                        aperture=aperture
+                        aperture=aperture,
+                        save_third_person_image=config["save_third_person_image"]
                     )
                 

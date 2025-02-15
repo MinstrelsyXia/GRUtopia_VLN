@@ -49,7 +49,7 @@ class BaseSingleScanEnv:
         distant_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
 
         up_disk_light = UsdLux.DiskLight.Define(stage, "/World/up_disk_light")
-        up_disk_light.CreateIntensityAttr(5000)
+        up_disk_light.CreateIntensityAttr(self.sim_config.config_dict['tasks'][0]['disk_light_intensity']) 
         up_disk_light.CreateRadiusAttr(50.0)
         up_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
         UsdGeom.Xformable(up_disk_light).AddRotateXYZOp().Set(Gf.Vec3f(180.0, 0.0, 0.0))
@@ -57,13 +57,12 @@ class BaseSingleScanEnv:
         self.up_disk_light_position = UsdGeom.Xformable(self.up_disk_light).AddTranslateOp()
         
         down_disk_light = UsdLux.DiskLight.Define(stage, "/World/down_disk_light")
-        down_disk_light.CreateIntensityAttr(5000)
+        down_disk_light.CreateIntensityAttr(self.sim_config.config_dict['tasks'][0]['disk_light_intensity'])
         down_disk_light.CreateRadiusAttr(50.0)
         down_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
         self.down_disk_light = down_disk_light
         self.down_disk_light_position = UsdGeom.Xformable(self.down_disk_light).AddTranslateOp()
 
-    
     def reset_light_position(self, position):
         from pxr import Gf
         self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2]-1))
@@ -112,7 +111,7 @@ class BaseSingleScanEnv:
         elif robot_name == 'aliengo':
             base_height = self.robot.get_robot_base().get_world_pose()[0][2]
             foot_height = self.robot.get_ankle_height()
-            min_height = base_height - foot_height + 0.125
+            min_height = base_height - foot_height + 0.1
             depth_mask = ((depth >= min_height) & (depth < max_height))
         elif robot_name == 'jetbot':
             base_height = self.robot.get_robot_base().get_world_pose()[0][2]
