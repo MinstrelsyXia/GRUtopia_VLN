@@ -12,7 +12,7 @@ split_data_types = ['val_unseen','val_seen']
 filter_same_trajectory = False
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0115'
 base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-name = '20250114_eval_navid'
+name = '20250207_sample_discrete'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 
 

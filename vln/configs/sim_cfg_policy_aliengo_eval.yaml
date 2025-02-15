@@ -11,14 +11,18 @@ tasks:
   env_num: 1
   offset_size: 100.0
   light_on: false
+  disk_light_intensity: 5000 # default: 5000
   robots:
-  - name: h1
-    prim_path: "/World/h1"
-    type: "HumanoidRobotVLNEval"
+  - name: aliengo
+    prim_path: "/World/aliengo"
+    type: "AliengoRobot"
     position: [0, 0, 0]
     scale: [1, 1, 1]
     orientation: [0,0,0,0]
+    robot_height: 0.40 # for get free_map
     ankle_height: 0.0758
+    fall_height_threshold: 0.04
+    aperture: 200
     controller_params:
     - name: "move_by_speed"
     - name: "joint_controller"
@@ -31,7 +35,6 @@ tasks:
     - name: "oracle_move_to_point"
     - name: "oracle_move_along_path"
     - name: "move_to_point_by_pid"
-    - name: "move_by_speed_vln"
     - name: "move_along_speeds"
     - name: "move_by_descrete"
     sensor_params:
@@ -44,54 +47,18 @@ tasks:
     - name: "pano_camera_0"
       enable: true
       size: [256, 256]
+    - name: "debug_camera"
+      enable: true # !!! for debug
+      size: [256, 256]
     - name: "topdown_camera_50"
       enable: true
       size: [500, 500]
     - name: "topdown_camera_500"
       enable: true
       size: [500, 500]
-    - name: "h1_pano_camera_debug"
-      enable: false
-      size: [640, 480]
     - name: "tp_pointcloud"
       enable: True
       size: [64, 64]
       camera_config:
         - no_rgb
         - point_cloud
-    - name: "pano_camera_45"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_90"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_135"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_180"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_225"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_270"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_315"
-      enable: false
-      size: [256, 256]
-    # - name: "camera_lookdown"
-    #   enable: true
-    #   size: [224, 224]
-    # - name: "camera_front"
-    #   enable: true
-    #   size: [640, 480]
-    # - name: "camera_behind"
-    #   enable: true
-    #   size: [640, 480]
-    # - name: "camera_left"
-    #   enable: true
-    #   size: [640, 480]
-    # - name: "camera_right"
-    #   enable: true
-    #   size: [640, 480]

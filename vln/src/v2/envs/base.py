@@ -5,6 +5,7 @@ from vln.src.v2.util.common import(
     create_robot_mask,
     freemap_to_accupancy_map,
     set_seed,
+    visualize_freemap,
 )
 import time
 import sys
@@ -12,12 +13,14 @@ import sys
 class BaseSingleScanEnv:
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
             start_rotation,
             headless,
         ):
+        self.robot_name = robot_name
         self.sim_config = sim_config
         self.scene_asset_path = scene_asset_path
         self.start_position = start_position
@@ -28,6 +31,10 @@ class BaseSingleScanEnv:
         self.robot = None
         self.isaac_robot = None
         self.timestamp = time.time()
+
+        # fall check
+        self.fall_height_threshold = self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
+        self.robot_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['robot_height']
 
     def update_timestamp(self):
         self.timestamp = time.time()
@@ -42,7 +49,7 @@ class BaseSingleScanEnv:
         distant_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
 
         up_disk_light = UsdLux.DiskLight.Define(stage, "/World/up_disk_light")
-        up_disk_light.CreateIntensityAttr(5000)
+        up_disk_light.CreateIntensityAttr(self.sim_config.config_dict['tasks'][0]['disk_light_intensity']) 
         up_disk_light.CreateRadiusAttr(50.0)
         up_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
         UsdGeom.Xformable(up_disk_light).AddRotateXYZOp().Set(Gf.Vec3f(180.0, 0.0, 0.0))
@@ -50,18 +57,16 @@ class BaseSingleScanEnv:
         self.up_disk_light_position = UsdGeom.Xformable(self.up_disk_light).AddTranslateOp()
         
         down_disk_light = UsdLux.DiskLight.Define(stage, "/World/down_disk_light")
-        down_disk_light.CreateIntensityAttr(5000)
+        down_disk_light.CreateIntensityAttr(self.sim_config.config_dict['tasks'][0]['disk_light_intensity'])
         down_disk_light.CreateRadiusAttr(50.0)
         down_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
         self.down_disk_light = down_disk_light
         self.down_disk_light_position = UsdGeom.Xformable(self.down_disk_light).AddTranslateOp()
 
-    
     def reset_light_position(self, position):
         from pxr import Gf
         self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2]-1))
         self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2]+1))
-    
 
     def load_scan_and_robot(self):
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path
@@ -93,6 +98,7 @@ class BaseSingleScanEnv:
         dilation_iterations=0,
         voxel_size=0.1,
         agent_radius=0.25,
+        robot_name='h1'
     ):
         # 获取 free_map
         min_height = robot_height
@@ -100,7 +106,18 @@ class BaseSingleScanEnv:
         data_info = self.topdown_global_map_camera.get_data()
         depth = np.array(data_info["depth"])
         flat_surface_mask = np.ones_like(depth, dtype=bool)
-        depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
+        if robot_name == 'h1':
+            depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
+        elif robot_name == 'aliengo':
+            base_height = self.robot.get_robot_base().get_world_pose()[0][2]
+            foot_height = self.robot.get_ankle_height()
+            min_height = base_height - foot_height + 0.1
+            depth_mask = ((depth >= min_height) & (depth < max_height))
+        elif robot_name == 'jetbot':
+            base_height = self.robot.get_robot_base().get_world_pose()[0][2]
+            foot_height = self.robot.get_ankle_height()
+            min_height = base_height - foot_height + 0.35 # 0.35 for scale: 5. 0.21 for scale: 1
+            depth_mask = ((depth >= min_height) & (depth < max_height))
         robot_mask = create_robot_mask(self.topdown_global_map_camera)
         free_map = np.zeros_like(depth, dtype=int)
         free_map[flat_surface_mask & depth_mask] = 1
@@ -112,12 +129,14 @@ class BaseSingleScanEnv:
             voxel_size=voxel_size,
             agent_radius=agent_radius,
         )
+        visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
         return accupancy_map
     
     def warm_up(self, step_count):
         for _ in range(step_count - 1):
-            self.env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=False, render=False)
-        self.env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=True, render=True)
+            self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=False, render=False)
+        obs = self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=True, render=True)
+        return obs
     
     def stop(self):
         if(hasattr(self.env, 'simulation_app')):
