@@ -76,8 +76,12 @@ if __name__ == "__main__":
     # base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
     base_data_dir = f'{project_path}/path_generation/path_generaton/output'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
-    robot_offset = np.array([0.   , 0.   , 0.4])
     name = config["name"]
+    robot_name = config["robot_name"] # h1 / aliengo
+    if robot_name == "aliengo":
+        robot_offset = np.array([0.   , 0.   , 0.50])
+    else:
+        robot_offset = np.array([0.   , 0.   , 1.05])
     common_log_util.init(name,rank)
     lmdb_path = project_path + f'/data/sample_episodes/{name}'
     retry_list = config["retry_list"]

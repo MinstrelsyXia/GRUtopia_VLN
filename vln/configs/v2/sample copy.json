@@ -1,7 +1,6 @@
 {
-    "name" : "20250214_sample_aliengo",
+    "name" : "20250211_sample_origin",
     "task_type" : "sample",
-    "robot_name": "aliengo",
     "sample_type":"discrete",
     "dagger_percentage":0,
     "ckpt_to_load" : "",

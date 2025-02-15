@@ -19,6 +19,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
     
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
@@ -30,6 +31,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             update_light=False
         ):
         super().__init__(
+            robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -66,7 +68,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                 break
             if self.step % 20 == 0:
                 robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-                is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+                is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
                 if is_fall:
                     fail_reason = "fall"
                     break
@@ -120,7 +122,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             self.warm_up(240)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
             if is_fall:
                 progress_log_util.trace_end(
                     trajectory_id = path_key,
@@ -151,6 +153,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                             process=current_point_index / len(nav_path),
                             camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
                             robot_pose=self.task.get_robot_poses_without_offset(),
+                            robot_name=self.robot_name
                         )
                         data_collector.collect_action([0])
                         robot_position, _ = self.isaac_robot.get_world_pose()
@@ -168,7 +171,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
                     break
-                map_info = self.get_global_map(robot_height=1.55, dilation_iterations=2)
+                map_info = self.get_global_map(robot_height=self.robot_height, dilation_iterations=2)
                 camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
                 
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
@@ -193,13 +196,14 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                 
                 action_index = 0
                 for action in action_list:
-                    env_action = [{'h1': {'move_by_descrete': [action]}}]
+                    env_action = [{self.robot_name: {'move_by_descrete': [action]}}]
                     data_collector.collect_observation_by_env(
                         env=self.env,
                         step=self.step,
                         process=current_point_index / len(nav_path),
                         camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
                         robot_pose=self.task.get_robot_poses_without_offset(),
+                        robot_name=self.robot_name,
                     )
                     data_collector.collect_action(action)
                     action_success, fail_reason = self.execute_one_action(env_action,stuck_checker)
