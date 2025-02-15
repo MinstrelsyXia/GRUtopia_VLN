@@ -50,9 +50,10 @@ if __name__ == "__main__":
         config = json.load(file)
     print(f"config:{config}")
     name = config['name']
+    # name = '20250207_sample_discrete'
     lmdb_path_0507 = project_path + f'/data/sample_episodes/{name}/sample_data.lmdb'
     database = lmdb.open(lmdb_path_0507, readonly=True, lock=False)
-    id=6
+    id=4
     key = f"{id}".encode()
     with database.begin() as txn:
         value = txn.get(key)

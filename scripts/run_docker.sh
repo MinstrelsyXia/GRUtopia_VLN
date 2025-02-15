@@ -16,6 +16,7 @@ sudo docker run -d --name ${NAME} -it --rm --gpus='"device=0"' --network host \
      -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:rw \
      -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
      -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:rw \
+     -v /ssd/zhaohui/workspace/rsl_rl:/root/rsl_rl:rw \
      w61_grutopia:v0.4
 
 # enter the docker

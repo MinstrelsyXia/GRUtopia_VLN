@@ -41,9 +41,9 @@ class DataCollector:
         }
         self.episode_total_data.append(episode_data)
 
-    def collect_observation_by_env(self, env , step , process, camera_pose, robot_pose):
+    def collect_observation_by_env(self, env , step , process, camera_pose, robot_pose, robot_name='h1'):
         obs = env.get_observations(add_rgb_subframes=True)
-        cur_obs = obs['vln_0']['h1_0']['pano_camera_0']
+        cur_obs = obs['vln_0'][f'{robot_name}_0']['pano_camera_0']
         rgb = cur_obs['rgba'][..., :3]
         depth = cur_obs['depth']
         depth = norm_depth(depth)

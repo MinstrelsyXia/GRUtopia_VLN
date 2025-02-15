@@ -3,6 +3,7 @@ from vln.src.v2.envs.discrete_sample import DiscreteSampleSingleScanEnv
 from vln.src.dataset.data_utils_multi_env import load_scene_usd
 from vln.src.utils.utils import Config
 from grutopia.core.config import SimulatorConfig
+<<<<<<< HEAD
 import numpy as np
 import sys
 
@@ -14,6 +15,21 @@ name = '20250107_sample_discrete'
 split_data_types = ['train']
 robot_offset = np.array([0.   , 0.   , 1.05])
 project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
+=======
+from vln.src.v2.util import common_log_util 
+from vln import PROJECT_ROOT_PATH
+import numpy as np
+import sys
+
+headless=True
+target_scan="1LXtFkjw3qL"
+target_trajectory = 67
+rank=0
+name = '20250207_sample_discrete'
+split_data_types = ['train']
+robot_offset = np.array([0.   , 0.   , 1.05])
+project_path = PROJECT_ROOT_PATH
+>>>>>>> w61/spring_festival_2025
 base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
 mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
 args_dict = {
@@ -23,8 +39,14 @@ args_dict = {
     }
 }
 scene_asset_path = load_scene_usd(Config(args_dict), target_scan)
+<<<<<<< HEAD
 retry_list=[]
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
+=======
+retry_list=['success']
+lmdb_path = project_path + f'/data/sample_episodes/{name}'
+common_log_util.init(name,rank)
+>>>>>>> w61/spring_festival_2025
 dataloader=SamplePathKeyDataloader(
     base_data_dir,
     split_data_types,
