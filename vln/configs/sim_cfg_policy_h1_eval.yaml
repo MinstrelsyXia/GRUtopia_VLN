@@ -11,7 +11,7 @@ tasks:
   env_num: 1
   offset_size: 100.0
   light_on: false
-  disk_light_intensity: 300 # default: 5000
+  disk_light_intensity: 5000 # default: 5000
   robots:
   - name: h1
     prim_path: "/World/h1"
