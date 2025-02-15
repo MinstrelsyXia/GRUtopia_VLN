@@ -5,7 +5,7 @@ from vln.src.v2.util.common import(
     create_robot_mask,
     freemap_to_accupancy_map,
     set_seed,
-    visualize_freemap
+    visualize_freemap,
 )
 import time
 import sys
