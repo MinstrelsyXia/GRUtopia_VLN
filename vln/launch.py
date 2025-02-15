@@ -8,6 +8,7 @@ import threading
 import json
 import os
 from vln import PROJECT_ROOT_PATH
+from vln.src.v2.util.common import set_seed_normal
 
 def start_reading_threads(process):
     def read_output(stream):
@@ -62,6 +63,8 @@ if __name__ == "__main__":
         print(f'unknown task_type: {task_type}')
         sys.exit()
     
+    set_seed_normal(0)
+
     round_count = 0
     max_round_num = 5
     while True:

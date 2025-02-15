@@ -290,6 +290,16 @@ def set_seed(seed):
     import omni.replicator.core as rep
     rep.set_global_seed(seed)
 
+def set_seed_normal(seed):
+    import random
+    import torch
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = False
+
 def norm_depth(depth_info, min_depth=0, max_depth=10):
     depth_info[depth_info > max_depth] = max_depth
     depth_info = (depth_info - min_depth) / (max_depth - min_depth)

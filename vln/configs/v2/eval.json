@@ -1,5 +1,5 @@
 {
-    "name" : "20250213_cmaSOTA_aliengo_eval",
+    "name" : "20250212_random_eval",
     "robot_name": "aliengo",
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/habitat_sota/CMA_PM_DA_Aug_converted.pth",
