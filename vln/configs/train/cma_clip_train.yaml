@@ -1,4 +1,4 @@
-NAME: 20250212_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_loadedWeight_continue
+NAME: 20250213_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_clipEncoders
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -82,9 +82,9 @@ EVAL:
   len_traj_act: 4
 
 IL:
-  epochs: 60
+  epochs: 120
   batch_size: 2
-  lr: 1e-4
+  lr: 2.5e-4
 
   use_iw: True
   inflection_weight_coef: 3.2
@@ -93,10 +93,10 @@ IL:
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: True
-  ckpt_to_load: data/checkpoints/20250212_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_loadedWeight/ckpts/ckpt.55.pth
+  ckpt_to_load: data/checkpoints/20250213_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_clipEncoders/ckpts/ckpt.20.pth
   load_from_pretrain: False
 
-  dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_preprocessed
+  dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_corrected
 
   camera_name: 'pano_camera_0'
   Filter_failure: 
@@ -136,7 +136,7 @@ IL:
     recollect_first: false
 
 MODEL:
-  policy_name: CMA_Policy
+  policy_name: CMA_CLIP_Policy
 
   ablate_instruction: False
   ablate_depth: False
@@ -144,30 +144,76 @@ MODEL:
 
   normalize_rgb: False
   
-  INSTRUCTION_ENCODER:
-    sensor_uuid: "instruction"
-    vocab_size: 2504
-    use_pretrained_embeddings: true
-    embedding_file: "data/datasets/R2R_VLNCE_v1-3_preprocessed/embeddings.json.gz"
-    dataset_vocab: "data/datasets/R2R_VLNCE_v1-3_preprocessed/train/train.json.gz"
-    fine_tune_embeddings: False
-    embedding_size: 50
-    hidden_size: 128
-    rnn_type: "LSTM"
-    final_state_only: True
-    bidirectional: True
+  TEXT_ENCODER:
+    load_model: true
+    max_length: 248
+    update_text_encoder: false
+    
+    # model settings
+    type: clip-long # roberta
+    model_name: clip-long # meter
+    model_path: data/pretrained/clip-long/longclip-B.pt # data/pretrained/meter/meter_clip16_224_roberta_pretrain.ckpt
+    num_l_layers: 6
+    hidden_size: 512
+    vocab_size: 50265
+    embedding_size: 512
 
-  RGB_ENCODER:
-    cnn_type: "TorchVisionResNet50"
-    output_size: 256
-    trainable: False
+    sot_token: 49406
+    eot_token: 49407
+    pad_token: 0
+
+    # text Q-former
+    use_qformer: False
+    q_former_length: 5
+
+  IMAGE_ENCODER:
+    img_stack_nums: 4 # the history images for inputs
+    use_stack: false
+    dropout: 0.1
+    use_env_drop: true
+    env_drop: 0.3
+
+    RGB:
+      load_model: true
+      update_rgb_encoder: False
+
+      # model settings
+      model_name: clip-long # clip-vit-base-patch32
+      model_path: data/pretrained/clip-long/longclip-B.pt # data/pretrained/clip-vit-base-patch32
+      rgb_proj: True # 768 -> 512?
+      feature_dim: 768
+      projection_dim: 512
+
+      # img_mod
+      img_mod: multi_patches_avg_pooling # cls / multi_patches_avg_pooling
+      multi_patches_num: 5
   
-  DEPTH_ENCODER:
-    cnn_type: "VlnResnetDepthEncoder"
-    output_size: 128
-    backbone: "resnet50"
-    ddppo_checkpoint: "data/ddppo-models/gibson-4plus-mp3d-train-val-test-resnet50.pth"
-    trainable: False
+    DEPTH:
+      load_model: True
+      update_depth_encoder: False
+
+      # model settings
+      bottleneck: resnet # TAC
+      model_name: openai/clip-vit-base-patch32
+      model_path: data/pretrained/TAC/tac_depth_encoder.pth
+      feature_dim: 768
+      projection_dim: 512
+
+      # for Resnet
+      cnn_type: VlnResnetDepthEncoder
+      output_size: 128
+      ddppo_checkpoint: data/ddppo-models/gibson-4plus-mp3d-train-val-test-resnet50.pth
+      backbone: resnet50
+  
+  CROSS_MODAL_ENCODER:
+    load_model: False
+    input_type: 3
+    num_x_layers: 2
+    hidden_size: 512
+    num_attention_heads: 8
+
+    txt_to_img: False  # the same as in CMA
+    txt_to_img_layer: 2
   
   STATE_ENCODER:
     hidden_size: 512
@@ -176,5 +222,21 @@ MODEL:
   PROGRESS_MONITOR:
     use: True
     alpha: 1.0
+  
+  LORA:
+    add_for_instruction_encoder: False
+    add_for_rgb_encoder: False
+    add_for_depth_encoder: False
+
+    lora_r: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    lora_start_layer: 6 # from this layer to add lora layers
+    lora_query: True
+    lora_key: False
+    lora_value: False
+    lora_projection: False
+    lora_mlp: False
+    lora_head: False
 
 

@@ -22,7 +22,10 @@ def extract_instruction_tokens(
         else:
             # use bert tokenizer
             if is_clip_long:
-                tokens = bert_tokenizer(observations[i]['instruction'])[0].tolist()
+                try:
+                    tokens = bert_tokenizer(observations[i]['instruction'])[0].tolist()
+                except Exception as e:
+                    print(1)
             else:
                 tokens = bert_tokenizer.text_token(observations[i]['instruction'])['input_ids'][0].tolist()
             observations[i]['instruction'] = tokens
