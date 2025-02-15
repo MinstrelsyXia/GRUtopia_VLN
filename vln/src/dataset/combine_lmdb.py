@@ -4,18 +4,18 @@ from tqdm import tqdm
 import json
 import gzip
 
-def combine_lmdb(source_lmdb, add_lmdb, target_lmdb, commit_frequency=100,added_prefix='_01'):
+def combine_lmdb(source_lmdb, add_lmdb, target_lmdb, commit_frequency=1000,added_prefix='_01'):
     source_env = lmdb.open(source_lmdb, readonly=True, lock=False)
     add_env = lmdb.open(add_lmdb, readonly=True, lock=False)
 
     os.makedirs(os.path.dirname(target_lmdb), exist_ok=True)
     
     # clear all existing contents
-    # with lmdb.open(
-    #     target_lmdb,
-    #     map_size=int(1e12),
-    # ) as target_env, target_env.begin(write=True) as txn:
-    #     txn.drop(target_env.open_db())
+    with lmdb.open(
+        target_lmdb,
+        map_size=int(1e12),
+    ) as target_env, target_env.begin(write=True) as txn:
+        txn.drop(target_env.open_db())
     
     target_env = lmdb.open(target_lmdb, map_size=int(1e12), readonly=False)
     
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     mode = 'combine_lmdb'
 
     if mode == 'combine_lmdb':
-        source_lmdb_path = "data/sample_episodes/20241213_sample_episodes_descrete_controller/sample_data.lmdb"
-        add_lmdb_path = "data/sample_episodes/20250110_dagger/sample_data.lmdb"
-        target_lmdb_path = "data/sample_episodes/20250113_descrete_dagger_01/sample_data.lmdb"
-        combine_lmdb(source_lmdb_path, add_lmdb_path, target_lmdb_path, added_prefix='_01')
+        source_lmdb_path = "data/sample_episodes/20250121_descrete_dagger_02/sample_data.lmdb"
+        add_lmdb_path = "data/sample_episodes/20250207_sample03_zh/sample_data.lmdb"
+        target_lmdb_path = "data/sample_episodes/20250208_descrete_dagger_03/sample_data.lmdb"
+        combine_lmdb(source_lmdb_path, add_lmdb_path, target_lmdb_path, added_prefix='_03')
 
