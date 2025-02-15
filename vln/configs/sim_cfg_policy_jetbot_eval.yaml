@@ -1,0 +1,50 @@
+simulator:
+  physics_dt: 1/200
+  rendering_dt: 1/200
+  rendering_interval: 10
+
+tasks:
+- type: "VLNTask"
+  name: "vln"
+  scene_asset_path: ""
+  scene_scale: [1, 1, 1]
+  env_num: 1
+  offset_size: 100.0
+  light_on: false
+  robots:
+  - name: jetbot
+    prim_path: "/World/jetbot"
+    type: "JetbotRobot"
+    position: [0, 0, 0]
+    scale: [5, 5, 5] # the original robot is too small
+    orientation: [0,0,0,0]
+    robot_height: 1.20 # for get free_map
+    ankle_height: 0.0758
+    fall_height_threshold: -1
+    aperture: 200
+    controller_params:
+    - name: "move_by_speed"
+    - name: "move_to_point"
+    - name: "move_along_path"
+    - name: "rotate"
+    - name: "move_with_keyboard"
+    # - name: "web_chat"
+    - name: "stand_still"
+    - name: "oracle_move_to_point"
+    - name: "oracle_move_along_path"
+    - name: "move_to_point_by_pid"
+    - name: "move_along_speeds"
+    - name: "move_by_descrete"
+    sensor_params:
+    - name: "camera"
+      enable: true
+      size: [640, 480]
+    - name: "pano_camera_0"
+      enable: true
+      size: [256, 256]
+    - name: "topdown_camera_50"
+      enable: true
+      size: [500, 500]
+    - name: "topdown_camera_500"
+      enable: true
+      size: [500, 500]

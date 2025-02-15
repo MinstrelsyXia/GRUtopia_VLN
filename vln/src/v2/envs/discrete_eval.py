@@ -23,6 +23,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
     
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
@@ -34,6 +35,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
             ckpt_name,
         ):
         super().__init__(
+            robot_name=robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -138,7 +140,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 sub_instr = None
                 sub_instr_tokens = None
                 max_instr_len = 200
-            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation, sub_instr, sub_instr_tokens)
+            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation, sub_instr, sub_instr_tokens, robot_name=self.robot_name)
             observations = extract_instruction_tokens(
                 observations, 
                 #TODO:
@@ -211,11 +213,11 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                         if a == 0:
                             log.info(f"[split:{split}][scan:{scan}][trajectory_id_episode_id: {path_key}][stop!!!]")
                             action = [
-                                {'h1': {'stop': ['stop']}}
+                                {self.robot_name: {'stop': ['stop']}}
                             ]
                         else:
                             action = [
-                                {'h1': {'move_by_descrete': [a.item()]}}
+                                {self.robot_name: {'move_by_descrete': [a.item()]}}
                             ]
                 executor = ActionExecutor(
                     env=self.env, 
@@ -229,6 +231,9 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
                     statistic_info=statistic_info,
                     context=self,
+                    
+                    robot_name=self.robot_name,
+                    fall_height_threshold=self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
                 )
                 outputs = executor.env_step(actions = action)
                 outputs_dict = outputs['outputs_dict']

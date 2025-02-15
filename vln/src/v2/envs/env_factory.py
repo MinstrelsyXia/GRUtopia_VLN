@@ -116,6 +116,7 @@ def get_env_by_config(
 ):
     task_type = config["task_type"]
     flash = config["flash"]
+    aperture = sim_config.config_dict['tasks'][0]['robots'][0]['aperture']
     if task_type == 'eval':
         name=config["name"]
         ckpt_to_load = config["ckpt_to_load"]
@@ -124,6 +125,7 @@ def get_env_by_config(
         ckpt_name=f"{name}_{ckpt_file_name}"
         if flash:
             return DiscreteFlashEvalSingleScanEnv(
+                robot_name=config["robot_name"],
                 sim_config=sim_config,
                 scene_asset_path=scene_asset_path,
                 start_position=start_position,
@@ -136,6 +138,7 @@ def get_env_by_config(
             )
         else:
             return DiscreteEvalSingleScanEnv(
+                robot_name=config["robot_name"],
                 sim_config=sim_config,
                 scene_asset_path=scene_asset_path,
                 start_position=start_position,
@@ -150,6 +153,7 @@ def get_env_by_config(
         sample_type = config["sample_type"]
         if sample_type =='continuous':
             return ContinuousSampleSingleScanEnv(
+                robot_name=config["robot_name"],
                 sim_config=sim_config,
                 scene_asset_path=scene_asset_path,
                 start_position=start_position,
@@ -160,6 +164,7 @@ def get_env_by_config(
         else:
             if flash:
                return DiscreteFlashSampleSingleScanEnv(
+                    robot_name=config["robot_name"],
                     sim_config=sim_config,
                     scene_asset_path=scene_asset_path,
                     start_position=start_position,
@@ -175,6 +180,7 @@ def get_env_by_config(
                     ckpt_to_load = config["ckpt_to_load"]
                     eval_config = get_eval_config(PROJECT_ROOT_PATH,ckpt_to_load)
                     return DiscreteSampleDaggerSingleScanEnv(
+                        robot_name=config["robot_name"],
                         sim_config=sim_config,
                         scene_asset_path=scene_asset_path,
                         start_position=start_position,
@@ -186,11 +192,14 @@ def get_env_by_config(
                     )
                 else:
                     return DiscreteSampleSingleScanEnv(
+                        robot_name=config["robot_name"],
                         sim_config=sim_config,
                         scene_asset_path=scene_asset_path,
                         start_position=start_position,
                         start_rotation=start_rotation,
                         headless=headless,
                         dataloader=dataloader,
+                        aperture=aperture,
+                        save_third_person_image=config["save_third_person_image"]
                     )
                 
