@@ -1,5 +1,5 @@
 {
-    "name" : "20250215_cmaSOTA_light300_eval",
+    "name" : "20250217_navid_aliengo_eval",
     "robot_name": "h1",
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth",
