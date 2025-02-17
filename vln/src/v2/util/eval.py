@@ -197,6 +197,16 @@ class ActionExecutor:
             return True, 'exceed_max_rotation_count'
         return False, ''
 
+    def _check_max_rotation_count(self, action):
+        is_action_rotate = (action == 2 or action == 3)
+        if is_action_rotate:
+            self.statistic_info.continuous_rotation_count += 1
+        else:
+            self.statistic_info.continuous_rotation_count = 0
+        if self.statistic_info.continuous_rotation_count > self.max_rotation_count:
+            return True, 'exceed_max_rotation_count'
+        return False, ''
+
     def _execute_action(
         self,
         action, 
@@ -210,7 +220,7 @@ class ActionExecutor:
         reason = ''
         prev_position, _ = self.task.get_robot_poses_without_offset()
         if check_max_rotation_count:
-            over_max_rotation_count, desc = self._check_max_rotation_count(action[0]['h1'][action_name][0])
+            over_max_rotation_count, desc = self._check_max_rotation_count(action[0][self.robot_name][action_name][0])
             if over_max_rotation_count:
                 reason = desc
                 log.warning(f"Current action has been interrupted by {reason}.")
@@ -244,7 +254,8 @@ class ActionExecutor:
 
     def env_step(
         self,
-        actions, 
+        actions,
+        check_max_rotation_count=False 
     ):
         '''step in isaac-sim until the action has finished'''
         dones = [False]
@@ -257,7 +268,7 @@ class ActionExecutor:
                 action = actions, 
                 action_name=action_name,  
                 check_fall_and_stuck=True,
-                check_max_rotation_count=False
+                check_max_rotation_count=check_max_rotation_count
             )
         
         robot_position, robot_rotation = self.isaac_robot.get_world_pose()
@@ -296,6 +307,7 @@ class FlashActionExecutor:
         self.instruction = self.statistic_info.path_data['instruction']
         # 进程 stuck 检查使用
         self.context = context
+        self.robot_name = self.context.robot_name
 
     def _execute_action(
         self,

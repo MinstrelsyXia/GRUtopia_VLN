@@ -86,7 +86,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
     def topdown_snapshot(self):
         map_info = self.get_global_map(
-            robot_height=1.55,
+            robot_height=self.robot_height,
         )
         camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
         height, width = self.topdown_global_map_camera._camera._resolution

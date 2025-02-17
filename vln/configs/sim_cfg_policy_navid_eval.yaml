@@ -19,6 +19,9 @@ tasks:
     scale: [1, 1, 1]
     orientation: [0,0,0,0]
     ankle_height: 0.0758
+    robot_height: 1.55
+    fall_height_threshold: 0.5
+    aperture: 200
     controller_params:
     - name: "move_by_speed"
     - name: "joint_controller"

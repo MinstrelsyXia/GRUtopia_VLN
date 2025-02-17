@@ -1,14 +1,11 @@
 {
-    "name" : "20250215_h1_light300",
-    "robot_name": "h1",
+    "name" : "20250211_sample_origin",
     "task_type" : "sample",
-    "robot_name": "aliengo",
     "sample_type":"discrete",
-    "dagger_percentage":0.0,
-    "ckpt_to_load" : "data/checkpoints/habitat_sota/CMA_PM_DA_Aug_converted.pth",
+    "dagger_percentage":0,
+    "ckpt_to_load" : "",
     "image" : "w61_grutopia:v0.4",
-    "save_third_person_image": false,
-    "total_rank": 8,
+    "total_rank": 16,
     "retry_list":[],
     "flash": false,
     "device_map" : {

@@ -1,23 +1,18 @@
 {
     "name" : "20250217_navid_aliengo_eval",
-    "robot_name": "h1",
+    "robot_name": "aliengo",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250212_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_continue/ckpts/ckpt.40.pth",
-    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
+    "ckpt_to_load" : "data/checkpoints/navid/navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split",
+    "eval_cfg_file": "vln/configs/train/navid_eval.yaml",
     "image" : "w61_grutopia:v0.5",
-    "total_rank": 8,
+    "total_rank": 3,
     "retry_list":[],
     "flash": false,
     "load_eval_subset": false,
     "device_map" : {
-        "0":["0"],
-        "1":["1"],
-        "2":["2"],
-        "3":["3"],
-        "4":["4"],
-        "5":["5"],
-        "6":["6"],
-        "7":["7"]
+        "0":["1","3"],
+        "1":["4","5"],
+        "2":["6","7"]
     },
     "merge_config" : {
         "data_0508":[8,9,10,11,12,13,14,15]

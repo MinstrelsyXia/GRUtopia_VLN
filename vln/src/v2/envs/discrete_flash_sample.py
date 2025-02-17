@@ -19,6 +19,7 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
     
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
@@ -29,6 +30,7 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
             max_step=25000,
         ):
         super().__init__(
+            robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -48,7 +50,7 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
         new_robot_position,new_robot_rotation = get_new_position_and_rotation(robot_position,robot_rotation,action)
         self.reset_robot(new_robot_position,new_robot_rotation)
         reset_topdown_camera(self.robot)
-        self.env.step(actions=[{'h1':{'stand_still': []}}], render=True)
+        self.env.step(actions=[{self.robot_name:{'stand_still': []}}], render=True)
         return True, 'success'
 
     def sample(self):
@@ -93,7 +95,7 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
             self.warm_up(240)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
             if is_fall:
                 progress_log_util.trace_end(
                     trajectory_id = path_key,
@@ -140,7 +142,7 @@ class DiscreteFlashSampleSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
                     break
-                map_info = self.get_global_map(robot_height=1.55, dilation_iterations=2)
+                map_info = self.get_global_map(robot_height=self.robot_height, dilation_iterations=2)
                 camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
                 
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
