@@ -64,6 +64,36 @@ class ObservationsDict(dict):
 
         return self
 
+def optimize_delta_action(action_deltas, gt_actions):
+    # action_deltas: [T, 3]
+    # gt_actions: [T]
+    # return: [T, 3]
+    turn_angle = 0
+    for idx, a in enumerate(gt_actions):
+        if a == 1:
+            if abs(action_deltas[idx][0]) < 0.1 and abs(action_deltas[idx][1]) < 0.1:
+                action_deltas[idx][0] = 0.25 * np.sin(turn_angle)
+                action_deltas[idx][1] = 0.25 * np.cos(turn_angle)
+        elif a == 2:
+            turn_angle += np.pi/12
+            if abs(action_deltas[idx][0]) > 0.1:
+                action_deltas[idx][0] = 0
+            if abs(action_deltas[idx][1]) > 0.1:
+                action_deltas[idx][1] = 0
+            if abs(action_deltas[idx][2]) < 0.2:
+                action_deltas[idx][2] = 0.27
+        elif a == 3:
+            turn_angle -= np.pi/12
+            if abs(action_deltas[idx][0]) > 0.1:
+                action_deltas[idx][0] = 0
+            if abs(action_deltas[idx][1]) > 0.1:
+                action_deltas[idx][1] = 0
+            if abs(action_deltas[idx][2]) < 0.2:
+                action_deltas[idx][2] = -0.27
+        elif a == 0:
+            action_deltas[idx] = torch.zeros_like(action_deltas[idx])
+    return action_deltas
+
 class VLNCE_DP_Dataset(IterableDataset):
     '''For vlnce diffusion policy'''
     def __init__(
@@ -215,6 +245,13 @@ class VLNCE_DP_Dataset(IterableDataset):
             'globalyaw': yaws,
         }
 
+        if 'action' in data.keys():
+            if isinstance(data['action'][-1], list):
+                data['action'] = data['action'][:-1] + data['action'][-1]
+            data['action'] = np.array(data['action'])
+            new_data['gt_actions'] = data['action']
+            new_data['prev_actions'] = np.concatenate([np.array([0]), data['action'][:-1]])
+
         # Handle RGB and depth features/data
         if 'rgb_features' in data:
             new_data['rgb_features'] = data['rgb_features']
@@ -302,6 +339,10 @@ class VLNCE_DP_Dataset(IterableDataset):
 
                     for instruction in instructions:
                         new_data = self._create_new_data(data, yaws, instruction, finish_status, fail_reason)
+                        # limit the max length
+                        for k, v in new_data.items():
+                            if isinstance(v, np.ndarray):
+                                new_data[k] = v[:self.config.MODEL.max_step]
                         new_preload.append(new_data)
                         finish_status_list.append(finish_status)
                         fail_reasons_list.append(fail_reason)
@@ -437,7 +478,14 @@ class VLNCE_DP_Dataset(IterableDataset):
                                                          fill_mode='constant')[:self.config.MODEL.len_traj_act]
                     
                     action_deltas = get_delta(actions)
-                    
+
+                    if self.config.IL.DAGGER.use_descrete_dataset and 'gt_actions' in item_obs.keys():
+                        end_step_idx = min(step_idx + self.len_traj_pred, len(item_obs["gt_actions"]))
+                        gt_actions = item_obs["gt_actions"][step_idx: end_step_idx]
+                        if len(gt_actions) < self.len_traj_pred:
+                            gt_actions = np.concatenate([gt_actions, np.zeros(self.len_traj_pred - len(gt_actions))])
+                        action_deltas = optimize_delta_action(action_deltas, gt_actions)
+
                     if self.learn_angle:                         
                         item_obs["actions"][step_idx] = normalize_data(action_deltas, self.action_stats) # convert actions to [-1, 1]
                     else:
