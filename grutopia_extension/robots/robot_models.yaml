@@ -459,7 +459,7 @@ robots:
     type: DescreteController
     steps_per_action: 50
     forward_distance: 0.25
-    rotation_angle: 15.0
+    rotation_angle: 30.0 # for navid !!!
     sub_controllers:
     - name: move_by_speed
 
