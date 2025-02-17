@@ -125,6 +125,8 @@ class CMADataset(torch.utils.data.IterableDataset):
             self.is_clip_long = True
 
             self.bert_tokenizer = bert_tokenizer          
+        if hasattr(self.config.MODEL, "TEXT_ENCODER"):
+            self.bert_tokenizer = bert_tokenizer
 
     def _create_new_data(self, data, instruction, finish_status, fail_reason):
         """Helper function to create new data entry"""
