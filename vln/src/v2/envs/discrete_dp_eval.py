@@ -1,3 +1,4 @@
+import os, sys
 from .base import BaseSingleScanEnv
 from grutopia.core.config import SimulatorConfig
 from vln.src.v2.dataloader.eval import EvalPathKeyDataloader
@@ -54,17 +55,26 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
         self.max_step=25000
         self.lmdb_path = lmdb_path
         self.ckpt_name = ckpt_name
+        
+        # Init the action stats
+        self.action_stats = None
+        if hasattr(self.eval_config.MODEL, 'Diffusion_Policy'):
+            self.action_stats = {
+                'min': torch.Tensor(np.asarray(self.eval_config.MODEL.Diffusion_Policy.action_stats.min)).to(self.device),
+                'max': torch.Tensor(np.asarray(self.eval_config.MODEL.Diffusion_Policy.action_stats.max)).to(self.device)
+            }
+
         policy, _, _, _ = initialize_policy(
             self.eval_config,
             log,
             load_from_ckpt=True,
             device=self.device,
             load_from_pretrain=False,
-            action_stats=None,
+            action_stats=self.action_stats,
         )
         self.policy = policy
 
-        if self.eval_config.MODEL.policy_name == "CMA_CLIP_Policy":
+        if self.eval_config.MODEL.policy_name in ["CMA_DP_ImgMultiPatch_Policy"]:
             self.use_clip_encoders = True
         else:
             self.use_clip_encoders = False
@@ -85,7 +95,13 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                 self.bert_tokenizer = longclip.tokenize
                 self.use_bert = True
                 self.is_clip_long = True
-
+        
+        # other model settings
+        self.action_dim = 3
+        
+        # mkdir for eval_dir
+        self.EP_DIR = os.path.join('logs', self.eval_config.NAME)
+        os.makedirs(self.EP_DIR, exist_ok=True)
 
     def topdown_snapshot(self):
         map_info = self.get_global_map(
@@ -103,7 +119,7 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
         }
         return snapshot
 
-    def eval(self):
+    def eval(self, test_verbose=False):
         
         self.load_scan_and_robot()
         eval_path_key_list = self.dataloader.eval_path_key_list
@@ -116,6 +132,7 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
         data_collector = DataCollector(self.dataloader.lmdb_path,self.dataloader.rank)
 
         self.policy.eval()
+        env_num = 1
         for path_key in eval_path_key_list:
             split = path_key_split[path_key]
             data = path_key_data[path_key]
@@ -160,7 +177,7 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
 
             batch = batch_obs(observations, self.device)
 
-            if self.config.MODEL.IMAGE_ENCODER.use_stack:
+            if self.eval_config.MODEL.IMAGE_ENCODER.use_stack:
                 batch_stack_rgb_length = [1 for _ in range(len(batch))]
                 h, w, c = batch['rgb'].shape[1:]
                 batch_stack_rgb = torch.zeros(len(batch), self.eval_config.MODEL.IMAGE_ENCODER.img_stack_nums, h, w, c, device=self.device)
@@ -179,7 +196,7 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                 self.policy, batch, 
                 img_mod=self.eval_config.MODEL.IMAGE_ENCODER.RGB.img_mod,
                 len_traj_act=self.eval_config.MODEL.IMAGE_ENCODER.img_stack_nums,
-                world_size=self.world_size,
+                world_size=1,
                 depth_encoder_type=self.eval_config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
                 stack_rgb = batch_stack_rgb,
                 stack_depth = batch_stack_depth,
@@ -190,10 +207,10 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                 )
             
             if self.eval_config.MODEL.IMU_ENCODER.use:
-                imu = torch.zeros(self.eval_env.env_nums, self.eval_config.MODEL.IMU_ENCODER.input_size, device=self.device)
+                imu = torch.zeros(env_num, self.eval_config.MODEL.IMU_ENCODER.input_size, device=self.device)
                 batch["imu"] = imu.float()
 
-            observations["steps"] = torch.from_numpy(np.array([0])).to(self.device)
+            batch["steps"] = torch.from_numpy(np.array([0])).to(self.device)
             env_nums = 1
             rnn_states = torch.zeros(
                 env_nums,
@@ -202,8 +219,7 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                 device=self.device,
             )
             prev_actions = torch.zeros(
-                env_nums,
-                1, device=self.device, dtype=torch.long
+                env_nums, self.eval_config.MODEL.len_traj_act, self.action_dim, device=self.device, dtype=torch.long
             )
             not_done_masks = torch.zeros(
                 env_nums,
@@ -213,10 +229,10 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
             # init fix_length_stack
             stack_rgb_length = self.eval_config.MODEL.IMAGE_ENCODER.img_stack_nums if self.eval_config.MODEL.IMAGE_ENCODER.use_stack else 1
             # stack_rgb_length = self.config.MODEL.len_traj_act
-            stack_rgb = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_num)]
-            stack_depth = [FixedLengthStack(stack_rgb_length) for _ in range(self.eval_env.env_nums)]
-            prev_globalgps = [FixedLengthStack(self.eval_config.MODEL.len_traj_act+1) for _ in range(self.eval_env.env_nums)] # TODO !!! act length
-            prev_globalyaw = [FixedLengthStack(self.eval_config.MODEL.len_traj_act+1) for _ in range(self.eval_env.env_nums)]
+            stack_rgb = [FixedLengthStack(stack_rgb_length) for _ in range(env_num)]
+            stack_depth = [FixedLengthStack(stack_rgb_length) for _ in range(env_num)]
+            prev_globalgps = [FixedLengthStack(self.eval_config.MODEL.len_traj_act+1) for _ in range(env_num)] # TODO !!! act length
+            prev_globalyaw = [FixedLengthStack(self.eval_config.MODEL.len_traj_act+1) for _ in range(env_num)]
             
             env_idx = 0
             # record the current position before action
@@ -258,12 +274,12 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                     'episode_ids': path_key,
                     'stop_mode': self.eval_config.EVAL.stop_mode,
                     'steps': steps,
-                    'predicted_actions_save_dir': self.eval_env.EP_DIR,
+                    'predicted_actions_save_dir': self.EP_DIR,
                     'num_sample': self.eval_config.EVAL.num_sample,
                     'train_cls_free_guidance': False,
                     'sample_cls_free_guidance': self.eval_config.MODEL.Diffusion_Policy.use_cls_free_guidance,
                     'need_txt_extraction': True,
-                    'vis': self.eval_config.test_verbose,
+                    'vis': test_verbose,
                 }
 
                 with torch.no_grad():
@@ -280,7 +296,7 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                         ]
                     else:
                         action = [
-                            {self.robot_name: {'move_by_descrete': [a.item()]}}
+                            {self.robot_name: {'move_by_descrete': a}}
                         ]
                     executor = ActionExecutor(
                         env=self.env, 
@@ -323,10 +339,10 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                     batch = batch_obs(outputs_dict, self.device)
 
                     # update prev_actions
-                    prev_globalgps[env_idx].push(outputs_dict[env_idx]['globalgps'].detach().cpu().numpy())
-                    prev_globalyaw[env_idx].push(outputs_dict[env_idx]['global_rotation'][-1].detach().cpu().item())
+                    prev_globalgps[env_idx].push(batch[env_idx]['globalgps'].detach().cpu().numpy())
+                    prev_globalyaw[env_idx].push(batch[env_idx]['global_rotation'][-1].detach().cpu().item())
 
-                    for idx in range(len(actions)):
+                    for idx in range(env_num):
                         # reverse to make the latest frame to be 0 position
                         prev_globalgps_numpy = np.array(prev_globalgps[idx].get_stack(reverse=True))
                         prev_globalyaw_numpy = np.array(prev_globalyaw[idx].get_stack(reverse=True))
@@ -349,8 +365,6 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                             # [forward, rotation]
                             prev_act_delta = torch.from_numpy(map_action_to_2d(action_deltas)).to(self.device)
                             prev_actions[idx] = prev_act_delta    
-                    
-                    prev_actions = torch.stack(prev_actions, axis=0).to(self.device)
 
                     ## Update image features in batch
                     # if self.config.MODEL.IMAGE_ENCODER.use_stack:
@@ -367,15 +381,20 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                     batch_stack_rgb = torch.from_numpy(np.array(batch_stack_rgb).astype(np.uint8)).to(self.device)
                     batch_stack_depth = torch.from_numpy(np.array(batch_stack_depth)).to(self.device)
 
+                    if not self.eval_config.MODEL.IMAGE_ENCODER.use_stack:
+                        batch['rgb'] = batch_stack_rgb.squeeze(1)
+                        batch['depth'] = batch_stack_depth.squeeze(1)
+                        batch_stack_rgb, batch_stack_depth = None, None
+
                     batch = extract_image_features(
                         self.policy, batch, 
                         img_mod=self.eval_config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-                        len_traj_act=self.eval_config.MODEL.IMAGE_ENCODER.img_stack_nums,
-                        world_size=self.world_size,
+                        len_traj_act=1,
+                        world_size=1,
                         depth_encoder_type=self.eval_config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
                         stack_rgb = batch_stack_rgb,
                         stack_depth = batch_stack_depth,
-                        batch_stack_rgb_length=batch_stack_rgb_length,
+                        batch_stack_rgb_length = batch_stack_rgb_length,
                         proj=self.eval_config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
                         need_rgb_extraction=True,
                         classifier_free_mask_depth=classifier_free_mask_depth,
@@ -391,10 +410,9 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                             batch["imu"][:, :2] = to_local_coords(batch["globalgps"][:, [0,1]].float(), start_positions, start_yaws)
                         else:
                             batch["imu"][:, :2] = batch["globalgps"][:, [0,1]] - start_positions
-                        if self.config.MODEL.IMU_ENCODER.input_size == 3:
+                        if self.eval_config.MODEL.IMU_ENCODER.input_size == 3:
                             batch["imu"][:, 2] = batch["globalyaw"] - start_yaws
 
-                    batch["steps"] = torch.from_numpy(np.array([0])).to(self.device)
                     not_done_masks = torch.tensor(
                         [[0] if done else [1] for done in dones],
                         dtype=torch.uint8,

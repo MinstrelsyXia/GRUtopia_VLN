@@ -6,6 +6,7 @@ from vln.src.v2.envs.discrete_flash_sample import DiscreteFlashSampleSingleScanE
 from vln.src.v2.envs.discrete_sample import DiscreteSampleSingleScanEnv
 from vln.src.v2.envs.discrete_sample_dagger import DiscreteSampleDaggerSingleScanEnv
 from vln.src.v2.envs.discrete_navid_eval import DiscreteNavidEvalSingleScanEnv
+from vln.src.v2.envs.discrete_dp_eval import DiscreteDPEvalSingleScanEnv
 from vln import PROJECT_ROOT_PATH
 from vln.src.utils.utils import Config, get_config
 
@@ -145,6 +146,8 @@ def get_env_by_config(
                     for sensor in sim_config.config_dict['tasks'][0]['robots'][0]['sensor_params']:
                         if sensor['name'] == 'pano_camera_0':
                             sensor['size'] = [640, 480]
+                elif eval_config['MODEL']['policy_name'] == 'CMA_DP_ImgMultiPatch_Policy':
+                    eval_env = DiscreteDPEvalSingleScanEnv
                 else:
                     eval_env = DiscreteEvalSingleScanEnv
             else:

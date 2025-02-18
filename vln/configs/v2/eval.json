@@ -3,7 +3,7 @@
     "robot_name": "h1",
     "task_type" : "eval",
     "ckpt_to_load" : "data/checkpoints/20250217_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset/ckpts/ckpt.6.pth",
-    "eval_cfg_file": "vln/configs/train/cma_dp_w61.yaml",
+    "eval_cfg_file": "vln/configs/train/cma_dp_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],
