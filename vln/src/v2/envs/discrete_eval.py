@@ -66,6 +66,10 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         else:
             self.use_clip_encoders = False
         
+        self.use_bert = False
+        self.bert_tokenizer = None
+        self.is_clip_long = False
+        
         if self.use_clip_encoders:
             self.use_bert = False
             self.bert_tokenizer = None
@@ -206,7 +210,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     if self.use_clip_encoders:
                         actions, rnn_states, _ = self.policy(batch)
                     else:
-                        actions, rnn_states = self.policy(batch)
+                        actions, rnn_states, _ = self.policy(batch)
                 prev_actions.copy_(actions)
                 if self.eval_config.EVAL.ACTION == 'descrete':
                     for bs_i, a in enumerate(actions):

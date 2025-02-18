@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 20250215_lowLight_sample
+#SBATCH -J 20250217_aliengo_ckpt55_eval
 #SBATCH -o slurm_logs/%j_%x.out 
 #SBATCH -e slurm_logs/%j_%x.err 
 #SBATCH -p gpu_4090  

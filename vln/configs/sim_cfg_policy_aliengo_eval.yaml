@@ -48,7 +48,7 @@ tasks:
       enable: true
       size: [256, 256]
     - name: "debug_camera"
-      enable: true # !!! for debug
+      enable: false # !!! for debug
       size: [256, 256]
     - name: "topdown_camera_50"
       enable: true

@@ -14,6 +14,9 @@ from vln.src.models.encoders import resnet_encoders
 from vln.src.models.encoders.instruction_encoder import (
     InstructionEncoder,
 )
+
+from transformers import PretrainedConfig
+import copy
     
 class CategoricalNet(nn.Module):
     def __init__(self, num_inputs: int, num_outputs: int) -> None:
@@ -66,9 +69,32 @@ class CMANet(nn.Module):
         self.model_config.INSTRUCTION_ENCODER.final_state_only = False
         self.model_config.freeze()
         # Init the instruction encoder
-        self.instruction_encoder = InstructionEncoder(
-            self.model_config.INSTRUCTION_ENCODER
-        )
+        self.use_instr_bert_encoder = False
+        if hasattr(self.model_config, "TEXT_ENCODER"):
+            # use BERT to encode instruction
+            if self.model_config.TEXT_ENCODER.model_name == 'clip-long':
+                self.instruction_encoder = encoders.InstructionLongCLIPEncoder(self.model_config.TEXT_ENCODER, self.model_config.LORA)
+                self.txt_linear_512_to_256 = nn.Linear(512, 256)
+                self.instruction_encoder.output_size = 256
+            else:
+                if self.model_config.TEXT_ENCODER.model_name in ['meter', 'roberta']:
+                    config_name = 'roberta-base'
+                else:
+                    config_name = self.model_config.TEXT_ENCODER.model_name
+                bert_config = PretrainedConfig.from_pretrained(config_name)
+                # Init the instruction encoder
+                text_encoder_config = copy.deepcopy(bert_config)
+                for k,v in self.model_config.TEXT_ENCODER.items():
+                    setattr(text_encoder_config, k, v)
+                # add LORA settings
+                setattr(text_encoder_config, 'LORA', self.model_config.LORA)
+
+                self.instruction_encoder = encoders.LanguageEncoder(text_encoder_config)
+            self.use_instr_bert_encoder = True
+        else:
+            self.instruction_encoder = InstructionEncoder(
+                self.model_config.INSTRUCTION_ENCODER
+            )
 
         # Init the depth encoder
         assert self.model_config.DEPTH_ENCODER.cnn_type in ["VlnResnetDepthEncoder"]
@@ -230,7 +256,13 @@ class CMANet(nn.Module):
         prev_actions: Tensor,
         masks: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        instruction_embedding = self.instruction_encoder(observations) # [bs, 256, 200]
+        if self.use_instr_bert_encoder:
+            instr = observations['instruction']
+            instruction_embedding, txt_masks, txt_cls_embeds = self.instruction_encoder(instr) # for rxr debug!
+            instruction_embedding = self.txt_linear_512_to_256(instruction_embedding)
+            instruction_embedding = instruction_embedding.permute(0, 2, 1) # [bs, 256, txt_len]
+        else:
+            instruction_embedding = self.instruction_encoder(observations) # [bs, 256, 200]
         depth_embedding = self.depth_encoder(observations) # [bs, 192, 4, 4]
         depth_embedding = torch.flatten(depth_embedding, 2) # [bs, 192, 16]
 
