@@ -1,4 +1,4 @@
-NAME: 20250213_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_clipEncoders
+NAME: 20250215_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_clipEncoders_aliengo
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -89,7 +89,7 @@ IL:
   use_iw: True
   inflection_weight_coef: 3.2
   
-  save_interval_epochs: 5
+  save_interval_epochs: 10
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: True
@@ -125,7 +125,8 @@ IL:
     # lmdb_features_dir: data/sample_episodes/20241216_sample_episodes_descrete_flash/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250121_descrete_dagger_02/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250208_descrete_dagger_03/sample_data.lmdb
-    lmdb_features_dir: data/sample_episodes/20250211_sample_origin/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/20250211_sample_origin/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20250214_sample_aliengo/sample_data.lmdb
     lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb
     pre_extract_img_features: true
     denoise_action: false # For debug!!!
