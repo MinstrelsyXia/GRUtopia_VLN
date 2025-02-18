@@ -270,159 +270,160 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                     actions, rnn_states, noise_pred, dist_pred, noise, diffusion_output, un_actions_nocumsum, pm_pred, stop_progress_pred = self.policy(batch_settings)
 
                 # prev_actions.copy_(actions)
-                if self.eval_config.EVAL.ACTION == 'descrete':
-                    for bs_i, a in enumerate(actions):
-                        if a == 0:
-                            log.info(f"[split:{split}][scan:{scan}][trajectory_id_episode_id: {path_key}][stop!!!]")
-                            action = [
-                                {self.robot_name: {'stop': ['stop']}}
-                            ]
-                        else:
-                            action = [
-                                {self.robot_name: {'move_by_descrete': [a.item()]}}
-                            ]
-                executor = ActionExecutor(
-                    env=self.env, 
-                    task=self.task, 
-                    stuck_checker=stuck_checker,
-                    robot=self.robot,
-
-                    per_action_max_step=self.per_action_max_step,
-                    total_max_step=self.max_step,
-                    robot_ankle_height=robot_ankle_height,
-
-                    statistic_info=statistic_info,
-                    context=self,
-                    
-                    robot_name=self.robot_name,
-                    fall_height_threshold=self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
-                )
-                outputs = executor.env_step(actions = action)
-                outputs_dict = outputs['outputs_dict']
-                dones = outputs['dones']
-                info = outputs['infos'][0]
-                reason = outputs['reason']
-                statistic_info = executor.statistic_info
-                statistic_info.policy_step +=1
-
-
-                if 'sub_instruction' in data: # MLANet
-                    max_instr_len = 100
-                else:
-                    max_instr_len = 200
-                    
-                outputs_dict = extract_instruction_tokens(
-                    outputs_dict,
-                    #TODO: 
-                    bert_tokenizer=self.bert_tokenizer,
-                    is_clip_long=self.is_clip_long,
-                    max_instr_len=max_instr_len
-                )
-                outputs_dict[0]['sub_instruction'] = sub_instr_tokens
-                batch = batch_obs(outputs_dict, self.device)
-
-                # update prev_actions
-                prev_globalgps[env_idx].push(outputs_dict[env_idx]['globalgps'].detach().cpu().numpy())
-                prev_globalyaw[env_idx].push(outputs_dict[env_idx]['global_rotation'][-1].detach().cpu().item())
-
-                for idx in range(len(actions)):
-                    # reverse to make the latest frame to be 0 position
-                    prev_globalgps_numpy = np.array(prev_globalgps[idx].get_stack(reverse=True))
-                    prev_globalyaw_numpy = np.array(prev_globalyaw[idx].get_stack(reverse=True))
-                    prev_act = _compute_actions( 
-                        prev_globalgps_numpy, prev_globalyaw_numpy,
-                        curr_time=0, fill_mode="constant",
-                        len_traj_pred=self.eval_config.MODEL.len_traj_act,
-                        waypoint_spacing=self.eval_config.MODEL.Diffusion_Policy.waypoint_spacing,
-                        learn_angle=self.eval_config.MODEL.learn_angle,
-                        metric_waypoint_spacing=self.eval_config.MODEL.Diffusion_Policy.metric_waypoint_spacing,
-                        num_action_params=self.action_dim,
-                        normalize=False)
-                    action_deltas = get_delta(prev_act)
-                    if self.eval_config.MODEL.learn_angle: 
-                        # [x,y,yaw]
-                        prev_act_delta = torch.from_numpy(action_deltas).to(self.device)
-                        prev_act_delta_norm = normalize_data(prev_act_delta, self.action_stats)
-                        prev_actions[idx] = prev_act_delta_norm
+                actions = actions[env_idx]
+                for exe_step_i in range(self.eval_config.EVAL.len_traj_act):
+                    a = actions[exe_step_i]
+                    if a == 0:
+                        log.info(f"[split:{split}][scan:{scan}][trajectory_id_episode_id: {path_key}][stop!!!]")
+                        action = [
+                            {self.robot_name: {'stop': ['stop']}}
+                        ]
                     else:
-                        # [forward, rotation]
-                        prev_act_delta = torch.from_numpy(map_action_to_2d(action_deltas)).to(self.device)
-                        prev_actions[idx] = prev_act_delta    
-                
-                prev_actions = torch.stack(prev_actions, axis=0).to(self.device)
+                        action = [
+                            {self.robot_name: {'move_by_descrete': [a.item()]}}
+                        ]
+                    executor = ActionExecutor(
+                        env=self.env, 
+                        task=self.task, 
+                        stuck_checker=stuck_checker,
+                        robot=self.robot,
 
-                ## Update image features in batch
-                # if self.config.MODEL.IMAGE_ENCODER.use_stack:
-                batch_stack_rgb, batch_stack_depth, batch_stack_rgb_length = [], [], []
-                for env_idx in range(len(stack_rgb)):
-                    cur_rgb = np.array(stack_rgb[env_idx].get_stack(reverse=True))
-                    cur_depth = np.array(stack_depth[env_idx].get_stack(reverse=True))
-                    batch_stack_rgb_length.append(len(cur_rgb))
-                    if len(cur_rgb) < stack_rgb_length:
-                        cur_rgb = np.concatenate([cur_rgb, np.zeros((stack_rgb_length-len(cur_rgb), *cur_rgb.shape[1:]))], axis=0)
-                        cur_depth = np.concatenate([cur_depth, np.zeros((stack_rgb_length-len(cur_depth), *cur_depth.shape[1:]))], axis=0)
-                    batch_stack_rgb.append(cur_rgb)
-                    batch_stack_depth.append(cur_depth) 
-                batch_stack_rgb = torch.from_numpy(np.array(batch_stack_rgb).astype(np.uint8)).to(self.device)
-                batch_stack_depth = torch.from_numpy(np.array(batch_stack_depth)).to(self.device)
+                        per_action_max_step=self.per_action_max_step,
+                        total_max_step=self.max_step,
+                        robot_ankle_height=robot_ankle_height,
 
-                batch = extract_image_features(
-                    self.policy, batch, 
-                    img_mod=self.eval_config.MODEL.IMAGE_ENCODER.RGB.img_mod,
-                    len_traj_act=self.eval_config.MODEL.IMAGE_ENCODER.img_stack_nums,
-                    world_size=self.world_size,
-                    depth_encoder_type=self.eval_config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
-                    stack_rgb = batch_stack_rgb,
-                    stack_depth = batch_stack_depth,
-                    batch_stack_rgb_length=batch_stack_rgb_length,
-                    proj=self.eval_config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
-                    need_rgb_extraction=True,
-                    classifier_free_mask_depth=classifier_free_mask_depth,
+                        statistic_info=statistic_info,
+                        context=self,
+                        
+                        robot_name=self.robot_name,
+                        fall_height_threshold=self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
                     )
+                    outputs = executor.env_step(actions = action)
+                    outputs_dict = outputs['outputs_dict']
+                    dones = outputs['dones']
+                    info = outputs['infos'][0]
+                    reason = outputs['reason']
+                    statistic_info = executor.statistic_info
+                    statistic_info.policy_step +=1
 
-                batch["steps"] = torch.from_numpy(np.array(steps)).to(self.device)
-                
-                # IMU
-                if self.eval_config.MODEL.IMU_ENCODER.use:
-                    # initialize_imu
-                    batch["imu"] = torch.zeros(batch["globalgps"].shape[0], self.eval_config.MODEL.IMU_ENCODER.input_size).to(self.device)
-                    if self.eval_config.MODEL.IMU_ENCODER.to_local_coords:
-                        batch["imu"][:, :2] = to_local_coords(batch["globalgps"][:, [0,1]].float(), start_positions, start_yaws)
+
+                    if 'sub_instruction' in data: # MLANet
+                        max_instr_len = 100
                     else:
-                        batch["imu"][:, :2] = batch["globalgps"][:, [0,1]] - start_positions
-                    if self.config.MODEL.IMU_ENCODER.input_size == 3:
-                        batch["imu"][:, 2] = batch["globalyaw"] - start_yaws
+                        max_instr_len = 200
 
-                batch["steps"] = torch.from_numpy(np.array([0])).to(self.device)
-                not_done_masks = torch.tensor(
-                    [[0] if done else [1] for done in dones],
-                    dtype=torch.uint8,
-                    device=self.device,
-                )
-                if dones[0]:
-                    result = reason
-                    if result == '':
-                        if info['success'] > 0:
-                            result='success'
+                    outputs_dict = extract_instruction_tokens(
+                        outputs_dict,
+                        #TODO: 
+                        bert_tokenizer=self.bert_tokenizer,
+                        is_clip_long=self.is_clip_long,
+                        max_instr_len=max_instr_len
+                    )
+                    outputs_dict[0]['sub_instruction'] = sub_instr_tokens
+                    batch = batch_obs(outputs_dict, self.device)
+
+                    # update prev_actions
+                    prev_globalgps[env_idx].push(outputs_dict[env_idx]['globalgps'].detach().cpu().numpy())
+                    prev_globalyaw[env_idx].push(outputs_dict[env_idx]['global_rotation'][-1].detach().cpu().item())
+
+                    for idx in range(len(actions)):
+                        # reverse to make the latest frame to be 0 position
+                        prev_globalgps_numpy = np.array(prev_globalgps[idx].get_stack(reverse=True))
+                        prev_globalyaw_numpy = np.array(prev_globalyaw[idx].get_stack(reverse=True))
+                        prev_act = _compute_actions( 
+                            prev_globalgps_numpy, prev_globalyaw_numpy,
+                            curr_time=0, fill_mode="constant",
+                            len_traj_pred=self.eval_config.MODEL.len_traj_act,
+                            waypoint_spacing=self.eval_config.MODEL.Diffusion_Policy.waypoint_spacing,
+                            learn_angle=self.eval_config.MODEL.learn_angle,
+                            metric_waypoint_spacing=self.eval_config.MODEL.Diffusion_Policy.metric_waypoint_spacing,
+                            num_action_params=self.action_dim,
+                            normalize=False)
+                        action_deltas = get_delta(prev_act)
+                        if self.eval_config.MODEL.learn_angle: 
+                            # [x,y,yaw]
+                            prev_act_delta = torch.from_numpy(action_deltas).to(self.device)
+                            prev_act_delta_norm = normalize_data(prev_act_delta, self.action_stats)
+                            prev_actions[idx] = prev_act_delta_norm
                         else:
-                            info['fail_reason']='not_reach_goal'
-                            result='not_reach_goal'
-                    progress_log_util.trace_end(
-                        trajectory_id = path_key,
-                        step_count=statistic_info.sim_step,
-                        result = result,
-                    )
+                            # [forward, rotation]
+                            prev_act_delta = torch.from_numpy(map_action_to_2d(action_deltas)).to(self.device)
+                            prev_actions[idx] = prev_act_delta    
+                    
+                    prev_actions = torch.stack(prev_actions, axis=0).to(self.device)
 
-                    # info['ext_info']=map_info
-                    data_collector.save_eval_result(
-                        ckpt_name=self.ckpt_name, 
-                        path_key=path_key, 
-                        info=info
+                    ## Update image features in batch
+                    # if self.config.MODEL.IMAGE_ENCODER.use_stack:
+                    batch_stack_rgb, batch_stack_depth, batch_stack_rgb_length = [], [], []
+                    for env_idx in range(len(stack_rgb)):
+                        cur_rgb = np.array(stack_rgb[env_idx].get_stack(reverse=True))
+                        cur_depth = np.array(stack_depth[env_idx].get_stack(reverse=True))
+                        batch_stack_rgb_length.append(len(cur_rgb))
+                        if len(cur_rgb) < stack_rgb_length:
+                            cur_rgb = np.concatenate([cur_rgb, np.zeros((stack_rgb_length-len(cur_rgb), *cur_rgb.shape[1:]))], axis=0)
+                            cur_depth = np.concatenate([cur_depth, np.zeros((stack_rgb_length-len(cur_depth), *cur_depth.shape[1:]))], axis=0)
+                        batch_stack_rgb.append(cur_rgb)
+                        batch_stack_depth.append(cur_depth) 
+                    batch_stack_rgb = torch.from_numpy(np.array(batch_stack_rgb).astype(np.uint8)).to(self.device)
+                    batch_stack_depth = torch.from_numpy(np.array(batch_stack_depth)).to(self.device)
+
+                    batch = extract_image_features(
+                        self.policy, batch, 
+                        img_mod=self.eval_config.MODEL.IMAGE_ENCODER.RGB.img_mod,
+                        len_traj_act=self.eval_config.MODEL.IMAGE_ENCODER.img_stack_nums,
+                        world_size=self.world_size,
+                        depth_encoder_type=self.eval_config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck,
+                        stack_rgb = batch_stack_rgb,
+                        stack_depth = batch_stack_depth,
+                        batch_stack_rgb_length=batch_stack_rgb_length,
+                        proj=self.eval_config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+                        need_rgb_extraction=True,
+                        classifier_free_mask_depth=classifier_free_mask_depth,
+                        )
+
+                    batch["steps"] = torch.from_numpy(np.array(steps)).to(self.device)
+                    
+                    # IMU
+                    if self.eval_config.MODEL.IMU_ENCODER.use:
+                        # initialize_imu
+                        batch["imu"] = torch.zeros(batch["globalgps"].shape[0], self.eval_config.MODEL.IMU_ENCODER.input_size).to(self.device)
+                        if self.eval_config.MODEL.IMU_ENCODER.to_local_coords:
+                            batch["imu"][:, :2] = to_local_coords(batch["globalgps"][:, [0,1]].float(), start_positions, start_yaws)
+                        else:
+                            batch["imu"][:, :2] = batch["globalgps"][:, [0,1]] - start_positions
+                        if self.config.MODEL.IMU_ENCODER.input_size == 3:
+                            batch["imu"][:, 2] = batch["globalyaw"] - start_yaws
+
+                    batch["steps"] = torch.from_numpy(np.array([0])).to(self.device)
+                    not_done_masks = torch.tensor(
+                        [[0] if done else [1] for done in dones],
+                        dtype=torch.uint8,
+                        device=self.device,
                     )
-                    stats_episodes[path_key] = info
-                    spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
-                    mean_spl = np.mean(list(spl_dict.values()))
-                    log.info(f"Average SPL: {mean_spl}, result:{result}")
-                    break
+                    if dones[0]:
+                        result = reason
+                        if result == '':
+                            if info['success'] > 0:
+                                result='success'
+                            else:
+                                info['fail_reason']='not_reach_goal'
+                                result='not_reach_goal'
+                        progress_log_util.trace_end(
+                            trajectory_id = path_key,
+                            step_count=statistic_info.sim_step,
+                            result = result,
+                        )
+
+                        # info['ext_info']=map_info
+                        data_collector.save_eval_result(
+                            ckpt_name=self.ckpt_name, 
+                            path_key=path_key, 
+                            info=info
+                        )
+                        stats_episodes[path_key] = info
+                        spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
+                        mean_spl = np.mean(list(spl_dict.values()))
+                        log.info(f"Average SPL: {mean_spl}, result:{result}")
+                        break
         
         progress_log_util.report()

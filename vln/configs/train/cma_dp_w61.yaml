@@ -78,7 +78,7 @@ EVAL:
   step_interval: 80 # the same in data sampling
 
   # len_traj_act
-  len_traj_act: 4
+  len_traj_act: 2
 
 IL:
   epochs: 100
