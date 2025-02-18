@@ -1,18 +1,23 @@
 {
-    "name" : "20250217_navid_aliengo_eval",
-    "robot_name": "aliengo",
+    "name" : "20250218_dp_descrete_eval",
+    "robot_name": "h1",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/navid/navid-7b-full-224-video-fps-1-grid-2-r2r-rxr-training-split",
-    "eval_cfg_file": "vln/configs/train/navid_eval.yaml",
+    "ckpt_to_load" : "data/checkpoints/20250217_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset/ckpts/ckpt.6.pth",
+    "eval_cfg_file": "vln/configs/train/cma_dp_w61.yaml",
     "image" : "w61_grutopia:v0.5",
-    "total_rank": 3,
+    "total_rank": 8,
     "retry_list":[],
     "flash": false,
     "load_eval_subset": false,
     "device_map" : {
-        "0":["1","3"],
-        "1":["4","5"],
-        "2":["6","7"]
+        "0":["0"],
+        "1":["1"],
+        "2":["2"],
+        "3":["3"],
+        "4":["4"],
+        "5":["5"],
+        "6":["6"],
+        "7":["7"]
     },
     "merge_config" : {
         "data_0508":[8,9,10,11,12,13,14,15]
