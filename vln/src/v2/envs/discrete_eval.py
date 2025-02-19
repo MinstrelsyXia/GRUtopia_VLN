@@ -82,6 +82,12 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 self.bert_tokenizer = longclip.tokenize
                 self.use_bert = True
                 self.is_clip_long = True
+        
+        if hasattr(self.eval_config.MODEL, 'TEXT_ENCODER'):
+            # use instr clip-long
+            self.bert_tokenizer = longclip.tokenize
+            self.use_bert = True
+            self.is_clip_long = True
 
 
     def topdown_snapshot(self):

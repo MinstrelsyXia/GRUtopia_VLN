@@ -13,6 +13,7 @@ TENSORBOARD_DIR: data/checkpoints/*name
 CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
 EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
 # EVAL_CKPT_PATH_DIR: data/checkpoints/habitat_sotas/CMA_PM_DA_Aug_converted.pth
+EVAL_CKPT_PATH_DIR: data/checkpoints/20250217_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_instrLongCLIP/ckpts/ckpt.55.pth
 LOG_DIR: data/checkpoints/*name/logs
 RESULTS_DIR: data/checkpoints/*name/evals
 
@@ -92,9 +93,9 @@ IL:
   save_interval_epochs: 5
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
-  load_from_ckpt: False
-  ckpt_to_load: none
-  load_from_pretrain: True
+  load_from_ckpt: True
+  ckpt_to_load: data/checkpoints/20250217_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_instrLongCLIP/ckpts/ckpt.55.pth
+  load_from_pretrain: False
 
   dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_preprocessed
 
