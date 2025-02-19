@@ -1,5 +1,6 @@
 datasets:
-  base_data_dir: "../VLN/VLNCE/R2R_VLNCE_v1-3"
+  base_data_dir: "data/datasets/R2R_VLNCE_v1-3_corrected"
+  # base_data_dir: "../VLN/VLNCE/R2R_VLNCE_v1-3"
   mp3d_data_dir: "../Matterport3D/data/v1/scans"
   mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
   mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
@@ -21,8 +22,9 @@ settings:
   camera_list:
     - pano_camera_0
     - topdown_camera_500
+    - topdown_camera_50
   
-  max_step: 25000
+  max_step: 50000
   per_action_max_step: 1500
 
 robots:

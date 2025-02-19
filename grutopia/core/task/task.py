@@ -81,6 +81,27 @@ class BaseTask(OmniBaseTask, ABC):
                 # set_lighting_mode_stage is not helpful
                 action.execute()
 
+                # Distant light # TODO
+                # from pxr import Gf, UsdLux, UsdGeom
+                # import omni.usd
+                # stage = omni.usd.get_context().get_stage()
+                # light = UsdLux.DistantLight.Define(stage, "/World/light")
+                # light.CreateIntensityAttr(1000)
+                # light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+                # disk_1 = UsdLux.DiskLight.Define(stage, "/World/disk_1")
+                # disk_1.CreateIntensityAttr(10000)
+                # disk_1.CreateRadiusAttr(50.0)
+                # disk_1.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+                # UsdGeom.Xformable(disk_1).AddTranslateOp().Set(Gf.Vec3f(0, 0, 2.6))
+
+                # disk_2 = UsdLux.DiskLight.Define(stage, "/World/disk_2")
+                # disk_2.CreateIntensityAttr(10000)
+                # disk_2.CreateRadiusAttr(50.0)
+                # disk_2.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+                # xformable = UsdGeom.Xformable(disk_2)
+                # xformable.AddRotateXYZOp().Set(Gf.Vec3d(180, 0, 0))  # 绕X轴旋转180度,使灯光朝上
+                # xformable.AddTranslateOp().Set(Gf.Vec3f(0, 0, 2.6))
+
         # load robots
         self.robots = init_robots(self.config, self._scene)
         
@@ -96,6 +117,16 @@ class BaseTask(OmniBaseTask, ABC):
     def set_up_scene(self, scene: Scene) -> None:
         self._scene = scene
         self.load()
+
+    def cleanup(self) -> None:
+        """Called before calling a reset() on the world to removed temporary objects that were added during
+        simulation for instance.
+        """
+        log.info("================ cleanup task ==================")
+        for robot in self.robots.values():
+            # Using try here because we want to ignore all exceptions
+            for sensor in robot.sensors.values():
+                sensor.reset()
 
     def get_observations(self,add_rgb_subframes=False) -> Dict[str, Any]:
         """

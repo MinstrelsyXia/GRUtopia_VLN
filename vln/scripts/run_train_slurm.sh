@@ -1,17 +1,23 @@
 #!/bin/bash
-#SBATCH --job-name=vlnrp_train          # 作业名称
-#SBATCH --output=logs/%j.out          # 标准输出文件路径 (%j 会被替换为作业ID)
-#SBATCH --error=logs/%j.err           # 标准错误文件路径
-#SBATCH --gres=gpu:4                  # GPU请求
-#SBATCH --cpus-per-task=6             # 每个任务的CPU核心数
+#SBATCH --job-name=dp_descreteDataset_Train         # 作业名称
+#SBATCH --output=logs/%j_%x.out          # 标准输出文件路径
+#SBATCH --error=logs/%j_%x.err           # 标准错误文件路径
+#SBATCH --gres=gpu:4                # GPU请求
+#SBATCH --cpus-per-task=24           # 每个任务的CPU核心数
 #SBATCH --partition=smartbot              # 使用GPU分区
+#SBATCH --mem=128G                     # 总内存分配
 
 # 创建日志目录
 mkdir -p logs
 
+module load anaconda/2024.02
+module unload tensorboard
 source activate grutopia_train
 
 export MAGNUM_LOG=quiet
+export PYTHONPATH=$PYTHONPATH:/ailab/user/wangliuyi/code/w61_grutopia
+
+# tar -xf /ailab/user/wangliuyi/code/w61_grutopia/data/sample_episodes/20241207_sample_episodes_processed/sample_data.lmdb.tar -C /dev/shm
 
 flags_cma="
   --exp-config vlnce_baselines/config/r2r_baselines/cma.yaml
@@ -25,9 +31,8 @@ flags_cma_raw_train="
 
 if [ "$1" == "--train" ]; then
   flags="
-    --exp-config vln/configs/train/cma_dp_train.yaml
+    --exp-config vln/configs/train/cma_dp_w61.yaml
     --run-type train
-    --train_quiet
   "
 elif [ "$1" == "--train_crossGRU" ]; then
   flags="
@@ -57,12 +62,27 @@ elif [ "$1" == "--collect_dataset" ]; then
     --exp-config vlnce_baselines/config/r2r_baselines/dp/dp_collect_data.yaml
     --run-type collect_dataset
   "
+elif [ "$1" == "--train_noRNN" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
+    --run-type train
+  "
+elif [ "$1" == "--preprocess_features" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
+    --run-type preprocess_features
+  "
+elif [ "$1" == "--train_cma" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_InstrLongCLIP_train.yaml
+    --run-type train
+    --train_quiet
+  "
+elif [ "$1" == "--train_cma_clip" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_clip_train.yaml
+    --run-type train
+    --train_quiet
+  "
 fi
 python vln/run_policy.py $flags
-
-# 添加错误处理
-set -e  # 遇到错误立即退出
-set -x  # 打印执行的命令
-
-# 在脚本最后添加作业完成通知
-echo "Job finished at $(date)"

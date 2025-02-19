@@ -1,0 +1,341 @@
+NAME: 20250101_dp_TransEnc0Dec3_InstrCLS_transformGPS_localIMU_CFG
+TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
+SIMULATOR_GPU_IDS: [0]
+TORCH_GPU_ID: 0
+TORCH_GPU_IDS: [0]
+# SIMULATOR_GPU_IDS: [0]
+# TORCH_GPU_ID: 1
+# TORCH_GPU_IDS: [2]
+
+NUM_ENVIRONMENTS: 4
+# TENSORBOARD_DIR: data/tensorboard_dirs/*name
+TENSORBOARD_DIR: data/checkpoints/*name/evals
+CHECKPOINT_FOLDER: data/checkpoints/*name/ckpts
+# EVAL_CKPT_PATH_DIR: data/checkpoints/*name/ckpts
+EVAL_CKPT_PATH_DIR: data/checkpoints/20250101_dp_TransEnc0Dec3_InstrCLS_transformGPS_localIMU_CFG/ckpts/ckpt.98.pth
+LOG_DIR: data/checkpoints/*name/logs
+RESULTS_DIR: data/checkpoints/*name/evals
+
+VIDEO_OPTION: true # -1 / true
+VIDEO_DIR: data/checkpoints/*name/videos
+
+SEED: 0
+DDP:
+  use: false
+  use_dp: true # true for data parallel, false for DDP
+  backend: nccl
+  seed: 0
+  fp16: False
+  n_workers: 8
+  find_unused_parameters: true
+  local_rank: 0 
+
+  node_rank: 0
+  world_size: 4
+
+EVAL:
+  USE_CKPT_CONFIG: False
+  SAVE_RESULTS: True
+  # SPLIT: [val_seen, val_unseen]
+  SPLIT: [val_unseen]
+  EPISODE_COUNT: -1
+  MAX_STEPS: 195
+  train_eval_interval: 100
+  ACTION: speed # descrete or xyyaw or speed
+
+  compute_shortest_path: False
+
+  # eval dataset settings
+  re_eval: false # if true, will re-evaluate the episodes in the result_json_path
+  load_eval_subset: true # if true, will load the eval subset (collect successfully)
+
+  # for xyyaw
+  success_distance: 3.0
+  stop_x_threshold: 1e-2
+  stop_y_threshold: 1e-2
+  stop_yaw_threshold: 1e-2
+
+  rotation_threshold: 1e-1
+
+  # for dynamic len_traj_act
+  use_dynamic_len_traj_act: false
+  min_len_traj_act: 3
+  max_len_traj_act: 8
+  min_displacement: 0.15
+
+  distance_threshold: 1.5
+  num_sample: 1
+  auto_remove: false
+
+  start_eval_epoch: -1
+  
+  # stop settings
+  stop_mode: stop_progress # progress / distance
+  distance_threshold: 1.5
+  pm_threshold: 0.90
+  continuous_stop_pm_threshold: 0.80 # 0.80 for continuous and 0.75 for logits
+  logits_stop_pm_threshold: 0.50
+
+  # for isaac-sim envs
+  sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
+  vln_cfg_file: vln/configs/vln_cfg_policy_eval.yaml
+  step_interval: 80 # the same in data sampling
+
+  # len_traj_act
+  len_traj_act: 4
+
+IL:
+  epochs: 60
+  batch_size: 2
+  lr: 1e-4
+  
+  save_interval_epochs: 2
+  save_interval_steps: 1500
+  save_filter_frozen_weights: true # only save the learnable weights!
+  load_from_ckpt: true
+  ckpt_to_load: none
+  load_from_pretrain: false
+
+  camera_name: 'pano_camera_0'
+  Filter_failure: 
+    use: true # drop the failure cases
+    min_rgb_nums: 15 # the item that is fewer than this number would be dropped.
+
+  analysis_time: False # analysis the processing time for each module
+
+  lr_schedule:
+    use: true
+    type: "cosine" # 可选 cosine/step/linear
+    warmup_epochs: 5
+    warmup_factor: 0.1
+    decay_factor: 0.1
+    decay_epochs: [30, 45] # 用于step scheduler
+    min_lr: 1e-5
+
+  DAGGER:
+    iterations: 5
+    full_size: 10819
+    update_size: 5000
+    p: 0.9
+    preload_lmdb_features: true # !IMPORTANT!
+    # lmdb_features_dir: data/sample_episodes/20241207_sample_episodes/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20241207_sample_episodes_processed/sample_data.lmdb
+    # lmdb_features_dir: /dev/shm/20241207_sample_episodes/sample_data.lmdb # For slurm
+    lmdb_features_dagger_update_dir: data/sample_episodes/20241207_sample_episodes_processed/sample_data.lmdb
+    pre_extract_img_features: true
+    denoise_action: false # For debug!!!
+    lmdb_save_episode_id: true
+    save_img_raw: false
+    sample_action_mode: policy # gt / policy / negative_sampling
+
+    recollect_first: false
+
+MODEL:
+  policy_name: CMA_DP_ImgMultiPatch_Policy # CMA_DP_Policy
+
+  # training settings
+  learn_angle: true # true: [delta_x, delta_y, delta_yaw] / false: [r, theta]
+  use_iw: false
+  len_traj_act: 4
+
+  TEXT_ENCODER:
+    load_model: true
+    max_length: 248
+    update_text_encoder: false
+    
+    # model settings
+    type: clip-long # roberta
+    model_name: clip-long # meter
+    model_path: data/pretrained/clip-long/longclip-B.pt # data/pretrained/meter/meter_clip16_224_roberta_pretrain.ckpt
+    num_l_layers: 6
+    hidden_size: 512
+    vocab_size: 50265
+    embedding_size: 512
+
+    sot_token: 49406
+    eot_token: 49407
+    pad_token: 0
+
+    # text Q-former
+    use_qformer: False
+    q_former_length: 5
+
+  IMAGE_ENCODER:
+    img_stack_nums: 4 # the history images for inputs
+    use_stack: false
+    dropout: 0.1
+    use_env_drop: true
+    env_drop: 0.3
+
+    RGB:
+      load_model: true
+      update_rgb_encoder: False
+
+      # model settings
+      model_name: clip-long # clip-vit-base-patch32
+      model_path: data/pretrained/clip-long/longclip-B.pt # data/pretrained/clip-vit-base-patch32
+      rgb_proj: false # 768 -> 512?
+      feature_dim: 768
+      projection_dim: 512
+
+      # img_mod
+      img_mod: multi_patches_avg_pooling # cls / multi_patches_avg_pooling
+      multi_patches_num: 5
+  
+    DEPTH:
+      load_model: True
+      update_depth_encoder: False
+
+      # model settings
+      bottleneck: resnet # TAC
+      model_name: openai/clip-vit-base-patch32
+      model_path: data/pretrained/TAC/tac_depth_encoder.pth
+      feature_dim: 768
+      projection_dim: 512
+
+      # for Resnet
+      cnn_type: VlnResnetDepthEncoder
+      output_size: 128
+      ddppo_checkpoint: data/ddppo-models/gibson-4plus-mp3d-train-val-test-resnet50.pth
+      backbone: resnet50
+
+  CROSS_MODAL_ENCODER:
+    load_model: False
+    input_type: 3
+    num_x_layers: 2
+    hidden_size: 512
+    num_attention_heads: 8
+
+    txt_to_img: True
+    txt_to_img_layer: 2
+  
+  STATE_ENCODER:
+    hidden_size: 512
+    rnn_type: GRU
+    num_layers: 1
+
+    rgb_depth_embed_method: flat # for multi_patches_avg_pooling. flat / first
+
+    use_dropout: False
+    dropout_rate: 0.2
+
+  Diffusion_Policy:
+    use: true
+    type: transformer # resnet_unet
+
+    # scheduler
+    scheduler: DDPM # DDPM / DDIM
+
+    # pred_type
+    pred_type: epsilon # epsilon / sample
+
+    # for diffusion sampling
+    add_random_variance: True 
+    clip_sample: True
+
+    # classifier-free guidance
+    use_cls_free_guidance: True
+    cls_free_guidance_scale: 1.5
+    cls_mask_ratio: 0.25
+    random_mask_rgb: True
+    random_mask_instr: True
+    cls_mask_method: mask_token # mask_token / mask_inputs
+
+    # distance bounds for distance and action and distance predictions 
+    distance:
+      min_dist_cat: 0
+      max_dist_cat: 20
+    action:
+      min_dist_cat: 3
+      max_dist_cat: 20
+
+    action_stats:
+      # min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
+      # max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
+      min: [-0.5, -0.5, -1.0] # [min_dx, min_dy, min_dyaw]
+      max: [0.5, 0.5, 1.0] # [max_dx, max_dy, max_dyaw]
+
+    metric_waypoint_spacing: 1
+    negative_mining: False
+
+    # diffusion model params
+    num_diffusion_iters: 20
+    context_size: 1
+    context_type: "temporal"
+
+    # for resnet_unet
+    encoding_size: 512
+    diffusion_step_embed_dim: 256
+    down_dims: [128,256,512]
+    cond_predict_scale: false
+    use_local_cond: true
+
+    # for transformer
+    transformer_n_cond_layers: 0
+    transformer_n_layers: 3
+    transformer_encoding_size: 512
+    # transformer_n_head: 8
+    transformer_p_drop_emb: 0.2
+    cond: 'v2_instr' # rnn_instr / rnn_instr_vis / rnn_Fullinstr_vis / rnn_Fullinstr / v2_instr / v2_Fullinstr
+    txt_len: 80 # use for v2_Fullinstr
+    state_concat_with_noise: False # concat states with noise during decoder
+
+    # action output params
+    waypoint_spacing: 1
+    len_traj_pred: 8
+
+    # stop_weight
+    stop_weight: 1
+  
+  DISTANCE_PREDICTOR:
+    use: false
+    normalize: false
+  
+  IMU_ENCODER:
+    input_size: 3
+    encoding_size: 64
+    use: true
+
+    to_local_coords: true 
+  
+  PREV_ACTION_ENCODER:
+    encoding_size: 64
+  
+  PROGRESS_MONITOR:
+    use: true
+    concat_state_txt: True
+
+  STOP_PROGRESS_PREDICTOR:
+    use: True
+    concat_state_txt: True
+
+    type: continuous # logits / continuous
+
+    # focal loss for logits
+    alpha: 0.25 # default: 0.25
+    gamma: 2 # default: 2
+  
+  STEP_ENCODER:
+    encoding_size: 64
+    use: true
+    max_steps: 500
+
+  LOSS:
+    alpha: 0.0001
+    dist_scale: 1
+  
+  LORA:
+    add_for_instruction_encoder: False
+    add_for_rgb_encoder: False
+    add_for_depth_encoder: False
+
+    lora_r: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    lora_start_layer: 6 # from this layer to add lora layers
+    lora_query: True
+    lora_key: False
+    lora_value: False
+    lora_projection: False
+    lora_mlp: False
+    lora_head: False

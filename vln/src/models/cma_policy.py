@@ -4,101 +4,128 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from gym import Space
-from habitat import Config
-from habitat_baselines.common.baseline_registry import baseline_registry
-from habitat_baselines.rl.models.rnn_state_encoder import (
-    build_rnn_state_encoder,
-)
-from habitat_baselines.rl.ppo.policy import Net
 from torch import Tensor
+from gym import Space
 
-from vlnce_baselines.common.aux_losses import AuxLosses
-from vlnce_baselines.models.encoders import resnet_encoders
-from vlnce_baselines.models.encoders.instruction_encoder import (
+import vln.src.models.encoders as encoders
+
+from vln.src.models.encoders import resnet_encoders
+
+from vln.src.models.encoders.instruction_encoder import (
     InstructionEncoder,
 )
-from vlnce_baselines.models.policy import ILPolicy
-from vlnce_baselines.models.utils import CustomFixedCategorical
 
+from transformers import PretrainedConfig
+import copy
+    
+class CategoricalNet(nn.Module):
+    def __init__(self, num_inputs: int, num_outputs: int) -> None:
+        super().__init__()
 
-@baseline_registry.register_policy
-class CMAPolicy(ILPolicy):
-    def __init__(
-        self,
-        observation_space: Space,
-        action_space: Space,
-        model_config: Config,
-    ) -> None:
-        super().__init__(
-            CMANet(
-                observation_space=observation_space,
-                model_config=model_config,
-                num_actions=action_space.n,
-            ),
-            action_space.n,
+        self.linear = nn.Linear(num_inputs, num_outputs)
+
+        nn.init.orthogonal_(self.linear.weight, gain=0.01)
+        nn.init.constant_(self.linear.bias, 0)
+
+    def forward(self, x: Tensor):
+        x = self.linear(x)
+        return CustomFixedCategorical(logits=x)
+
+class CustomFixedCategorical(torch.distributions.Categorical):
+    """Same as the CustomFixedCategorical in hab-lab, but renames log_probs
+    to log_prob. All the torch distributions use log_prob.
+    """
+
+    def sample(
+        self, sample_shape=torch.Size()  # noqa: B008
+    ) -> Tensor:
+        return super().sample(sample_shape).unsqueeze(-1)
+
+    def log_prob(self, actions: Tensor) -> Tensor:
+        return (
+            super()
+            .log_prob(actions.squeeze(-1))
+            .view(actions.size(0), -1)
+            .sum(-1)
+            .unsqueeze(-1)
         )
 
-    @classmethod
-    def from_config(
-        cls, config: Config, observation_space: Space, action_space: Space
-    ):
-        return cls(
-            observation_space=observation_space,
-            action_space=action_space,
-            model_config=config.MODEL,
-        )
+    def mode(self):
+        return self.probs.argmax(dim=-1, keepdim=True)
 
 
-class CMANet(Net):
+class CMANet(nn.Module):
     """An implementation of the cross-modal attention (CMA) network in
     https://arxiv.org/abs/2004.02857
     """
 
     def __init__(
-        self, observation_space: Space, model_config: Config, num_actions: int
+        self, config, observation_space, action_stats=None, num_actions=4
     ) -> None:
         super().__init__()
-        self.model_config = model_config
-        model_config.defrost()
-        model_config.INSTRUCTION_ENCODER.final_state_only = False
-        model_config.freeze()
-
+        self.num_actions = num_actions
+        self.model_config = config.MODEL
+        self.model_config.defrost()
+        self.model_config.INSTRUCTION_ENCODER.final_state_only = False
+        self.model_config.freeze()
         # Init the instruction encoder
-        self.instruction_encoder = InstructionEncoder(
-            model_config.INSTRUCTION_ENCODER
-        )
+        self.use_instr_bert_encoder = False
+        if hasattr(self.model_config, "TEXT_ENCODER"):
+            # use BERT to encode instruction
+            if self.model_config.TEXT_ENCODER.model_name == 'clip-long':
+                self.instruction_encoder = encoders.InstructionLongCLIPEncoder(self.model_config.TEXT_ENCODER, self.model_config.LORA)
+                self.txt_linear_512_to_256 = nn.Linear(512, 256)
+                self.instruction_encoder.output_size = 256
+            else:
+                if self.model_config.TEXT_ENCODER.model_name in ['meter', 'roberta']:
+                    config_name = 'roberta-base'
+                else:
+                    config_name = self.model_config.TEXT_ENCODER.model_name
+                bert_config = PretrainedConfig.from_pretrained(config_name)
+                # Init the instruction encoder
+                text_encoder_config = copy.deepcopy(bert_config)
+                for k,v in self.model_config.TEXT_ENCODER.items():
+                    setattr(text_encoder_config, k, v)
+                # add LORA settings
+                setattr(text_encoder_config, 'LORA', self.model_config.LORA)
+
+                self.instruction_encoder = encoders.LanguageEncoder(text_encoder_config)
+            self.use_instr_bert_encoder = True
+        else:
+            self.instruction_encoder = InstructionEncoder(
+                self.model_config.INSTRUCTION_ENCODER
+            )
 
         # Init the depth encoder
-        assert model_config.DEPTH_ENCODER.cnn_type in ["VlnResnetDepthEncoder"]
+        assert self.model_config.DEPTH_ENCODER.cnn_type in ["VlnResnetDepthEncoder"]
         self.depth_encoder = getattr(
-            resnet_encoders, model_config.DEPTH_ENCODER.cnn_type
+            resnet_encoders, self.model_config.DEPTH_ENCODER.cnn_type
         )(
             observation_space,
-            output_size=model_config.DEPTH_ENCODER.output_size,
-            checkpoint=model_config.DEPTH_ENCODER.ddppo_checkpoint,
-            backbone=model_config.DEPTH_ENCODER.backbone,
-            trainable=model_config.DEPTH_ENCODER.trainable,
+            output_size=self.model_config.DEPTH_ENCODER.output_size,
+            checkpoint=self.model_config.DEPTH_ENCODER.ddppo_checkpoint,
+            backbone=self.model_config.DEPTH_ENCODER.backbone,
+            trainable=self.model_config.DEPTH_ENCODER.trainable,
             spatial_output=True,
         )
 
         # Init the RGB visual encoder
-        assert model_config.RGB_ENCODER.cnn_type in [
+        assert self.model_config.RGB_ENCODER.cnn_type in [
             "TorchVisionResNet18",
             "TorchVisionResNet50",
         ]
         self.rgb_encoder = getattr(
-            resnet_encoders, model_config.RGB_ENCODER.cnn_type
+            resnet_encoders, self.model_config.RGB_ENCODER.cnn_type
         )(
-            model_config.RGB_ENCODER.output_size,
-            normalize_visual_inputs=model_config.normalize_rgb,
-            trainable=model_config.RGB_ENCODER.trainable,
+            self.model_config.RGB_ENCODER.output_size,
+            normalize_visual_inputs=self.model_config.normalize_rgb,
+            trainable=self.model_config.RGB_ENCODER.trainable,
             spatial_output=True,
         )
 
         self.prev_action_embedding = nn.Embedding(num_actions + 1, 32)
 
-        hidden_size = model_config.STATE_ENCODER.hidden_size
+        hidden_size = self.model_config.STATE_ENCODER.hidden_size
         self._hidden_size = hidden_size
 
         self.rgb_linear = nn.Sequential(
@@ -106,47 +133,47 @@ class CMANet(Net):
             nn.Flatten(),
             nn.Linear(
                 self.rgb_encoder.output_shape[0],
-                model_config.RGB_ENCODER.output_size,
+                self.model_config.RGB_ENCODER.output_size,
             ),
             nn.ReLU(True),
         )
         self.depth_linear = nn.Sequential(
             nn.Flatten(),
             nn.Linear(
-                np.prod(self.depth_encoder.output_shape),
-                model_config.DEPTH_ENCODER.output_size,
+                np.prod(self.depth_encoder.output_shape), # (192, 4, 4)
+                self.model_config.DEPTH_ENCODER.output_size, # 128
             ),
             nn.ReLU(True),
         )
 
         # Init the RNN state decoder
-        rnn_input_size = model_config.DEPTH_ENCODER.output_size
-        rnn_input_size += model_config.RGB_ENCODER.output_size
+        rnn_input_size = self.model_config.DEPTH_ENCODER.output_size
+        rnn_input_size += self.model_config.RGB_ENCODER.output_size
         rnn_input_size += self.prev_action_embedding.embedding_dim
 
-        self.state_encoder = build_rnn_state_encoder(
+        self.state_encoder = encoders.build_rnn_state_encoder(
             input_size=rnn_input_size,
-            hidden_size=model_config.STATE_ENCODER.hidden_size,
-            rnn_type=model_config.STATE_ENCODER.rnn_type,
-            num_layers=1,
+            hidden_size=self.model_config.STATE_ENCODER.hidden_size,
+            rnn_type=self.model_config.STATE_ENCODER.rnn_type,
+            num_layers=1
         )
 
         self._output_size = (
-            model_config.STATE_ENCODER.hidden_size
-            + model_config.RGB_ENCODER.output_size
-            + model_config.DEPTH_ENCODER.output_size
+            self.model_config.STATE_ENCODER.hidden_size
+            + self.model_config.RGB_ENCODER.output_size
+            + self.model_config.DEPTH_ENCODER.output_size
             + self.instruction_encoder.output_size
         )
 
         self.rgb_kv = nn.Conv1d(
             self.rgb_encoder.output_shape[0],
-            hidden_size // 2 + model_config.RGB_ENCODER.output_size,
+            hidden_size // 2 + self.model_config.RGB_ENCODER.output_size,
             1,
         )
 
         self.depth_kv = nn.Conv1d(
             self.depth_encoder.output_shape[0],
-            hidden_size // 2 + model_config.DEPTH_ENCODER.output_size,
+            hidden_size // 2 + self.model_config.DEPTH_ENCODER.output_size,
             1,
         )
 
@@ -170,19 +197,24 @@ class CMANet(Net):
             nn.ReLU(True),
         )
 
-        self.second_state_encoder = build_rnn_state_encoder(
+        self.second_state_encoder = encoders.build_rnn_state_encoder(
             input_size=self._hidden_size,
             hidden_size=self._hidden_size,
-            rnn_type=model_config.STATE_ENCODER.rnn_type,
+            rnn_type=self.model_config.STATE_ENCODER.rnn_type,
             num_layers=1,
         )
-        self._output_size = model_config.STATE_ENCODER.hidden_size
+        self._output_size = self.model_config.STATE_ENCODER.hidden_size
 
         self.progress_monitor = nn.Linear(self.output_size, 1)
 
         self._init_layers()
 
         self.train()
+        
+        # Determine
+        self.action_distribution = CategoricalNet(
+            self._output_size, self.num_actions
+        )
 
     @property
     def output_size(self) -> int:
@@ -217,18 +249,24 @@ class CMANet(Net):
 
         return torch.einsum("ni, nci -> nc", attn, v)
 
-    def forward(
+    def _forward(
         self,
         observations: Dict[str, Tensor],
         rnn_states: Tensor, # [bs, 2, 512]
         prev_actions: Tensor,
         masks: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        instruction_embedding = self.instruction_encoder(observations)
-        depth_embedding = self.depth_encoder(observations)
+        if self.use_instr_bert_encoder:
+            instr = observations['instruction']
+            instruction_embedding, txt_masks, txt_cls_embeds = self.instruction_encoder(instr) # for rxr debug!
+            instruction_embedding = self.txt_linear_512_to_256(instruction_embedding)
+            instruction_embedding = instruction_embedding.permute(0, 2, 1) # [bs, 256, txt_len]
+        else:
+            instruction_embedding = self.instruction_encoder(observations) # [bs, 256, 200]
+        depth_embedding = self.depth_encoder(observations) # [bs, 192, 4, 4]
         depth_embedding = torch.flatten(depth_embedding, 2) # [bs, 192, 16]
 
-        rgb_embedding = self.rgb_encoder(observations)
+        rgb_embedding = self.rgb_encoder(observations) # [370, 2112, 4, 4]
         rgb_embedding = torch.flatten(rgb_embedding, 2) # [bs, 2112, 16]
 
         prev_actions = self.prev_action_embedding(
@@ -242,8 +280,8 @@ class CMANet(Net):
         if self.model_config.ablate_rgb:
             rgb_embedding = rgb_embedding * 0
 
-        rgb_in = self.rgb_linear(rgb_embedding)
-        depth_in = self.depth_linear(depth_embedding)
+        rgb_in = self.rgb_linear(rgb_embedding) # [bs, 256]
+        depth_in = self.depth_linear(depth_embedding) # [bs, 128]
 
         state_in = torch.cat([rgb_in, depth_in, prev_actions], dim=1)
         rnn_states_out = rnn_states.detach().clone()
@@ -256,8 +294,8 @@ class CMANet(Net):
             masks,
         )
 
-        text_state_q = self.state_q(state)
-        text_state_k = self.text_k(instruction_embedding)
+        text_state_q = self.state_q(state) # [bs, 256]
+        text_state_k = self.text_k(instruction_embedding) # [bs, 256, 200]
         text_mask = (instruction_embedding == 0.0).all(dim=1)
         text_embedding = self._attn(
             text_state_q, text_state_k, instruction_embedding, text_mask
@@ -265,13 +303,13 @@ class CMANet(Net):
 
         rgb_k, rgb_v = torch.split(
             self.rgb_kv(rgb_embedding), self._hidden_size // 2, dim=1
-        )
+        ) # [bs, 256, 16]
         depth_k, depth_v = torch.split(
             self.depth_kv(depth_embedding), self._hidden_size // 2, dim=1
-        )
+        ) # [bs, 256, 16]
 
-        text_q = self.text_q(text_embedding)
-        rgb_embedding = self._attn(text_q, rgb_k, rgb_v)
+        text_q = self.text_q(text_embedding) # text_embedding: [bs, 256]. text_q: [bs, 256]
+        rgb_embedding = self._attn(text_q, rgb_k, rgb_v) # [bs, 256]
         depth_embedding = self._attn(text_q, depth_k, depth_v)
 
         x = torch.cat(
@@ -294,17 +332,31 @@ class CMANet(Net):
             masks, # [B, 512]
         )
 
-        if self.model_config.PROGRESS_MONITOR.use and AuxLosses.is_active():
+        progress_hat = None
+        if self.model_config.PROGRESS_MONITOR.use:
             progress_hat = torch.tanh(self.progress_monitor(x))
             progress_loss = F.mse_loss(
                 progress_hat.squeeze(1),
                 observations["progress"],
                 reduction="none",
             )
-            AuxLosses.register_loss(
-                "progress_monitor",
-                progress_loss,
-                self.model_config.PROGRESS_MONITOR.alpha,
-            )
 
-        return x, rnn_states_out
+        return x, rnn_states_out, progress_hat
+
+    def build_distribution(
+        self, observations, rnn_states, prev_actions, masks
+    ) -> CustomFixedCategorical:
+        features, rnn_states = self.forward(
+            observations, rnn_states, prev_actions, masks
+        )
+        return self.action_distribution(features)
+    
+    def forward(self, batch):
+        x, rnn_states_out, progress_hat = self._forward(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+        # distribution = self.action_distribution(x) # This would meet the error when using DataParallel during training "TypeError: 'CustomFixedCategorical' object is not iterable"
+        if batch['mode'] == 'train':
+            outputs = self.action_distribution(x).logits
+        elif batch['mode'] == 'inference':
+            outputs = self.action_distribution(x).mode()
+        return outputs, rnn_states_out, progress_hat
+

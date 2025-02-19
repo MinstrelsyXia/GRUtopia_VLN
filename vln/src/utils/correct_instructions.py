@@ -228,9 +228,17 @@ class CorrectInstructions:
             
         return corrected_episodes
 
+def load_gather_data(dataset_root_dir, split):
+    ''' Load data based on VLN-CE
+    '''
+    with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_gather_data.json"), 'r') as f:
+        data = json.load(f)
+    print(1)
+
 if __name__ == "__main__":
-    dataset_root_dir = "/isaac-sim/GRUtopia/data/datasets/R2R_VLNCE_v1-3"
-    statistic_data_folder = Path("/isaac-sim/GRUtopia/data/datasets/revised/statistics")
+    dataset_root_dir = "data/datasets/R2R_VLNCE_v1-3_preprocessed"
+    # dataset_root_dir = "data/datasets/revised/corrected"
+    statistic_data_folder = Path("data/datasets/revised/statistics")
     inst_alias = "inst"
     splits = ["train", "val_seen","val_unseen"]
     action_map = {
@@ -253,9 +261,15 @@ if __name__ == "__main__":
     ]
 
     # Add output directory
-    output_dir = "data/datasets/revised/corrected"
+    output_dir = "data/datasets/revised/processed_corrected"
     os.makedirs(output_dir, exist_ok=True)
     
+    # load_gather_data(dataset_root_dir="/ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected", split="train")
+
+    # data_1 = load_data('/ssd/wangliuyi/code/w61_grutopia/data/datasets/R2R_VLNCE_v1-3', 'val_seen')
+    # data_2 = load_data('/ssd/wangliuyi/code/w61_grutopia/data/datasets/R2R_VLNCE_v1-3_preprocessed', 'val_seen')
+    # print(1)
+
     correct_instructions = CorrectInstructions(splits, dataset_root_dir, statistic_data_folder, output_dir)
     for split in splits:
         # correct_instructions.correct_heading_error(split, angle_threshold=180, Turn180_candidates=Turn180_candidates, correct_and_save=True)

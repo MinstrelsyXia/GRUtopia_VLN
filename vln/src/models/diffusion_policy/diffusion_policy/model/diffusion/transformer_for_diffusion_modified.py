@@ -23,7 +23,10 @@ class TransformerForDiffusion(ModuleAttrMixin):
             time_as_cond: bool=True,
             obs_as_cond: bool=False,
             n_cond_layers: int = 0,
-            head_dim: int=64
+            head_dim: int=64,
+            use_dp: bool=True,
+            state_concat_with_noise: bool=False,
+            T_y_cond: int=None,
         ) -> None:
         super().__init__()
 
@@ -52,6 +55,7 @@ class TransformerForDiffusion(ModuleAttrMixin):
         
         if obs_as_cond:
             self.cond_obs_emb = nn.Linear(cond_dim, n_emb)
+        
 
         self.cond_pos_emb = None
         self.encoder = None
@@ -60,6 +64,7 @@ class TransformerForDiffusion(ModuleAttrMixin):
         encoder_only = False
         
         n_head = n_emb // head_dim
+        self.n_head = n_head
         if T_cond > 0:
             self.cond_pos_emb = nn.Parameter(torch.zeros(1, T_cond, n_emb))
             if self.use_encoder:
@@ -115,6 +120,13 @@ class TransformerForDiffusion(ModuleAttrMixin):
                 num_layers=n_layer
             )
 
+                    
+        self.state_concat_with_noise = state_concat_with_noise
+        if self.state_concat_with_noise:
+            if obs_as_cond: 
+                self.y_cond_obs_emb = nn.Linear(cond_dim, n_emb)
+                self.y_cond_pos_emb = nn.Parameter(torch.zeros(1, T_y_cond+1, n_emb))
+        
         # attention mask
         if causal_attn:
             # causal mask to ensure that attention is only applied to the left in the input sequence
@@ -140,6 +152,13 @@ class TransformerForDiffusion(ModuleAttrMixin):
         else:
             self.mask = None
             self.memory_mask = None
+
+        # init the decoder inputs if use_dp is False
+        self.use_dp = use_dp
+        if not use_dp:
+            self.decoder_queries = nn.Parameter(torch.zeros(1, T, n_emb))
+            self.decoder_queries.data.normal_(mean=0.0, std=0.02)
+            self.input_emb = nn.Linear(n_emb, n_emb) # TODO: whether need this?
 
         # decoder head
         self.ln_f = nn.LayerNorm(n_emb)
@@ -283,20 +302,24 @@ class TransformerForDiffusion(ModuleAttrMixin):
         cond: (B,T',cond_dim)
         output: (B,T,input_dim)
         """
-        # 1. time
-        timesteps = timestep
-        if not torch.is_tensor(timesteps):
-            # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
-            timesteps = torch.tensor([timesteps], dtype=torch.long, device=sample.device)
-        elif torch.is_tensor(timesteps) and len(timesteps.shape) == 0:
-            timesteps = timesteps[None].to(sample.device)
-        # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
-        timesteps = timesteps.expand(sample.shape[0])
-        time_emb = self.time_emb(timesteps).unsqueeze(1)
-        # (B,1,n_emb)
+        if self.use_dp:
+            # 1. time
+            timesteps = timestep
+            if not torch.is_tensor(timesteps):
+                # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
+                timesteps = torch.tensor([timesteps], dtype=torch.long, device=sample.device)
+            elif torch.is_tensor(timesteps) and len(timesteps.shape) == 0:
+                timesteps = timesteps[None].to(sample.device)
+            # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
+            timesteps = timesteps.expand(sample.shape[0])
+            time_emb = self.time_emb(timesteps).unsqueeze(1)
+            # (B,1,n_emb)
 
-        # process input
-        input_emb = self.input_emb(sample)
+            # process input
+            input_emb = self.input_emb(sample)
+        else:
+            time_emb = None
+            input_emb = self.input_emb(self.decoder_queries)
 
         if self.encoder_only:
             # BERT
@@ -319,11 +342,28 @@ class TransformerForDiffusion(ModuleAttrMixin):
                 # (B,To,n_emb)
                 if type_embeds is not None:
                     cond_obs_emb = cond_obs_emb + type_embeds
-                cond_embeddings = torch.cat([cond_embeddings, cond_obs_emb], dim=1)
+                if self.use_dp:
+                    if self.state_concat_with_noise:
+                        y_cond = kwargs.get('y_cond', None)
+                        y_cond_mask = kwargs.get('y_cond_mask', None)
+                        if y_cond is not None:
+                            y_cond_emb = self.y_cond_obs_emb(y_cond)
+                            cond_embeddings = torch.cat([cond_embeddings, y_cond_emb], dim=1)
+                        else:
+                            cond_embeddings = torch.cat([cond_embeddings, cond_obs_emb], dim=1)
+                    else:
+                        cond_embeddings = torch.cat([cond_embeddings, cond_obs_emb], dim=1)
+                else:
+                    cond_embeddings = cond_obs_emb
             tc = cond_embeddings.shape[1]
-            position_embeddings = self.cond_pos_emb[
-                :, :tc, :
-            ]  # each position maps to a (learnable) vector
+            if self.state_concat_with_noise:
+                position_embeddings = self.y_cond_pos_emb[:, :tc, :]
+                concat_cond_pos_emb = self.cond_pos_emb[:, :cond_obs_emb.shape[1], :]
+                concat_cond_emb = self.drop(concat_cond_pos_emb + cond_obs_emb)
+            else:
+                position_embeddings = self.cond_pos_emb[
+                    :, :tc, :
+                ]  # each position maps to a (learnable) vector
             x = self.drop(cond_embeddings + position_embeddings)
             if self.use_encoder:
                 x = self.encoder(x)
@@ -338,18 +378,49 @@ class TransformerForDiffusion(ModuleAttrMixin):
             ]  # each position maps to a (learnable) vector
             x = self.drop(token_embeddings + position_embeddings)
             # (B,T,n_emb)
-            x = self.decoder(
-                tgt=x,
-                memory=memory,
-                tgt_mask=self.mask,
-                # memory_mask=self.memory_mask
-            ) # 20241031 update: 感觉不需要causal mask
-            # (B,T,n_emb)
+            cond_mask = kwargs.get('cond_mask', None)
+            if not self.use_dp:
+                x = x.repeat(memory.shape[0], 1, 1)  # 将x的第一个维度扩展到与memory相同
+            if self.state_concat_with_noise:
+                cond_mask = cond_mask[:,1:] # remove the first token for the time embedding
+                # construct new mask for decoder
+                triu_mask = self.mask.repeat(x.shape[0], 1, 1)
+                noise_to_state_mask = cond_mask.unsqueeze(1).repeat(1, x.shape[1], 1)
+                state_to_noise_mask = torch.ones_like(noise_to_state_mask).permute(0,2,1)*(-torch.inf)
+                state_to_state_mask = cond_mask.unsqueeze(1).repeat(1, cond_mask.shape[1], 1)
+                concat_mask_0 = torch.cat([triu_mask, noise_to_state_mask], dim=-1)
+                concat_mask_1 = torch.cat([state_to_noise_mask, state_to_state_mask], dim=-1)
+                tgt_mask = torch.cat([concat_mask_0, concat_mask_1], dim=1).repeat(self.n_head,1,1) # [bs*n_head, L_seq, K_seq] needed for decoder.
+                
+                x = torch.cat([x, concat_cond_emb], dim=1) # (B,T+T_y,n_emb)
+                
+                x = self.decoder(
+                    tgt=x,
+                    memory=memory,
+                    tgt_mask=tgt_mask,
+                    memory_key_padding_mask=y_cond_mask, # 为True的位置会被mask掉
+                    # memory_mask=self.memory_mask
+                )
+                
+            else:
+                tgt_mask = self.mask
+            
+                x = self.decoder(
+                    tgt=x,
+                    memory=memory,
+                    tgt_mask=tgt_mask,
+                    memory_key_padding_mask=cond_mask, # 为True的位置会被mask掉
+                    # memory_mask=self.memory_mask
+                ) # 20241031 update: 感觉不需要causal mask
+                # (B,T,n_emb)
         
         # head
         x = self.ln_f(x)
         x = self.head(x)
         # (B,T,n_out)
+        if self.state_concat_with_noise:
+            x = x[:, :self.T, :]
+        
         return x
 
 
