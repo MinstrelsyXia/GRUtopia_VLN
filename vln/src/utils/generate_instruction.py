@@ -6,6 +6,7 @@ import gzip
 import os
 import json
 from tqdm import tqdm
+import random
 
 def load_data(dataset_file=None, change_from_habitat=True):
     ''' Load data based on VLN-CE
@@ -112,13 +113,61 @@ def generate_new_dataset(source_dataset_file, rgb_dir, output_dir, instr_dir='in
     print(f"Generated new dataset with {len(new_episodes_data)} episodes")
     return new_data
 
+def split_dataset(dataset_file, output_dir, train_ratio=0.8):
+    with gzip.open(dataset_file, 'rt', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # 随机分配数据到训练集和验证集
+    episodes = data["episodes"]
+    filter_episodes = []
+    for ep in episodes:
+        if len(ep["instruction"]["instruction_text"]) == 0:
+            filter_episodes.append(ep)
+    episodes = filter_episodes  
+
+    total_length = len(episodes)
+    train_size = int(total_length * train_ratio)
+    
+    train_data = []
+    val_seen_data = []
+
+    random.shuffle(episodes)
+    
+    train_data = episodes[:train_size]
+    val_seen_data = episodes[train_size:]
+    
+    # 创建新的数据集字典
+    train_dataset = {"episodes": train_data}
+    val_seen_dataset = {"episodes": val_seen_data}
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 保存训练集和验证集
+    train_output = os.path.join(output_dir, "train.json.gz")
+    val_seen_output = os.path.join(output_dir, "val_seen.json.gz")
+    
+    with gzip.open(train_output, 'wt', encoding='utf-8') as f:
+        json.dump(train_dataset, f, indent=2)
+    
+    with gzip.open(val_seen_output, 'wt', encoding='utf-8') as f:
+        json.dump(val_seen_dataset, f, indent=2)
+    
+    print(f"Dataset split complete:")
+    print(f"Total episodes: {total_length}")
+    print(f"Training episodes: {len(train_data)}")
+    print(f"Validation episodes: {len(val_seen_data)}")
+    
+    return train_dataset, val_seen_dataset
+
 if __name__ == "__main__":
-    six_floor_dataset_file = "data/sixth_floor.json.gz"
+    six_floor_dataset_file = "/ailab/user/wangliuyi/code/w61_grutopia/data/datasets/sixth_floor/sixth_floor_with_instr.json.gz"
 
     # six_floor_data = load_data(six_floor_dataset_file, change_from_habitat=False)
     # vlnce_data = load_data(vlnce_dataset_file, change_from_habitat=True)
     # print(six_floor_data)
     # print(vlnce_data)
 
-    generate_new_dataset(six_floor_dataset_file, "data/six_floor_rgbs", "data/outputs")
+    # generate_new_dataset(six_floor_dataset_file, "data/six_floor_rgbs", "data/outputs")
+    split_dataset(six_floor_dataset_file, "data/datasets/sixth_floor", train_ratio=0.8)
 

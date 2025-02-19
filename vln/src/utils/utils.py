@@ -461,7 +461,10 @@ def load_dataset(dataset_root_dir, split, logger=None):
         for item in data["episodes"]:
             item["start_position"] = [item["start_position"][0], -item["start_position"][2], item["start_position"][1]]
             item["start_rotation"] = [-item["start_rotation"][3], item["start_rotation"][0], item["start_rotation"][2], -item["start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
-            item["scan"] = item["scene_id"].split("/")[1]
+            if '/' in item["scene_id"]: # for sixth floor dataset   
+                item["scan"] = item["scene_id"].split("/")[1]
+            else:
+                item["scan"] = item["scene_id"]
             item["c_reference_path"] = []
             if "reference_path" in item.keys():
                 for path in item["reference_path"]:
