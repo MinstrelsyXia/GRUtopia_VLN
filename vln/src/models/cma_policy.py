@@ -333,7 +333,7 @@ class CMANet(nn.Module):
         )
 
         progress_hat = None
-        if self.model_config.PROGRESS_MONITOR.use:
+        if self.model_config.PROGRESS_MONITOR.use and "progress" in observations:
             progress_hat = torch.tanh(self.progress_monitor(x))
             progress_loss = F.mse_loss(
                 progress_hat.squeeze(1),
