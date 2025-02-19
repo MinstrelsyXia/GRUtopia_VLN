@@ -37,6 +37,7 @@ class DescreteController(BaseController):
             self.current_steps = 0
         
         self.current_steps += 1
+        scaler = 1 / self.robot.get_robot_scale()[0] # TODO: for jetbot 
         
         # Define actions:
         # 0: stop

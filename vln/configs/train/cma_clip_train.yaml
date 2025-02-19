@@ -92,9 +92,9 @@ IL:
   save_interval_epochs: 10
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
-  load_from_ckpt: False
-  ckpt_to_load: none
-  load_from_pretrain: True
+  load_from_ckpt: True
+  ckpt_to_load: data/checkpoints/20250213_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_clipEncoders/ckpts/ckpt.20.pth
+  load_from_pretrain: False
 
   dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_corrected
 

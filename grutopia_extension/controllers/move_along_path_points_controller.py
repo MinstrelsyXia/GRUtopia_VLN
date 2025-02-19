@@ -38,7 +38,7 @@ class MoveAlongPathPointsController(BaseController):
         if self.path_points is not path_points:
             self.path_points = path_points
             self.path_point_idx = 0
-            log.info('reset path points')
+            # log.info('reset path points')
             self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
             self.current_path_point[-1] = 0
 
