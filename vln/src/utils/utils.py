@@ -7,6 +7,7 @@ import gzip
 import copy
 import glob
 import cv2
+
 import yacs.config
 
 import numpy as np
@@ -17,7 +18,7 @@ from torch import Size, Tensor
 from torch import nn as nn
 
 from collections import defaultdict
-# from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation as R
 
 from grutopia.core.util.log import log
 
@@ -579,7 +580,8 @@ def batch_obs(
 
     for obs in observations:
         for sensor in obs:
-            batch[sensor].append(torch.as_tensor(obs[sensor]))
+            if obs[sensor] is not None:
+                batch[sensor].append(torch.as_tensor(obs[sensor]))
 
     batch_t: TensorDict = TensorDict()
 
@@ -627,3 +629,10 @@ def namespace_to_dict(namespace):
         else:
             result[key] = value
     return result
+
+def get_config(exp_config, opts):
+    config = Config()
+    config.merge_from_file(exp_config)
+    if opts:
+        config.merge_from_list(opts)
+    return config

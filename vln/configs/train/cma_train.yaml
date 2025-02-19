@@ -92,9 +92,15 @@ IL:
   save_interval_epochs: 5
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
+<<<<<<< HEAD
+  load_from_ckpt: True
+  ckpt_to_load: data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth
+  load_from_pretrain: False
+=======
   load_from_ckpt: False
   ckpt_to_load: none
   load_from_pretrain: True
+>>>>>>> 1184725a1f7656e4f9f57de94cd5cf19b5329084
 
   dataset_root_dir: data/datasets/R2R_VLNCE_v1-3_preprocessed
 

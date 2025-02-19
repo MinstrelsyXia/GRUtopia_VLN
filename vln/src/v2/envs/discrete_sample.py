@@ -1,0 +1,244 @@
+from .base import BaseSingleScanEnv
+from grutopia.core.config import SimulatorConfig
+from vln.src.v2.dataloader.sample import SamplePathKeyDataloader
+from vln.src.v2.util.common_log_util import common_logger as log
+from vln.src.v2.util import progress_log_util
+from vln.src.v2.util.discrete_planner import AStarDiscretePlanner
+from vln.src.v2.util.path_plan import plan_and_get_actions_discrete
+from vln.src.v2.util.common import (
+    check_robot_fall, 
+    describe_action, 
+    get_action_state,
+    check_is_on_track
+)
+from vln.src.v2.util.stuck_checker import StuckChecker
+from vln.src.v2.util.data_collector import DataCollector
+import numpy as np
+
+class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
+    
+    def __init__(
+            self,
+            robot_name,
+            sim_config:SimulatorConfig,
+            scene_asset_path,
+            start_position,
+            start_rotation,
+            headless,
+            dataloader:SamplePathKeyDataloader,
+            aperture=200,
+            max_step=25000,
+            update_light=False,
+            save_third_person_image=False
+        ):
+        super().__init__(
+            robot_name=robot_name,
+            sim_config=sim_config,
+            scene_asset_path=scene_asset_path,
+            start_position=start_position,
+            start_rotation=start_rotation,
+            headless=headless,
+        )
+        self.dataloader = dataloader
+        self.aperture = aperture
+        self.max_step = max_step
+        self.robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
+
+        self.update_light = update_light
+        self.save_third_person_image = save_third_person_image
+
+    def execute_one_action(
+        self,
+        action,
+        stuck_checker,
+    ):
+        finish_state = False
+        fail_reason = None
+        while not finish_state:
+            self.update_timestamp()
+            # update light
+            if self.update_light:
+                robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                self.update_light_positions(robot_position) #TODO: 解决部分z轴照不到光的问题
+
+            obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
+            robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+            self.step += 1
+            finish_state = get_action_state(obs, 'move_by_descrete')
+            if self.step > self.max_step:
+                fail_reason = "max_step"
+                break
+            if self.step % 20 == 0:
+                robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
+                is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
+                if is_fall:
+                    fail_reason = "fall"
+                    break
+                is_stuck = stuck_checker.check_robot_stuck(robot_position, robot_rotation, cur_iter=self.step, max_iter=2500, threshold=0.2)
+                if is_stuck:
+                    fail_reason = "stuck"
+                    break
+        if fail_reason is not None:
+            return False, fail_reason
+        return True, 'success'
+
+    def sample(self):
+        self.load_scan_and_robot()
+        height, width = self.topdown_global_map_camera._camera._resolution
+        self.path_planner = AStarDiscretePlanner(
+            map_width = width,
+            map_height= height,
+            aperture = self.aperture,
+            step_unit_meter = 0.25,
+            angle_unit = 15,
+            max_step = 50000,
+        )
+        sample_path_key_list = self.dataloader.sample_path_key_list
+        path_key_data = self.dataloader.path_key_data
+        path_key_split = self.dataloader.path_key_split
+        scan = self.dataloader.target_scan
+
+        progress_log_util.init(scan, len(sample_path_key_list), rank=self.dataloader.rank)
+        progress_log_util.progress_logger.info(f"start sample scan: {scan}, total_path:{len(sample_path_key_list)}")
+
+        for path_key in sample_path_key_list:
+            split = path_key_split[path_key]
+            data = path_key_data[path_key]
+            nav_path = data['reference_path']
+            trajectory_id = path_key.split('_')[0]
+            log.info(f"split: {split}")
+            log.info(f"scan: {scan}")
+            log.info(f"trajectory_id_episode_id: {path_key}")
+            log.info(f"data: {data}")
+            progress_log_util.trace_start(
+                trajectory_id = path_key,
+                step_count=0,
+            )
+            data_collector = DataCollector(
+                lmdb_path=self.dataloader.lmdb_path,
+                rank = self.dataloader.rank,
+                save_third_person_image= self.save_third_person_image
+            )
+            start_position = data['start_position']
+            start_rotation = data['start_rotation']
+            self.reset_robot(start_position, start_rotation)
+            obs = self.warm_up(240)
+            robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+            robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
+            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
+            if is_fall:
+                progress_log_util.trace_end(
+                    trajectory_id = path_key,
+                    step_count=0,
+                    result = 'fast_fall',
+                )
+                data_collector.save_sample_data(
+                    key=str(trajectory_id),
+                    result='fast_fall',
+                    instruction=data['instruction']['instruction_text'],
+                )
+                log.info(f"[scan:{scan}][path:{trajectory_id}] finish[step:0] result: fast_fall")
+                continue
+            stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
+
+            finish = False
+            result = None
+            current_point_index = 0
+            self.step = 0
+
+            while True:
+                if finish:
+                    distance_str = "-"
+                    if result == "success":
+                        data_collector.collect_observation_by_env(
+                            env=self.env,
+                            step=self.step,
+                            process=current_point_index / len(nav_path),
+                            camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
+                            robot_pose=self.task.get_robot_poses_without_offset(),
+                            robot_name=self.robot_name
+                        )
+                        data_collector.collect_action([0])
+                        robot_position, _ = self.isaac_robot.get_world_pose()
+                        distance = np.linalg.norm(robot_position[:2] - nav_path[-1][:2])
+                        distance_str = f"{round(distance, 2)}"
+                    log.info(f"[scan:{scan}][path:{trajectory_id}] finish[step:{self.step}] result:{result}, distance:{distance_str} m")
+                    data_collector.save_sample_data(
+                        key=str(trajectory_id),
+                        result=result,
+                        instruction=data['instruction']['instruction_text'],
+                    )
+                    progress_log_util.trace_end(
+                        trajectory_id = path_key,
+                        step_count=self.step,
+                        result = result,
+                    )
+                    break
+                map_info = self.get_global_map(robot_height=self.robot_height, dilation_iterations=2, robot_name=self.robot_name)
+                camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
+                
+                robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                # path_plan
+                action_list, real_points, find_flag, reason = plan_and_get_actions_discrete(
+                    map_info=map_info,
+                    robot_position=robot_position,
+                    robot_rotation=robot_rotation,
+                    goal = nav_path[current_point_index + 1],
+                    camera_pose = camera_pose,
+                    aperture=self.aperture,
+                    width=width,
+                    height=height,
+                    path_planner=self.path_planner,
+                )
+                if not find_flag or action_list is None or len(action_list) == 0:
+                    finish = True
+                    result = 'path planning'
+                    if reason is not None:
+                        result = reason
+                    continue
+                
+                action_index = 0
+                for action in action_list:
+                    env_action = [{self.robot_name: {'move_by_descrete': [action]}}]
+                    data_collector.collect_observation_by_env(
+                        env=self.env,
+                        step=self.step,
+                        process=current_point_index / len(nav_path),
+                        camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
+                        robot_pose=self.task.get_robot_poses_without_offset(),
+                        robot_name=self.robot_name,
+                    )
+                    data_collector.collect_action(action)
+                    # robot_position_0, robot_rotation_0 = self.task.get_robot_poses_without_offset() # !!! debug
+                    action_success, fail_reason = self.execute_one_action(env_action,stuck_checker)
+                    log.info(f"[scan:{scan}][path:{path_key}] finish one action[step:{self.step}][ {action_index + 1} / {len(action_list)} ][result:{fail_reason}] {describe_action(action)}")
+                    if not action_success:
+                        finish = True
+                        result = fail_reason
+                        break
+                    robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                    # # !!! debug !!!
+                    # from omni.isaac.core.utils.rotations import quat_to_euler_angles
+                    # _, _, ori_yaw = quat_to_euler_angles(robot_rotation_0)
+                    # _, _, new_yaw = quat_to_euler_angles(robot_rotation)
+                    # ori_yaw = np.rad2deg(ori_yaw)
+                    # new_yaw = np.rad2deg(new_yaw)
+                    # print(f"ori_yaw: {ori_yaw}, new_yaw: {new_yaw}")
+                    
+                    is_on_track = check_is_on_track(
+                        robot_position=robot_position,
+                        robot_rotation=robot_rotation,
+                        action=action,
+                        action_index=action_index,
+                        real_points=real_points,
+                    )
+                    if not is_on_track:
+                        break
+                    action_index +=1
+                if action_index == len(action_list):
+                    current_point_index += 1
+                    if current_point_index == len(nav_path) - 1:
+                        finish = True
+                        result = 'success'
+        
+        progress_log_util.report()

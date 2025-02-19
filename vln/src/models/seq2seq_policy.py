@@ -1,55 +1,56 @@
+from typing import Dict, Optional, Tuple
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 from gym import Space
-from habitat import Config
-from habitat_baselines.common.baseline_registry import BaselineRegistry
-from habitat_baselines.rl.models.rnn_state_encoder import (
-    build_rnn_state_encoder,
-)
-from habitat_baselines.rl.ppo.policy import Net
 
-from vlnce_baselines.common.aux_losses import AuxLosses
-from vlnce_baselines.models.encoders import resnet_encoders
-from vlnce_baselines.models.encoders.instruction_encoder import (
+import vln.src.models.encoders as encoders
+
+from vln.src.models.encoders import resnet_encoders
+
+from vln.src.models.encoders.instruction_encoder import (
     InstructionEncoder,
 )
-from vlnce_baselines.models.policy import ILPolicy
+    
+class CategoricalNet(nn.Module):
+    def __init__(self, num_inputs: int, num_outputs: int) -> None:
+        super().__init__()
 
+        self.linear = nn.Linear(num_inputs, num_outputs)
 
-@BaselineRegistry.register_policy
-class Seq2SeqPolicy(ILPolicy):
-    def __init__(
-        self,
-        observation_space: Space,
-        action_space: Space,
-        model_config: Config,
-    ):
-        super().__init__(
-            Seq2SeqNet(
-                observation_space=observation_space,
-                model_config=model_config,
-                num_actions=action_space.n,
-            ),
-            action_space.n,
+        nn.init.orthogonal_(self.linear.weight, gain=0.01)
+        nn.init.constant_(self.linear.bias, 0)
+
+    def forward(self, x: Tensor):
+        x = self.linear(x)
+        return CustomFixedCategorical(logits=x)
+
+class CustomFixedCategorical(torch.distributions.Categorical):
+    """Same as the CustomFixedCategorical in hab-lab, but renames log_probs
+    to log_prob. All the torch distributions use log_prob.
+    """
+
+    def sample(
+        self, sample_shape=torch.Size()  # noqa: B008
+    ) -> Tensor:
+        return super().sample(sample_shape).unsqueeze(-1)
+
+    def log_prob(self, actions: Tensor) -> Tensor:
+        return (
+            super()
+            .log_prob(actions.squeeze(-1))
+            .view(actions.size(0), -1)
+            .sum(-1)
+            .unsqueeze(-1)
         )
 
-    @classmethod
-    def from_config(
-        cls, config: Config, observation_space: Space, action_space: Space
-    ):
-        config.defrost()
-        config.MODEL.TORCH_GPU_ID = config.TORCH_GPU_ID
-        config.freeze()
+    def mode(self):
+        return self.probs.argmax(dim=-1, keepdim=True)
 
-        return cls(
-            observation_space=observation_space,
-            action_space=action_space,
-            model_config=config.MODEL,
-        )
-
-
-class Seq2SeqNet(Net):
+class Seq2SeqNet(nn.Module):
     """A baseline sequence to sequence network that performs single modality
     encoding of the instruction, RGB, and depth observations. These encodings
     are concatentated and fed to an RNN. Finally, a distribution over discrete
@@ -57,10 +58,11 @@ class Seq2SeqNet(Net):
     """
 
     def __init__(
-        self, observation_space: Space, model_config: Config, num_actions: int
+        self, config, observation_space, num_actions=4, action_stats=None
     ):
         super().__init__()
-        self.model_config = model_config
+        self.model_config = model_config = config.MODEL
+        self.num_actions = num_actions
 
         # Init the instruction encoder
         self.instruction_encoder = InstructionEncoder(
@@ -106,7 +108,7 @@ class Seq2SeqNet(Net):
         if model_config.SEQ2SEQ.use_prev_action:
             rnn_input_size += self.prev_action_embedding.embedding_dim
 
-        self.state_encoder = build_rnn_state_encoder(
+        self.state_encoder = encoders.build_rnn_state_encoder(
             input_size=rnn_input_size,
             hidden_size=model_config.STATE_ENCODER.hidden_size,
             rnn_type=model_config.STATE_ENCODER.rnn_type,
@@ -120,6 +122,11 @@ class Seq2SeqNet(Net):
         self._init_layers()
 
         self.train()
+
+        # Determine
+        self.action_distribution = CategoricalNet(
+            self.output_size, self.num_actions
+        )
 
     @property
     def output_size(self):
@@ -139,7 +146,7 @@ class Seq2SeqNet(Net):
         )
         nn.init.constant_(self.progress_monitor.bias, 0)
 
-    def forward(self, observations, rnn_states, prev_actions, masks):
+    def _forward(self, observations, rnn_states, prev_actions, masks):
         instruction_embedding = self.instruction_encoder(observations)
         depth_embedding = self.depth_encoder(observations)
         rgb_embedding = self.rgb_encoder(observations)
@@ -163,17 +170,28 @@ class Seq2SeqNet(Net):
 
         x, rnn_states_out = self.state_encoder(x, rnn_states, masks)
 
-        if self.model_config.PROGRESS_MONITOR.use and AuxLosses.is_active():
+        if self.model_config.PROGRESS_MONITOR.use:
             progress_hat = torch.tanh(self.progress_monitor(x))
             progress_loss = F.mse_loss(
                 progress_hat.squeeze(1),
                 observations["progress"],
                 reduction="none",
             )
-            AuxLosses.register_loss(
-                "progress_monitor",
-                progress_loss,
-                self.model_config.PROGRESS_MONITOR.alpha,
-            )
 
         return x, rnn_states_out
+    
+    def build_distribution(
+        self, observations, rnn_states, prev_actions, masks
+    ) -> CustomFixedCategorical:
+        features, rnn_states = self.forward(
+            observations, rnn_states, prev_actions, masks
+        )
+        return self.action_distribution(features)
+
+    def forward(self, batch):
+        x, rnn_states_out = self._forward(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+        if batch['mode'] == 'train':
+            outputs = self.action_distribution(x).logits
+        elif batch['mode'] == 'inference':
+            outputs = self.action_distribution(x).mode()
+        return outputs, rnn_states_out

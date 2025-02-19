@@ -1,0 +1,28 @@
+simulator:
+  physics_dt: 1/240
+  rendering_dt: 1/240
+
+tasks:
+- type: "SingleInferenceTask"
+  name: "aliengo_locomotion"
+  env_num: 1
+  offset_size: 1.0
+  scene_asset_path: assets/scenes/empty.usd
+  light_on: true
+  robots:
+  - name: aliengo
+    prim_path: "/World/aliengo"
+    type: "AliengoRobot"
+    position: [.0, .0, 1.05]
+    scale: [1, 1, 1]
+    controller_params:
+    - name: "move_by_speed"
+    - name: "joint_controller"
+    - name: "move_to_point"
+    - name: "move_along_path"
+    - name: "rotate"
+    sensor_params:
+    - name: "camera"
+      enable: True
+    - name: "tp_camera"
+      enable: True
