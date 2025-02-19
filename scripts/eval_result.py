@@ -62,6 +62,7 @@ if __name__ == "__main__":
 
     for split,path_key_list in split_map.items():
         data_list = []
+        error_list = []
         for path_key in path_key_list:
             data_key = generate_eval_key(ckpt_name,path_key)
             with database_read.begin() as txn:
@@ -69,7 +70,11 @@ if __name__ == "__main__":
                 if value is None:
                     # print(f"[key:{data_key}] value is None ")
                     continue
-                value = msgpack_numpy.unpackb(value)
+                try:
+                    value = msgpack_numpy.unpackb(value)
+                except Exception as E:
+                    error_list.append(data_key)
+                    continue
             value['path_key']=path_key
             data_list.append(value)
         count=len(data_list)
@@ -121,7 +126,10 @@ if __name__ == "__main__":
             continue
         log_print(f"TL = {total_TL} / {count} = {round((total_TL / count),4)}")
         log_print(f"NE = {total_NE} / {count} = {round((total_NE / count),4)}")
-        log_print(f"FR = {reason_map['fall']} / {count} = {round((reason_map['fall'] / count),4) * 100}%")
+        if 'fall' in reason_map:
+            log_print(f"FR = {reason_map['fall']} / {count} = {round((reason_map['fall'] / count),4) * 100}%")
+        else:
+            log_print(f"FR = 0 / {count} = 0%")
         if 'stuck' in reason_map:
             log_print(f"StR = {reason_map['stuck']} / {count} = {round((reason_map['stuck'] / count),4) * 100}%")
         else:
