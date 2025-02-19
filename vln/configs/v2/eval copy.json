@@ -1,9 +1,9 @@
 {
-    "name" : "20250217_aliengo_ckpt55_eval",
-    "robot_name": "aliengo",
+    "name" : "20250219_h1_MLANet_eval",
+    "robot_name": "h1",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250215_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_aliengo/ckpts/ckpt.55.pth",
-    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
+    "ckpt_to_load" : "data/checkpoints/mla/converted/mla_best_ppo_converted.pth",
+    "eval_cfg_file": "vln/configs/train/mla_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],

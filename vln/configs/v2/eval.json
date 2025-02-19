@@ -1,13 +1,13 @@
 {
-    "name" : "20250219_h1_cmaSOTA_flash_eval",
+    "name" : "20250219_h1_MLANet_eval",
     "robot_name": "h1",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/habitat_sota/CMA_PM_DA_Aug_converted.pth",
-    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
+    "ckpt_to_load" : "data/checkpoints/mla/converted/mla_best_ppo_converted.pth",
+    "eval_cfg_file": "vln/configs/train/mla_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],
-    "flash": true,
+    "flash": false,
     "load_eval_subset": false,
     "device_map" : {
         "0":["0"],
