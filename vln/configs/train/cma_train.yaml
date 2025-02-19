@@ -1,4 +1,4 @@
-NAME: 20250217_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_debugStop
+NAME: 20250219_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_h1_flash_aliengo
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -82,7 +82,7 @@ EVAL:
   len_traj_act: 4
 
 IL:
-  epochs: 60
+  epochs: 100
   batch_size: 2
   lr: 1e-4
 
@@ -125,8 +125,11 @@ IL:
     # lmdb_features_dir: data/sample_episodes/20241216_sample_episodes_descrete_flash/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250121_descrete_dagger_02/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250208_descrete_dagger_03/sample_data.lmdb
-    lmdb_features_dir: data/sample_episodes/20250211_sample_origin/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/20250211_sample_origin/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/20250217_sample_h1_aliengo/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250214_sample_aliengo/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/20250218_sample_flash/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20250219_sample_h1_aliengo_flash/sample_data.lmdb
     lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb
     pre_extract_img_features: true
     denoise_action: false # For debug!!!

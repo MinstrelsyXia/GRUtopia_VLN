@@ -123,10 +123,11 @@ class CMADataset(torch.utils.data.IterableDataset):
         if self.config.MODEL.policy_name == "CMA_CLIP_Policy":
             self.use_clip_encoders = True
             self.is_clip_long = True
-
             self.bert_tokenizer = bert_tokenizer          
+
         if hasattr(self.config.MODEL, "TEXT_ENCODER"):
             self.bert_tokenizer = bert_tokenizer
+            self.is_clip_long = True
 
     def _create_new_data(self, data, instruction, finish_status, fail_reason):
         """Helper function to create new data entry"""
@@ -217,7 +218,7 @@ class CMADataset(torch.utils.data.IterableDataset):
                         # For dagger dataset, the key is like '999_01', we need to remove the '_01'
                         if '_' in key:
                             key = key.split('_')[0]
-                        if self.use_clip_encoders:
+                        if self.bert_tokenizer is not None:
                             instructions = [
                                 self.dataset_data[key][ep_idx]['instruction']['instruction_text']
                                 for ep_idx in range(len(self.dataset_data[key]))
@@ -234,7 +235,7 @@ class CMADataset(torch.utils.data.IterableDataset):
                             fail_reasons_list.append(fail_reason)
                             lengths.append(len(new_data))
                         
-                if self.use_clip_encoders:
+                if self.bert_tokenizer is not None:
                     new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
                 
                 if empty_data_nums > 0:
