@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=pr-cma-h1-aliengo-flash-train         # 作业名称
+#SBATCH --job-name=pr-cmaLongInstr-sixFloor-aliengo-train         # 作业名称
 #SBATCH --output=logs/%j_%x.out          # 标准输出文件路径
 #SBATCH --error=logs/%j_%x.err           # 标准错误文件路径
 #SBATCH --gres=gpu:1               # GPU请求
@@ -75,6 +75,12 @@ elif [ "$1" == "--preprocess_features" ]; then
 elif [ "$1" == "--train_cma" ]; then
   flags="
     --exp-config vln/configs/train/cma_train.yaml
+    --run-type train
+    --train_quiet
+  "
+elif [ "$1" == "--train_cma_InstrLongCLIP" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_InstrLongCLIP_train_6floor.yaml
     --run-type train
     --train_quiet
   "

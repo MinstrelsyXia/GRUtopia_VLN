@@ -9,7 +9,7 @@ import zlib
 import json
 import msgpack_numpy
 from collections import defaultdict
-
+from tqdm import tqdm
 class LmdbReader:
     def __init__(self, lmdb_path):
         self.lmdb_path = lmdb_path
@@ -67,6 +67,43 @@ class LmdbReader:
 
         env.close()
         return keys
+
+    def changeEpisodeId(self):
+        """将LMDB数据库中的key值都乘以3，并创建新的数据库存储结果。"""
+        # 创建新的LMDB数据库路径
+        new_lmdb_path = self.lmdb_path.replace('.lmdb', '_modified.lmdb')
+        
+        # 打开源数据库和目标数据库
+        src_env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
+        dst_env = lmdb.open(new_lmdb_path, map_size=int(1e11), readonly=False) 
+        
+        try:
+            # 读取源数据并写入新数据库
+            with src_env.begin() as src_txn, dst_env.begin(write=True) as dst_txn:
+                with src_txn.cursor() as cursor:
+                    # 获取总数据量
+                    total = src_txn.stat()['entries']
+                    
+                    # 使用tqdm创建进度条
+                    for key, value in tqdm(cursor, total=total, desc="处理数据"):
+                        # 解码原始key
+                        key_decode = key.decode('utf-8')
+                        try:
+                            old_key = int(key_decode)
+                            # 计算新的key (key*3)
+                            new_key = str(old_key * 3).encode()
+                            # 将数据写入新数据库
+                            dst_txn.put(new_key, value)
+                            print(f"处理: 原key={old_key}, 新key={new_key.decode()}")
+                        except Exception as e:
+                            print(f"错误: 无法处理key={key_decode}")
+        
+        finally:
+            # 关闭数据库连接
+            src_env.close()
+            dst_env.close()
+            
+        print(f"已完成key转换，新数据库保存在: {new_lmdb_path}")
     
     def save_episode_video(self, episode_data, key, output_dir, use_pid=False):
         """Save the episode video to a file."""
@@ -252,7 +289,7 @@ def extract_frames_from_video(video_dir, video_path, output_dir):
 
 # 使用示例
 if __name__ == "__main__":
-    mode = 'save_rgbs_from_lmdb'
+    mode = 'changeEpisodeId'
 
     if mode == 'save_rgbs_from_video':
         '''1. save rgbs from video'''
@@ -266,3 +303,7 @@ if __name__ == "__main__":
         output_dir = 'data/aliengo_rgbs_lmdb'
         data_collector = LmdbReader(lmdb_path)
         data_collector.save_rgb_from_lmdb(lmdb_path, output_dir)
+    elif mode == 'changeEpisodeId':
+        lmdb_path = 'data/sample_episodes/20250211_sixth_floor_sample/sample_data.lmdb'
+        data_collector = LmdbReader(lmdb_path)
+        data_collector.changeEpisodeId()
