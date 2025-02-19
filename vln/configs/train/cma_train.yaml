@@ -92,6 +92,7 @@ IL:
   save_interval_epochs: 5
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
+
   load_from_ckpt: True
   ckpt_to_load: data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth
   load_from_pretrain: False

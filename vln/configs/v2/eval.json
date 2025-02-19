@@ -1,13 +1,13 @@
 {
-    "name" : "20250219_cma_dp_ckpt26_eval",
+    "name" : "20250219_h1_cmaSOTA_flash_eval",
     "robot_name": "h1",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250217_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset/ckpts/ckpt.26.pth",
-    "eval_cfg_file": "vln/configs/train/cma_dp_eval.yaml",
+    "ckpt_to_load" : "data/checkpoints/habitat_sota/CMA_PM_DA_Aug_converted.pth",
+    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],
-    "flash": false,
+    "flash": true,
     "load_eval_subset": false,
     "device_map" : {
         "0":["0"],

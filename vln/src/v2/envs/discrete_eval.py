@@ -69,7 +69,6 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         self.use_bert = False
         self.bert_tokenizer = None
         self.is_clip_long = False
-        
         if self.use_clip_encoders:
             if self.eval_config.MODEL.TEXT_ENCODER.type == 'roberta':
                 self.bert_tokenizer = BertTokenizer(
