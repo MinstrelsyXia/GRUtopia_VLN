@@ -73,8 +73,8 @@ if __name__ == "__main__":
     mode = 'combine_lmdb'
 
     if mode == 'combine_lmdb':
-        source_lmdb_path = "data/sample_episodes/20250121_descrete_dagger_02/sample_data.lmdb"
-        add_lmdb_path = "data/sample_episodes/20250207_sample03_zh/sample_data.lmdb"
-        target_lmdb_path = "data/sample_episodes/20250208_descrete_dagger_03/sample_data.lmdb"
-        combine_lmdb(source_lmdb_path, add_lmdb_path, target_lmdb_path, added_prefix='_03')
+        source_lmdb_path = "data/sample_episodes/20250211_sample_origin/sample_data.lmdb"
+        add_lmdb_path = "data/sample_episodes/20250214_sample_aliengo/sample_data.lmdb"
+        target_lmdb_path = "data/sample_episodes/20250217_sample_h1_aliengo/sample_data.lmdb"
+        combine_lmdb(source_lmdb_path, add_lmdb_path, target_lmdb_path, added_prefix='_aliengo')
 

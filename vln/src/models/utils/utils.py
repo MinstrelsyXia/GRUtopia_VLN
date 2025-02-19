@@ -368,7 +368,12 @@ def get_action(diffusion_output, action_stats, cumsum=True):
     # ndeltas = ndeltas.detach().cpu().numpy() # TODO: optimize
     ndeltas = unnormalize_data(ndeltas, action_stats)
     if cumsum:
-        actions = torch.cumsum(ndeltas, dim=1) # This get the relative actions (not delta) from the diffusion output
+        try:
+            actions = torch.cumsum(ndeltas, dim=1) # This get the relative actions (not delta) from the diffusion output
+        except Exception as e:
+            torch.use_deterministic_algorithms(False)
+            actions = torch.cumsum(ndeltas, dim=1) # This get the relative actions (not delta) from the diffusion output
+            torch.use_deterministic_algorithms(True)
     else:
         actions = ndeltas
     return actions.float()

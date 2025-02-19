@@ -1,5 +1,5 @@
 NAME=w61_test2
-sudo docker run -d --name ${NAME} -it --rm --gpus='"device=1,3,4,5"' --network host \
+sudo docker run -d --name ${NAME} -it --rm --gpus='"device=0"' --network host \
      -e "ACCEPT_EULA=Y" \
      -e "PRIVACY_CONSENT=Y" \
      -e "WEBUI_HOST=${WEBUI_HOST}" \
