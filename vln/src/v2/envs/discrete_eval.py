@@ -69,11 +69,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         self.use_bert = False
         self.bert_tokenizer = None
         self.is_clip_long = False
-        
         if self.use_clip_encoders:
-            self.use_bert = False
-            self.bert_tokenizer = None
-            self.is_clip_long = False
             if self.eval_config.MODEL.TEXT_ENCODER.type == 'roberta':
                 self.bert_tokenizer = BertTokenizer(
                     max_length=self.eval_config.MODEL.INSTRUCTION_ENCODER.max_length,
@@ -89,7 +85,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
     def topdown_snapshot(self):
         map_info = self.get_global_map(
-            robot_height=1.55,
+            robot_height=self.robot_height,
         )
         camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
         height, width = self.topdown_global_map_camera._camera._resolution

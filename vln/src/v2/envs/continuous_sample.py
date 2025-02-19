@@ -16,6 +16,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
     
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
@@ -26,6 +27,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
             max_step=25000,
         ):
         super().__init__(
+            robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -45,7 +47,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
         process,
         sample_interval=80,
     ):
-        env_action=[{'h1':{'move_along_path': [exe_path]}}]
+        env_action=[{self.robot_name:{'move_along_path': [exe_path]}}]
         finish_state = False
         fail_reason = None
         while not finish_state:
@@ -71,7 +73,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
                 break
             if self.step % 20 == 0:
                 robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-                is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+                is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
                 if is_fall:
                     fail_reason = "fall"
                     log.info(fail_reason)
@@ -123,7 +125,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
             self.warm_up(240)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
             if is_fall:
                 progress_log_util.trace_end(
                     trajectory_id = path_key,
@@ -169,7 +171,7 @@ class ContinuousSampleSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
                     break
-                map_info = self.get_global_map(robot_height=1.55, dilation_iterations=2)
+                map_info = self.get_global_map(robot_height=self.robot_height, dilation_iterations=2)
                 camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
                 
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()

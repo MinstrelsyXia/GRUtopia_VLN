@@ -5,6 +5,7 @@ from vln.src.v2.envs.continuous_sample import ContinuousSampleSingleScanEnv
 from vln.src.v2.envs.discrete_flash_sample import DiscreteFlashSampleSingleScanEnv
 from vln.src.v2.envs.discrete_sample import DiscreteSampleSingleScanEnv
 from vln.src.v2.envs.discrete_sample_dagger import DiscreteSampleDaggerSingleScanEnv
+from vln.src.v2.envs.discrete_navid_eval import DiscreteNavidEvalSingleScanEnv
 from vln import PROJECT_ROOT_PATH
 from vln.src.utils.utils import Config, get_config
 
@@ -137,7 +138,19 @@ def get_env_by_config(
                 ckpt_name=ckpt_name,
             )
         else:
-            return DiscreteEvalSingleScanEnv(
+            if eval_cfg_file is not None:
+                if 'Navid' in eval_config['MODEL']['policy_name']:
+                    eval_env = DiscreteNavidEvalSingleScanEnv
+                    # change camera resolution
+                    for sensor in sim_config.config_dict['tasks'][0]['robots'][0]['sensor_params']:
+                        if sensor['name'] == 'pano_camera_0':
+                            sensor['size'] = [640, 480]
+                else:
+                    eval_env = DiscreteEvalSingleScanEnv
+            else:
+                eval_env = DiscreteEvalSingleScanEnv
+
+            return eval_env(
                 robot_name=config["robot_name"],
                 sim_config=sim_config,
                 scene_asset_path=scene_asset_path,
@@ -160,6 +173,7 @@ def get_env_by_config(
                 start_rotation=start_rotation,
                 headless=headless,
                 dataloader=dataloader,
+                aperture=aperture
             )
         else:
             if flash:
@@ -171,6 +185,7 @@ def get_env_by_config(
                     start_rotation=start_rotation,
                     headless=headless,
                     dataloader=dataloader,
+                    aperture=aperture
                )
             else:
                 dagger_percentage = 0
@@ -189,6 +204,7 @@ def get_env_by_config(
                         dataloader=dataloader,
                         eval_config=eval_config,
                         policy_probability=dagger_percentage,
+                        aperture=aperture
                     )
                 else:
                     return DiscreteSampleSingleScanEnv(

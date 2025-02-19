@@ -1,7 +1,8 @@
 {
-    "name" : "20250211_distLight_cma_sota",
+    "name" : "20250217_aliengo_ckpt55_eval",
+    "robot_name": "aliengo",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/CMA_habitat_SOTA/converted/CMA_PM_DA_Aug_converted.pth",
+    "ckpt_to_load" : "data/checkpoints/20250215_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_aliengo/ckpts/ckpt.55.pth",
     "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
