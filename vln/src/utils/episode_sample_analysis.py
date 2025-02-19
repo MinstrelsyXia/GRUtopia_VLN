@@ -95,6 +95,10 @@ def analyze_episodes(sample_episodes_dir, save_details=False):
             print(f'Episode details saved to {save_file}.txt')
     print(1)
 
+class lmdbAnalysis:
+    def __init__(self, lmdb_path):
+        self.lmdb_path = lmdb_path
+        
 
 if __name__ == '__main__':
     analyze_episodes(LOG_DIR)

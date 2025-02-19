@@ -1,5 +1,6 @@
 #!/bin/bash
 export MAGNUM_LOG=quiet
+export PYTHONPATH=$PYTHONPATH:/ailab/user/wangliuyi/code/w61_grutopia
 
 flags_cma="
   --exp-config vlnce_baselines/config/r2r_baselines/cma.yaml
@@ -34,15 +35,32 @@ elif [ "$1" == "--debug" ]; then
     --run-type train
   "
 
-elif [ "$1" == "--eval" ]; then
-  flags="
-    --exp-config vlnce_baselines/config/r2r_baselines/dp/cma_dp_eval.yaml
-    --run-type eval
-  "
 elif [ "$1" == "--collect_dataset" ]; then
   flags="
     --exp-config vlnce_baselines/config/r2r_baselines/dp/dp_collect_data.yaml
     --run-type collect_dataset
+  "
+elif [ "$1" == "--eval" ]; then
+  flags="
+    --run-type eval
+    --exp-config vln/configs/train/cma_dp_w61.yaml
+    --headless
+    --test_verbose
+  "
+elif [ "$1" == "--train_noRNN" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
+    --run-type train
+  "
+elif [ "$1" == "--preprocess_features" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_dp_train_noRNN.yaml
+    --run-type preprocess_features
+  "
+elif [ "$1" == "--train_cma" ]; then
+  flags="
+    --exp-config vln/configs/train/cma_train.yaml
+    --run-type train
   "
 fi
 python vln/run_policy.py $flags

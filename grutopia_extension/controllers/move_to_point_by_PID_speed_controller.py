@@ -137,8 +137,8 @@ class PIDSpeedController(BaseController):
         forward_speed *= (1 - (abs(angle_error) * 2 / np.pi))**3
         
         # 接近目标时降低速度（使用三次方使减速更平滑）
-        if dist_error < self.threshold * 2:
-            forward_speed *= (dist_error / (self.threshold * 2))**3
+        # if dist_error < self.threshold * 2:
+        #     forward_speed *= (dist_error / (self.threshold * 2))**3
         
         # 到达目标点时停止
         if dist_error < self.threshold:

@@ -122,6 +122,7 @@ work_dirs/
 # grutopia assets
 /asset
 /assets
+assets/
 
 # user scripts
 # /scripts
@@ -134,3 +135,10 @@ logs/
 
 # vln data
 data/
+/data
+data_0508/
+/data_0508
+
+nohup.out
+slurm_logs/
+/slurm_logs

@@ -16,7 +16,7 @@ from vln.src.local_nav.camera_occupancy_map import CamOccupancyMap
 from vln.src.local_nav.path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
 
 class GlobalTopdownMap:
-    def __init__(self, args, scan_name):
+    def __init__(self, args, scan_name, vis_verbose=False):
         self.args = args
         self.scan_name = scan_name
 
@@ -39,7 +39,7 @@ class GlobalTopdownMap:
                                          map_width=self.width,map_height=self.height,max_step=self.planner_config.a_star_max_iter,
                             windows_head=self.args.windows_head,
                             for_llm=self.args.settings.use_llm,
-                            verbose=self.args.save_path_planning)
+                            verbose=self.args.save_path_planning or vis_verbose)
 
         # init vis settings
         self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
@@ -326,7 +326,7 @@ class GlobalTopdownMap:
         
         if current_world_pose is not None:
             current_pixel = self.world_to_pixel(current_world_pose)
-            plt.scatter(current_pixel[1], current_pixel[0], color=[0,0,1], marker='*', label=f"current ({current_world_pose[0]:.2f}, {current_world_pose[1]:.2f}, {current_world_pose[2]:.2f})", s=30)
+            plt.scatter(current_pixel[1], current_pixel[0], color=[0,0,1], marker='*', label=f"current ({current_world_pose[0]:.2f}, {current_world_pose[1]:.2f}, {current_world_pose[2]:.2f})", s=15)
         
         if target_world_pose is not None:
             target_pixel = self.world_to_pixel(target_world_pose)

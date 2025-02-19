@@ -13,4 +13,4 @@ flags_sample_episodes_multi_dockers="
     --save_path_planning
 "
 
-python vln/main_sample_episode.py $flags_sample_episodes_multi_dockers
+python vln/main_sample_episode.py $flags_sample_episodes

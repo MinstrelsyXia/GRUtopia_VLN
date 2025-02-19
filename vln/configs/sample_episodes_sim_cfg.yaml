@@ -8,13 +8,14 @@ tasks:
   name: "vln"
   scene_asset_path: ""
   scene_scale: [1, 1, 1]
-  env_num: 2
+  env_num: 4
   offset_size: 100.0
   light_on: true
   robots:
   - name: h1
     prim_path: "/World/h1"
     type: "HumanoidRobot"
+    # type: "HumanoidRobotVLNEval"
     position: [0, 0, 0]
     scale: [1, 1, 1]
     orientation: [0,0,0,0]
@@ -30,6 +31,7 @@ tasks:
     - name: "stand_still"
     - name: "oracle_move_to_point"
     - name: "oracle_move_along_path"
+    # - name: "move_to_point_by_pid"
     sensor_params:
     - name: "camera"
       enable: false

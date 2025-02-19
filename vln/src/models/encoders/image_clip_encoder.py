@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torchvision.transforms import Resize, ToPILImage
 from copy import deepcopy
 from PIL import Image
+import time
 
 from vln.src.models.encoders import resnet_encoders
 
@@ -31,10 +32,11 @@ class WrapModule(torch.nn.Module):
 
 
 class ImageEncoder(torch.nn.Module):
-    def __init__(self, full_config, config, observation_space, lora_config=None, test=False):
+    def __init__(self, full_config, config, observation_space, lora_config=None, test=False, analysis_time=False):
         super().__init__()
 
         self.config = config
+        self.analysis_time = analysis_time
 
         # RGB image model
         self.is_clip_long = False
@@ -92,6 +94,7 @@ class ImageEncoder(torch.nn.Module):
                 backbone=config.DEPTH.backbone,
                 trainable=config.DEPTH.update_depth_encoder,
                 spatial_output=True,
+                analysis_time=analysis_time,
             )
             self.depth_linear = nn.Sequential(
                 nn.Flatten(),
@@ -103,7 +106,10 @@ class ImageEncoder(torch.nn.Module):
             )
         
         # position embedding
-        self.pos_embedding = PositionalEncoding(config.RGB.projection_dim, max_seq_len=config.img_stack_nums)
+        if config.RGB.img_mod == 'multi_patches_avg_pooling':
+            self.pos_embedding = PositionalEncoding(config.RGB.projection_dim*config.RGB.multi_patches_num, max_seq_len=config.img_stack_nums)
+        else:
+            self.pos_embedding = PositionalEncoding(config.RGB.projection_dim, max_seq_len=config.img_stack_nums)
         
         self.layernorm = nn.LayerNorm(config.RGB.projection_dim)
 
@@ -156,7 +162,7 @@ class ImageEncoder(torch.nn.Module):
                 image_inputs = image_inputs.permute(0,3,1,2)
                 image_feat = []
                 for image in image_inputs:
-                    image = self.to_pil(image.cpu())
+                    image = self.to_pil(image)
                     image_feat.append(np.array(self.image_processor(image)))
                 image_feat = np.array(image_feat)
                 image_feat = torch.from_numpy(image_feat).to(image_inputs.device)
@@ -220,8 +226,11 @@ class ImageEncoder(torch.nn.Module):
             image_batch = image_batch.unsqueeze(0)
         
         BS = image_batch.shape[0]
+        reshape_flag = False
         if len(image_batch.shape) == 5:
-            image_batch = image_batch.reshape(-1, 3, image_batch.shape[3], image_batch.shape[4])
+            stack_num = image_batch.shape[1]
+            image_batch = image_batch.reshape(-1, 3, image_batch.shape[3], image_batch.shape[4]) # [BS, T, 224, 224, 3] -> [BS*T, 3, 224, 224]
+            reshape_flag = True
         
         embeddings = []
         # Process in chunks if the batch size exceeds the limit
@@ -246,22 +255,53 @@ class ImageEncoder(torch.nn.Module):
 
         if fc:
             outputs = self.image_fc(outputs)
+        if reshape_flag:
+            outputs = outputs.reshape(BS, stack_num, *outputs.shape[1:])
         return outputs
     
     def embed_depth(self, input, return_x_before_fc=False):
+        if self.analysis_time:
+            start_time = time.time()
         if self.config.DEPTH.bottleneck == 'resnet':
             outputs = self.embed_depth_resnet(input, return_x_before_fc=return_x_before_fc)
             if return_x_before_fc:
-                outputs = outputs[0] # [bs, 128, 4, 4]
+                outputs = outputs[0] # [bs, 128, 4, 4]. Otherwise, [bs, 192, 4, 4]
         elif self.config.DEPTH.bottleneck == 'TAC':
             outputs = self.embed_depth_TAC(input, fc=False)
+        if self.analysis_time:
+            end_time = time.time()
+            print(f"MODEL depth embedding time: {end_time - start_time}")
         return outputs
     
     def embed_depth_resnet(self, depth, return_x_before_fc=False):
         # set return_x_before_fc to be True when collect dataset (the same as CMA)
+        BS = depth.shape[0]
+        reshape_flag = False
+        if len(depth.shape) == 5:
+            # stack depth: [BS, T, 224, 224, 1]
+            depth = depth.flatten(0,1)
+            reshape_flag = True
+        if self.analysis_time:
+            start_time = time.time()
         batch = {'depth': depth}
         outputs = self.depth_encoder(batch, return_x_before_fc=return_x_before_fc)
-        return outputs
+        if self.analysis_time:
+            end_time = time.time()
+            print(f"MODEL embed_depth_resnet time: {end_time - start_time}")
+            start_time = time.time()
+        if return_x_before_fc:
+            if reshape_flag:
+                outputs0 = outputs[0].reshape(BS, -1, *outputs[0].shape[1:])
+                outputs1 = outputs[1].reshape(BS, -1, *outputs[1].shape[1:])
+            else:
+                outputs0 = outputs[0]
+                outputs1 = outputs[1]
+            if self.analysis_time:
+                end_time = time.time()
+                print(f"MODEL embed_depth_resnet reshape_flag time: {end_time - start_time}")
+            return [outputs0, outputs1]
+        else:
+            return outputs
 
     def embed_depth_TAC(self, depth_batch, fc=False, max_batch_size=500):
         """Embed a batch of depth."""
@@ -333,7 +373,6 @@ class ImageEncoder(torch.nn.Module):
             image_embeddings = image_embeddings[:,0,:]
             depth_embeddings = depth_embeddings[:,0,:]
         
-        
         if self.config.use_env_drop:
             # directly use dropout on the raw features
             image_embeddings = self.env_drop(image_embeddings)
@@ -342,19 +381,19 @@ class ImageEncoder(torch.nn.Module):
         if self.config.DEPTH.bottleneck == 'resnet':
             if use_stack:
                 stack_lens = depth_embeddings.shape[1]
-                depth_embeddings = depth_embeddings.reshape(-1, 128, 4, 4)
+                depth_embeddings = depth_embeddings.reshape(-1, *depth_embeddings.shape[2:])
             depth_resnet_inputs = {'depth_features': depth_embeddings}
             depth_embeds = self.depth_encoder(depth_resnet_inputs) # [bs,128,4,4]
             depth_embeds = torch.flatten(depth_embeds, 2) # [bs, 192, 16]
-            depth_embeddings = self.depth_linear(depth_embeds)
+            depth_embeds = self.depth_linear(depth_embeds)
             if use_stack:
-                depth_embeddings = depth_embeddings.reshape(batch_size, stack_lens, -1)
+                depth_embeds = depth_embeds.reshape(batch_size, stack_lens, -1)
 
-        image_embeddings = self.dropout(self.img_learnable_linear(image_embeddings))
-        depth_embeddings = self.dropout(self.depth_learnable_linear(depth_embeddings))
+        image_map_embeds = self.dropout(self.img_learnable_linear(image_embeddings))
+        depth_map_embeds = self.dropout(self.depth_learnable_linear(depth_embeds))
         
         if img_mod == 'cls':
-            img_depth_embeds = image_embeddings + depth_embeddings
+            img_depth_embeds = image_map_embeds + depth_map_embeds
             if prev_action_embeds is not None and use_stack:
                 img_depth_embeds = img_depth_embeds + prev_action_embeds
                             
@@ -364,13 +403,16 @@ class ImageEncoder(torch.nn.Module):
             # 20241025: combine the depth with the full rgb embeds at the 0-pth location.
             ## 0-th location: full depth+img. 2~5: semantic rgb.
             if use_stack:
-                image_embeddings[:,:,0,:] = image_embeddings[:,:,0,:] + depth_embeddings[:,:,]
+                image_map_embeds[:,:,0,:] = image_map_embeds[:,:,0,:] + depth_map_embeds[:,:,]
             else:
-                image_embeddings[:,0,:] = image_embeddings[:,0,:] + depth_embeddings
-            img_depth_embeds = image_embeddings     
+                image_map_embeds[:,0,:] = image_map_embeds[:,0,:] + depth_map_embeds
+            img_depth_embeds = image_map_embeds     
         
         if use_stack:
+            stack_num, patch_num = img_depth_embeds.shape[1], img_depth_embeds.shape[2]
+            img_depth_embeds = torch.flatten(img_depth_embeds, 2, 3)
             img_depth_pos_embeds = self.pos_embedding(img_depth_embeds)
+            img_depth_pos_embeds = img_depth_pos_embeds.reshape(batch_size, stack_num, patch_num, image_map_embeds.shape[-1])
             return img_depth_pos_embeds
         else:
             if img_mod == 'cls':

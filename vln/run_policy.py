@@ -3,6 +3,9 @@ Author: w61
 Date: 2014/11/05
 Function: the main file to support training and evluation
 '''
+import os,sys
+current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(current_dir)
 
 import argparse
 import os
@@ -13,18 +16,26 @@ import shutil
 
 import numpy as np
 import torch
+from typing import List, Optional, Union
+
+import yacs.config
+from yacs.config import CfgNode
+torch.autograd.set_detect_anomaly(True)
 
 from vln.src.utils.logger import MyLogger
-from vln.src.trainers import dp_trainer
-from vln.src.utils.utils import dict_to_namespace
+from vln.src.trainers import dp_trainer, cma_trainer, navid_trainer
+from vln.src.utils.utils import dict_to_namespace, namespace_to_dict, Config
 
 from vln.parser import process_args
+
+def get_local_rank():
+    return int(os.environ["LOCAL_RANK"])
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--run-type",
-        choices=["train", "eval", "inference"],
+        choices=["train", "eval", "inference", "preprocess_features"],
         required=True,
         help="run type of the experiment (train, eval, inference, collect_dataset)",
     )
@@ -55,16 +66,33 @@ def main():
         default=False,
         action='store_true',
     )
+    parser.add_argument(
+        "--local_rank",
+        type=int,
+        default=0,
+        help="local rank for distributed training",
+    )
+    parser.add_argument(
+        "--debug",
+        default=False,
+        action='store_true',
+    )
+    parser.add_argument(
+        "--train_quiet",
+        default=False,
+        action='store_true',
+    )
+    
     args = parser.parse_args()
+    
+        
     run_exp(**vars(args))
 
 def get_config(exp_config, opts):
-    with open(exp_config, 'r') as f:
-        config = dict_to_namespace(yaml.load(f.read(), yaml.FullLoader))
-    if len(opts) > 0:
-        # update args into vln_config
-        for key, value in vars(opts).items():
-            setattr(config, key, value)
+    config = Config()
+    config.merge_from_file(exp_config)
+    if opts:
+        config.merge_from_list(opts)
     return config
 
 def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs) -> None:
@@ -78,6 +106,9 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     config = get_config(exp_config, opts)
     config.test_verbose = kwargs.get('test_verbose', False)
     config.show_topdown_window = kwargs.get('show_topdown_window', False)
+    config.local_rank = local_rank if local_rank is not None else kwargs.get('local_rank', 0)
+    config.debug = kwargs.get('debug', False)
+    config.train_quiet = kwargs.get('train_quiet', False)
     # logger.info(f"config: {config}")
     
     # Process the log dir
@@ -95,7 +126,6 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
             if config.VIDEO_OPTION != -1:
                 config.VIDEO_DIR = config.VIDEO_DIR.replace("*name", name)
         
-        config.local_rank = local_rank 
         config.world_size = config.GPU_NUMBERS = len(config.TORCH_GPU_IDS)
         
         logdir = config.LOG_DIR
@@ -107,20 +137,20 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
             name="w61_grutopia", level=logging.INFO, filename=config.LOG_FILE, format_str="%(asctime)-15s %(message)s"
         )   
     
-    # DDP
-    # if hasattr(config, 'DDP') and config.DDP.use:
+    # Move DDP setup earlier and consolidate local_rank handling
     if hasattr(config, 'DDP'):
         config.seed = config.DDP.seed
         config.fp16 = config.DDP.fp16
         config.n_workers = config.DDP.n_workers
-        config.local_rank = config.DDP.local_rank
         config.node_rank = config.DDP.node_rank
-        config.world_size = config.DDP.world_size
-        config.cuda_first_device = config.DDP.cuda_first_device
+        config.world_size = len(config.TORCH_GPU_IDS)
         
-        if config.local_rank == -1 and config.world_size > 1:
-            # Ensure the batch size must be divisible by the number of GPUs for DP
+        if config.DDP.use_dp and config.world_size > 1:
             assert config.IL.batch_size % len(config.TORCH_GPU_IDS) == 0
+        
+        if config.DDP.use and not config.DDP.use_dp:
+            config.local_rank = get_local_rank()
+            print(f"config.local_rank: {config.local_rank}")
 
     random.seed(config.SEED)
     np.random.seed(config.SEED)
@@ -130,25 +160,31 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
     # if torch.cuda.is_available():
     #     torch.set_num_threads(1)
 
+    sim_config = None
     if run_type == "eval":
         torch.backends.cudnn.deterministic = True
         # Read vln_config and sim_config
         vln_config, sim_config = process_args(sim_cfg_file=config.EVAL.sim_cfg_file, vln_cfg_file=config.EVAL.vln_cfg_file)
         # Combine vln_config and sim_config with the config
-        config.vln_config = vln_config
-        config.sim_config = sim_config
+        vln_config_dict = namespace_to_dict(vln_config)  # Convert Namespace to dict
+        config.vln_config = Config(vln_config_dict)
 
         config.GT_PATH_DIR = os.path.join(config.LOG_DIR, "gt_paths")
         if not os.path.exists(config.GT_PATH_DIR):
             os.makedirs(config.GT_PATH_DIR)
         
-        if not os.path.exists(config.VIDEO_DIR):
-            os.makedirs(config.VIDEO_DIR)
+        if config.VIDEO_OPTION != -1:
+            if not os.path.exists(config.VIDEO_DIR):
+                os.makedirs(config.VIDEO_DIR)
         
-    if config.MODEL.policy_name == 'CMA_DP_ImgMultiPatch_Policy':
+    if config.MODEL.policy_name in ['CMA_DP_ImgMultiPatch_Policy', 'DP_noRNN_Policy']:
         trainer_init = dp_trainer.DaggerDiffusonPolicyTrainer
+    elif config.MODEL.policy_name in ['CMA_Policy', 'Seq2SeqPolicy', 'MLAPolicy']:
+        trainer_init = cma_trainer.DaggerCMATrainer
+    elif config.MODEL.policy_name == 'Navid_Policy':
+        trainer_init = navid_trainer.NavidTrainer
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
-    trainer = trainer_init(config, logger)
+    trainer = trainer_init(config, sim_config, logger)
 
     logger.info(f"config: {config}")
     
@@ -163,6 +199,8 @@ def run_exp(exp_config: str, run_type: str, opts=None, local_rank=None, **kwargs
         trainer.train()
     elif run_type == "eval":
         trainer.eval()
+    elif run_type == "preprocess_features":
+        trainer._preprocess_features()
     # elif run_type == "inference":
     #     trainer.inference()
     # elif run_type == 'collect_dataset':
