@@ -443,29 +443,33 @@ class DiscreteDPEvalSingleScanEnv(BaseSingleScanEnv):
                         device=self.device,
                     )
                     if dones[0]:
-                        result = reason
-                        if result == '':
-                            if info['success'] > 0:
-                                result='success'
-                            else:
-                                info['fail_reason']='not_reach_goal'
-                                result='not_reach_goal'
-                        progress_log_util.trace_end(
-                            trajectory_id = path_key,
-                            step_count=statistic_info.sim_step,
-                            result = result,
-                        )
-
-                        # info['ext_info']=map_info
-                        data_collector.save_eval_result(
-                            ckpt_name=self.ckpt_name, 
-                            path_key=path_key, 
-                            info=info
-                        )
-                        stats_episodes[path_key] = info
-                        spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
-                        mean_spl = np.mean(list(spl_dict.values()))
-                        log.info(f"Average SPL: {mean_spl}, result:{result}")
+                        stop_flag = True
                         break
+                    
+                if dones[0]:
+                    result = reason
+                    if result == '':
+                        if info['success'] > 0:
+                            result='success'
+                        else:
+                            info['fail_reason']='not_reach_goal'
+                            result='not_reach_goal'
+                    progress_log_util.trace_end(
+                        trajectory_id = path_key,
+                        step_count=statistic_info.sim_step,
+                        result = result,
+                    )
+
+                    # info['ext_info']=map_info
+                    data_collector.save_eval_result(
+                        ckpt_name=self.ckpt_name, 
+                        path_key=path_key, 
+                        info=info
+                    )
+                    stats_episodes[path_key] = info
+                    spl_dict[path_key] = float(stats_episodes[path_key]["spl"])
+                    mean_spl = np.mean(list(spl_dict.values()))
+                    log.info(f"Average SPL: {mean_spl}, result:{result}")
+                    break
         
         progress_log_util.report()
