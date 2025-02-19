@@ -84,4 +84,3 @@ tasks:
     - name: "pano_camera_315"
       enable: false
       size: [256, 256]
-

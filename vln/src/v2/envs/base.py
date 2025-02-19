@@ -31,6 +31,8 @@ class BaseSingleScanEnv:
         self.robot = None
         self.isaac_robot = None
         self.timestamp = time.time()
+        self.fall_height_threshold = self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
+        self.robot_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['robot_height']
 
         # fall check
         self.fall_height_threshold = self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
@@ -65,8 +67,12 @@ class BaseSingleScanEnv:
 
     def reset_light_position(self, position):
         from pxr import Gf
-        self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2]-1))
-        self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2]+1))
+        raise_light = 1
+        if self.robot_name == 'aliengo':
+           raise_light+= 0.55 
+        self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2] - raise_light))
+        self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2] + raise_light))
+    
 
     def load_scan_and_robot(self):
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path
@@ -106,17 +112,12 @@ class BaseSingleScanEnv:
         data_info = self.topdown_global_map_camera.get_data()
         depth = np.array(data_info["depth"])
         flat_surface_mask = np.ones_like(depth, dtype=bool)
-        if robot_name == 'h1':
+        if self.robot_name == 'h1':
             depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
-        elif robot_name == 'aliengo':
+        elif self.robot_name == 'aliengo':
             base_height = self.robot.get_robot_base().get_world_pose()[0][2]
             foot_height = self.robot.get_ankle_height()
-            min_height = base_height - foot_height + 0.1
-            depth_mask = ((depth >= min_height) & (depth < max_height))
-        elif robot_name == 'jetbot':
-            base_height = self.robot.get_robot_base().get_world_pose()[0][2]
-            foot_height = self.robot.get_ankle_height()
-            min_height = base_height - foot_height + 0.35 # 0.35 for scale: 5. 0.21 for scale: 1
+            min_height = base_height - foot_height + 0.05
             depth_mask = ((depth >= min_height) & (depth < max_height))
         robot_mask = create_robot_mask(self.topdown_global_map_camera)
         free_map = np.zeros_like(depth, dtype=int)
