@@ -98,10 +98,11 @@ if __name__ == "__main__":
     # 复制配置文件到目标目录
     shutil.copy(cfg_file_path, target_dir)
     shutil.copy(sim_cfg_file, target_dir)
-    
-    # !!! For MLANet
-    # sim_config.config.tasks[0].robots[0].sensor_params[2].size=(224,224) # pano_camera_0
-    # sim_config.config_dict['tasks'][0]['robots'][0]['sensor_params'][2]['size']=(224,224)
+
+    if 'MLANet' in name:
+        sim_config.config.tasks[0].robots[0].sensor_params[2].size=(224,224) # pano_camera_0
+        sim_config.config_dict['tasks'][0]['robots'][0]['sensor_params'][2]['size']=(224,224)
+        base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_FSASub'
 
     scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
     dataloader=EvalPathKeyDataloader(
