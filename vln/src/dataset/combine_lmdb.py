@@ -73,8 +73,8 @@ if __name__ == "__main__":
     mode = 'combine_lmdb'
 
     if mode == 'combine_lmdb':
-        source_lmdb_path = "data/sample_episodes/20250211_sample_origin/sample_data.lmdb"
-        add_lmdb_path = "data/sample_episodes/20250214_sample_aliengo/sample_data.lmdb"
-        target_lmdb_path = "data/sample_episodes/20250217_sample_h1_aliengo/sample_data.lmdb"
-        combine_lmdb(source_lmdb_path, add_lmdb_path, target_lmdb_path, added_prefix='_aliengo')
+        source_lmdb_path = "data/sample_episodes/20250217_sample_h1_aliengo/sample_data.lmdb"
+        add_lmdb_path = "data/sample_episodes/20250218_sample_flash/sample_data.lmdb"
+        target_lmdb_path = "data/sample_episodes/20250219_sample_h1_aliengo_flash/sample_data.lmdb"
+        combine_lmdb(source_lmdb_path, add_lmdb_path, target_lmdb_path, added_prefix='_flash')
 

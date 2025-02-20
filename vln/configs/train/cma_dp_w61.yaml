@@ -1,4 +1,4 @@
-NAME: 20250217_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset
+NAME: 20250218_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset_notPreProcess
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -120,6 +120,7 @@ IL:
     # lmdb_features_dir: data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20241213_sample_episodes_descrete_controller/sample_data.lmdb
     lmdb_features_dir: data/sample_episodes/20250211_sample_origin/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/20250218_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset/sample_data.lmdb
     lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb
     pre_extract_img_features: true
     denoise_action: false # For debug!!!
@@ -254,11 +255,11 @@ MODEL:
 
     action_stats:
       # for descrete controller
-      # min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
-      # max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
+      min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
+      max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
       # for continuous controller 
-      min: [-0.5, -0.5, -0.5] # [min_dx, min_dy, min_dyaw]
-      max: [0.5, 0.5, 0.5] # [max_dx, max_dy, max_dyaw]
+      # min: [-0.5, -0.5, -0.5] # [min_dx, min_dy, min_dyaw]
+      # max: [0.5, 0.5, 0.5] # [max_dx, max_dy, max_dyaw]
 
     metric_waypoint_spacing: 1
     negative_mining: False
