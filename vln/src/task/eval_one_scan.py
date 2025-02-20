@@ -17,6 +17,8 @@ import json
 from vln import PROJECT_ROOT_PATH
 import traceback
 
+from vln.src.v2.util.common import set_seed_normal
+
 def check_process_stuck(env:DiscreteEvalSingleScanEnv):
     index = 0
     while True:
@@ -68,6 +70,8 @@ if __name__ == "__main__":
         sys.exit()
     with open(cfg_file_path, 'r') as file:
         config = json.load(file)
+    
+    set_seed_normal(0)
 
     headless = True
     split_data_types = ['val_unseen','val_seen']

@@ -126,7 +126,10 @@ if __name__ == "__main__":
             continue
         log_print(f"TL = {total_TL} / {count} = {round((total_TL / count),4)}")
         log_print(f"NE = {total_NE} / {count} = {round((total_NE / count),4)}")
-        log_print(f"FR = {reason_map['fall']} / {count} = {round((reason_map['fall'] / count),4) * 100}%")
+        if 'fall' in reason_map:
+            log_print(f"FR = {reason_map['fall']} / {count} = {round((reason_map['fall'] / count),4) * 100}%")
+        else:
+            log_print(f"FR = 0 / {count} = 0%")
         if 'stuck' in reason_map:
             log_print(f"StR = {reason_map['stuck']} / {count} = {round((reason_map['stuck'] / count),4) * 100}%")
         else:

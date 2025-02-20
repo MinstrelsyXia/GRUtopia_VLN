@@ -89,9 +89,9 @@ IL:
   
   save_interval_epochs: 2
   save_filter_frozen_weights: true # only save the learnable weights!
-  load_from_ckpt: False
-  ckpt_to_load: none
-  load_from_pretrain: True
+  load_from_ckpt: True
+  ckpt_to_load: data/checkpoints/20250217_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset/ckpts/ckpt.26.pth
+  load_from_pretrain: False
 
   camera_name: 'pano_camera_0'
   Filter_failure: 

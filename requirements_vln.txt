@@ -17,7 +17,7 @@ opencv-python
 matplotlib
 httpx
 toml
-pydantic==1.9.0
+pydantic==1.9.2
 scipy
 
 # pip install -e vln/src/models/diffusion_policy

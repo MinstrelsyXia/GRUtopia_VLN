@@ -946,17 +946,36 @@ class CMA_DP_Net(nn.Module):
                                 actions[bs_idx].append(action_spaces['stop'])
                                 stop = True
                                 continue
-                        elif stop_mode == 'progress':
+                        elif stop_mode in ['progress', 'stop_progress']:
                             stop_flag = False
                             steps = None # !!! 
-                            if steps is not None:
-                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                                (steps[bs_idx] > 5 and abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
+                            if stop_mode == 'stop_progress':
+                                stop_flag = stop_pm_pred[bs_idx].item() > self.config.EVAL.stop_progress_threshold
                             else:
-                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                                    (abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
-                            # stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                            #     (abs(diffusion_output[bs_idx][step_idx][0]) < 3e-1 and abs(diffusion_output[bs_idx][step_idx][1]) < 3e-1 and abs(diffusion_output[bs_idx][step_idx][2]) < 3e-1)
+                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold)
+
+                            '''一次actions为stop就对应位置stop'''
+                            # if steps is not None:
+                            #     stop_flag = stop_flag or\
+                            #     (steps[bs_idx] > 5 and abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
+                            # else:
+                            #     stop_flag = stop_flag or\
+                            #         (abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
+                            
+                            '''连续N次stop即stop'''
+                            M_stops = 3
+                            if step_idx + M_stops < len(un_actions_nocumsum[0]):  # Make sure we have enough steps ahead
+                                consecutive_stops = True
+                                for i in range(M_stops):  # Check current and next M steps
+                                    curr_action = un_actions_nocumsum[0][step_idx+i]
+                                    if not (abs(curr_action[0]) < 1e-1 and \
+                                        abs(curr_action[1]) < 1e-1 and \
+                                        abs(curr_action[2]) < 1e-1):
+                                        consecutive_stops = False
+                                        break
+                                
+                                if consecutive_stops or stop_flag:
+                                    stop_flag = True
 
                             if stop_flag:
                                 actions[bs_idx].append(action_spaces['stop'])
@@ -1107,7 +1126,7 @@ class CMA_DP_Net(nn.Module):
         step = batch['step']
         episode_ids = batch['episode_ids']
 
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
+        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], sample_classifier_free_guidance=batch['sample_cls_free_guidance'])
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         

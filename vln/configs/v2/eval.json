@@ -1,9 +1,9 @@
 {
-    "name" : "20250220_h1_cma_instrLongCLIP_ckpt40_eval",
+    "name" : "20250220_h1_dp_ckpt40_eval",
     "robot_name": "h1",
     "task_type" : "eval",
     "ckpt_to_load" : "0",
-    "eval_cfg_file": "vln/configs/train/cma_InstrLongCLIP_train.yaml",
+    "eval_cfg_file": "vln/configs/train/cma_dp_eval.yaml",
     "image" : "w61_grutopia:v0.5",
     "total_rank": 8,
     "retry_list":[],

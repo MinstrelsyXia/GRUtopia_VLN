@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 20250219_h1_MLANet_eval
+#SBATCH -J 20250220_h1_dp_ckpt30_eval
 #SBATCH -o slurm_logs/%j_%x.out 
 #SBATCH -e slurm_logs/%j_%x.err 
 #SBATCH -p gpu_4090  

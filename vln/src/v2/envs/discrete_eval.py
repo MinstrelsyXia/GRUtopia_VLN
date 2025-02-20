@@ -81,6 +81,12 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 self.bert_tokenizer = longclip.tokenize
                 self.use_bert = True
                 self.is_clip_long = True
+        
+        if hasattr(self.eval_config.MODEL, 'TEXT_ENCODER'):
+            # use instr clip-long
+            self.bert_tokenizer = longclip.tokenize
+            self.use_bert = True
+            self.is_clip_long = True
 
 
     def topdown_snapshot(self):
@@ -99,7 +105,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         }
         return snapshot
 
-    def eval(self):
+    def eval(self, test_verbose=False):
         
         self.load_scan_and_robot()
         eval_path_key_list = self.dataloader.eval_path_key_list
@@ -191,6 +197,10 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     'prev_actions': prev_actions,
                     'masks': not_done_masks
                 }
+
+                if test_verbose:
+                    import matplotlib.pyplot as plt
+                    plt.imsave('logs/test0.jpg', observations[0]['rgb'].cpu().numpy())
 
                 if self.use_clip_encoders:
                     batch.update({
