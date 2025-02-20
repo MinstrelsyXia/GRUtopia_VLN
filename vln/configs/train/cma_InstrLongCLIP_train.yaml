@@ -1,4 +1,4 @@
-NAME: 20250217_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_instrLongCLIP_h1_aliengo
+NAME: 20250219_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_instrLongCLIP_h1_aliengo_flash
 TRAINER_NAME: dagger_diffusion_policy # dagger / recollect_trainer
 SIMULATOR_GPU_IDS: [0]
 TORCH_GPU_ID: 0
@@ -127,7 +127,8 @@ IL:
     # lmdb_features_dir: data/sample_episodes/20250208_descrete_dagger_03/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250211_sample_origin/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250214_sample_aliengo/sample_data.lmdb
-    lmdb_features_dir: data/sample_episodes/20250217_sample_h1_aliengo/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/20250217_sample_h1_aliengo/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20250219_sample_h1_aliengo_flash/sample_data.lmdb
 
     lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb
     pre_extract_img_features: true
@@ -164,6 +165,7 @@ MODEL:
     load_model: true
     max_length: 248
     update_text_encoder: false
+    update_text_encoder_last_layer: false
     
     # model settings
     type: clip-long # roberta

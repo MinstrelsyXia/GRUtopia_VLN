@@ -113,6 +113,7 @@ class DaggerCMATrainer:
         
         if hasattr(self.config.MODEL, "TEXT_ENCODER"):
             self.bert_tokenizer = longclip.tokenize
+            self.is_clip_long = True
 
         # Init the file_logger
         if self.config.run_type in ['train', 'preprocess_features']:

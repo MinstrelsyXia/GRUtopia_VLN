@@ -274,13 +274,13 @@ class CMA_CLIP_Net(nn.Module):
         # 1. Q: state. KV: text.
         text_embedding, _ = self.state_txt_cross_encoder(state.unsqueeze(1), instruction_embedding, q_masks=masks, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
         
-        # 2. Q: text. KV: rgb.
-        rgb_embedding, _ = self.txt_rgb_cross_encoder(text_embedding, rgb_features, q_masks=masks, kv_masks=None, output_attentions=True,do_self_attn=do_self_attn)
+        # 2. Q: rgb. KV: text.
+        rgb_embedding, _ = self.txt_rgb_cross_encoder(rgb_features, instruction_embedding, q_masks=None, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
         rgb_embedding = rgb_embedding[:,0,:]
         
-        # 3. Q: text. KV: depth.
+        # 3. Q: depth. KV: text.
         depth_k_embedding = self.depth_k_linear(depth_embedding.permute(0, 2, 1))
-        depth_embedding, _ = self.txt_depth_cross_encoder(text_embedding, depth_k_embedding, q_masks=masks, kv_masks=None, output_attentions=True,do_self_attn=do_self_attn)
+        depth_embedding, _ = self.txt_depth_cross_encoder(depth_k_embedding, instruction_embedding, q_masks=None, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
         depth_embedding = depth_embedding[:, 0, :]
         
         text_embedding = text_embedding.squeeze(1)
