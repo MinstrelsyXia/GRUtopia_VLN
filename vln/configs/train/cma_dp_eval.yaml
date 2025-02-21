@@ -79,7 +79,7 @@ EVAL:
   step_interval: 80 # the same in data sampling
 
   # len_traj_act
-  len_traj_act: 2
+  len_traj_act: 4
 
 IL:
   epochs: 100
@@ -91,7 +91,7 @@ IL:
   save_interval_epochs: 2
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: True
-  ckpt_to_load: data/checkpoints/20250218_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset_notPreProcess/ckpts/ckpt.30.pth
+  ckpt_to_load: data/checkpoints/20250218_dp_TransEnc1Dec3_InstrCLS_transformGPS_localIMU_CFG_noStep_descreteDataset_notPreProcess/ckpts/ckpt.48.pth
   load_from_pretrain: False
 
   camera_name: 'pano_camera_0'
@@ -255,11 +255,11 @@ MODEL:
 
     action_stats:
       # for descrete controller
-      # min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
-      # max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
+      min: [-0.25, -0.25, -0.27] # [min_dx, min_dy, min_dyaw]
+      max: [0.25, 0.25, 0.27] # [max_dx, max_dy, max_dyaw]
       # for continuous controller 
-      min: [-0.5, -0.5, -0.5] # [min_dx, min_dy, min_dyaw]
-      max: [0.5, 0.5, 0.5] # [max_dx, max_dy, max_dyaw]
+      # min: [-0.5, -0.5, -0.5] # [min_dx, min_dy, min_dyaw]
+      # max: [0.5, 0.5, 0.5] # [max_dx, max_dy, max_dyaw]
 
     metric_waypoint_spacing: 1
     negative_mining: False

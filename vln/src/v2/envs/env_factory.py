@@ -7,6 +7,7 @@ from vln.src.v2.envs.discrete_sample import DiscreteSampleSingleScanEnv
 from vln.src.v2.envs.discrete_sample_dagger import DiscreteSampleDaggerSingleScanEnv
 from vln.src.v2.envs.discrete_navid_eval import DiscreteNavidEvalSingleScanEnv
 from vln.src.v2.envs.discrete_dp_eval import DiscreteDPEvalSingleScanEnv
+from vln.src.v2.envs.discrete_dp_flash_eval import DiscreteFlashDPEvalSingleScanEnv
 from vln import PROJECT_ROOT_PATH
 from vln.src.utils.utils import Config, get_config
 
@@ -126,7 +127,11 @@ def get_env_by_config(
         ckpt_file_name = ckpt_to_load.split('/')[-1]
         ckpt_name=f"{name}_{ckpt_file_name}"
         if flash:
-            return DiscreteFlashEvalSingleScanEnv(
+            if eval_config['MODEL']['policy_name'] == 'CMA_DP_ImgMultiPatch_Policy':
+                eval_env = DiscreteFlashDPEvalSingleScanEnv
+            else:
+                eval_env = DiscreteFlashEvalSingleScanEnv
+            return eval_env(
                 robot_name=config["robot_name"],
                 sim_config=sim_config,
                 scene_asset_path=scene_asset_path,
