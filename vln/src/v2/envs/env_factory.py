@@ -120,7 +120,7 @@ def get_env_by_config(
     task_type = config["task_type"]
     flash = config["flash"]
     aperture = sim_config.config_dict['tasks'][0]['robots'][0]['aperture']
-    if task_type == 'eval':
+    if task_type == 'eval' or task_type == 'sixth_floor_eval':
         name=config["name"]
         ckpt_to_load = config["ckpt_to_load"]
         eval_config = get_eval_config(PROJECT_ROOT_PATH,ckpt_to_load, eval_config_path=eval_cfg_file)

@@ -9,6 +9,34 @@ from vln.parser import process_args
 # from vln.src.dataset.data_utils import load_data
 from vln.src.utils.utils import euler_angles_to_quat, quat_to_euler_angles, compute_rel_orientations
 
+def load_sixth_floor_data(args, split, dataset_root_dir = None):
+    ''' Load data based on VLN-CE
+    '''
+    total_scans = []
+    load_data = []
+    with gzip.open(dataset_root_dir, 'rt', encoding='utf-8') as f:
+        data = json.load(f)
+        for item in data["episodes"]:
+            item["original_start_position"] = copy.copy(item["start_position"])
+            item["original_start_rotation"] = copy.copy(item["start_rotation"])
+            item["start_position"] = [item["original_start_position"][0], item["original_start_position"][1], item["original_start_position"][2]] # unchanged
+            init_orientation = item['original_start_rotation']
+            init_orientation = quat_to_euler_angles(init_orientation)
+            orientation = [0, 0, init_orientation[2]]
+            init_orientation = euler_angles_to_quat(orientation)
+            item['start_rotation'] = init_orientation
+            item["scan"] = item["scene_id"]
+            item["c_reference_path"] = []
+            if "reference_path" in item.keys():
+                for path in item["reference_path"]:
+                    item["c_reference_path"].append([path[0], path[1], path[2]])
+                item["reference_path"] = item["c_reference_path"]
+                del item["c_reference_path"]
+            load_data.append(item)
+            total_scans.append(item["scan"])
+    print(f"Loaded data with a total of {len(load_data)} items from {split}")
+    return load_data, list(set(total_scans))
+
 def load_data(args, split, dataset_root_dir=None, is_fsa_dataset=False, correct_fsa_rotation=False):
     ''' Load data based on VLN-CE
     '''
@@ -85,12 +113,18 @@ def get_yaw_degree(rotation):
 class datasetGather:
     def __init__(self, args, dataset_root_dir=None, is_fsa_dataset=False, correct_fsa_rotation=False):
         self.args = args
-        self.splits = ['train', 'val_seen', 'val_unseen']
+        # self.splits = ['train', 'val_seen', 'val_unseen']
+        self.splits = ['train', 'val_seen']
         # self.splits = ['envdrop']
         self.data = {split: [] for split in self.splits}
         self.scan = {}
-        for split in self.splits:
-            self.data[split], self.scan[split] = load_data(self.args, split, dataset_root_dir=dataset_root_dir, is_fsa_dataset=is_fsa_dataset, correct_fsa_rotation=correct_fsa_rotation)
+        if args.mode == 'sixth_floor':
+            for split in self.splits:
+                dataset_path = os.path.join(dataset_root_dir, f"{split}", f"{split}.json.gz")
+                self.data[split], self.scan[split] = load_sixth_floor_data(args, split, dataset_root_dir=dataset_path)
+        else:
+            for split in self.splits:
+                self.data[split], self.scan[split] = load_data(self.args, split, dataset_root_dir=dataset_root_dir, is_fsa_dataset=is_fsa_dataset, correct_fsa_rotation=correct_fsa_rotation)
 
     def gatherSameScanData(self, save_gather_data=True, save_dir='gather_data/', fix_rotation=False):
         scan2data = {split: {} for split in self.splits}
@@ -101,7 +135,8 @@ class datasetGather:
                     scan2data[split][scan] = []
                 if fix_rotation:
                     # no need. already turn in load_data.
-                    data['start_rotation'] = transform_rotation_z_90degrees(data['start_rotation'])
+                    # data['start_rotation'] = transform_rotation_z_90degrees(data['start_rotation'])
+                    data['start_rotation'] = data['start_rotation']
                 scan2data[split][scan].append(data)
         
         if save_gather_data:
@@ -131,7 +166,8 @@ def gather_eval_data(ori_dataset, sample_dataset_file, split, save_dir='gather_d
         dataset = json.load(f)
     
     scan_data = defaultdict(list)
-    
+    if 'sixth_floor' in dataset:
+        dataset = dataset['sixth_floor']
     for item in dataset:
         scan = item['scan']
         trajectory_id = item['trajectory_id']
@@ -156,12 +192,15 @@ if __name__ == "__main__":
     '''1. Gather standard dataset'''
     # dataset_root_dir = "data/datasets/revised/processed_corrected"
     # dataset_root_dir = "data/datasets/R2R_VLNCE_v1-3_preprocessed"
-    dataset_root_dir = "data/datasets/R2R_VLNCE_FSASub"
+    # dataset_root_dir = "data/datasets/R2R_VLNCE_FSASub"
     # dataset_root_dir = "data/datasets/R2R_VLNCE_v1-3_corrected"
+    dataset_root_dir = '/ssd/wangliuyi/code/w61_grutopia_main/data/datasets/sixth_floor/sixth_floor/'
 
     args, _ = process_args()
-    dataset_gather = datasetGather(args, dataset_root_dir=dataset_root_dir, is_fsa_dataset=True, correct_fsa_rotation=False)
-    scan2data = dataset_gather.gatherSameScanData(save_gather_data=True, save_dir='gather_data/', fix_rotation=False)
+    args.mode = 'sixth_floor'
+    # dataset_gather = datasetGather(args, dataset_root_dir=dataset_root_dir, is_fsa_dataset=True, correct_fsa_rotation=False)
+    dataset_gather = datasetGather(args, dataset_root_dir=dataset_root_dir, is_fsa_dataset=False, correct_fsa_rotation=False)
+    # scan2data = dataset_gather.gatherSameScanData(save_gather_data=True, save_dir='gather_data/', fix_rotation=False)
     
     # read_gather_data('/ssd/wangliuyi/code/w61_grutopia/data/datasets/R2R_VLNCE_FSASub/val_seen/val_seen_sub.json.gz')
 
@@ -172,6 +211,11 @@ if __name__ == "__main__":
     # gather_eval_data(dataset_gather.data['val_unseen'], val_unseen_sample_dataset_file, 'val_unseen')
     # gather_eval_data(dataset_gather.data['val_seen'], val_seen_sample_dataset_file, 'val_seen')
 
+    # train_sample_dataset_file = 'path_generation/path_generaton/output/gather_data/sixth_floor_train_gather_data.json'
+    # val_seen_dataset_file = 'path_generation/path_generaton/output/gather_data/sixth_floor_val_seen_gather_data.json'
+    sample_dataset_file = 'path_generation/path_generaton/output/gather_data/sixth_floor_gather_data.json'
+    gather_eval_data(dataset_gather.data['train'], sample_dataset_file, 'train')
+    gather_eval_data(dataset_gather.data['val_seen'], sample_dataset_file, 'val_seen')
     '''3. Check the dataset'''
     # mlanet_data = load_json_gz('/ssd/wangliuyi/code/w61_grutopia/data/datasets/R2R_VLNCE_FSASub/val_seen/val_seen_sub.json.gz')
     # mlanet_gt_data = load_json_gz('/ssd/wangliuyi/code/w61_grutopia/data/datasets/R2R_VLNCE_FSASub/val_seen/val_seen.json.gz')

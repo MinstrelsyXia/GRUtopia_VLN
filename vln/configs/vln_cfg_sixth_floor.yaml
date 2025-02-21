@@ -8,7 +8,9 @@ datasets:
   scene_config_file: "thirdparty/landmark_isaacsim_interaction/json_configs/multi_model_sixthfloor.json"
   splits:
     # - envdrop
-    - sixth_floor #! fake
+    - train
+    - val_seen
+    # - sixth_floor #! fake
     # - val_seen
     # - val_unseen
     # - test
@@ -54,7 +56,7 @@ robots:
     z_offset: 0.7 # !!! 1.05
   
 maps:
-  robot_z: [0.1, 1.7]  # Robot's height range on the Z-axis
+  robot_z: [0.15, 1.7]  # Robot's height range on the Z-axis
   global_robot_z: [0, 1.7]
   agent_radius: 0.25 # Robot's radius (original: 0.25)
   voxel_size: 0.1  # Size of a voxel (original: 0.05)
@@ -79,7 +81,7 @@ planners:
   agent_radius: 0 # Radius of the agent
   last_scope: 1  # The last scope
   goal_sampling_rate: 0.2  # Goal sampling rate
-  a_star_max_iter: 50000  # Maximum number of iterations
+  a_star_max_iter: 30000  # Maximum number of iterations
   rrt_star_max_iter: 3000  # Maximum number of iterations
   extend_length: 1  # Extension length
   consider_range: 3  # A range parameter, specific meaning depends on context

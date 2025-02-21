@@ -4,6 +4,7 @@ datasets:
   mp3d_data_dir: "../Matterport3D/data/v1/scans"
   mp3d_category_file: "vln/data/mappings/category_mapping.tsv"
   mp3d_mpcat40_file: "vln/data/mappings/mpcat40.tsv"
+  scene_config_file: "thirdparty/landmark_isaacsim_interaction/json_configs/multi_model_sixthfloor.json"
   splits:
     - val_seen
     # - train

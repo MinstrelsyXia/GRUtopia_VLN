@@ -80,12 +80,14 @@ class LmdbReader:
         else:
             camera_key = 'pano_camera_0'
         rgb_data = episode_data['episode_data']['camera_info'][camera_key]['rgb']
+        # depth_data = episode_data['episode_data']['camera_info'][camera_key]['depth']
         for frame in rgb_data:
             # Convert the frame to a PIL image and then to a NumPy array
             pil_image = Image.fromarray(frame)
             # 将RGB转换为BGR格式
-            bgr_frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-            frames.append(bgr_frame)
+            # bgr_frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            # frames.append(bgr_frame)
+            frames.append(pil_image)
 
         # Define output video file path
         if use_pid:

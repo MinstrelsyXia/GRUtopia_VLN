@@ -584,7 +584,11 @@ def batch_obs(
     for obs in observations:
         for sensor in obs:
             if obs[sensor] is not None:
-                batch[sensor].append(torch.as_tensor(obs[sensor]))
+                if type(obs[sensor]) == np.ndarray:
+                    data = obs[sensor].copy()
+                else:
+                    data = obs[sensor]
+                batch[sensor].append(torch.as_tensor(data))
 
     batch_t: TensorDict = TensorDict()
 
