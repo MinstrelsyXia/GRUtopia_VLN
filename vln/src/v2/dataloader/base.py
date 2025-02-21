@@ -15,7 +15,7 @@ class BasePathKeyDataloader:
         self.path_key_split = {}
 
         for split_data_type in split_data_types:
-            load_data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True)
+            load_data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True,load_eval_subset=True)
             for scan, path_list in load_data_map.items():
                 for path in path_list:
                     trajectory_id = path['trajectory_id']

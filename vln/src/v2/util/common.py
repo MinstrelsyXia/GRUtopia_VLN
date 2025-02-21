@@ -185,7 +185,8 @@ def load_data(
     filter_stairs=True,
     load_eval_subset=False,
 ):
-    if load_eval_subset and split != 'train':
+    # if load_eval_subset and split != 'train':
+    if load_eval_subset:
         # only load the eval data (collect successfully)
         with open(os.path.join(dataset_root_dir, "gather_data", f"{split}_PReval_gather_data.json"), 'r') as f:
             data = json.load(f)

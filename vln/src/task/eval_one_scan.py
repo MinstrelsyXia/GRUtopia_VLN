@@ -74,9 +74,11 @@ if __name__ == "__main__":
     set_seed_normal(0)
 
     headless = True
-    # split_data_types = ['val_unseen','val_seen']
-    split_data_types = ['sixth_floor']
-    base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    split_data_types = ['val_seen']
+    # split_data_types = ['sixth_floor']
+    # base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
+    # base_data_dir = '/ssd/wangliuyi/code/w61_grutopia_main/'
+    base_data_dir = '/ssd/xiaxinyuan/code/w61-grutopia/'
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans" # !!! convert rel path to abs path for allowing rel texture path inside the usd
     name = config["name"]
     robot_name = config["robot_name"] # h1 / aliengo
@@ -110,6 +112,8 @@ if __name__ == "__main__":
         base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_FSASub'
 
     scene_asset_path = load_scene_usd(mp3d_data_dir, scan)
+    if 'scene_config_file' in config:
+        scene_config_file = config['scene_config_file']
     dataloader=EvalPathKeyDataloader(
         base_data_dir,
         split_data_types,
@@ -119,6 +123,7 @@ if __name__ == "__main__":
         lmdb_path,
         scan,
         retry_list,
+        scene_config_file = scene_config_file
     )
     eval_path_key_list = dataloader.eval_path_key_list
     if len(eval_path_key_list) == 0:

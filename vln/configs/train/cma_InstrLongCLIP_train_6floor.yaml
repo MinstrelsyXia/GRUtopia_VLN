@@ -74,7 +74,8 @@ EVAL:
   pm_threshold: 0.90
 
   # for isaac-sim envs
-  sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
+  # sim_cfg_file: vln/configs/sim_cfg_policy_eval.yaml
+  sim_cfg_file: vln/configs/sim_cfg_path_generation.yaml
   vln_cfg_file: vln/configs/vln_cfg_policy_eval.yaml
   step_interval: 50 
   
@@ -93,10 +94,11 @@ IL:
   save_interval_steps: 1500
   save_filter_frozen_weights: true # only save the learnable weights!
   load_from_ckpt: True
-  ckpt_to_load: data/checkpoints/20250219_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_instrLongCLIP_h1_aliengo_debug/ckpts/ckpt.5.pth
+  # ckpt_to_load: data/checkpoints/20250219_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_instrLongCLIP_h1_aliengo_debug/ckpts/ckpt.5.pth
+  ckpt_to_load: data/20250219_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_distLight_instrLongCLIP_6floor_aliengo_loadWeight/ckpts/ckpt.5.pth
   load_from_pretrain: False
 
-  dataset_root_dir: data/datasets/sixth_floor
+  dataset_root_dir: :/ssd/wangliuyi/code/w61_grutopia_main/data/datasets/sixth_floor
 
   camera_name: 'pano_camera_0'
   Filter_failure: 
@@ -129,7 +131,8 @@ IL:
     # lmdb_features_dir: data/sample_episodes/20250214_sample_aliengo/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250217_sample_h1_aliengo/sample_data.lmdb
     # lmdb_features_dir: data/sample_episodes/20250219_sample_h1_aliengo_flash/sample_data.lmdb
-    lmdb_features_dir: data/sample_episodes/six_floor_aliengo/sample_data.lmdb
+    # lmdb_features_dir: data/sample_episodes/six_floor_aliengo/sample_data.lmdb
+    lmdb_features_dir: data/sample_episodes/20250214_sample_aliengo/sample_data.lmdb
 
 
     lmdb_features_dagger_update_dir: data/sample_episodes/*name/sample_data.lmdb

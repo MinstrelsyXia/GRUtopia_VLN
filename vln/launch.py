@@ -62,6 +62,9 @@ if __name__ == "__main__":
     elif task_type == 'sixth_floor':
         key_prefix = 'sample_rank'
         task_file = 'sample_one_scan.py'
+    elif task_type == 'sixth_floor_eval':
+        key_prefix = 'eval_rank'
+        task_file = 'eval_one_scan.py'
     else:
         print(f'unknown task_type: {task_type}')
         sys.exit()

@@ -226,8 +226,9 @@ class Camera_3dgs(BaseSensor):
                 rgb = np.transpose(rgb, (1, 2, 0))  # shape [H,W,3]
                 rgb = np.clip(rgb, 0, 1)
                 rgb = (rgb * 255).astype(np.uint8)
-                rgb = rgb[:, :, ::-1]  # BGR to RGB
+                # rgb = rgb[:, :, ::-1]  # BGR to RGB
                 depth = scgs_rendering['depth'].detach().cpu().numpy()[0]    # shape：（H，W）
+                depth = depth * 100
                 # pc = self.get_pc(depth,cam_transform_matrix)
             pc = self._camera.get_pointcloud()
                 # pc[:,2] = -pc[:,2]

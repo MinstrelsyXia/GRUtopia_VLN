@@ -218,10 +218,12 @@ robots:
 
 
 - type: "HumanoidRobotVLNEval"
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_500.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_500.usd"
+  usd_path: ""
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
+  usd_path: "assets/robots/h1/h1_invisible_1121.usd"
   gains: [0.0, 0.0]
   controllers:
   - name: "move_by_speed"

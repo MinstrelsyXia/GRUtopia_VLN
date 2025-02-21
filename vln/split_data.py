@@ -29,19 +29,24 @@ def split_data(config):
         filter_same_trajectory = False
         #! align with key = f"sample_rank_{self.rank} in vln/src/v2/dataloader/sample.py
         prefix = 'sample_rank'
+    elif task_type == 'sixth_floor_eval':
+        split_data_types = ['train', 'val_seen']
+        filter_same_trajectory = False
+        prefix = "eval_rank"
     else:
         print(f"unknown task_type:{task_type}")
         sys.exit()
     
     # base_data_dir = f'{PROJECT_ROOT_PATH}/data/datasets/R2R_VLNCE_v1-3_corrected'
-    base_data_dir = f"{PROJECT_ROOT_PATH}/path_generation/path_generaton/output/"
+    # base_data_dir = f"{PROJECT_ROOT_PATH}/path_generation/path_generaton/output/"
+    base_data_dir = f"{PROJECT_ROOT_PATH}"
     lmdb_path = PROJECT_ROOT_PATH + f'/data/sample_episodes/{name}'
 
     #获取所有数据
     path_key_map = {}
     count=0
     for split_data_type in split_data_types:
-        data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True)
+        data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=filter_same_trajectory, filter_stairs=True,load_eval_subset=True)
         for scan,path_list in data_map.items():
             path_key_list = []
             for path in path_list:

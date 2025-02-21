@@ -28,7 +28,7 @@ from vln.src.models.navid.model.navid_arch import NaVidMetaModel, NaVidMetaForCa
 from vln.src.models.navid.constants import NAVIGATION_IDENTIFIER
 
 class LlavaConfig(LlamaConfig):
-    model_type = "llava"
+    model_type = "llava_navid"
 
 class LlavaAttLlamaModel(NaVidMetaModel, LlamaModel):
     config_class = LlavaConfig
@@ -145,5 +145,5 @@ class LlavaLlamaAttForCausalLM(LlamaForCausalLM, NaVidMetaForCausalLM):
         )
         return model_inputs
 
-AutoConfig.register("llava", LlavaConfig)
+AutoConfig.register("llava_navid", LlavaConfig)
 AutoModelForCausalLM.register(LlavaConfig, LlavaLlamaAttForCausalLM)
