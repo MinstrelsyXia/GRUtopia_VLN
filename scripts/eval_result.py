@@ -11,7 +11,7 @@ from vln.src.v2.util.common import load_data
 def get_split_map(project_path, load_eval_subset=False):
     split_map={}
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-    split_data_types=['val_unseen','val_seen']
+    split_data_types=['val_seen', 'val_unseen']
     for split_data_type in split_data_types:
         load_data_map = load_data(base_data_dir, split_data_type, filter_same_trajectory=False, filter_stairs=True, load_eval_subset=load_eval_subset)
         path_key_list=[]
@@ -62,6 +62,7 @@ if __name__ == "__main__":
 
     for split,path_key_list in split_map.items():
         data_list = []
+        error_list = []
         for path_key in path_key_list:
             data_key = generate_eval_key(ckpt_name,path_key)
             with database_read.begin() as txn:
@@ -69,7 +70,11 @@ if __name__ == "__main__":
                 if value is None:
                     # print(f"[key:{data_key}] value is None ")
                     continue
-                value = msgpack_numpy.unpackb(value)
+                try:
+                    value = msgpack_numpy.unpackb(value)
+                except Exception as E:
+                    error_list.append(data_key)
+                    continue
             value['path_key']=path_key
             data_list.append(value)
         count=len(data_list)
@@ -121,9 +126,17 @@ if __name__ == "__main__":
             continue
         log_print(f"TL = {total_TL} / {count} = {round((total_TL / count),4)}")
         log_print(f"NE = {total_NE} / {count} = {round((total_NE / count),4)}")
-        log_print(f"osr = {total_osr} / {count} = {round((total_osr / count),4)}")
-        log_print(f"success = {total_success} / {count} = {round((total_success / count),4)}")
-        log_print(f"spl = {total_spl} / {count} = {round((total_spl / count),4)}")
+        if 'fall' in reason_map:
+            log_print(f"FR = {reason_map['fall']} / {count} = {round((reason_map['fall'] / count),4) * 100}%")
+        else:
+            log_print(f"FR = 0 / {count} = 0%")
+        if 'stuck' in reason_map:
+            log_print(f"StR = {reason_map['stuck']} / {count} = {round((reason_map['stuck'] / count),4) * 100}%")
+        else:
+            log_print(f"StR = 0 / {count} = 0%")
+        log_print(f"OS = {total_osr} / {count} = {round((total_osr / count),4) * 100}%")
+        log_print(f"SR = {total_success} / {count} = {round((total_success / count),4) * 100}%")
+        log_print(f"SPL = {total_spl} / {count} = {round((total_spl / count),4) * 100}%")
         log_print("detail:")
         for k,v in reason_map.items():
             log_print(f"[{k}]:{v}")

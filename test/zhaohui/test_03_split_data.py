@@ -3,28 +3,16 @@ from vln.src.utils.utils import Config
 import os
 import lmdb
 import msgpack_numpy
-<<<<<<< HEAD
-
-#参数
-split_number = 16
-# split_data_types = ['val_unseen','val_seen']
-split_data_types = ['train']
-filter_same_trajectory = True
-project_path = '/ssd/zhaohui/workspace/w61_grutopia_0107'
-base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
-name = '20250120_dagger'
-=======
 from vln import PROJECT_ROOT_PATH
 
 #参数
-split_number = 1
-# split_data_types = ['val_unseen','val_seen']
-split_data_types = ['train']
-filter_same_trajectory = True
-project_path = PROJECT_ROOT_PATH
+split_number = 8
+split_data_types = ['val_unseen','val_seen']
+# split_data_types = ['train']
+filter_same_trajectory = False
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0115'
 base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
 name = '20250207_sample_discrete'
->>>>>>> w61/spring_festival_2025
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 
 

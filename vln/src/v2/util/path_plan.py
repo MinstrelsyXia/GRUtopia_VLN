@@ -105,13 +105,13 @@ def plan_and_get_actions_discrete(
     if not find_flag:
         return [], [], find_flag, reason
     real_points = get_real_points(yaw,points,actions,camera_pose,aperture,width,height)
-    # file_name = f"path_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg" 
+    file_name = f"path_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg" 
     # vis_nav_path(
     #     start_pixel, 
     #     goal_pixel, 
     #     points, 
     #     map_info, 
-    #     img_save_path=os.path.join('/ssd/zhaohui/workspace/w61_grutopia_0107/test/zhaohui/', file_name)
+    #     img_save_path=os.path.join('logs/images', file_name)
     # )
     return actions, real_points, find_flag, reason
 

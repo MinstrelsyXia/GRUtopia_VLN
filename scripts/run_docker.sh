@@ -1,4 +1,4 @@
-NAME=w61_test
+NAME=w61_test2
 sudo docker run -d --name ${NAME} -it --rm --gpus='"device=0"' --network host \
      -e "ACCEPT_EULA=Y" \
      -e "PRIVACY_CONSENT=Y" \

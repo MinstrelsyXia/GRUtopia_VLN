@@ -530,4 +530,4 @@ class MLANet(nn.Module):
             outputs = self.action_distribution(x).logits
         elif batch['mode'] == 'inference':
             outputs = self.action_distribution(x).mode()
-        return outputs, rnn_states_out
+        return outputs, rnn_states_out, None

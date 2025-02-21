@@ -87,7 +87,7 @@ def split_data(config):
 
     if not os.path.exists(lmdb_path):
         os.makedirs(lmdb_path)
-    database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0)
+    database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, max_dbs=0, lock=True)
     with database.begin(write=True) as txn:
         for rank, path_key_map in ranked_data.items():
             key = f"{prefix}_{rank}".encode()

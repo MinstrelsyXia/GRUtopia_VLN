@@ -11,6 +11,7 @@ tasks:
   env_num: 1
   offset_size: 100.0
   light_on: false
+  disk_light_intensity: 5000 # default: 5000
   robots:
   - name: aliengo
     prim_path: "/World/aliengo"
@@ -45,6 +46,9 @@ tasks:
       size: [640, 480]
     - name: "pano_camera_0"
       enable: true
+      size: [256, 256]
+    - name: "debug_camera"
+      enable: false # !!! for debug
       size: [256, 256]
     - name: "topdown_camera_50"
       enable: true

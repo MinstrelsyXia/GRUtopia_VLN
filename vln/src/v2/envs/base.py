@@ -5,6 +5,7 @@ from vln.src.v2.util.common import(
     create_robot_mask,
     freemap_to_accupancy_map,
     set_seed,
+    visualize_freemap,
 )
 import time
 import sys
@@ -35,6 +36,10 @@ class BaseSingleScanEnv:
         self.fall_height_threshold = self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
         self.robot_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['robot_height']
 
+        # fall check
+        self.fall_height_threshold = self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
+        self.robot_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['robot_height']
+
     def update_timestamp(self):
         self.timestamp = time.time()
         sys.stdout.flush()
@@ -48,7 +53,7 @@ class BaseSingleScanEnv:
         distant_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
 
         up_disk_light = UsdLux.DiskLight.Define(stage, "/World/up_disk_light")
-        up_disk_light.CreateIntensityAttr(5000)
+        up_disk_light.CreateIntensityAttr(self.sim_config.config_dict['tasks'][0]['disk_light_intensity']) 
         up_disk_light.CreateRadiusAttr(50.0)
         up_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
         UsdGeom.Xformable(up_disk_light).AddRotateXYZOp().Set(Gf.Vec3f(180.0, 0.0, 0.0))
@@ -56,13 +61,12 @@ class BaseSingleScanEnv:
         self.up_disk_light_position = UsdGeom.Xformable(self.up_disk_light).AddTranslateOp()
         
         down_disk_light = UsdLux.DiskLight.Define(stage, "/World/down_disk_light")
-        down_disk_light.CreateIntensityAttr(5000)
+        down_disk_light.CreateIntensityAttr(self.sim_config.config_dict['tasks'][0]['disk_light_intensity'])
         down_disk_light.CreateRadiusAttr(50.0)
         down_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
         self.down_disk_light = down_disk_light
         self.down_disk_light_position = UsdGeom.Xformable(self.down_disk_light).AddTranslateOp()
 
-    
     def reset_light_position(self, position):
         from pxr import Gf
         raise_light = 1
@@ -144,6 +148,7 @@ class BaseSingleScanEnv:
         dilation_iterations=0,
         voxel_size=0.1,
         agent_radius=0.25,
+        robot_name='h1'
     ):
         # 获取 free_map
         min_height = robot_height
@@ -169,12 +174,14 @@ class BaseSingleScanEnv:
             voxel_size=voxel_size,
             agent_radius=agent_radius,
         )
+        visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
         return accupancy_map
     
     def warm_up(self, step_count):
         for _ in range(step_count - 1):
             self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=False, render=False)
-        self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=True, render=True)
+        obs = self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=True, render=True)
+        return obs
     
     def stop(self):
         if(hasattr(self.env, 'simulation_app')):

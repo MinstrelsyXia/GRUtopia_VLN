@@ -536,6 +536,8 @@ class DaggerDiffusonPolicyTrainer:
             need_img_extraction = True
         else:
             need_img_extraction = False
+            observations['stack_rgb'] = observations['rgb_features'] 
+            observations['stack_depth'] = observations['depth_features']
         
         if self.config.MODEL.IMAGE_ENCODER.DEPTH.update_depth_encoder:
             need_img_extraction = True
@@ -559,7 +561,8 @@ class DaggerDiffusonPolicyTrainer:
             'process_images': False, # has processed in dataLoader
             'train_cls_free_guidance': self.config.MODEL.Diffusion_Policy.use_cls_free_guidance,
             'sample_cls_free_guidance': False,
-            'need_txt_extraction': need_instr_extraction
+            'need_txt_extraction': need_instr_extraction,
+            'analysis_time': self.config.IL.analysis_time
         }
         # if observations['stack_depth'].shape[1] == 1:
         #     observations['stack_depth'] = observations['stack_depth'].squeeze(1)
@@ -1459,7 +1462,7 @@ class DaggerDiffusonPolicyTrainer:
             input_lmdb_dir=self.config.IL.DAGGER.lmdb_features_dir,
             output_lmdb_dir=self.config.IL.DAGGER.lmdb_features_dagger_update_dir,
             device=self.device,
-            del_original_rgb=True
+            del_original_rgb=False
         )
 
         feature_preprocessor.preprocess_features()

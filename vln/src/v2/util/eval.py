@@ -26,6 +26,8 @@ class Statistic_Info:
         self.policy_step = 0
         # sim step 执行次数
         self.sim_step = 0
+        # rotation 连续旋转次数
+        self.continuous_rotation_count = 0
         # 目前已经移动的长度
         self.current_path_length = 0
         self.step_interval = step_interval
@@ -140,6 +142,9 @@ class ActionExecutor:
 
         statistic_info:Statistic_Info,
         context,
+        robot_name='h1',
+        fall_height_threshold=0.5,
+        max_rotation_count=-1
     ):
         # 执行 step 用到的工具类
         self.env=env
@@ -152,14 +157,17 @@ class ActionExecutor:
         self.per_action_max_step=per_action_max_step
         self.total_max_step = total_max_step
         self.robot_ankle_height = robot_ankle_height
+        self.max_rotation_count = max_rotation_count
         # 统计信息
         self.statistic_info = statistic_info
         # 可以优化掉的变量
         self.instruction = self.statistic_info.path_data['instruction']
         # 进程 stuck 检查使用
         self.context = context
-        self.fall_height_threshold = self.context.fall_height_threshold
-        self.robot_name = self.context.robot_name
+        
+        # robot name
+        self.robot_name = robot_name
+        self.fall_height_threshold = fall_height_threshold
 
     def _check_max_steps(self, step):
         if step > self.per_action_max_step:
@@ -178,18 +186,46 @@ class ActionExecutor:
             log.warning(f"Current action has been interrupted by {reason}.")
             return [True], reason
         return [False], ''
+    
+    def _check_max_rotation_count(self, action):
+        is_action_rotate = (action == 2 or action == 3)
+        if is_action_rotate:
+            self.statistic_info.continuous_rotation_count += 1
+        else:
+            self.statistic_info.continuous_rotation_count = 0
+        if self.statistic_info.continuous_rotation_count > self.max_rotation_count:
+            return True, 'exceed_max_rotation_count'
+        return False, ''
+
+    def _check_max_rotation_count(self, action):
+        is_action_rotate = (action == 2 or action == 3)
+        if is_action_rotate:
+            self.statistic_info.continuous_rotation_count += 1
+        else:
+            self.statistic_info.continuous_rotation_count = 0
+        if self.statistic_info.continuous_rotation_count > self.max_rotation_count:
+            return True, 'exceed_max_rotation_count'
+        return False, ''
 
     def _execute_action(
         self,
         action, 
         action_name, 
         check_fall_and_stuck,
+        check_max_rotation_count=False,
     ):
         finish_state = False
         step = 0
         dones = [False]
         reason = ''
         prev_position, _ = self.task.get_robot_poses_without_offset()
+        if check_max_rotation_count:
+            over_max_rotation_count, desc = self._check_max_rotation_count(action[0][self.robot_name][action_name][0])
+            if over_max_rotation_count:
+                reason = desc
+                log.warning(f"Current action has been interrupted by {reason}.")
+                return [True], reason
+        
         while not finish_state:
             self.context.update_timestamp()
             obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
@@ -218,7 +254,8 @@ class ActionExecutor:
 
     def env_step(
         self,
-        actions, 
+        actions,
+        check_max_rotation_count=False 
     ):
         '''step in isaac-sim until the action has finished'''
         dones = [False]
@@ -231,10 +268,11 @@ class ActionExecutor:
                 action = actions, 
                 action_name=action_name,  
                 check_fall_and_stuck=True,
+                check_max_rotation_count=check_max_rotation_count
             )
         
         robot_position, robot_rotation = self.isaac_robot.get_world_pose()
-        outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation)
+        outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation, robot_name=self.robot_name)
         self.statistic_info.pred_traj_list[0].append(robot_position)
         infos = self.statistic_info.compute_metrics(robot_position=robot_position,fail_reason=reason)
         
@@ -299,7 +337,7 @@ class FlashActionExecutor:
                 reason = 'exceed_total_max_step'
         
         robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-        outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation)
+        outputs_dict = get_obs(self.env,self.instruction,robot_position,robot_rotation, robot_name=self.robot_name)
         self.statistic_info.pred_traj_list[0].append(robot_position)
         infos = self.statistic_info.compute_metrics(robot_position=robot_position,fail_reason=reason)
         log.info(f"[descrete][step:{self.statistic_info.sim_step}] 完成动作:{describe_action(action)},距离目标 {round(infos[0]['NE'],2)} 米")
@@ -310,7 +348,7 @@ class FlashActionExecutor:
             "reason": reason,
         }
 
-def get_obs(env, instruction,robot_position,robot_rotation, sub_instr=None, sub_instr_tokens=None):
+def get_obs(env, instruction,robot_position,robot_rotation, sub_instr=None, sub_instr_tokens=None, robot_name='h1'):
     obs = env.get_observations(add_rgb_subframes=True)
     obs_data = {}
     obs_data['globalgps'] = None
@@ -328,7 +366,7 @@ def get_obs(env, instruction,robot_position,robot_rotation, sub_instr=None, sub_
         obs_data['sub_instruction'] = sub_instr_tokens
 
     obs_data['step'] = 0
-    cur_obs = obs['vln_0']["h1_0"]['pano_camera_0']
+    cur_obs = obs['vln_0'][f"{robot_name}_0"]['pano_camera_0']
     rgb_info = cur_obs['rgba'][..., :3]
     depth_info = norm_depth(cur_obs['depth'])
     obs_data['rgb'] = rgb_info

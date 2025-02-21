@@ -30,9 +30,9 @@ def get_split_map(project_path):
         split_map[split_data_type]=path_key_list
     return split_map
 
-ckpt_name="20250122_seq2seq_eval_Seq2Seq_DA_converted.pth"
-project_path = './'
-name = '20250122_seq2seq_eval'
+ckpt_name="navid-7b.0"
+project_path = '/ssd/zhaohui/workspace/w61_grutopia_0115'
+name = '20250114_eval_navid'
 lmdb_path = project_path + f'/data/sample_episodes/{name}'
 database_read = lmdb.open(f"{lmdb_path}/sample_data.lmdb", readonly=True, lock=False)
 split_map = get_split_map(project_path)
