@@ -283,12 +283,12 @@ if __name__ == '__main__':
             for ep_info in success_lmdb_data:
                 data_collector.save_episode_video(episode_data=ep_info[1], key=ep_info[0], output_dir=output_video_dir, use_pid=use_pid)
     elif mode == 'sixth_floor':
-        lmdb_path = 'data/sample_episodes/20250211_sixth_floor_sample/sample_data.lmdb'
+        lmdb_path = 'data/sample_episodes/20250214_sample_aliengo/sample_data.lmdb'
         data_collector = LmdbReader(lmdb_path)
         all_keys = data_collector.read_all_keys()
-        path_id = '1'
+        path_id = '0'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
         if episode_data is not None:
-            data_collector.save_episode_video(episode_data, key=path_id, output_dir='data/sample_episodes/20250211_sixth_floor_sample/', use_pid=use_pid)
+            data_collector.save_episode_video(episode_data, key=path_id, output_dir='data/sample_episodes/20250214_sample_aliengo/', use_pid=use_pid)
 

@@ -1,0 +1,22 @@
+{
+    "name" : "20250214_sample_aliengo",
+    "task_type" : "sixth_floor",
+    "scene_config_file": "/ssd/xiaxinyuan/code/w61-grutopia/thirdparty/landmark_isaacsim_interaction/json_configs/multi_model_sixthfloor.json",
+    "robot_name": "aliengo",
+    "sample_type":"discrete",
+    "dagger_percentage":0,
+    "ckpt_to_load" : "",
+    "image" : "w61_grutopia:v0.4",
+    "total_rank": 4,
+    "retry_list":[],
+    "flash": false,
+    "device_map" : {
+        "0":["0,1"],
+        "1":["2,3"],
+        "2":["4,5"],
+        "3":["6,7"]
+    },
+    "merge_config" : {
+        "data_0508":[]
+    }
+}

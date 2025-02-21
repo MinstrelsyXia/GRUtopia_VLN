@@ -68,7 +68,8 @@ if __name__ == "__main__":
     with open(cfg_file_path, 'r') as file:
         config = json.load(file)
     headless = True
-    split_data_types = ['val_unseen','val_seen']
+    # split_data_types = ['val_unseen','val_seen']
+    split_data_types = ['sixth_floor']
     base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_v1-3_corrected'
     # base_data_dir = f'{project_path}/data/datasets/R2R_VLNCE_FSASub' # !!! This is for MLANet
     mp3d_data_dir = f"{project_path}/../Matterport3D/data/v1/scans"
