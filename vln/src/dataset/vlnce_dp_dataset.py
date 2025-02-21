@@ -64,6 +64,38 @@ class ObservationsDict(dict):
 
         return self
 
+def optimize_delta_action(action_deltas, gt_actions):
+    # action_deltas: [T, 3]
+    # gt_actions: [T]
+    # return: [T, 3]
+    turn_angle = 0
+    for idx, a in enumerate(gt_actions):
+        if a == 1:
+            if abs(action_deltas[idx][0]) < 0.1 and abs(action_deltas[idx][1]) < 0.1:
+                action_deltas[idx][0] = 0.25 * np.cos(turn_angle)
+                action_deltas[idx][1] = 0.25 * np.sin(turn_angle)
+                if action_deltas[idx][2] > 0.1:
+                    action_deltas[idx][2] = 0.0
+        elif a == 2:
+            if abs(action_deltas[idx][0]) > 0.1:
+                action_deltas[idx][0] = 0
+            if abs(action_deltas[idx][1]) > 0.1:
+                action_deltas[idx][1] = 0
+            if abs(action_deltas[idx][2]) < 0.2:
+                action_deltas[idx][2] = 0.27
+            turn_angle += np.pi/12
+        elif a == 3:
+            if abs(action_deltas[idx][0]) > 0.1:
+                action_deltas[idx][0] = 0
+            if abs(action_deltas[idx][1]) > 0.1:
+                action_deltas[idx][1] = 0
+            if abs(action_deltas[idx][2]) < 0.2:
+                action_deltas[idx][2] = -0.27
+            turn_angle -= np.pi/12
+        elif a == 0:
+            action_deltas[idx] = torch.zeros_like(action_deltas[idx])
+    return action_deltas
+
 class VLNCE_DP_Dataset(IterableDataset):
     '''For vlnce diffusion policy'''
     def __init__(
@@ -215,6 +247,13 @@ class VLNCE_DP_Dataset(IterableDataset):
             'globalyaw': yaws,
         }
 
+        if 'action' in data.keys():
+            if isinstance(data['action'][-1], list):
+                data['action'] = data['action'][:-1] + data['action'][-1]
+            data['action'] = np.array(data['action'])
+            new_data['gt_actions'] = data['action']
+            new_data['prev_actions'] = np.concatenate([np.array([0]), data['action'][:-1]])
+
         # Handle RGB and depth features/data
         if 'rgb_features' in data:
             new_data['rgb_features'] = data['rgb_features']
@@ -237,6 +276,7 @@ class VLNCE_DP_Dataset(IterableDataset):
             lengths = []
             finish_status_list = []
             fail_reasons_list = []
+            empty_data_nums = 0
                 
             with lmdb.open(
                 self.lmdb_features_dir,
@@ -255,9 +295,17 @@ class VLNCE_DP_Dataset(IterableDataset):
                     #     data_to_load = pickle.loads(data_to_load)                 
                     # except:
                     data_to_load = msgpack_numpy.unpackb(packed_data, raw=False)
-                    data = data_to_load['episode_data']
+                    try:
+                        data = data_to_load['episode_data']
+                    except KeyError:
+                        print(f"KeyError: {key}")
+                        continue
                     finish_status = data_to_load['finish_status']
                     fail_reason = data_to_load['fail_reason']
+                    # Filter the empty data 
+                    if len(data['camera_info']) == 0:
+                        empty_data_nums += 1
+                        continue
                     if self.config.IL.Filter_failure.use:
                         if finish_status != 'success':
                             if len(data['camera_info']) == 0: # without any camera info
@@ -290,9 +338,10 @@ class VLNCE_DP_Dataset(IterableDataset):
                             yaw -= 2*np.pi
                         yaws[yaw_i] = yaw
 
-                    if 'instr_features' in data and not self.config.MODEL.TEXT_ENCODER.update_text_encoder:
+                    if 'instr_features' in data and not self.config.MODEL.TEXT_ENCODER.update_text_encoder and False:
+                        # TODO: some bug in preprocess_features.py
                         instructions = data['instr_features']
-                        self.need_extract_instr_features = False
+                        self.need_extract_instr_features = False # !!!
                     else:
                         instructions = [
                             self.dataset_data[key][ep_idx]['instruction']['instruction_text'][:self.config.MODEL.TEXT_ENCODER.max_length]
@@ -302,6 +351,10 @@ class VLNCE_DP_Dataset(IterableDataset):
 
                     for instruction in instructions:
                         new_data = self._create_new_data(data, yaws, instruction, finish_status, fail_reason)
+                        # limit the max length
+                        for k, v in new_data.items():
+                            if isinstance(v, np.ndarray):
+                                new_data[k] = v[:self.config.MODEL.max_step]
                         new_preload.append(new_data)
                         finish_status_list.append(finish_status)
                         fail_reasons_list.append(fail_reason)
@@ -310,6 +363,9 @@ class VLNCE_DP_Dataset(IterableDataset):
                 if self.need_extract_instr_features:
                     # compute stack images, positions, yaw, and relative actions, time_distance for each observations
                     new_preload = extract_instruction_tokens(new_preload, self.bert_tokenizer, is_clip_long=self.is_clip_long)
+                
+                if empty_data_nums > 0:
+                    print(f"empty data nums: {empty_data_nums}")
             
             # process the instruction
             # copy the instruction to each step
@@ -437,7 +493,14 @@ class VLNCE_DP_Dataset(IterableDataset):
                                                          fill_mode='constant')[:self.config.MODEL.len_traj_act]
                     
                     action_deltas = get_delta(actions)
-                    
+
+                    if self.config.IL.DAGGER.use_descrete_dataset and 'gt_actions' in item_obs.keys():
+                        end_step_idx = min(step_idx + self.len_traj_pred, len(item_obs["gt_actions"]))
+                        gt_actions = item_obs["gt_actions"][step_idx: end_step_idx]
+                        if len(gt_actions) < self.len_traj_pred:
+                            gt_actions = np.concatenate([gt_actions, np.zeros(self.len_traj_pred - len(gt_actions))])
+                        action_deltas = optimize_delta_action(action_deltas, gt_actions)
+
                     if self.learn_angle:                         
                         item_obs["actions"][step_idx] = normalize_data(action_deltas, self.action_stats) # convert actions to [-1, 1]
                     else:

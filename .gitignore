@@ -149,3 +149,5 @@ data_0508/
 /data_0508
 
 nohup.out
+slurm_logs/
+/slurm_logs

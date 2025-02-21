@@ -65,8 +65,8 @@ class Camera(BaseSensor):
                 if add_rgb_subframes:
                     rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False)
                 rgba = self._camera.get_rgba()
-            if add_rgb_subframes:
-                rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
+            # if add_rgb_subframes:
+            #     rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
             depth = self._camera.get_depth()
             if self.config.camera_config and 'point_cloud' in self.config.camera_config:
                 pointcloud = self._camera.get_pointcloud()

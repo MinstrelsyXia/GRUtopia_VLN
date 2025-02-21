@@ -6,7 +6,8 @@
     "dagger_percentage":0,
     "ckpt_to_load" : "",
     "image" : "w61_grutopia:v0.4",
-    "total_rank": 16,
+    "save_third_person_image": false,
+    "total_rank": 8,
     "retry_list":[],
     "flash": false,
     "device_map" : {
@@ -23,3 +24,4 @@
         "data_0508":[8,9,10,11,12,13,14,15]
     }
 }
+

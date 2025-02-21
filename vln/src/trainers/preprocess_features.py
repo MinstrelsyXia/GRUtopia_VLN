@@ -42,7 +42,7 @@ class FeaturePreprocessor:
         # Create output directory
         if os.path.exists(output_lmdb_dir):
             shutil.rmtree(output_lmdb_dir)
-        os.makedirs(output_lmdb_dir)
+        os.makedirs(output_lmdb_dir, exist_ok=True)
         print(f"Output LMDB directory: {output_lmdb_dir}")
 
     def process_batch(self, batch_data):
@@ -52,13 +52,27 @@ class FeaturePreprocessor:
         batch_rgb_lengths = []  # Track lengths of each data item's rgb sequence
         batch_instr = []
         batch_instr_lengths = []
+
+        skip_list = []
         
         # Process each item in batch
-        for data in batch_data:
+        for bs_idx, data in enumerate(batch_data):
             # Get RGB and depth images
-            rgb = copy.deepcopy(data['episode_data']['camera_info']['pano_camera_0']['rgb'])
-            depth = copy.deepcopy(data['episode_data']['camera_info']['pano_camera_0']['depth'])
-            instrs = copy.deepcopy(data['episode_data']['instructions'])
+            try:
+                episode_data = data['episode_data']
+            except KeyError:
+                skip_list.append(bs_idx)
+                batch_rgb_lengths.append(0)
+                batch_instr_lengths.append(0)
+                continue
+            if len(episode_data['camera_info']) == 0:
+                skip_list.append(bs_idx)
+                batch_rgb_lengths.append(0)
+                batch_instr_lengths.append(0)
+                continue
+            rgb = copy.deepcopy(episode_data['camera_info']['pano_camera_0']['rgb'])
+            depth = copy.deepcopy(episode_data['camera_info']['pano_camera_0']['depth'])
+            instrs = copy.deepcopy(episode_data['instructions'])
             
             # Store the length of rgb sequence
             batch_rgb_lengths.append(len(rgb))
@@ -111,18 +125,32 @@ class FeaturePreprocessor:
         split_depth_features = []
         split_instr_features = []
         start_idx = 0
+        adding_idx = 0
         for length in batch_rgb_lengths:
+            if adding_idx in skip_list:
+                adding_idx += 1
+                split_rgb_features.append(None)
+                split_depth_features.append(None)
+                split_instr_features.append(None)
+                continue
+
             end_idx = start_idx + length
             split_rgb_features.append(rgb_features[start_idx:end_idx])
             split_depth_features.append(depth_features[start_idx:end_idx])
             start_idx = end_idx
-        
+            adding_idx += 1
+
         start_idx = 0
+        adding_idx = 0
         for length in batch_instr_lengths:
+            if adding_idx in skip_list:
+                adding_idx += 1
+                split_instr_features.append(None)
+                continue
             end_idx = start_idx + length
             split_instr_features.append(instr_features[start_idx:end_idx])
             start_idx = end_idx
-            
+            adding_idx += 1
         return split_rgb_features, split_depth_features, split_instr_features
 
     def preprocess_features(self):
@@ -130,13 +158,13 @@ class FeaturePreprocessor:
         # Open input LMDB
         with lmdb.open(
             self.input_lmdb_dir,
-            map_size=int(1e9),
+            map_size=int(1e12),
             readonly=True,
             lock=False
         ) as input_env, \
         lmdb.open(
             self.output_lmdb_dir, 
-            map_size=int(1e11),
+            map_size=int(1e12),
             writemap=True
         ) as output_env:
             
@@ -155,6 +183,13 @@ class FeaturePreprocessor:
                 with input_env.begin(buffers=True) as txn:
                     data = msgpack_numpy.unpackb(txn.get(key.encode('utf-8')), raw=False)
                     
+                    try:
+                        episode_data = data['episode_data']
+                    except KeyError:
+                        continue
+                    if len(episode_data['camera_info']) == 0:
+                        continue
+
                     # add instructions
                     data['episode_data']['instructions'] = []
                     for ep_idx in range(len(self.train_dataset[key])):
@@ -172,9 +207,12 @@ class FeaturePreprocessor:
                         for i, k in enumerate(keys[idx-len(batch_data)+1:idx+1]):
                             data = copy.deepcopy(batch_data[i])
                             # Update data with new features
-                            data['episode_data']['rgb_features'] = rgb_features[i].cpu().numpy()
-                            data['episode_data']['depth_features'] = depth_features[i].cpu().numpy()
-                            data['episode_data']['instr_features'] = instr_features[i].cpu().numpy()
+                            if rgb_features[i] is not None:
+                                data['episode_data']['rgb_features'] = rgb_features[i].cpu().numpy()
+                            if depth_features[i] is not None:
+                                data['episode_data']['depth_features'] = depth_features[i].cpu().numpy()
+                            if instr_features[i] is not None:
+                                data['episode_data']['instr_features'] = instr_features[i].cpu().numpy()
                             
                             if self.del_original_rgb:
                                 del data['episode_data']['camera_info']['pano_camera_0']['rgb']

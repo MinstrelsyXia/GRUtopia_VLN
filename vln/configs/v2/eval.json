@@ -1,12 +1,13 @@
 {
-    "name" : "20250209_cma_dagger03_eval",
+    "name" : "20250221_h1_dpAction0.27_ckpt48_flash_eval",
+    "robot_name": "h1",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250208_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger03/ckpts/ckpt.10.pth",
-    "eval_cfg_file": "vln/configs/train/cma_eval.yaml",
+    "ckpt_to_load" : "0",
+    "eval_cfg_file": "vln/configs/train/cma_dp_eval.yaml",
     "image" : "w61_grutopia:v0.4",
     "total_rank": 8,
     "retry_list":[],
-    "flash": false,
+    "flash": true,
     "load_eval_subset": false,
     "device_map" : {
         "0":["0"],

@@ -91,8 +91,8 @@ class SimulatorRunner:
         if self.render_trigger > self.render_interval:
             self.render_trigger = 0
         
-        if add_rgb_subframes:
-            rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
+        # if add_rgb_subframes:
+        #     rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
 
         if analysis_time:
             world_step_start_time = time.time()
@@ -101,8 +101,8 @@ class SimulatorRunner:
         if analysis_time:
             world_step_time = time.time() - world_step_start_time 
 
-        if add_rgb_subframes:
-            rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False) # !!!
+        # if add_rgb_subframes:
+        #     rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False) # !!!
 
         if analysis_time:
             log.info(f"apply_action time: {apply_action_time:.4f}s, world_step time: {world_step_time:.4f}s")

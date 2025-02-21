@@ -68,18 +68,24 @@ class LmdbReader:
         env.close()
         return keys
     
-    def save_episode_video(self, episode_data, key, output_dir, use_pid=False):
+    def save_episode_video(self, episode_data, key, output_dir, use_pid=False, use_third_person_camera=False):
         """Save the episode video to a file."""
         frames = []
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         
         # Collect frames from episode data
-        rgb_data = episode_data['episode_data']['camera_info']['pano_camera_0']['rgb']
+        if use_third_person_camera:
+            camera_key = 'third_person_camera'
+        else:
+            camera_key = 'pano_camera_0'
+        rgb_data = episode_data['episode_data']['camera_info'][camera_key]['rgb']
         for frame in rgb_data:
             # Convert the frame to a PIL image and then to a NumPy array
             pil_image = Image.fromarray(frame)
-            frames.append(np.array(pil_image))
+            # 将RGB转换为BGR格式
+            bgr_frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            frames.append(bgr_frame)
 
         # Define output video file path
         if use_pid:
@@ -226,10 +232,12 @@ class LmdbReader:
 if __name__ == '__main__':
     mode = 'sixth_floor'
     use_pid = False
+    use_third_person_camera = False
     
     pid_lmdb_path = 'data/sample_episodes/20241207_sample_episodes/sample_data.lmdb'
     # original_lmdb_path = '/data/sample_episodes/20241120_sample_episodes_full/sample_data.lmdb'
-    original_lmdb_path = 'data/sample_episodes/20250208_light_controller_resample/sample_data.lmdb'
+    # original_lmdb_path = 'data/sample_episodes/20241216_sample_episodes_descrete_flash/sample_data.lmdb'
+    original_lmdb_path = 'data/sample_episodes/20250110_dagger/sample_data.lmdb'
 
     val_seen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_seen/sample_data.lmdb'
     val_unseen_lmdb_path = 'data/sample_episodes/20241115_sample_episodes_val_unseen/sample_data.lmdb'
@@ -244,23 +252,23 @@ if __name__ == '__main__':
 
         data_collector = LmdbReader(lmdb_path)
         '''1. Load all data'''
-        # all_data = data_collector.read_all_episode_data()
-        # path_id_list = all_data.keys()
+        all_data = data_collector.read_all_episode_data()
+        path_id_list = all_data.keys()
         # path_id_list = [1220, 476, 531, 67, 883, 94]
         # path_id_list = [str(x) for x in path_id_list]
-        # for path_id in path_id_list:
-        #     episode_data = data_collector.read_episode_data(path_id)
+        for path_id in path_id_list:
+            episode_data = data_collector.read_episode_data(path_id)
         #     ## save to the video
         #     if episode_data is not None:
         #         data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)
 
         '''2. Load the target path_id'''
         all_keys = data_collector.read_all_keys()
-        path_id = '4'
+        path_id = '2202'
         episode_data = data_collector.read_episode_data(path_id)
         ## save to the video
         if episode_data is not None:
-            data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid)
+            data_collector.save_episode_video(episode_data, key=path_id, output_dir='logs/videos', use_pid=use_pid, use_third_person_camera=use_third_person_camera)
     
     elif mode == 'analysis':
         '''3. Analysis the LMDB data'''

@@ -14,6 +14,9 @@ from vln.src.models.encoders import resnet_encoders
 from vln.src.models.encoders.instruction_encoder import (
     InstructionEncoder,
 )
+
+from transformers import PretrainedConfig
+import copy
     
 class CategoricalNet(nn.Module):
     def __init__(self, num_inputs: int, num_outputs: int) -> None:
@@ -66,9 +69,32 @@ class CMANet(nn.Module):
         self.model_config.INSTRUCTION_ENCODER.final_state_only = False
         self.model_config.freeze()
         # Init the instruction encoder
-        self.instruction_encoder = InstructionEncoder(
-            self.model_config.INSTRUCTION_ENCODER
-        )
+        self.use_instr_bert_encoder = False
+        if hasattr(self.model_config, "TEXT_ENCODER"):
+            # use BERT to encode instruction
+            if self.model_config.TEXT_ENCODER.model_name == 'clip-long':
+                self.instruction_encoder = encoders.InstructionLongCLIPEncoder(self.model_config.TEXT_ENCODER, self.model_config.LORA)
+                self.txt_linear_512_to_256 = nn.Linear(512, 256)
+                self.instruction_encoder.output_size = 256
+            else:
+                if self.model_config.TEXT_ENCODER.model_name in ['meter', 'roberta']:
+                    config_name = 'roberta-base'
+                else:
+                    config_name = self.model_config.TEXT_ENCODER.model_name
+                bert_config = PretrainedConfig.from_pretrained(config_name)
+                # Init the instruction encoder
+                text_encoder_config = copy.deepcopy(bert_config)
+                for k,v in self.model_config.TEXT_ENCODER.items():
+                    setattr(text_encoder_config, k, v)
+                # add LORA settings
+                setattr(text_encoder_config, 'LORA', self.model_config.LORA)
+
+                self.instruction_encoder = encoders.LanguageEncoder(text_encoder_config)
+            self.use_instr_bert_encoder = True
+        else:
+            self.instruction_encoder = InstructionEncoder(
+                self.model_config.INSTRUCTION_ENCODER
+            )
 
         # Init the depth encoder
         assert self.model_config.DEPTH_ENCODER.cnn_type in ["VlnResnetDepthEncoder"]
@@ -114,8 +140,8 @@ class CMANet(nn.Module):
         self.depth_linear = nn.Sequential(
             nn.Flatten(),
             nn.Linear(
-                np.prod(self.depth_encoder.output_shape),
-                self.model_config.DEPTH_ENCODER.output_size,
+                np.prod(self.depth_encoder.output_shape), # (192, 4, 4)
+                self.model_config.DEPTH_ENCODER.output_size, # 128
             ),
             nn.ReLU(True),
         )
@@ -230,11 +256,17 @@ class CMANet(nn.Module):
         prev_actions: Tensor,
         masks: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        instruction_embedding = self.instruction_encoder(observations)
-        depth_embedding = self.depth_encoder(observations)
+        if self.use_instr_bert_encoder:
+            instr = observations['instruction']
+            instruction_embedding, txt_masks, txt_cls_embeds = self.instruction_encoder(instr) # for rxr debug!
+            instruction_embedding = self.txt_linear_512_to_256(instruction_embedding)
+            instruction_embedding = instruction_embedding.permute(0, 2, 1) # [bs, 256, txt_len]
+        else:
+            instruction_embedding = self.instruction_encoder(observations) # [bs, 256, 200]
+        depth_embedding = self.depth_encoder(observations) # [bs, 192, 4, 4]
         depth_embedding = torch.flatten(depth_embedding, 2) # [bs, 192, 16]
 
-        rgb_embedding = self.rgb_encoder(observations)
+        rgb_embedding = self.rgb_encoder(observations) # [370, 2112, 4, 4]
         rgb_embedding = torch.flatten(rgb_embedding, 2) # [bs, 2112, 16]
 
         prev_actions = self.prev_action_embedding(
@@ -248,8 +280,8 @@ class CMANet(nn.Module):
         if self.model_config.ablate_rgb:
             rgb_embedding = rgb_embedding * 0
 
-        rgb_in = self.rgb_linear(rgb_embedding)
-        depth_in = self.depth_linear(depth_embedding)
+        rgb_in = self.rgb_linear(rgb_embedding) # [bs, 256]
+        depth_in = self.depth_linear(depth_embedding) # [bs, 128]
 
         state_in = torch.cat([rgb_in, depth_in, prev_actions], dim=1)
         rnn_states_out = rnn_states.detach().clone()
@@ -262,8 +294,8 @@ class CMANet(nn.Module):
             masks,
         )
 
-        text_state_q = self.state_q(state)
-        text_state_k = self.text_k(instruction_embedding)
+        text_state_q = self.state_q(state) # [bs, 256]
+        text_state_k = self.text_k(instruction_embedding) # [bs, 256, 200]
         text_mask = (instruction_embedding == 0.0).all(dim=1)
         text_embedding = self._attn(
             text_state_q, text_state_k, instruction_embedding, text_mask
@@ -271,13 +303,13 @@ class CMANet(nn.Module):
 
         rgb_k, rgb_v = torch.split(
             self.rgb_kv(rgb_embedding), self._hidden_size // 2, dim=1
-        )
+        ) # [bs, 256, 16]
         depth_k, depth_v = torch.split(
             self.depth_kv(depth_embedding), self._hidden_size // 2, dim=1
-        )
+        ) # [bs, 256, 16]
 
-        text_q = self.text_q(text_embedding)
-        rgb_embedding = self._attn(text_q, rgb_k, rgb_v)
+        text_q = self.text_q(text_embedding) # text_embedding: [bs, 256]. text_q: [bs, 256]
+        rgb_embedding = self._attn(text_q, rgb_k, rgb_v) # [bs, 256]
         depth_embedding = self._attn(text_q, depth_k, depth_v)
 
         x = torch.cat(
@@ -300,7 +332,8 @@ class CMANet(nn.Module):
             masks, # [B, 512]
         )
 
-        if self.model_config.PROGRESS_MONITOR.use:
+        progress_hat = None
+        if self.model_config.PROGRESS_MONITOR.use and "progress" in observations:
             progress_hat = torch.tanh(self.progress_monitor(x))
             progress_loss = F.mse_loss(
                 progress_hat.squeeze(1),
@@ -308,7 +341,7 @@ class CMANet(nn.Module):
                 reduction="none",
             )
 
-        return x, rnn_states_out
+        return x, rnn_states_out, progress_hat
 
     def build_distribution(
         self, observations, rnn_states, prev_actions, masks
@@ -319,11 +352,11 @@ class CMANet(nn.Module):
         return self.action_distribution(features)
     
     def forward(self, batch):
-        x, rnn_states_out = self._forward(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
+        x, rnn_states_out, progress_hat = self._forward(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'])
         # distribution = self.action_distribution(x) # This would meet the error when using DataParallel during training "TypeError: 'CustomFixedCategorical' object is not iterable"
         if batch['mode'] == 'train':
             outputs = self.action_distribution(x).logits
         elif batch['mode'] == 'inference':
             outputs = self.action_distribution(x).mode()
-        return outputs, rnn_states_out
+        return outputs, rnn_states_out, progress_hat
 
