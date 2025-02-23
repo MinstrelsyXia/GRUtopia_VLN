@@ -38,12 +38,13 @@ simulation_app = SimulationApp({'headless': True, 'anti_aliasing': 0, 'renderer'
 from omni.isaac.core import World
 from omni.isaac.sensor import Camera
 import numpy as np
-from omni.isaac.lab.app import AppLauncher
+# from omni.isaac.lab.app import AppLauncher
 import argparse
 import open3d as o3d
 
 import carb
 from pxr import Sdf, Usd, UsdGeom, Vt
+import omni.replicator.core as rep
 # # 命令行参数解析
 # parser = argparse.ArgumentParser(description="This script demonstrates different dexterous hands.")
 # AppLauncher.add_app_launcher_args(parser)
@@ -73,122 +74,85 @@ class my_Camera(Camera):
         self.world_w_cam_u_T = UsdGeom.Imageable(self.prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
         return self.world_w_cam_u_T
 # 初始化相机实例
-camera = my_Camera(
-        prim_path="/World/camera",
-        resolution=(640, 480) # (640,480)
-    )
-camera.set_projection_type('pinhole')
 
-# my_world.scene.add_default_ground_plane()
-# my_world.reset()
-camera.initialize()
+class FineCamera(Camera):
+
+    def get_render_product(self):
+        return self._render_product
+
+    def get_view_matrix_ros(self):
+        """3D points in World Frame -> 3D points in Camera Ros Frame
+
+        Returns:
+            np.ndarray: the view matrix that transforms 3d points in the world frame to 3d points in the camera axes
+                        with ros camera convention.
+        """
+        R_U_TRANSFORM = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+        width, height = self.get_resolution()
+        rp = rep.create.render_product(self.prim_path, resolution=(width, height))
+        _camera_params = rep.annotators.get('CameraParams')
+        _camera_params.attach(rp)
+        camera_params = _camera_params.get_data()
+        try:
+            world_w_cam_u_T = self._backend_utils.transpose_2d(
+                self._backend_utils.convert(
+                    np.linalg.inv(camera_params['cameraViewTransform'].reshape(4, 4)),
+                    dtype='float32',
+                    device=self._device,
+                    indexed=True,
+                ))
+        except np.linalg.LinAlgError:
+            world_w_cam_u_T = self._backend_utils.transpose_2d(
+                self._backend_utils.convert(
+                    UsdGeom.Imageable(self.prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default()),
+                    dtype='float32',
+                    device=self._device,
+                    indexed=True,
+                ))
+        r_u_transform_converted = self._backend_utils.convert(R_U_TRANSFORM,
+                                                              dtype='float32',
+                                                              device=self._device,
+                                                              indexed=True)
+        return self._backend_utils.matmul(r_u_transform_converted, self._backend_utils.inverse(world_w_cam_u_T))
+    
+    def get_pointcloud(self,depth) -> np.ndarray:
+        im_height, im_width = depth.shape[0], depth.shape[1]
+
+        ww = np.linspace(0, im_width - 1, im_width)
+        hh = np.linspace(0, im_height - 1, im_height)
+        xmap, ymap = np.meshgrid(ww, hh)
+
+        points_2d = np.column_stack((xmap.ravel(), ymap.ravel()))
+
+        # Directly use this function from the camera class to do this.
+        pointcloud = self.get_world_points_from_image_coords(points_2d, depth.flatten())
+
+        return pointcloud
+
+camera_type = "fine_camera"
+if camera_type == "my_camera":
+    camera = my_Camera(
+            prim_path="/World/camera",
+            resolution=(640, 480) # (640,480)
+        )
+    camera.set_projection_type('pinhole')
+
+    # my_world.scene.add_default_ground_plane()
+    # my_world.reset()
+    camera.initialize()
+if camera_type == "fine_camera":
+    camera = FineCamera(
+            prim_path="/World/camera",
+            resolution=(640, 480) # (640,480)
+        )
+    camera.initialize()
+    camera.add_distance_to_image_plane_to_frame()
+
 
 # 载入姿态和深度图数据
-main_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes_safe/s8pcmisQ38h/id_37"
+# main_dir = "sample_episodes_safe/s8pcmisQ38h/id_37"
+main_dir = "/g0433_data/xiaxinyuan/code/w61-grutopia/logs/sample_episodes_safe/s8pcmisQ38h/id_2606"
 pose = np.loadtxt(main_dir + "/poses.txt")
-
-# depth_map1 = np.load(main_dir + "/depth/pano_camera_0_depth_step_8.npy")
-# depth_map2 = np.load(main_dir + "/depth/pano_camera_0_depth_step_11.npy")
-# depth_map3 = np.load(main_dir + "/depth/pano_camera_0_depth_step_14.npy")
-# height, width = depth_map1.shape
-
-# # 生成像素坐标的网格
-# x = np.arange(width)
-# y = np.arange(height)
-# xx, yy = np.meshgrid(x, y)
-# xx_flat = xx.flatten()
-# yy_flat = yy.flatten()
-# points_2d = np.vstack((xx_flat, yy_flat)).T  # (N, 2)
-
-# actions = {'h1': {'move_with_keyboard': []}}
-# global_pcd = o3d.geometry.PointCloud()
-
-# # 点云下采样函数
-# def downsample_pc(pc, depth_sample_rate):
-#     shuffle_mask = np.arange(pc.shape[0])
-#     np.random.shuffle(shuffle_mask)
-#     shuffle_mask = shuffle_mask[::depth_sample_rate]
-#     pc = pc[shuffle_mask, :]
-#     return pc
-
-# # 保存点云图像函数
-# def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
-#     vis = o3d.visualization.Visualizer()
-#     vis.create_window()
-#     ctr = vis.get_view_control()
-#     ctr.set_front([0, 0, -1])
-#     ctr.set_lookat([0, 0, 0])
-#     ctr.set_up([0, 0, 1])
-#     vis.add_geometry(pcd)
-#     vis.update_geometry(pcd)
-#     vis.poll_events()
-#     vis.update_renderer()
-#     vis.capture_screen_image(save_path)
-#     vis.destroy_window()
-
-# # 点云可视化函数
-# def visualize_pc(pcd, headless, save_path='pc.jpg'):
-#     if headless:
-#         save_point_cloud_image(pcd, save_path=save_path)
-#     else:
-#         coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
-#         # o3d.visualization.draw_geometries([pcd, coordinate_frame])
-#         o3d.io.write_point_cloud("point_cloud.pcd", pcd)
-#         o3d.io.write_triangle_mesh("coordinate_frame.ply", coordinate_frame)
-# # 仿真主循环
-# i = 0
-# headless = False
-# while simulation_app.is_running():
-#     i += 1
-#     print(i)
-#     my_world.step()
-#     world_w_cam_u_T = camera.obtain_world_w_cam_u_T()
-#     print(world_w_cam_u_T)
-#     if i == 50:
-#         camera.set_world_pose(pose[0, :3], pose[0, 3:])
-#         print(pose)
-#         print(camera.get_world_pose())
-    
-#     if i ==100:
-#         depth_map1 = depth_map1.flatten() # (N,)
-#         points_3d = camera.get_world_points_from_image_coords(points_2d, depth_map1)
-#         points_3d_downsampled = downsample_pc(points_3d, 100)
-#         pcd_global = o3d.geometry.PointCloud()
-#         pcd_global.points = o3d.utility.Vector3dVector(points_3d_downsampled)
-#         global_pcd += pcd_global
-#         visualize_pc(pcd_global, headless, "1.jpg")
-
-#     if i == 150 :
-#         camera.set_world_pose(pose[1, :3], pose[1, 3:])
-#         print(pose)
-#         print(camera.get_world_pose())
-
-#     if i ==200:
-#         depth_map2 = depth_map2.flatten() # (N,)
-#         points_3d = camera.get_world_points_from_image_coords(points_2d, depth_map2)
-#         points_3d_downsampled = downsample_pc(points_3d, 100)
-#         pcd_global = o3d.geometry.PointCloud()
-#         pcd_global.points = o3d.utility.Vector3dVector(points_3d_downsampled)
-#         global_pcd += pcd_global
-#         visualize_pc(pcd_global, headless, "2.jpg")
-#         visualize_pc(global_pcd, headless, "3.jpg")
-
-#     if i == 250:
-#         camera.set_world_pose(pose[2, :3], pose[2, 3:])
-#         print(pose)
-#         print(camera.get_world_pose())
-    
-#     if i == 300:
-#         depth_map3 = depth_map3.flatten() # (N,)
-#         points_3d = camera.get_world_points_from_image_coords(points_2d, depth_map3)
-#         points_3d_downsampled = downsample_pc(points_3d, 100)
-#         pcd_global = o3d.geometry.PointCloud()
-#         pcd_global.points = o3d.utility.Vector3dVector(points_3d_downsampled)
-#         global_pcd += pcd_global
-#         visualize_pc(pcd_global, headless, "4.jpg")
-#         visualize_pc(global_pcd, headless, "5.jpg")
-#         break
-# simulation_app.close()
 
 def get_dummy_2d_grid(width,height):
     # Generate a meshgrid of pixel coordinates
@@ -259,10 +223,14 @@ def visualize_pc(pcd,headless,save_path = 'pc.jpg'):
 PCD_GLOBAL = o3d.geometry.PointCloud()
 
 
-def test_pc(camera,depth):
+def test_pc(camera,depth,camera_type='my_camera'):
     global PCD_GLOBAL
-    grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
-    pc = camera.get_world_points_from_image_coords(grid_2d, depth.flatten())
+    if camera_type == 'my_camera':
+        grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
+        pc = camera.get_world_points_from_image_coords(grid_2d, depth.flatten())
+
+    else:
+        pc = camera.get_pointcloud(depth)
     pc_downsampled = downsample_pc(pc, 150)
     pcd_global = o3d.geometry.PointCloud()
     pcd_global.points = o3d.utility.Vector3dVector(pc_downsampled)
@@ -289,6 +257,6 @@ while simulation_app.is_running():
         camera.set_world_pose(pose[k, :3], pose[k, 3:])
         depth_map = np.load(os.path.join(depth_dir, depth_files[k]))
         k+=1
-        test_pc(camera,depth_map)
+        test_pc(camera,depth_map,camera_type)
 
 simulation_app.close()

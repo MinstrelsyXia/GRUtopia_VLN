@@ -29,7 +29,7 @@ parser.add_argument("--test_verbose", action="store_true", default=False)
 parser.add_argument("--wait", action="store_true", default=False)
 args = parser.parse_args()
 
-file_path = './GRUtopia/demo/configs/h1_vlnce.yaml'
+file_path = '/isaac-sim/GRUtopia/demo/configs/h1_vlnce.yaml'
 sim_config = SimulatorConfig(file_path)
 
 def euler_angles_to_quat(angles):

@@ -16,7 +16,7 @@ class Navigator:
         
 
     def plan_to(
-        self, start_full_map: Tuple[float, float], goal_full_map: Tuple[float, float], vis: bool = False, navigable_map_visual = None,save_path ='tmp2/tmp/planned_path.jpg'
+        self, start_full_map: Tuple[float, float], goal_full_map: Tuple[float, float], vis: bool = False, navigable_map_visual = None,save_path ='tmp/planned_path.jpg'
     ) -> List[List[float]]:
         """
         Take full map start (row, col) and full map goal (row, col) as input
@@ -102,6 +102,7 @@ class Navigator:
         start, goal: (row, col) in full map
         grid: 2D list or array representing the map, where 0 is free and 1 is blocked
         '''
+        goal = [int(goal[0]), int(goal[1])]
         line_points = bresenham_line(start[0], start[1], goal[0], goal[1])
         
         for point in line_points:
@@ -121,9 +122,11 @@ def bresenham_line(x0, y0, x1, y1):
     sy = 1 if y0 < y1 else -1
     err = dx - dy
 
+    x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
+
     while True:
         points.append((x0, y0))
-        if x0 == x1 and y0 == y1:
+        if x0 == x1 and y0 == y1 or len(points) > abs(dx) + abs(dy) + 2:
             break
         e2 = 2 * err
         if e2 > -dy:

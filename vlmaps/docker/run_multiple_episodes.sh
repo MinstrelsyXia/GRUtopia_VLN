@@ -2,7 +2,7 @@
 
 # 配置参数
 
-DATA_DIR="/ssd/xiaxinyuan/code/VLN/VLNCE/R2R_VLNCE_v1-3"
+DATA_DIR="/ssd/xiaxinyuan/code/VLN/VLNCE/R2R_VLNCE_v1-3_corrected"
 # add date+hour+minute
 
 CACHE_ROOT="/ssd/xiaxinyuan/docker"
@@ -17,8 +17,9 @@ mkdir -p ${LOG_DIR}
 
 
 # GPU ID 列表
-GPU_LIST=( "5" "6" "7" "8")
-NUM_GPUS=4
+# GPU_LIST=( "0" "1" "2" "4" "5" "6" )
+GPU_LIST=("7")
+NUM_GPUS=1
 # GPU_LIST=( "1" "2" "4" "5" "6" "7")
 SPLITS=("val_unseen")
 OUTPUT_DIR="multi_gpu_list_$NUM_GPUS"  # 相对路径，例如: multi_gpu_list_val_unseen_7
@@ -69,13 +70,13 @@ for GPU in "${GPU_LIST[@]}"; do
             --rm \
             --network=bridge \
             --shm-size="32g" \
-            -v /ssd/xiaxinyuan/checkpoints/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz:/root/.cache/torch/hub/checkpoints/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz:ro \
-            -v /home/xiaxinyuan/.cache/huggingface/hub/models--timm--vit_large_patch16_384.augreg_in21k_ft_in1k:/root/.cache/huggingface/hub/models--timm--vit_large_patch16_384.augreg_in21k_ft_in1k:ro \
-            -v /ssd/xiaxinyuan/code/demo_e200.ckpt:/isaac-sim/GRUtopia/vlmaps/vlmaps/lseg/checkpoints/demo_e200.ckpt:ro \
-            -v /ssd/xiaxinyuan/checkpoints/ViT-B-32.pt:/root/.cache/clip/ViT-B-32.pt:ro \
+            -v /g0433_data/xiaxinyuan/checkpoints/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz:/root/.cache/torch/hub/checkpoints/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz:ro \
+            -v /g0433_data/xiaxinyuan/checkpoints/models--timm--vit_large_patch16_384.augreg_in21k_ft_in1k:/root/.cache/huggingface/hub/models--timm--vit_large_patch16_384.augreg_in21k_ft_in1k:ro \
+            -v /g0433_data/xiaxinyuan/code/demo_e200.ckpt:/isaac-sim/GRUtopia/vlmaps/vlmaps/lseg/checkpoints/demo_e200.ckpt:ro \
+            -v /g0433_data/xiaxinyuan/checkpoints/ViT-B-32.pt:/root/.cache/clip/ViT-B-32.pt:ro \
             -v /ssd/share/Matterport3D:/isaac-sim/Matterport3D:ro \
-            -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3:rw \
-            -v /ssd/xiaxinyuan/code/w61-grutopia/logs_docker_1213:/isaac-sim/GRUtopia/logs:rw \
+            -v /ssd/share/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:/isaac-sim/VLN/VLNCE/R2R_VLNCE_v1-3_corrected:rw \
+            -v /ssd/xiaxinyuan/code/w61-grutopia/logs_docker_1213:/isaac-sim/GRUtopia/logs_docker:rw \
             -v /ssd/xiaxinyuan/code/w61-grutopia:/isaac-sim/GRUtopia:rw \
             -v /ssd/xiaxinyuan/assets:/isaac-sim/GRUtopia/assets:ro \
             -v ${CACHE_ROOT}/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \

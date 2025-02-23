@@ -21,7 +21,9 @@ import pickle
 import time
 from vlmaps.vlmaps.robot.lang_robot import LangRobot
 from vlmaps.vlmaps.dataloader.isaacsim_dataloader import VLMapsDataloaderHabitat
-from vlmaps.vlmaps.navigator.navigator import Navigator
+# from vlmaps.vlmaps.navigator.navigator import Navigator
+
+from vln.src.v2.util.continuous_planner_v2 import AStarPlanner
 from vlmaps.vlmaps.controller.discrete_nav_controller import DiscreteNavController
 from vlmaps.vlmaps.task.isaacsim_task import IsaacSimSpatialGoalNavigationTask
 from vlmaps.vlmaps.utils.mapping_utils import (
@@ -74,6 +76,21 @@ def is_equal(a, b, threshold=0.1):
     # 如果距离小于指定阈值，则认为相等
     return distance < threshold
 
+def set_seed(seed):
+    import random
+    import torch
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = False
+    from omni.isaac.core.utils.torch.maths import set_seed
+    set_seed(seed,torch_deterministic=True)
+    import omni.isaac.core.utils.torch as torch_utils
+    torch_utils.set_seed(seed)
+    import omni.replicator.core as rep
+    rep.set_global_seed(seed)
 
 class IsaacSimLanguageRobot(LangRobot):
 
@@ -115,7 +132,8 @@ class IsaacSimLanguageRobot(LangRobot):
 
         self.vis = False
 
-        self.nav = Navigator()
+        # self.nav = Navigator()
+
         self.controller = DiscreteNavController(self.config["params"]["controller_config"])
 
         # from data_utils: init agents
@@ -162,7 +180,8 @@ class IsaacSimLanguageRobot(LangRobot):
         self.min_height = 100 #! arbitray
         ## occupancy map to get the top-down oracle map:
         # in self._setup_sim
-        self.eval_helper = IsaacSimSpatialGoalNavigationTask(config) 
+        log_path = log.handlers[1].baseFilename
+        self.eval_helper = IsaacSimSpatialGoalNavigationTask(config,log_path) 
     
     ############################### init env ############################################
 
@@ -250,6 +269,7 @@ class IsaacSimLanguageRobot(LangRobot):
     def init_env(self, sim_config, headless=True):
         '''init env''' 
         self.env = BaseEnv(sim_config, headless=headless, webrtc=False)
+        
     
     
     def init_agents(self):
@@ -258,8 +278,49 @@ class IsaacSimLanguageRobot(LangRobot):
         self.agent_last_pose = None
         self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
         self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
-
+        
+        self.create_light()
         self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
+
+        self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
+        self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))
+        
+        agent_pose =self.agents.get_world_pose()[0].astype(np.float64)
+        self.reset_light_position(agent_pose)
+    
+    def reset_light_position(self, position):
+        from pxr import Gf
+        raise_light = 1.0
+        if self.robot_name == 'aliengo':
+           raise_light+= 0.55 
+        self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2] - raise_light))
+        self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2] + raise_light))
+    
+    
+    def create_light(self):
+        from pxr import Gf, UsdLux, UsdGeom
+        import omni.usd
+        stage = omni.usd.get_context().get_stage()
+        distant_light = UsdLux.DistantLight.Define(stage, "/World/distant_light")
+        distant_light.CreateIntensityAttr(1000)
+        distant_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+
+        up_disk_light = UsdLux.DiskLight.Define(stage, "/World/up_disk_light")
+        up_disk_light.CreateIntensityAttr(5000)
+        up_disk_light.CreateRadiusAttr(50.0)
+        up_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+        UsdGeom.Xformable(up_disk_light).AddRotateXYZOp().Set(Gf.Vec3f(180.0, 0.0, 0.0))
+        self.up_disk_light = up_disk_light
+        self.up_disk_light_position = UsdGeom.Xformable(self.up_disk_light).AddTranslateOp()
+        
+        down_disk_light = UsdLux.DiskLight.Define(stage, "/World/down_disk_light")
+        down_disk_light.CreateIntensityAttr(5000)
+        down_disk_light.CreateRadiusAttr(50.0)
+        down_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+        self.down_disk_light = down_disk_light
+        self.down_disk_light_position = UsdGeom.Xformable(self.down_disk_light).AddTranslateOp()
+
+
     
     def set_agent_pose(self, position, rotation):
         self.agents.set_world_pose(position, rotation)
@@ -333,7 +394,9 @@ class IsaacSimLanguageRobot(LangRobot):
 
 #################### update from VLFM ###########################
     def init_occupancy_map(self):
-        from vlmaps.vlfm.obstacle_map import ObstacleMap
+        # from vlmaps.vlfm.obstacle_map import ObstacleMap
+        from vlmaps.vlfm.obstacle_map_v2 import ObstacleMap
+
         min_height, max_height = self.map_config["robot_z"][0],self.map_config["robot_z"][1]
         agent_radius = self.vln_config.maps.agent_radius
         area_thresh = self.map_config["area_thresh"]
@@ -341,7 +404,7 @@ class IsaacSimLanguageRobot(LangRobot):
         size = self.map_config["map_size"]
         pixels_per_meter = 1.0/self.cs
         self.ObstacleMap = ObstacleMap(min_height=min_height, max_height=max_height,agent_radius=agent_radius, area_thresh=area_thresh,hole_area_thresh= hole_area_thresh, size = size, pixels_per_meter = pixels_per_meter,log_image_dir=self.test_file_save_dir)
-
+        self.nav = AStarPlanner(map_width = 100, map_height = 100, trajectory_visualizer=self.ObstacleMap._traj_vis)
 
 
     def update_semantic_map(self):
@@ -349,10 +412,11 @@ class IsaacSimLanguageRobot(LangRobot):
         obs = self.get_observations(["rgba","depth"])
         rgb = obs[self.task_name][self.robot_name][self.camera_list[0]]["rgba"][...,:3]
         depth_map = obs[self.task_name][self.robot_name][self.camera_list[0]]["depth"]
+        pointcloud = obs[self.task_name][self.robot_name][self.camera_list[0]]["pointcloud"]
         max_depth = 10
         depth_map[depth_map > max_depth] = 0
         # update semantic map
-        pc, max_depth= self.map._update_semantic_map(self.camera, rgb, depth_map, labels = mp3dcat[1:-1],step=self.step)
+        pc, max_depth= self.map._update_semantic_map(self.camera, rgb, depth_map, labels = mp3dcat[1:-1],step=self.step,pointcloud=pointcloud)
 
         return pc,max_depth
     
@@ -378,7 +442,7 @@ class IsaacSimLanguageRobot(LangRobot):
         self.ObstacleMap.update_map_with_pc(
             pc_filtered,
             camera_position=camera_position,
-            camera_orientation=camera_orientation_angle+np.pi/2,
+            camera_orientation=camera_orientation_angle,
             max_depth=max_depth, 
             topdown_fov=self.fov ,
             verbose=self.vln_config.test_verbose,
@@ -566,12 +630,12 @@ class IsaacSimLanguageRobot(LangRobot):
         log.info(f"enter test_movement with action {action_name}")
 
         # test whether the action_name is valid
-        try:
-            check_valid_parsed_instruction(action_name)
-        except Exception as e:
-            log.warning(f"Invalid action name: {action_name}, {e}")
-            self.eval_helper.add_action_func(f"Invalid action name: {action_name}, {e}")
-            return
+        # try:
+        #     check_valid_parsed_instruction(action_name)
+        # except Exception as e:
+        #     log.warning(f"Invalid action name: {action_name}, {e}")
+        #     self.eval_helper.add_action_func(f"Invalid action name: {action_name}, {e}")
+        #     return
         self.eval_helper.add_action_func(f"Step:{self.step}: enter test_movement with action {action_name}")
         prev_step = self.step
         self.subgoal = extract_parameters(action_name)
@@ -662,8 +726,9 @@ class IsaacSimLanguageRobot(LangRobot):
 
     def warm_up(self,warm_step =50):
         self.step = 0
-        # env_actions = [{'h1': {'stand_still': []}}]
-        env_actions = [{'h1': {'move_along_path': [[self.agent_init_pose.tolist()]]}}]
+        env_actions = [{'h1': {'stand_still': []}}]
+
+        # env_actions = [{'h1': {'move_along_path': [[self.agent_init_pose.tolist()]]}}]
         fps_start = time.time()
         while self.step < warm_step:
             self.env.step(actions=env_actions)
@@ -677,11 +742,25 @@ class IsaacSimLanguageRobot(LangRobot):
                 print(f"Current step: {self.step}. FPS: {fps:.2f}")
                 log.info(f"Current step: {self.step}. FPS: {fps:.2f}")
                 fps_start = fps_end
+                print("init pose and rotation: ", self.agent_init_pose, self.agent_init_rotation)
+                print("last pose and rotation: ", self.get_agent_pose()[0], self.get_agent_pose()[1])
+        
         log.info("Warm up finished, updated all maps")
         update_start = time.time()
         self.update_all_maps()
         update_end = time.time()
         print(f"Update all maps time: {update_end - update_start}")
+        # check whether robot falls and reset robot:
+        while True:
+            reset_robot = self.check_and_reset_robot(cur_iter=self.step, update_freemap=True, verbose=self.vln_config.test_verbose)
+            if reset_robot:
+                self.eval_helper.add_action_func(f"Step:{self.step}: Robot fall down in warm up.")
+                for _ in range(50):
+                    self.step += 1
+                    self.env.step(actions=env_actions)
+            else:
+                break
+
 
     def from_obsmap_to_vlmap(self,pos):
         '''
@@ -715,7 +794,7 @@ class IsaacSimLanguageRobot(LangRobot):
             self.turn(60)
             
 
-    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 1.0,subgoal = None) -> List[str]:
+    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 0.5,subgoal = None) -> List[str]:
         """Move the robot to the position on the obstacle map
             based on accurate localization in the environment
             with falls and movements
@@ -786,12 +865,12 @@ class IsaacSimLanguageRobot(LangRobot):
             self.step = self.step + 1
             env_actions = []
             env_actions.append(actions)
-            if self.step % 200 == 0:
-                self.env.step(actions=env_actions,add_rgb_subframes=True,render=True)
-            else:
-                self.env.step(actions=env_actions,add_rgb_subframes=False,render=False)
-            # log.info(f'action now {actions}')
-
+            # if self.step % 200 == 0:
+            #     self.env.step(actions=env_actions,add_rgb_subframes=True,render=True)
+            # else:
+            #     self.env.step(actions=env_actions,add_rgb_subframes=False,render=False)
+            # # log.info(f'action now {actions}')
+            self.env.step(actions=env_actions)
             #! check whether robot falls first, then update map
             if (self.step % 200 == 0):
                 while True:
@@ -799,32 +878,30 @@ class IsaacSimLanguageRobot(LangRobot):
                     reset_flag = reset_robot
                     if reset_flag:
                         self.eval_helper.add_action_func(f"Step:{self.step}: Robot fall down in move_to.")
-                        # self.map.update_occupancy_map(verbose = self.vln_config.test_verbose) #! find dilate->vlmap occupancy map
-                        # self._set_nav_curr_pose()
-                        # # plan the path
-                        # curr_pose_on_full_map = self.get_agent_pose_on_map()
-                        # start = self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2])
-
+                        for _ in range(50):
+                            self.step += 1
+                            self.env.step(actions=env_actions)
                         current_pos = self.agents.get_world_pose()[0][:2]
                         start = self.ObstacleMap._xy_to_px(np.array([[current_pos[0],current_pos[1]]]))[0]
                         start_modified = [start[0],start[1]]
                         log.info(f"stuck or fall down, reset the robot to {start_modified}")
+                        # 检查路径规划结果:
                         paths, paths_3d = self.planning_path(start_modified,goal_modified)
+                        if len(paths_3d) == 0:
+                            log.error("path is blocked, cannot move")
+                            return False
                         goal_xy = paths_3d[-1][:2]
                         actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
-                        log.info(f"moving from {start} to {goal_modified} on {paths}")
-                        log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
+                        env_actions = []
+                        env_actions.append(actions)
+                        # log.info(f"moving from {start} to {goal_modified} on {paths}")
+                        # log.info(f'moving from {self.agents.get_world_pose()[0][:2]} to {goal_xy} on {paths_3d}')
                         self._retrive_robot_stuck_check()
-                        for _ in range(50):
-                            self.step += 1
-                            self.env.step(actions=env_actions)
-                        self.eval_helper.start_new_episode(self.step)
-                        
-                    else:
-                        self.eval_helper.add_action_func(f"Step:{self.step}: reset the robot finished")
-                        break
-                
 
+                        self.eval_helper.start_new_episode(self.step)
+                        self.eval_helper.add_action_func(f"Step:{self.step}: Trial to reset robot finished")
+                    else:
+                        break
 
             if (self.step % 200 == 0):
                 ### check and reset robot
@@ -833,7 +910,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 # curr_pose_on_full_map = self.get_agent_pose_on_map()
                 # start = self.from_vlmap_to_obsmap(curr_pose_on_full_map[:2])
                 current_pos = self.agents.get_world_pose()[0][:2]
-                start = self.ObstacleMap._xy_to_px(np.array([[current_pos[0],current_pos[1]]]))[0]
+                start = self.ObstacleMap._xy_to_px(current_pos)[0]
                 start_modified = [start[0],start[1]]
                 log.info(f"Step {self.step}: In obstacle map coord, present at {start_modified}, need to navigate to {goal_modified}")
 
@@ -841,12 +918,12 @@ class IsaacSimLanguageRobot(LangRobot):
             if (self.step % 1000 == 0):
                 # check whether path is blocked
 
-                if self.nav.check_path_blocked(start_modified, goal_modified):
+                if self.nav.check_path_blocked(start_modified, goal_modified, self.ObstacleMap._navigable_map):
                     current_pos = self.agents.get_world_pose()[0][:2]
-                    start = self.ObstacleMap._xy_to_px(np.array([[current_pos[0],current_pos[1]]]))[0]
+                    start = self.ObstacleMap._xy_to_px(current_pos)[0]
                     start_modified = [start[0],start[1]]
                     goal_xy = env_actions[0]['h1']['move_along_path'][0][-1]
-                    goal_modified = self.ObstacleMap._xy_to_px(np.array([[goal_xy[0],goal_xy[1]]]))[0]
+                    goal_modified = self.ObstacleMap._xy_to_px(goal_xy)[0]
                     log.warning("Path is blocked, replanning")
                     paths, paths_3d = self.planning_path(start_modified,goal_modified)
                     actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
@@ -862,6 +939,7 @@ class IsaacSimLanguageRobot(LangRobot):
                     if self.map.check_object(self.subgoal):
                         log.info(f"Subgoal {self.subgoal} is reached at step {self.step}")
                         self.eval_helper.add_action_func(f"Step:{self.step} Subgoal {self.subgoal} is reached")
+                        self.eval_helper.add_action_func(f"Step:{self.step}: Early break in move_to, successfully executed self.move_to({self.subgoal})")
                         return True
 
             if ((self.step-init_step) % 3000 == 0):
@@ -878,9 +956,9 @@ class IsaacSimLanguageRobot(LangRobot):
         self._set_nav_curr_pose()
         self.eval_helper.add_action_func(f"Step:{self.step}: move forward {meters}")
         curr_pos = self.agents.get_world_pose()[0][:2]
-        curr_pos_obs = self.ObstacleMap._xy_to_px(np.array([[curr_pos[0],curr_pos[1]]]))[0]
-        curr_ang_obs = self.quat_to_euler_angles(self.agents.get_world_pose()[1])[2]+np.pi/2
-        pos = self.ObstacleMap.get_forward_pos(curr_pos_obs, curr_ang_obs, meters)
+        curr_pos_obs = self.ObstacleMap._xy_to_px(curr_pos)[0]
+        curr_ang_obs = self.quat_to_euler_angles(self.agents.get_world_pose()[1])[2]
+        pos = self.ObstacleMap.get_forward_pos_v2(curr_pos_obs, curr_ang_obs, meters)
         self.move_to(pos,type= 'obs')
         self.eval_helper.add_action_func(f"Step:{self.step}: successfully move forward {meters}")
 
@@ -929,14 +1007,32 @@ class IsaacSimLanguageRobot(LangRobot):
         angle = self.get_angle(frontier_angle)
         self.turn(angle)
 
+    def planning_path_v2(self, start,goal):
+        if np.linalg.norm(np.array(start) - np.array(goal)) < 2:
+            log.info("起点和终点太近，直接返回")
+            return [[start, goal]], [start, goal]
+        accupancy_map = self.ObstacleMap.freemap_to_accupancy_map()
+        path_save_path = self.nav_save_dir + f"/path_{self.step}.png"
+        paths = self.nav.plan_to(start, goal, vis = True, navigable_map_visual=self.ObstacleMap.nav_map_visual,obs_map = accupancy_map,save_path = path_save_path)
+
+        paths_3d = self.ObstacleMap._px_to_xy(paths,self.agent_init_pose[2])
+
+        goal[:] = paths[-1]
+        return paths, paths_3d
+
     def planning_path(self,start_modified,goal_modified):
         '''
         will change goal_modified if goal is not reachable
         '''
-        rows, cols = np.where(self.ObstacleMap._navigable_map == 0)
+        return self.planning_path_v2(start_modified,goal_modified)
+        #! not in use:
+        if np.linalg.norm(np.array(start_modified) - np.array(goal_modified)) < 2:
+            log.info("起点和终点太近，直接返回")
+            return [[start_modified, goal_modified]], [start_modified, goal_modified]
+        rows, cols = np.where(self.ObstacleMap.explored_area == 0)
         min_row = np.max(np.min(rows)-1,0)
         min_col = np.max(np.min(cols)-1,0)
-        self.nav.build_visgraph(self.ObstacleMap._navigable_map,
+        self.nav.build_visgraph(self.ObstacleMap.explored_area,
             rowmin = min_row,
             colmin = min_col,
             vis = True)
@@ -987,22 +1083,22 @@ class IsaacSimLanguageRobot(LangRobot):
             # log.info(f'action now {actions}')
             while abs(self.quat_to_euler_angles(current_orientation)[2] - rotation_goal) > threshold:
                 self.step += 1
-                # if step_time%100==0 or step_time <= 3:
-                #     agent.bev_map.step_time = step_time
-                #     obs = self.env.step(actions=actions, render = True)
-                #     rgb, depth = agent.update_memory(dialogue_result=None, update_candidates= True, verbose=task_config['verbose']) 
+
+                # if self.step % 200 == 0:
+                #     self.env.step(actions= env_actions,add_rgb_subframes=True,render=True)
                 # else:
-                #     obs = runner.step(actions=actions, render = False)
-                if self.step % 200 == 0:
-                    self.env.step(actions= env_actions,add_rgb_subframes=True,render=True)
-                else:
-                    self.env.step(actions= env_actions,add_rgb_subframes=False,render=False)
+                #     self.env.step(actions= env_actions,add_rgb_subframes=False,render=False)
+
+                self.env.step(actions= env_actions)
                 current_orientation = self.agents.get_world_pose()[1]
 
-                if (self.step % 1000 == 0):
+                if (self.step % 200 == 0):
                     reset_robot = self.check_and_reset_robot(cur_iter=self.step, update_freemap=False, verbose=self.vln_config.test_verbose)
                     reset_flag = reset_robot
                     if reset_flag:
+                        for _ in range(50):
+                            self.step += 1
+                            self.env.step(actions=env_actions)
                         self.eval_helper.add_action_func(f"Step:{self.step}: Robot fall down in turn.")
                         # self.map.update_occupancy_map(verbose = self.vln_config.test_verbose) #! find dilate->vlmap occupancy map
                         self._set_nav_curr_pose()
@@ -1010,7 +1106,9 @@ class IsaacSimLanguageRobot(LangRobot):
                         curr_pose_on_full_map = self.get_agent_pose_on_map()  # TODO: (row, col, angle_deg) on full map
                         current_yaw = curr_pose_on_full_map[2]
                         # rotation_goals = [(current_yaw + degree) % 360 - 360 if (current_yaw + degree) % 360 > 180 else (current_yaw + degree) % 360 for degree in np.arange(angle_deg+base_yaw-current_yaw, 0, -2)]
-    
+
+
+                        self._retrive_robot_stuck_check()
                         rotation_goals = [(current_yaw + degree)%(2*np.pi) - (2*np.pi) if (current_yaw + degree)%(2*np.pi) > np.pi else (self.quat_to_euler_angles(current_orientation)[2] + degree)%(2*np.pi) for degree in np.linspace( (angle_deg / 180.0 * np.pi + base_yaw - current_yaw+4*np.pi)%(2*np.pi), 0, 2, endpoint=False)]
                         break  
 
@@ -1021,7 +1119,7 @@ class IsaacSimLanguageRobot(LangRobot):
                     log.info(f"Step {self.step}: Present at {self.quat_to_euler_angles(current_orientation)[2]}, need to navigate to {rotation_goal}")
                     #! fall down check
 
-        self._retrive_robot_stuck_check()
+
         if check_frontier:
             return frontier_image_dict
         return True
@@ -1164,10 +1262,10 @@ class IsaacSimLanguageRobot(LangRobot):
         '''
         is_stuck = False
         if self.agent_last_pose is None:
-            self.agent_last_valid_pose = self.get_agent_pose()[0]
+            # 初始化时，当前姿态就是有效姿态
+            # self.agent_last_valid_pose = self.get_agent_pose()[0]
             self.agent_last_pose, self.agent_last_rotation = self.get_agent_pose()
-            self.agent_last_valid_pose = self.agent_last_pose
-            self.agent_last_valid_rotation = self.agent_last_rotation
+            # self.agent_last_valid_rotation = self.agent_last_rotation
             self.stuck_threshold = 0
             self.stuck_last_iter = cur_iter
             return is_stuck
@@ -1179,11 +1277,8 @@ class IsaacSimLanguageRobot(LangRobot):
         if (cur_iter - self.stuck_last_iter) >= max_iter:
             if self.stuck_threshold < threshold:
                 is_stuck = True
-            else:
-                self.stuck_threshold = 0
-                self.stuck_last_iter = cur_iter
-                self.agent_last_valid_pose = current_pose
-                self.agent_last_valid_rotation = current_rotation
+            self.stuck_threshold = 0
+            self.stuck_last_iter = cur_iter
 
         self.agent_last_pose = current_pose
         self.agent_last_rotation = current_rotation
@@ -1242,16 +1337,16 @@ class IsaacSimLanguageRobot(LangRobot):
         self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
         self.agents.set_joint_positions(np.zeros(len(self.agents.dof_names)))
     
-    def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False,prev_orientation=None):
+    def check_and_reset_robot(self, cur_iter, update_freemap=False, verbose=False):
         is_fall = self.check_robot_fall(self.agents, adjust=False)
         is_stuck = self.check_robot_stuck(cur_iter=cur_iter, max_iter=300, threshold=0.2)
-        # prev_orientation = prev_orientation if prev_orientation is not None else self.agent_init_rotation
-        prev_orientation = self.agent_last_valid_rotation
+        
         if (not is_fall) and (not is_stuck):
             if update_freemap:
-                self.get_surrounding_free_map(verbose=verbose) # update the surrounding_free_map
-                # ! using gt because in real life, a robot knows when it falls
-                self.agent_last_valid_rotation = prev_orientation
+                self.get_surrounding_free_map(verbose=verbose)
+                # 只有在机器人正常时才更新有效旋转
+                self.agent_last_valid_rotation = self.get_agent_pose()[1]
+                self.agent_last_valid_pose = self.get_agent_pose()[0]
             return False
         else:
             if is_fall:
@@ -1260,9 +1355,18 @@ class IsaacSimLanguageRobot(LangRobot):
             if is_stuck:
                 log.info("Robot is stuck. Reset robot pose.")
                 self.eval_helper.add_action_func(f"Robot is stuck.")
+            
+            # 使用最后一个有效的姿态
             random_position = self.randomly_pick_position_from_freemap()
-            # self.reset_robot(random_position, self.agent_last_valid_rotation)
-            self.reset_robot(random_position, prev_orientation)
+            if hasattr(self, 'agent_last_valid_rotation') and self.agent_last_valid_rotation is not None:
+                valid_rotation = self.agent_last_valid_rotation
+            elif hasattr(self, 'agent_init_rotation') and self.agent_init_rotation is not None:
+                valid_rotation = self.agent_init_rotation
+            else:
+                valid_rotation = self.get_agent_pose()[1]  # 使用当前旋转作为后备选项
+
+            # valid_rotation = self.agent_last_valid_rotation if self.agent_last_valid_rotation is not None else self.agent_init_rotation
+            self.reset_robot(random_position, valid_rotation)
             log.info(f"Reset robot pose to {random_position}.")
             return True
         
@@ -1278,13 +1382,17 @@ class IsaacSimLanguageRobot(LangRobot):
     
     def set_ultimate_goal(self, subaction:str):
         self.ultimate_action = subaction
-        fin_obj = extract_parameters(subaction)[-1]
-        self.ultimate_goal = fin_obj 
+        tmp = extract_parameters(subaction)
+        if tmp == None:
+            self.ultimate_goal = None
+        else:
+            fin_obj = tmp[-1]
+            self.ultimate_goal = fin_obj 
     
-    def save_metric(self):
+    def save_metric(self,state):
         self.eval_helper.start_new_episode(self.step)
         self.eval_helper.calculate_metric(self.step)
-        self.eval_helper.save_single_task_metric(save_path = self.test_file_save_dir + '/metric.json')
+        self.eval_helper.save_single_task_metric(save_path = self.test_file_save_dir + '/metric.json',state=state)
         pos_list_all = self.eval_helper.pos_list_all
         traj_obs = []
         gt_obs = self.ObstacleMap._xy_to_px(self.eval_helper.get_goals()[:,:2])
@@ -1436,6 +1544,7 @@ def main(config: DictConfig) -> None:
         init_omni_scene = True
         reset_scene = False
         for split in vln_config.datasets.splits:
+
             robot = IsaacSimLanguageRobot(config, sim_config, vln_config=vln_config, split=split)
             last_scene_name = scan_trajectory_episode_pairs[start_idx][0]
             for scene_name, trajectory_id, episode_id in scan_trajectory_episode_pairs[start_idx:]: 
@@ -1460,13 +1569,14 @@ def main(config: DictConfig) -> None:
                 robot.setup_scene(episode_id, trajectory_id,reset_scene=reset_scene,init_omni_scene=init_omni_scene)
                 init_omni_scene = False
                 # for the following episodes: if the new scene id is different from the last one, then use reset_scene()
-
+                set_seed(2025)
                 # else: only set the task and robot position
                 robot.map.init_categories(mp3dcat.copy())
                 # ! debuging
-                parsed_instructions = ['self.move_forward(3)']
+                # parsed_instructions = ['self.move_forward(3)']
                 # gpt_ans = parse_spatial_instruction(robot.instruction)
                 # parsed_instructions = extract_self_methods(gpt_ans)
+                parsed_instructions =['self.move_forward(1)', "self.move_to_object('lamp')"]
 
                 log.info(f"instruction: {robot.instruction}")
                 log.info(f"parsed instructions: {parsed_instructions}")
@@ -1474,6 +1584,16 @@ def main(config: DictConfig) -> None:
                 robot.eval_helper.add_parsed_instruction(parsed_instructions)
                 skip_flag = 0 # 
                 skipped_i = 0 # [:skipped_i] are skipped
+                # check valid parsed instructions
+                valid_parsed_instruction = []
+                for action_name in parsed_instructions:
+                    try:
+                        if check_valid_parsed_instruction(action_name):
+                            valid_parsed_instruction.append(action_name)
+                    except Exception as e:
+                        log.warning(f"Invalid action name: {action_name}, {e}")
+                        robot.eval_helper.add_action_func(f"Invalid action name: {action_name}, {e}")
+                        
                 for idx in range(len(parsed_instructions) - 1, -1, -1):
                     subgoal = parsed_instructions[idx]
                     if not (('move_forward' in subgoal) or ('turn' in subgoal)):
@@ -1484,10 +1604,13 @@ def main(config: DictConfig) -> None:
                 while robot.env.simulation_app.is_running():
                     robot.eval_helper.add_pos(robot.agents.get_world_pose()[0])
                     robot.warm_up(200)
-                    robot.turn(90)
+                    robot.save_metric(state=False)
+
                     #! for debuging
+                    # robot.turn(90)
                     # goal_obs = robot.ObstacleMap._xy_to_px(robot.eval_helper.goals[:,:2])
-                    # robot.move_to(goal_obs[1],'obs')
+                    # robot.move_to(goal_obs[-1],'obs')
+                    # break
                     ''' if the target is reached, then raise EarlyFound and stop the exploration'''
                     for cat_i, subgoal in enumerate(parsed_instructions):
                         if cat_i >= skip_flag:
@@ -1508,7 +1631,7 @@ def main(config: DictConfig) -> None:
                     # robot.env.simulation_app.close()
                     last_scene_name = scene_name
                     robot.eval_helper.add_pos(robot.agents.get_world_pose()[0])
-                    robot.save_metric()
+                    robot.save_metric(state=True)
                     robot.clear_maps()
                     break # break from 'while simulator is running'
 
@@ -1518,15 +1641,18 @@ def main(config: DictConfig) -> None:
         ''' restart, and save the episode no matter it is finished or not'''
         if robot.env.simulation_app.is_running():
             try:
-                robot.save_metric()
+                robot.save_metric(state=False)
                 robot.clear_maps()
                 # 确保父目录存在
                 os.makedirs(os.path.dirname(config.last_scan_file), exist_ok=True)
                 
+                # write in the next episode
+                if idx != len(scan_trajectory_episode_pairs)-1:
+                    next_episode_id = scan_trajectory_episode_pairs[idx][2]
                 # 写入文件
-                with open(config.last_scan_file, 'w') as f:
-                    f.write(str(episode_id))
-                log.info(f"Successfully wrote scan {episode_id} to {config.last_scan_file}")
+                    with open(config.last_scan_file, 'w') as f:
+                        f.write(str(next_episode_id))
+                    log.info(f"Error occurs, writing {next_episode_id} to {config.last_scan_file}")
             except Exception as e:
                 log.error(f"Unexpected error while writing file: {e}")
             # sys.exit(1)

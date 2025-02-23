@@ -1,13 +1,7 @@
-x8F5xyUWy9e,42,7,Go straight past the pool. Walk between the bar and chairs.  Stop when you get to the corner of the bar.  That's where you will wait. 
-x8F5xyUWy9e,42,9,Go forward one meter
-Go to the chairs
-Go to the steps
-Go to the endtable
-Go to the tan door. 
 zsNo4HB9uLZ,62,13,Walk passed the dining table and continue towards the kitchen. Walk through the kitchen passed the counters and stove and stop near the sink. 
-2azQ1b91cZZ,161,43,Go into the kitchen area. Turn left. Take the first right into the dining area. Walk past the dining table. Stop left of the tall lamp with a white lampshade. 
 QUCTc6BB5sX,307,98,Walk to the oven, turn left, walk to the lattice gate, turn right, enter the office, wait at the desk. 
-X7HyMhZNoso,407,112,Walk to the other side of the patio and enter the building through the sliding glass doors turn right and wait in the dining area. 
+zsNo4HB9uLZ,478,126,Go through door. Turn right on corner. Turn right on corner again. Stop. 
+QUCTc6BB5sX,601,149,TURN RIGHT TO FACE THE END OF THE BED AND WALK TOWARDS THE CHAIR, TURN RIGHT AND WALK TOWARDS THE OPEN DOOR AND THE HALLWAY, WALK ACROSS THE HALLWAY AND TO THE NEXT OPEN DOORWAY, WALK THROUGH THE DOOR AND INTO THE CLOSET. 
 zsNo4HB9uLZ,635,155,TURN SLIGHTLY TO THE RIGHT AND WALK THROUGH THE DOOR TOWARDS THE BUTLERS PANTRY, WALK FORWARD INTO THE KITCHEN, AT THE END OF THE KITCHEN COUNTER TURN LEFT TOWARDS THE HALL,  WALK FORWARD THROUGH THE OPEN DOOR TO THE SINK. 
 2azQ1b91cZZ,657,160,TURN COMPLETELY AROUND UNTIL YOU FACE AN OPEN DOOR WITH A WINDOW TO THE LEFT AND A PATIO TO THE RIGHT, WALK FORWARD THOUGH THE DOOR AND INTO A DINNING ROOM, TURN LEFT AND WALK TO THE END OF THE DINNING TABLE, YOU WILL BE FACING AN OPEN DOOR, WALK THOUGH THE OPEN DOOR INTO A WIDE HALLWAY. 
 2azQ1b91cZZ,657,161,Go to the 4 panel window
@@ -15,22 +9,163 @@ Go to the gold rug
 Go to the white rug
 Go to the third chair on the left
 Go to the electrical receptacle. 
-2azQ1b91cZZ,657,162,Go towards a dining area passing an area open to the outside to your right, and pass the dining table. Walk towards three sets of doors, and stop before reaching them. 
 2azQ1b91cZZ,668,166,Go forward by the windows, and then stop by the lamp. 
 QUCTc6BB5sX,788,192,Walk through breakfast nook. Walk past kitchen. Walk past thermostat. Wait at exercise ball. 
+EU6Fwq7SyZv,856,211,Go to the newspaper rack
+Go to the post
+Go to the rugs on the table
+Go to the 2 metre high lamp. 
 zsNo4HB9uLZ,992,249,Walk past beige rug. Walk past butler's pantry. Make left after eye chart. Wait at gold polka dot picture frame. 
+EU6Fwq7SyZv,1111,282,Go to the stairs
+Go to the Buck's Country
+Go to the footstool
+Go to the semiround chair
+Go to the right four metres
+Go to the pool table. 
+2azQ1b91cZZ,1125,287,turn right, go past the couch, past the back of the brown chair, turn right toward the pool table, turn right toward the love seat. 
+2azQ1b91cZZ,1125,288,Go to the white rug
+Go to the brown rug
+Go to the dark brown chair
+Go to the sliding doors
+Go to the pool table. 
 8194nk5LbLH,1141,289,Go right around the counter and turn left. Continue until you are at the end of the second orange couch. 
 8194nk5LbLH,1141,291,Turn left and walk past the counter top. Turn left and walk forward. Stop by the last stool and the counter. 
-EU6Fwq7SyZv,1195,316,Walk up the stairs and go straight. Stop next to the recliner that is next to the fireplace. 
-EU6Fwq7SyZv,1195,318,Go up the stairs. Go left toward the couch and walk past it to the chair next to the fireplace. 
-EU6Fwq7SyZv,1345,347,Continue up the stairs, walk towards the sitting area, go straight passed the table on the left. stop by the double doors. 
-EU6Fwq7SyZv,1345,348,Go up the stairs and take a left. Walk towards the couch and chairs in the sitting area. Walk through the sitting area and stop in front of the first door to the balcony on your left. 
-8194nk5LbLH,1382,350,Turn around on the stairs and go down them.  Then go past the couch, veer to the right and towards the kitchen.  Stop and wait by the big counter. 
-8194nk5LbLH,1382,351,Walk down the stairs towards and past the atrium.  Head towards the kitchen and wait in the dining area. 
-X7HyMhZNoso,1473,370,Move through the kitchen with the square table to your right. Continue moving forward to the staircase just after the refrigerator. Walk up the stairs and stop 18 inches before the end of the stair railing to your right. 
-X7HyMhZNoso,1478,375,Go up the stairs. Turn right and go toward the slatted door. Turn right and enter the living area. 
-EU6Fwq7SyZv,1567,388,Turn around where you stand and walk around to chair to your left and continue forward to the end of the wood counter to your right. Turn slightly to your right and walk past the pillar that is between the lamp and the stairs going down.  Stop between the pillar and the stairs. 
-EU6Fwq7SyZv,1567,389,Walk next to the first white chair on its right side, walk straight towards the older floral chair, take a right towards the stairs and stop. 
-2azQ1b91cZZ,1581,395,Walk past the sitting area to the fireplace. Wait in front of the fireplace. 
+EU6Fwq7SyZv,1145,296,Move forward with the long table to your right. Move between the wall corner and wooden beam. Turn right and move between the smaller green chair and the bigger beige chair. Continue moving forward with the large wooden cabinet to your right. Turn 30 degrees to the right and pass between the small green chair and the tall floor lamp. Move around the wooden beam in front of you and then stop. 
+x8F5xyUWy9e,1192,310,Walk out of the sauna. Walk by the Jacuzzi. Stop on the Jacuzzi control panel. 
+2azQ1b91cZZ,1239,327,Walk up to the photo on the wall directly in front of you. 
+zsNo4HB9uLZ,1416,362,Walk through kitchen. Make left after spider plant. Wait at open door on left. 
+X7HyMhZNoso,1539,382,Walk across the patio to the other wall. Stop at the edge of the patio near the brick wall and the pillar of brick. 
+X7HyMhZNoso,1539,383,Go to the edge of the platform near the grass and turn right. Continue until you are at the dark brick wall. 
+X7HyMhZNoso,1539,384,Walk behind the couch and turn right. Walk forward and wait near the dining table. 
 2azQ1b91cZZ,1581,396,Walk to the front of the fireplace. 
 EU6Fwq7SyZv,1775,442,Walk on into the kitchen and turn to the right.  Walk past the staircase, behind the chairs.  Walk to the right of the pillar.  Stop and wait by the footstool. 
+Z6MFQCViBuw,1879,470,Go through the large wooden doors and turn right. Pass the photos on the left and pass the second set of wooden doors. Continue going straight and stop at the chair at the end of the table. 
+QUCTc6BB5sX,1911,481,Leave the toilet closet and take a left. Enter the closet through the first door on the right.Stop just inside the door. 
+EU6Fwq7SyZv,1927,484,Walk straight then talk a right at the window and wait by the pool table. 
+EU6Fwq7SyZv,1927,485,Go toward the two brown daybeds. Continue past them and turn right. Go past the daybeds again to the pool table. 
+EU6Fwq7SyZv,1927,486,Walk to the back of the couch and stop at the pool table. 
+2azQ1b91cZZ,1940,489,Walk through the door and over the overpass.  Wait on the white circular rug. 
+EU6Fwq7SyZv,2012,503,Go to the ottoman. Go to the bed. Go to the wardrobe. Go to the glass jug. 
+TbHJrupSAjP,2141,523,Go to the closed door. Go to the electrical outlet. Go to the two brown pots. Go to the glass door. 
+EU6Fwq7SyZv,2144,526,Walk past sisal carpet runner. Wait at open white door. 
+Z6MFQCViBuw,2230,548,Turn to the right and walk forward. 
+Z6MFQCViBuw,2230,549,Head towards the painting of the woman in a white dress. Turn right at the painting.  Follow the red path until you are standing next to two red and white chairs. 
+X7HyMhZNoso,2642,634,Turn right and enter through the sliding door. Continue past the TV on the right. Enter the kitchen and wait beside the fridge. 
+X7HyMhZNoso,2642,636,Walk toward the white patio table and chairs and go into the house through the glass sliding doors. Pass the grey couches and go into the kitchen. Wait by the toaster. 
+pLe4wQe7qrG,2690,649,Turn right and head towards the end. Once you reach the end make a right and stop. 
+zsNo4HB9uLZ,2695,657,Go to the painting. Go to the electrical receptacle. Go to the NQHG painting. Go to the couch. Go to the footstool. 
+TbHJrupSAjP,2738,658,Walk towards the sink and turn right. Walk forward and turn left before the table set. Wait in the corner. 
+TbHJrupSAjP,2738,659,Go to the sink and turn right. Go to the first chair. Go to the left side of the dining table. 
+TbHJrupSAjP,2738,660,Head towards the sink. Turn to the right and walk towards the table. Turn and walk behind the chair on the left side of the table. Stop behind the chair looking out at the backyard. 
+zsNo4HB9uLZ,2763,675,Go left through the door. 
+Z6MFQCViBuw,2853,703,Continue down the red carpet path past the white statue of two people in the corner two the right. Stop on the path with the two vases on the ground to your right. 
+Z6MFQCViBuw,2853,705,Walk forward along red carpet. Stop at the fire extinguisher. 
+2azQ1b91cZZ,2909,723,Head toward the round table and four chairs then make a left turn toward the kitchen and then turn right and stand by the kitchen sink. 
+8194nk5LbLH,2978,731,Go straight until you pass the mustard colored couches and then stop near the kitchen bar with the orange stools. 
+EU6Fwq7SyZv,3149,765,Turn right at the post and walk forward alongside the glass doors on the left. Wait in front of the pool table. 
+EU6Fwq7SyZv,3263,781,Move ahead in between bar and table to the chair. 
+Z6MFQCViBuw,3390,825,Turn until you're facing the red carpet that creates a path for tourists to walk on. Then move forward passing a couple of chairs on your right until you pass through a double door opening and the carpet takes an approximately thirty degree turn to the right. Stop just after the carpet makes that turn. 
+2azQ1b91cZZ,3411,833,Go left and go through the first arch on the right then turn left and stop by the sink. 
+2azQ1b91cZZ,3503,859,Locate the large painting above the teapot. Go through the door to the right of it. Pass the white couch and go through the door to the right of the fireplace. Travel to the brown couch with the pillow. 
+zsNo4HB9uLZ,3529,869,Go past the dink and out the door, towards the big sofa.  Stop between the back of the sofa and the white kitchen counter. 
+zsNo4HB9uLZ,3618,893,Go straight ahead to the other side of the kitchen and stop right at the beginning of the long brown table. 
+X7HyMhZNoso,3659,901,Walk along the patio. Stan behind the table at the end and stop. 
+X7HyMhZNoso,3659,902,Walk straight and pass the couches then pass the white table with the four chairs and stop by the brick wall. 
+X7HyMhZNoso,3659,903,Turn around and walk across the patio to the other side. Stop on the other side of the white table facing the yard and the brick wall. 
+zsNo4HB9uLZ,3731,915,Turn left. Wait in between the table and chairs on the right and the couches. 
+8194nk5LbLH,3785,919,Move forward past the television on the wall, continue forward until you reach the potted plant and a door. 
+zsNo4HB9uLZ,3858,936,Walk towards the mirror, and take a right. Walk straight through the open door in front of you. Make a hard left, then another. Wait by the long table. 
+EU6Fwq7SyZv,3968,970,Walk past the long rectangular dining table to the left, then turn left. Wait under the stairs. 
+EU6Fwq7SyZv,3968,971,Go along the brown table towards the china display, turn left before the display and stop near the brown post. 
+EU6Fwq7SyZv,3968,972,Go stand underneath the stairs, next to the liquor shelf. 
+QUCTc6BB5sX,4084,1003,Walk past the counters and exit the kitchen. Wait next to the landscape painting on the wall. 
+zsNo4HB9uLZ,4202,1040,Walk past the kitchen and through the first door on the right. Stop outside the closet door. 
+2azQ1b91cZZ,4225,1050,Walk past the railings and over the square rug.  Keep following the railings and walk across the round rug that is in the 11 o'clock position from the end of the square rug.  Stop after passing over the round rug, just before some stairs going down. 
+Z6MFQCViBuw,4253,1059,Walk towards the antique bed and wait in front of it. 
+TbHJrupSAjP,4330,1076,Turn right and walk around the stair case, and turn left and stop in the door on the left. 
+8194nk5LbLH,4332,1078,Walk to the other end of the lobby and wait near the exit. 
+8194nk5LbLH,4332,1079,Walk straight toward the bar with the chairs/stool. Turn left and go straight until you get to three tables with chairs. Turn left and wait near the couch. 
+8194nk5LbLH,4332,1080,Go forward toward the windows. Go toward the the far couch, Stop next to the couch, in front of the windows. 
+QUCTc6BB5sX,4448,1097,Walk straight until you get to a dresser with a vase on top of it. Turn left and wait there. 
+QUCTc6BB5sX,4469,1105,Turn right, and walk a bit, and turn left. Walk towards the black chairs, and turn right. Stop in front of the refrigerator. 
+zsNo4HB9uLZ,4471,1110,Walk forward, in between sofa and kitchen counter.  Continue straight until you reach a wooden table with two red squares on top.  Wait here. 
+zsNo4HB9uLZ,4563,1136,Turn around and exit the pantry. Cross from the counter to the patio and stop. 
+8194nk5LbLH,4597,1147,Go through the lobby and wait in the kitchen. 
+8194nk5LbLH,4597,1148,walk towards fireplace, walk on the left side of the brown couch, turn right after couch, turn left after four person table and stop in front of barstools. 
+8194nk5LbLH,4597,1149,walk around the sofa then walk straight at the island table. 
+Z6MFQCViBuw,4633,1163,Walk past the white marble bust on a pedestal to the right. Make a left at the barricade stanchion to the left. Wait at the fire extinguisher on the floor the left. 
+zsNo4HB9uLZ,4634,1165,Walk into and through the kitchen. Stop next to the long wooden dining table. 
+zsNo4HB9uLZ,4634,1166,Turn around and go straight into the kitchen. Go straight and stop by the table near the window. 
+TbHJrupSAjP,4645,1171,Turn to face potted plant. Turn right. Walk out of double doors. Turn left. Walk forward. Stop between stairs and mirror. 
+TbHJrupSAjP,4645,1172,Go around the table and to the right. Walk through the double doors leading into the house and turn left. Take a hard left and wait between the bottom of the stairs and the wall near the mirror on the left. 
+2azQ1b91cZZ,4721,1189,Turn around and go left passed the table and chairs. Go through the door, and stop by the door mat to the next door. 
+EU6Fwq7SyZv,4782,1204,Walk around the long dining table and chairs.  At the opposite end of the table, turn left and stop when you are standing directly underneath the stairs. 
+EU6Fwq7SyZv,4782,1205,Walk across kitchen, turn left and stop under the stairs. 
+EU6Fwq7SyZv,4782,1206,Go straight past the large table and chairs. Turn left and wait near the lamp. 
+Z6MFQCViBuw,4835,1225,Keep walking forward passing the entire picture frames wall on the right. Stop in front of the door that is visible on the left. 
+QUCTc6BB5sX,4837,1230,Enter the door to the left of the globe.  Walk forward and continue down the corridor.  Continue straight until you reach a circular design on the floor.  Wait here. 
+2azQ1b91cZZ,4943,1256,Walk straight until you get to a white pot with flowers. Turn left and wait near the bottom of the stairs. 
+2azQ1b91cZZ,4954,1265,Turn right on the second arch. Turn left. Pass the kitchen. Wait near the fireplace. 
+Z6MFQCViBuw,5059,1297,Walk down the red carpet and turn right at the bed.  Stop under the door frame. 
+EU6Fwq7SyZv,5079,1303,Walk past the furniture and to the left of the stairs. Stop by the post at the top of the stairs. 
+EU6Fwq7SyZv,5079,1305,Go past table and cabinet. Stop just after chairs. 
+TbHJrupSAjP,5123,1307,Turn right and go straight past the table and chairs. Wait at the kitchen entrance. 
+Z6MFQCViBuw,5134,1311,Walk forward and turn right when you pass the sign on the wall and to the right of the large painting of a man. Keep walking forward and exit out the last door on the left and stop. 
+EU6Fwq7SyZv,5144,1315,Walk past the table and turn right. Walk past the coffee table and couch and stop by the pool table. 
+EU6Fwq7SyZv,5144,1316,Take a right, another immediate right, go to the front of the couch towards the billiard table, and stop. 
+oLBMNvg9in8,5162,1325,Turn to the right and walk forward through the open door onto the oriental rug.Turn to the right and walk through the open door and continue walking straight through the next open door. Walk through the next open door that is just after the staircase. Once through the door, stop on the red oriental rug. 
+QUCTc6BB5sX,5167,1329,Turn right and go straight past the bar with the stool/chairs. Wait near the ledge with the vase and white flowers. 
+QUCTc6BB5sX,5261,1345,Go to the pottery. Go to the bar. Go to the microwave. 
+QUCTc6BB5sX,5261,1346,Walk past the glass doors and left towards the island. Turn right and walk into the kitchen. Stop in front of the microwave. 
+zsNo4HB9uLZ,5293,1354,Walk to the far end of the kitchen and wait by the dining table. 
+zsNo4HB9uLZ,5293,1356,Go straight through the kitchen. Wait near the table and chairs. 
+2azQ1b91cZZ,5455,1382,Walk toward the cock and go left past the mirror. Walk to the left of the bed and into the closet and stop. 
+zsNo4HB9uLZ,5488,1387,Turn around and turn right. Wait next to the blue couch that is on the right. 
+QUCTc6BB5sX,5512,1397,Go straight then turn right and go into the kitchen. Turn left and walk through the kitchen . When you pass the fridge on the right wait near the phone on the left. 
+2azQ1b91cZZ,5687,1443,Walk to the opposite side of bed.  Wait by white bear rug on the floor. 
+X7HyMhZNoso,5704,1445,Go straight until you pass the couches and the table then turn right and go inside. Wait near the grey couches. 
+X7HyMhZNoso,5704,1446,With the sink behind you, walk the length of the patio to the table with the high stools.  Turn right and walk inside through the closest open door.  Stop once stepping inside. 
+2azQ1b91cZZ,5838,1471,Go through the double doors and walk straight. Bear to the right and exit through the open sliding glass doors. Turn to the right and stand and wait by the corner of the pool table. 
+2azQ1b91cZZ,5838,1472,Go straight past the table and chairs. After you get to the couches turn right and go out to the porch with the pool table. Wait near the pool table. 
+zsNo4HB9uLZ,5840,1475,Walk right past the clock and couch. Turn right and stop to the left of the end table. 
+zsNo4HB9uLZ,5860,1478,Walk past the table and chairs. Walk past the bar with the stools. After you pass that turn left and wait near the two white couches and the coffee table. 
+EU6Fwq7SyZv,5956,1516,Move forward staying between the footstool on your right and the basket on the floor on your left. Proceed ahead past the desk on the left. Continue on the forward path until you pass by the one wooden pole on your left. When you are even with the staircase on the left, remain in this spot. 
+EU6Fwq7SyZv,5956,1517,Walk to the left of the pool table and stop across from the stairs. 
+EU6Fwq7SyZv,5956,1518,Go straight toward the stairs. When you get to the stairs on the left. Stop there. 
+EU6Fwq7SyZv,6164,1564,Go to your right passed the couch and the coffee table. Go to the pool table and then stop next to the window. 
+EU6Fwq7SyZv,6164,1565,Go straight passed the coffee table to your right, before the pool table make a left and stop between the post and the glass door. 
+EU6Fwq7SyZv,6164,1566,Walk straight. Pass the fireplace on your right. When you get to the pool table turn left and wait. 
+8194nk5LbLH,6339,1591,Go straight until you pass all the couches and chairs. Stop by the large picture of the bridge. 
+8194nk5LbLH,6339,1592,Walk to the right of the blue and black chairs and turn left. Walk past the coffee table and stop by the green and black chair. 
+8194nk5LbLH,6339,1593,Walk to the far end of the lobby and wait under the exit sign. 
+2azQ1b91cZZ,6417,1607,Head a bit ahead and towards the double doors on the left towards the kitchen. Stop upon reaching the counter. 
+2azQ1b91cZZ,6417,1608,Go stand behind the nearest of the three chairs with white cushions at the kitchen bar. 
+QUCTc6BB5sX,6440,1615,go straight to the door then turn right. 
+QUCTc6BB5sX,6440,1616,Walk past the shelves and out of the garage. Stop in front of the opening to the wine cellar. 
+Z6MFQCViBuw,6448,1618,Walk through the double doors next to the red cushioned bench. Stop just after the red path turns right, near the first of two information signs next to each other. 
+pLe4wQe7qrG,6523,1624,Walk onto the platform on the right, pass two book stands. Wait between the second and the third. 
+pLe4wQe7qrG,6523,1625,Turn right to face an old pew and chairs. Walk up to the old chairs and turn right. Walk down the row until you reach the 5th chair. 
+pLe4wQe7qrG,6523,1626,Turn to the right walk into the choir loft. Walk  down to the last music stand and wait. 
+Z6MFQCViBuw,6623,1659,Turn around, go to the end of the ropes, and stop just over the white line. 
+zsNo4HB9uLZ,6671,1682,Walk toward the kitchen counter and turn left. Walk into the kitchen past the stove and refrigerator and stop in front of the sink. 
+zsNo4HB9uLZ,6671,1683,Walk passed the right of the bar, and turn left to walk through the kitchen. Stop once you reach the shelves on your right. 
+zsNo4HB9uLZ,6710,1690,Go past the kitchen island and turn left.  Go through the kitchen and stop when the antique scale is on the left. 
+zsNo4HB9uLZ,6710,1691,Walk forward, then turn left immediately after the kitchen counter.  Continue straight through the kitchen until you reach the second sink.  Wait here. 
+zsNo4HB9uLZ,6710,1692,Walk into the kitchen and past the stove and refrigerator.. Stop in front of the sink. 
+TbHJrupSAjP,6792,1712,Go straight and then turn left. Go passed the railing of the stairs towards the jugs. Then turn left and stop in the double french doors. 
+QUCTc6BB5sX,6828,1718,Turn left and go straight until you get to a large table. 
+QUCTc6BB5sX,6828,1719,Head in the direction of the wine cellar on the left, and enter it. Stop behind the table at the far end. 
+QUCTc6BB5sX,6843,1723,Turn left and take a right at the table. Take a left at the painting and then take your first right. Wait next to the exercise equipment. 
+zsNo4HB9uLZ,6875,1732,Exit the closet and go to the right. Enter the door and go to the left and go to the end and stop. 
+zsNo4HB9uLZ,6875,1734,Exit the closet. Turn right. Turn left and then turn left again. Walk toward the large table and chairs then wait there. 
+EU6Fwq7SyZv,6911,1744,Take a left around the lamp, go straight along the dresser drawers and go straight and stop in front of the glass doors. 
+EU6Fwq7SyZv,6911,1745,Walk past the embroidered ottoman the right. Walk past the bottom of the stairs on the left. Wait at the wooden stick leaning on the frame of the french doors. 
+EU6Fwq7SyZv,6911,1746,Turn left at the lamp. Wait next to the beige chairs and the double glass doors. 
+zsNo4HB9uLZ,6982,1765,Go straight. Pass the bar with the stools. Walk straight until you get to a table with chairs then stop. 
+zsNo4HB9uLZ,6982,1766,With the large mirror to your left, move forward, passing the kitchen to your left, stopping even with the corner of the dining table that has eight chairs around it. 
+zsNo4HB9uLZ,6982,1767,Go to the clock on the wall. Go between the blue couch and counter. Go to the table with a plant on it. 
+zsNo4HB9uLZ,7007,1775,Exit the closet. Turn right. Go straight and then when you get to the double doors turn right. Wait near the sink. 
+QUCTc6BB5sX,7181,1806,Turn around and go passed the refridgerator. Turn right and go through the door. Stop near the large table. 
+zsNo4HB9uLZ,7192,1808,Go straight along the dining table and then down the path in between the kitchen counters and sofas. Continue straight ahead, stopping next to the mirror before the front door. 
+oLBMNvg9in8,7295,1832,Leave through the second door on the left. Go down the stairs, and stop on the second stair down. 
+oLBMNvg9in8,7295,1833,Go out the second door on the left. Turn right and go down the stairs. Wait on the third step to the bottom. 

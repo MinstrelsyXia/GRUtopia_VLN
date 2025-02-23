@@ -10,7 +10,7 @@ tasks:
   scene_scale: [1, 1, 1]
   env_num: 1
   offset_size: 0.0
-  light_on: true
+  light_on: false # if light_on=True, use camera lighting
   robots:
   - name: h1
     prim_path: "/World/h1"
@@ -27,7 +27,7 @@ tasks:
     - name: "rotate"
     # - name: "move_with_keyboard"
     # - name: "web_chat"
-    # - name: "stand_still"
+    - name: "stand_still"
     # - name: "oracle_move_to_point"
     # - name: "oracle_move_along_path"
     sensor_params:

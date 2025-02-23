@@ -1,5 +1,3 @@
-
-
 # from vln.src.local_nav.sementic_map import BEVSemMap
 # identical to semantic map/main.py
 import os, sys ,re
@@ -439,11 +437,12 @@ class TMP(VLMap):
         new_map[delta_map_coord[0]:(old_map.shape[0]+delta_map_coord[0]),delta_map_coord[1]:(old_map.shape[1]+delta_map_coord[1]),delta_map_coord[2]:(old_map.shape[2]+delta_map_coord[2])] = old_map
         return new_map
     
-    def _update_semantic_map(self,camera,rgb,depth,labels,step= 0 ):
+    def _update_semantic_map(self,camera,rgb,depth,labels,step= 0,pointcloud=None,test_mode = True):
         '''
         build semantic map locally, given sync camera
         
         '''
+        #! old version of camera
         max_depth = 10
         downsample_rate = 150
         grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
@@ -453,12 +452,19 @@ class TMP(VLMap):
         rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
         # pose
         camera_position, camera_orientation = camera.get_world_pose()
-
         grid_2d_ds = downsample_pc(grid_2d,downsample_rate)
         pc_image = grid_2d_ds
         depth_ds = depth[grid_2d_ds[:, 1], grid_2d_ds[:, 0]]
         downsampled_cloud = camera.get_world_points_from_image_coords(grid_2d_ds, depth_ds)
-        downsampled_cloud = downsampled_cloud[np.isfinite(downsampled_cloud).all(axis=1)]
+        visualize_pc(downsampled_cloud,headless=False,save_path="downsampled_cloud_original.pcd")
+        if test_mode:
+            grid_2d_ds = downsample_pc(grid_2d,downsample_rate)
+            pc_image = grid_2d_ds
+            downsampled_cloud = pointcloud[grid_2d_ds[:, 1] * depth.shape[1] + grid_2d_ds[:, 0]]
+            visualize_pc(downsampled_cloud,headless=False,save_path="downsampled_cloud_test.pcd")
+        # 去掉包含inf或nan的行
+        valid_mask = ~np.any(np.isnan(downsampled_cloud) | np.isinf(downsampled_cloud), axis=1)
+        downsampled_cloud = downsampled_cloud[valid_mask]
         # point_to_consider = downsampled_cloud = self.convert_world_to_map(downsampled_cloud)
         point_to_consider = downsampled_cloud
         # adjusted_coords = (downsampled_cloud[:, :2]/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2]).astype(int) 
@@ -550,7 +556,7 @@ class TMP(VLMap):
         mask = np.zeros_like(depth)
         mask[pc_image[:, 1], pc_image[:, 0]] = 1
         max_depth = np.max(depth[mask==1])
-        visualize_naive_occupancy_map(occupied_ids, save_path = "occupancy.jpg")
+        visualize_naive_occupancy_map(occupied_ids, save_path = "tmp/occupancy.jpg")
         return pc,max_depth
 
 

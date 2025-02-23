@@ -14,13 +14,14 @@ images/
 results/
 logs/
 logs_docker/
+logs_docker_room/
 tmp/
 tmp2/
 logs_docker_1213/
 logs_docker_1211/
 .auto-run-docker/
 GRUtopia/logs/
-.vscode/
+# .vscode/
 test/
 outputs/
 # Byte-compiled / optimized / DLL files

@@ -92,9 +92,9 @@ import traceback
 
 
 class IsaacSimSpatialGoalNavigationTask():
-    def __init__(self,config):
+    def __init__(self,config,log_path):
         self.config = config
-        
+        self.log_path = log_path
 
 
     def add_action_func(self,action_func):
@@ -239,8 +239,14 @@ class IsaacSimSpatialGoalNavigationTask():
     def save_single_task_metric(
         self,
         save_path: Union[Path, str],
+        state: False
     ):
         results_dict = self.metrics
+        if state == True:
+            results_dict['end_state'] = 'Finished'
+        else:
+            results_dict['end_state'] = 'Not finished, check log'
+        results_dict["log_path"] = self.log_path
         results_dict["episode_id"] = self.episode_id
         results_dict["scan"] = self.scan
         # results_dict["num_subgoals"] = self.n_subgoals_in_task
