@@ -8,8 +8,7 @@ tasks:
   name: "h1_locomotion"
   env_num: 1
   offset_size: 1.0
-  # scene_asset_path: assets/scenes/test.usd
-  scene_asset_path: ""
+  scene_asset_path: assets/scenes/empty.usd
   light_on: true
   robots:
   - name: h1

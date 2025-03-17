@@ -38,19 +38,19 @@ class MoveAlongPathPointsController(BaseController):
         if self.path_points is not path_points:
             self.path_points = path_points
             self.path_point_idx = 0
-            log.info('reset path points')
+            # log.info('reset path points')
             self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
             self.current_path_point[-1] = 0
 
         # Just make sure we ignore z components
-        start_position[-1] = 0
+        start_position[-1] = 0 # start_position is obtained via the robot's get_world_pose()
         dist_from_goal = np.linalg.norm(start_position - self.current_path_point)
         if dist_from_goal < threshold:
             if self.path_point_idx < len(self.path_points) - 1:
                 self.path_point_idx += 1
                 self.current_path_point = np.array(deepcopy(self.path_points[self.path_point_idx]))
                 self.current_path_point[-1] = 0
-                log.info(f'switch to next path point: {self.current_path_point}')
+                # log.info(f'switch to next path point: {self.current_path_point}')
 
         return self.sub_controllers[0].forward(
             start_position=start_position,

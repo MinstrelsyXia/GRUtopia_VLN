@@ -11,6 +11,7 @@ import argparse
 import yaml
 import time
 import shutil
+import lmdb
 from collections import defaultdict
 from PIL import Image
 from copy import deepcopy
@@ -19,6 +20,7 @@ from multiprocessing import Pipe, Process, Pool
 from threading import Thread
 import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor
+import torch.multiprocessing as mp
 
 from grutopia.core.config import SimulatorConfig
 from grutopia.core.env import BaseEnv
@@ -26,7 +28,7 @@ from grutopia.core.util.container import is_in_container
 from grutopia.core.util.log import log
 
 from vln.src.dataset.data_utils_multi_env import VLNDataLoader
-from vln.src.dataset.data_collector import dataCollector
+from vln.src.dataset.data_collector import dataCollector, LmdbDataCollector
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ISSAC_SIM_DIR = os.path.join(os.path.dirname(ROOT_DIR), "isaac-sim-4.0.0")
@@ -73,29 +75,28 @@ def update_env_actions(action_name, paths_list, path_idx=-1):
         env_actions.append(init_actions)
     return env_actions
 
-def sample_episode_worker(args, vln_envs, data_camera_list, data_list):
+def sample_episode_worker(args, sim_config, vln_envs, data_camera_list, data_list):
     """
     Worker function to be executed in parallel.
     """
     is_app_up = False
     for split, scan in data_list:
-        # try:
         scan_log_dir = os.path.join(args.sample_episode_dir, split, scan)
         if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
             log.info(f'Scan {scan} has been sampled. Pass.')
             continue
-        env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
-        is_app_up = True
-            # Assuming `sample_episodes_single_scan` handles its own exceptions and cleanup
-        # except Exception as e:
-        #     log.error(f"Error processing {scan} in {split}: {e}")
-        # finally:
-        #     # if hasattr(env, 'simulation_app'):
-        #     env.simulation_app.close()
-        #     return
+        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+        if env is not None:
+            is_app_up = True
     env.simulation_app.close()
 
-def sample_episodes_multiprocess(args, num_workers, vln_envs, data_camera_list):
+def process_wrapper(*task):
+    try:
+        sample_episode_worker(*task)
+    except Exception as e:
+        log.error(f"Process encountered an error: {e}")
+            
+def sample_episodes_multiprocess(args, sim_config, num_workers, vln_envs, data_camera_list):
     '''Use multiprocess to handle different scans'''
     tasks = [[] for _ in range(num_workers)]
     scans = [[] for _ in range(num_workers)]
@@ -108,26 +109,32 @@ def sample_episodes_multiprocess(args, num_workers, vln_envs, data_camera_list):
             i += 1
 
     for task_idx in range(num_workers):
-        tasks[task_idx] = (args, vln_envs, data_camera_list, scans[task_idx])
+        tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
+    
+    mp.set_start_method("spawn", force=True)  # "spawn" is recommended for CUDA compatibility
+    # with mp.Pool(num_workers) as pool:
+        # pool.starmap(sample_episode_worker, tasks)  # Distribute tasks to worker function
+    
+    processes = []
+            
+    for task_idx in range(num_workers):
+        tasks[task_idx] = (args, sim_config, vln_envs, data_camera_list, scans[task_idx])
+        process = mp.Process(target=process_wrapper, args=tasks[task_idx])
+        process.start()
+        processes.append(process)
 
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        # Using the executor to submit all tasks and immediately creating a list of futures
-        futures = [executor.submit(sample_episode_worker, *task) for task in tasks]
+    # Join processes to ensure all complete
+    for process in processes:
+        process.join()
+        
+    log.info('Finished.')
+    
 
-        # Optionally, you can wait for all futures to complete and handle their results or exceptions
-        for future in futures:
-            try:
-                result = future.result()  # This will block until the future is complete
-                # Handle the result (if any) here
-            except Exception as exc:
-                # Handle exceptions
-                print(f'Generated an exception: {exc}')
-
-def sample_episodes_reset_scans(args, vln_envs, data_camera_list, assigned_split=None, assigned_scan=None):
+def sample_episodes_reset_scans(args, sim_config, vln_envs, data_camera_list, assigned_split=None, assigned_scan=None, assigned_path_id=None):
     '''Use one app to handle different scans'''
     is_app_up = False
-    if assigned_split is not None and assigned_scan is not None:
-        env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=assigned_split, scan=assigned_scan, is_app_up=is_app_up)
+    if len(assigned_split) > 0 and len(assigned_scan) > 0:
+        env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=assigned_split, scan=assigned_scan, path_id=assigned_path_id, is_app_up=is_app_up)
     else:
         for split in vln_envs.data.keys():
             for scan in vln_envs.data[split].keys():
@@ -135,12 +142,14 @@ def sample_episodes_reset_scans(args, vln_envs, data_camera_list, assigned_split
                 if not args.settings.force_sample_scan and os.path.exists(scan_log_dir):
                     log.info(f'Scan {scan} has been sampled. Pass.')
                     continue
-                env = sample_episodes_single_scan(args, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
-                is_app_up = True
+                env = sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=split, scan=scan, is_app_up=is_app_up)
+                if env is not None:
+                    # env has not up
+                    is_app_up = True
 
     env.simulation_app.close()
 
-def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, scan=None, is_app_up=False):
+def sample_episodes_single_scan(args, sim_config, vln_envs, data_camera_list, split=None, scan=None, path_id=None, is_app_up=False):
     '''1. Init the variables'''
     action_name = args.settings.action
     is_app_up = is_app_up
@@ -149,7 +158,10 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
     stand_still_action = {'h1': {'stand_still': []}}
 
     '''2. Init the data and env_num'''
-    vln_envs.allocate_data(split, scan)
+    allocate_flag = vln_envs.allocate_data(split, scan, path_id)
+    if not allocate_flag:
+        # This scan has been sampled.
+        return None
 
     '''3. Init the app or Reset the scene'''
     if not is_app_up:
@@ -164,12 +176,17 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
         vln_envs.cam_occupancy_map_local_list[0].open_windows_head(text_info=data_item['instruction']['instruction_text'])
     
     '''4. init pipe for saving images'''
-    parent_conn, child_conn = Pipe()
-    data_collector = dataCollector(args, parent_conn, child_conn, split, scan, vln_envs.path_id_list)
-    # save_process = Process(target=data_collector.save_episode_data, args=())
-    save_process = Thread(target=data_collector.save_episode_data, args=())
-    save_process.start()
-    log.info(f"Save process starts.")
+    if args.sample_episodes.save_form == 'thread':
+        # V1: Use multiple threads to save raw images and information
+        parent_conn, child_conn = Pipe()
+        data_collector = dataCollector(args, parent_conn, child_conn, split, scan, vln_envs.path_id_list)
+        # save_process = Process(target=data_collector.save_episode_data, args=())
+        save_process = Thread(target=data_collector.save_episode_data, args=())
+        save_process.start()
+        log.info(f"Save process starts.")
+    elif args.sample_episodes.save_form == 'lmdb':
+        # V2: use lmdb to save all information
+        data_collector = LmdbDataCollector(args, split, scan, vln_envs.path_id_list, args.lmdb_path, sim_config.config.tasks[0].env_num)
 
     '''5. start simulation'''
     i = 0
@@ -194,8 +211,10 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
     
     '''6. Enter the env flow loop'''
     while (not all(vln_envs.end_list)) and (not vln_envs.all_episode_finish) and env.simulation_app.is_running():
+        # if i == 30: # !!!
+        #     vln_envs.all_episode_finish = True
         ''' (0) check the maximum steps for each env'''
-        max_step = 500 if args.debug else args.settings.max_step
+        max_step = 400 if args.debug else args.settings.max_step
         for env_idx in range(vln_envs.env_num):
             if (i - vln_envs.env_step_start_index[env_idx]) >= max_step:
                 log.error(f"[Failed]. Scan: {scan}, Path_id: {vln_envs.path_id_list[env_idx]}. Exceed the maximum steps: {max_step}")
@@ -207,6 +226,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
             render = True
         else:
             render = False
+        render = True
 
         # update warm up list
         for warm_up_idx in range(vln_envs.env_num):
@@ -220,6 +240,7 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
             obs = env.step(actions=env_actions)
             
             if i % 50 == 0:
+                # break
                 if args.windows_head:
                     # show the topdown camera
                     vln_envs.cam_occupancy_map_local_list[0].update_windows_head(robot_pos=vln_envs.isaac_robots[0].get_world_pose()[0], mode=args.windows_head_type)
@@ -255,9 +276,10 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                             reason = 'stuck'
                         vln_envs.episode_end_setting(split, scan, status_idx, reason)
         
-        if args.test_verbose and args.windows_head:
+        if args.test_verbose or args.windows_head:
             # TODO
-            vln_envs.cam_occupancy_map_local_list[0].update_windows_head(robot_pos=vln_envs.isaac_robots.get_world_pose()[0], mode=args.windows_head_type)
+            if i % 100 == 0:
+                vln_envs.cam_occupancy_map_local_list[0].update_windows_head(robot_pos=vln_envs.isaac_robots[0].get_world_pose()[0], mode=args.windows_head_type) # For now, only use the first env to show the topdown camera
         
         '''(3) check for action finish status and update navigation'''
         for env_idx in range(vln_envs.env_num):
@@ -328,6 +350,18 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
                 if args.settings.sample_env_flow:
                     # assign new path to the finished env
                     if vln_envs.end_list[env_idx]:
+                        data_collector.save_data(env_idx,vln_envs.path_id_list[env_idx], vln_envs.success_list[env_idx], vln_envs.fail_reasons[env_idx], data_item['instruction']['instruction_text'])
+                        if args.sample_episodes.docker_nums > 1:
+                            # update the json file for multi docker
+                            with open(args.lmdb_json_path, 'r') as f:
+                                json_data = json.load(f)
+                                if vln_envs.success_list[env_idx]:
+                                    json_data[scan][vln_envs.path_id_list[env_idx]] = 'success'
+                                else:
+                                    json_data[scan][vln_envs.path_id_list[env_idx]] = vln_envs.fail_reasons[env_idx]
+                            with open(args.lmdb_json_path, 'w') as f:
+                                json.dump(json_data, f, indent=4)
+            
                         update_flag = vln_envs.update_next_single_data(env_idx, split, scan, current_step=i)
                         if update_flag:
                             log.error(f"{env_idx}-th Env: Assign new path_id: {vln_envs.path_id_list[env_idx]}. Reset this env!")
@@ -361,15 +395,29 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
             # Since oracle_move_path_controller moves to the next point every 5 steps, the image is fetched every 5+3 steps
             camera_pose_dict = vln_envs.get_camera_pose()
             robot_pose_dict = vln_envs.get_robot_poses()
-            data_collector.collect_and_send_data(i, env, 
-                        camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
-                        robot_pose_dict=robot_pose_dict,
-                        end_list=vln_envs.end_list, 
-                        path_id_list=vln_envs.path_id_list,
-                        start_step_list=vln_envs.env_step_start_index,
-                        add_rgb_subframes=True, finish_flag=False)
-
-            is_image_stacked = True
+            if args.sample_episodes.save_form == 'thread':
+                data_collector.collect_and_send_data(i, env, 
+                            camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
+                            robot_pose_dict=robot_pose_dict,
+                            end_list=vln_envs.end_list, 
+                            path_id_list=vln_envs.path_id_list,
+                            start_step_list=vln_envs.env_step_start_index,
+                            add_rgb_subframes=True, finish_flag=False)
+            elif args.sample_episodes.save_form == 'lmdb':
+                progress_list = []
+                for env_idx in range(vln_envs.env_num):
+                    progress = vln_envs.nav_point_list[env_idx] / len(vln_envs.paths_list[env_idx])
+                    progress_list.append(progress)
+                data_collector.collect_data(i, env, 
+                            camera_list=data_camera_list, camera_pose_dict=camera_pose_dict,
+                            robot_pose_dict=robot_pose_dict,
+                            end_list=vln_envs.end_list, 
+                            path_id_list=vln_envs.path_id_list,
+                            start_step_list=vln_envs.env_step_start_index,
+                            progress_list=progress_list,
+                            add_rgb_subframes=True, 
+                            success_list=vln_envs.success_list,
+                            fail_reasons=vln_envs.fail_reasons)
 
         if args.test_verbose and args.save_obs and (i-move_step) != 0 and (i-move_step)%(args.sample_episodes.step_interval-1) == 0:
             # TODO
@@ -394,8 +442,9 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
     log.info(f"Total time for scan {scan}: {total_time:.2f} minutes")
 
     print('finish')
-    parent_conn.send({'finish_flag': True})
-    save_process.join() 
+    if args.sample_episodes.save_form == 'thread':
+        parent_conn.send({'finish_flag': True})
+        save_process.join()
 
     return env
 
@@ -404,13 +453,26 @@ def sample_episodes_single_scan(args, vln_envs, data_camera_list, split=None, sc
         # vln_envs.cam_occupancy_map_local.close_windows_head()
     
     # env.simulation_app.close()
-        
+
+def read_assigned_json(args, json_dir, docker_id):
+    args.lmdb_json_path = os.path.join(json_dir, f"scan_pathId_part_{docker_id}.json")
+    with open(args.lmdb_json_path, 'r') as f:
+        data = json.load(f)
+    return data
 
 if __name__ == "__main__":
     vln_envs, vln_config, sim_config, data_camera_list = build_dataset()
+    log.info(f'Is in container: {is_in_container()}')
     
     if vln_config.settings.mode == "sample_episodes_multiprocess":
-        sample_episodes_multiprocess(vln_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
+        sample_episodes_multiprocess(vln_config, sim_config, vln_config.settings.num_workers, vln_envs, data_camera_list)
     elif vln_config.settings.mode == "sample_episodes_reset_scans":
-        # sample_episodes_reset_scans(vln_config, vln_envs, data_camera_list, assigned_split='train', assigned_scan='VzqfbhrpDEA')
-        sample_episodes_reset_scans(vln_config, vln_envs, data_camera_list)
+        sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list)
+        # sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split=vln_config.split, assigned_scan=vln_config.scan, assigned_path_id=vln_config.path_id)
+    elif vln_config.settings.mode == "sample_episodes_reset_scans_with_assigned_path":
+        # This is for multi-docker
+        data = read_assigned_json(vln_config, vln_config.lmdb_pathId_dir, vln_config.docker_id)
+        
+        for scan, path_id in data.items():
+            log.info(f"***Start with Scan: {scan}***")
+            sample_episodes_reset_scans(vln_config, sim_config, vln_envs, data_camera_list, assigned_split=vln_config.split, assigned_scan=scan)

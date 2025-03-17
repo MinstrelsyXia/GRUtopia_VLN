@@ -16,7 +16,11 @@ images/
 results/
 logs/
 logs_docker/
+<<<<<<< HEAD
 logs_docker_room/
+=======
+*.hdf5
+>>>>>>> 0682f0b83aee6bfadb259e0e726b462c10f86962
 tmp/
 tmp2/
 logs_docker_1213/
@@ -151,12 +155,20 @@ work_dirs/
 # grutopia assets
 /asset
 /assets
+assets/
 
 # user scripts
-/scripts
+# /scripts
 
 # sphinx build dir
 docs/en/_build
 
 # Log
 logs/
+<<<<<<< HEAD
+=======
+
+# vln data
+data/
+/data
+>>>>>>> bc1ce9df3ca11f216ccee7975ada5d36e41f595e

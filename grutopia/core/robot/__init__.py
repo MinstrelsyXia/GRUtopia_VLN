@@ -11,7 +11,7 @@ from grutopia.core.robot.robot_model import RobotModels
 # ROBOT_TYPES = {}
 
 ROBOT_MODELS_PATH = os.path.join(
-    os.path.split(os.path.realpath(__file__))[0], '../../../grutopia_extension/robots', 'robot_models.yaml')
+    os.path.split(os.path.realpath(__file__))[0], '../../../grutopia_extension/robots', 'robot_models_path_generation.yaml')
 # print(ROBOT_MODELS_PATH)
 
 with open(ROBOT_MODELS_PATH, 'r') as f:

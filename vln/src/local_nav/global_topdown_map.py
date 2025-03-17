@@ -16,7 +16,7 @@ from vln.src.local_nav.camera_occupancy_map import CamOccupancyMap
 from vln.src.local_nav.path_planner import QuadTreeNode, Node, RRTstarPathPlanning, AStarPlanner
 
 class GlobalTopdownMap:
-    def __init__(self, args, scan_name):
+    def __init__(self, args, scan_name, vis_verbose=False):
         self.args = args
         self.scan_name = scan_name
 
@@ -30,7 +30,7 @@ class GlobalTopdownMap:
 
         self.agent_radius = args.maps.agent_radius  # The radius(m) of robot
         self.voxel_size = args.maps.global_topdown_config.voxel_size # TODO
-        if self.args.maps.add_dilation: # TODO
+        if self.args.maps.add_dilation:
             self.dilation_structure = self.create_dilation_structure(self.agent_radius)
 
         # Attributes for path_planner
@@ -39,7 +39,7 @@ class GlobalTopdownMap:
                                          map_width=self.width,map_height=self.height,max_step=self.planner_config.a_star_max_iter,
                             windows_head=self.args.windows_head,
                             for_llm=self.args.settings.use_llm,
-                            verbose=True)
+                            verbose=self.args.save_path_planning or vis_verbose)
 
         # init vis settings
         self.cmap = mcolors.ListedColormap(['white', 'green', 'gray', 'black'])  # Colors for 0, between 1-254, 2, 255
@@ -75,16 +75,36 @@ class GlobalTopdownMap:
         # log.info(f"Saved global topdown map at height {height} to {img_save_path}")
         plt.close()
     
-    def get_height(self, pos, is_camera_base=False):
+    def get_height(self, pos, is_camera_base=False, find_nearest=True):
         # if is_camera_base:
         #     return math.floor(pos[2] - self.camera_height)
         # return math.floor(pos[2])
         if is_camera_base:
-            return round(pos[2] - self.camera_height)
-        return round(pos[2])
+            height = round(pos[2] - self.camera_height)
+        else:
+            height = round(pos[2])
+        
+        if height not in self.floor_maps.keys() and find_nearest:
+            cur_height = pos[2]
+            if is_camera_base:
+                cur_height = cur_height - self.camera_height
+            
+            # Find a nearest height key from self.floor_maps
+            total_heights = list(self.floor_maps.keys())
+            
+            # Calculate the closest height
+            closest_height = min(total_heights, key=lambda h: abs(h - cur_height))
+            
+            if closest_height in self.floor_maps:
+                log.info(f"Using nearest height: {closest_height} for current height: {cur_height}")
+                return closest_height
+            else:
+                log.error("No valid height found in global topdown map")
+                return None  # or raise an exception if preferred
+        return height
     
     def update_map(self, freemap, camera_pose, update_map=False, verbose=False, env_idx=None):
-        height = self.get_height(camera_pose, is_camera_base=True)
+        height = self.get_height(camera_pose, is_camera_base=True, find_nearest=False)
         if height not in self.floor_maps:
             self.floor_heights.append(height)
             self.floor_maps[height] = {
@@ -105,13 +125,31 @@ class GlobalTopdownMap:
 
     def get_map(self, world_pose, is_camera_base=False, return_camera_pose=False):
         height = self.get_height(world_pose, is_camera_base=is_camera_base)
+        
         if height in self.floor_maps.keys():
             if return_camera_pose:
                 return self.floor_maps[height]['occupancy_map'], self.floor_maps[height]['camera_pose']
             return self.floor_maps[height]['occupancy_map']
         else:
             log.error("Floor height not found in global topdown map")
-            return None
+            cur_height = world_pose[2]
+            if is_camera_base:
+                cur_height = cur_height - self.camera_height
+            
+            # Find a nearest height key from self.floor_maps
+            total_heights = list(self.floor_maps.keys())
+            
+            # Calculate the closest height
+            closest_height = min(total_heights, key=lambda h: abs(h - cur_height))
+            
+            if closest_height in self.floor_maps:
+                log.info(f"Using nearest height: {closest_height} for current height: {cur_height}")
+                if return_camera_pose:
+                    return self.floor_maps[closest_height]['occupancy_map'], self.floor_maps[closest_height]['camera_pose']
+                return self.floor_maps[closest_height]['occupancy_map']
+            else:
+                log.error("No valid height found in global topdown map")
+                return None  # or raise an exception if preferred
 
     def world_to_pixel_old(self, world_pose, specific_height=None, is_camera_base=False):
         if specific_height is None:
@@ -275,6 +313,37 @@ class GlobalTopdownMap:
             transfer_paths.pop(0)
 
         return transfer_paths
+
+    def draw_point(self, predicted_world_poses, color=[1,0,0], current_world_pose=None, target_world_pose=None, img_save_path=None, step=0, logger=None):        
+        occupancy_map = self.get_map(predicted_world_poses[0])
+        plt.figure(figsize=(6, 6))
+        plt.imshow(occupancy_map, cmap=self.cmap, norm=self.norm, origin='upper')
+        
+        for i, predicted_world_pose in enumerate(predicted_world_poses):
+            if predicted_world_pose is not None:
+                predicted_pixel = self.world_to_pixel(predicted_world_pose)
+                plt.scatter(predicted_pixel[1], predicted_pixel[0], color=color, marker='o', label=f"predicted {i} ({predicted_world_pose[0]:.2f}, {predicted_world_pose[1]:.2f}, {predicted_world_pose[2]:.2f})", s=30)
+        
+        if current_world_pose is not None:
+            current_pixel = self.world_to_pixel(current_world_pose)
+            plt.scatter(current_pixel[1], current_pixel[0], color=[0,0,1], marker='*', label=f"current ({current_world_pose[0]:.2f}, {current_world_pose[1]:.2f}, {current_world_pose[2]:.2f})", s=15)
+        
+        if target_world_pose is not None:
+            target_pixel = self.world_to_pixel(target_world_pose)
+            plt.scatter(target_pixel[1], target_pixel[0], color=[0,1,0], marker='x', label=f"target ({target_world_pose[0]:.2f}, {target_world_pose[1]:.2f}, {target_world_pose[2]:.2f})", s=30)
+        
+        plt.legend(fontsize='x-small')
+        plt.grid(alpha=0.3)
+        plt.colorbar(label='occupied (0: free, 1: occupied)', shrink=0.8)
+        plt.title('Global Topdown Map', fontsize=10)
+        
+        if img_save_path is not None:
+            img_save_path = os.path.join(img_save_path, f"global_topdown_map_{step}.jpg")
+            plt.savefig(img_save_path, dpi=100, bbox_inches='tight')
+            if logger is not None:
+                logger.info(f"Saved global topdown map to {img_save_path}")
+        
+        plt.close()
 
     def vis_nav_path(self, start_pixel, goal_pixel, points, occupancy_map, img_save_path='path_planning.jpg'):
         plt.figure(figsize=(10, 10))

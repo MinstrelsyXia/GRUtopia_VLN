@@ -111,6 +111,7 @@ class IsaacSimLanguageRobot(LangRobot):
         '''
         super().__init__(config)
 
+        self.record_actions_list = []
         self.test_scene_dir = self.config["data_paths"]["habitat_scene_dir"]
         # data_dir = Path(self.config["data_paths"]["vlmaps_data_dir"]) / "vlmaps_dataset" 
         self.vlmaps_data_dir = self.config["data_paths"]["vlmaps_data_dir"]
