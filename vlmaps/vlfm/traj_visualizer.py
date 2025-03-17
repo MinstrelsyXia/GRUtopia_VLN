@@ -41,7 +41,7 @@ class TrajectoryVisualizer:
         camera_yaw: float,
     ) -> np.ndarray:
         """Draws the trajectory on the image and returns it"""
-        img = self._draw_path(img, camera_positions)
+        img = self.draw_path(img, camera_positions)
         # img = self.draw_agent(img, camera_positions[-1], camera_yaw)
         return img
 
@@ -64,7 +64,7 @@ class TrajectoryVisualizer:
 
         return img
 
-    def draw_path(self, img: np.ndarray, camera_positions: Union[np.ndarray, List[np.ndarray]]) -> np.ndarray:
+    def draw_path(self, img: np.ndarray, camera_positions: Union[np.ndarray, List[np.ndarray]], color: tuple = (255,0,0)) -> np.ndarray:
         """绘制路径"""
         img_copy = img.copy()
         
@@ -74,10 +74,10 @@ class TrajectoryVisualizer:
         for i in range(len(camera_positions) - 1):
             pt_a = camera_positions[i]
             pt_b = camera_positions[i + 1]
-            img_copy = self._draw_line(img_copy, pt_a, pt_b)
+            img_copy = self._draw_line(img_copy, pt_a, pt_b , color)
         return img_copy
 
-    def _draw_line(self, img: np.ndarray, pt_a: np.ndarray, pt_b: np.ndarray) -> np.ndarray:
+    def _draw_line(self, img: np.ndarray, pt_a: np.ndarray, pt_b: np.ndarray,color = (255,0,0)) -> np.ndarray:
         """画线"""
         img_copy = img.copy()
         
@@ -91,7 +91,7 @@ class TrajectoryVisualizer:
             img_copy,
             tuple(px_a[::-1]),
             tuple(px_b[::-1]),
-            255,
+            color,
             int(self.path_thickness * self.scale_factor),
         )
         return img_copy

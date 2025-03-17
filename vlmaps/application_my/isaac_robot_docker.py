@@ -54,7 +54,7 @@ from vln.src.local_nav.BEVmap import BEVMap
 
 from vlmaps.vlmaps.map.map import Map
 
-from vlmaps.application_my.utils import NotFound, EarlyFound, TooManySteps,extract_parameters, extract_self_methods, visualize_subgoal_images, check_valid_parsed_instruction
+from vlmaps.application_my.utils import NotFound, EarlyFound, TooManySteps, RobotFallDown, RobotStuck, extract_parameters, extract_self_methods, visualize_subgoal_images, check_valid_parsed_instruction
 
 import logging
 import traceback
@@ -182,7 +182,7 @@ class IsaacSimLanguageRobot(LangRobot):
         # in self._setup_sim
         log_path = log.handlers[1].baseFilename
         self.eval_helper = IsaacSimSpatialGoalNavigationTask(config,log_path) 
-    
+        self.robot_reset = True
     ############################### init env ############################################
 
     #! not in use !!!
@@ -269,7 +269,7 @@ class IsaacSimLanguageRobot(LangRobot):
     def init_env(self, sim_config, headless=True):
         '''init env''' 
         self.env = BaseEnv(sim_config, headless=headless, webrtc=False)
-        
+        self.create_light()
     
     
     def init_agents(self):
@@ -279,7 +279,7 @@ class IsaacSimLanguageRobot(LangRobot):
         self.agent_init_pose = self.sim_config.config.tasks[0].robots[0].position
         self.agent_init_rotation = self.sim_config.config.tasks[0].robots[0].orientation
         
-        self.create_light()
+
         self.set_agent_pose(self.agent_init_pose, self.agent_init_rotation)
 
         self.agents.set_joint_velocities(np.zeros(len(self.agents.dof_names)))
@@ -366,7 +366,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 log.info("Initialized path id %d", episode_id)
                 log.info("Scan: %s", item['scan'])
                 log.info("Instruction: %s", item['instruction']['instruction_text'])
-                self.instruction = item['instruction']['instruction_text']
+                self.instruction = item['instruction']['instruction_text'].lower()
                 log.info(f"Start Position: {self.sim_config.config.tasks[0].robots[0].position}, Start Rotation: {self.sim_config.config.tasks[0].robots[0].orientation}")
                 self.reference_path = item["reference_path"]
                 return item
@@ -630,12 +630,13 @@ class IsaacSimLanguageRobot(LangRobot):
         log.info(f"enter test_movement with action {action_name}")
 
         # test whether the action_name is valid
-        # try:
-        #     check_valid_parsed_instruction(action_name)
-        # except Exception as e:
-        #     log.warning(f"Invalid action name: {action_name}, {e}")
-        #     self.eval_helper.add_action_func(f"Invalid action name: {action_name}, {e}")
-        #     return
+        try:
+            if check_valid_parsed_instruction(action_name) == False:
+                raise NameError(f"Instruction GPT parsed {action_name} doesn't exist")
+        except NameError as e:
+            log.warning(f"Invalid action name: {action_name}, {e}")
+            self.eval_helper.add_action_func(f"Invalid action name: {action_name}, {e}")
+            return
         self.eval_helper.add_action_func(f"Step:{self.step}: enter test_movement with action {action_name}")
         prev_step = self.step
         self.subgoal = extract_parameters(action_name)
@@ -794,7 +795,7 @@ class IsaacSimLanguageRobot(LangRobot):
             self.turn(60)
             
 
-    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 0.5,subgoal = None) -> List[str]:
+    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 0.3,subgoal = None) -> List[str]:
         """Move the robot to the position on the obstacle map
             based on accurate localization in the environment
             with falls and movements
@@ -815,7 +816,12 @@ class IsaacSimLanguageRobot(LangRobot):
         curr_pose_on_full_map = self.get_agent_pose_on_map() # pos0, pos1,deg
 
         # if pos is not Tuple, then it is a subgoal name, need to find the pos on semantic map first
-        
+        if pos is None:
+            log.warning("No goal found, cannot move")
+            return False
+        if len(pos) == 0:
+            log.warning("No goal found, cannot move")
+            return False
         if type == 'sem':
             print('calls from object indexed from semantic map')
             print("transfering to obstacle map coord")
@@ -830,7 +836,7 @@ class IsaacSimLanguageRobot(LangRobot):
             position = self.agents.get_world_pose()[0][:2]
             start = self.ObstacleMap._xy_to_px(np.array([[position[0],position[1]]]))[0]
         
-        
+
         # nav should be built on obstacle map; 
         # !
         # self.nav.build_visgraph(self.ObstacleMap._navigable_map,
@@ -890,6 +896,8 @@ class IsaacSimLanguageRobot(LangRobot):
                         if len(paths_3d) == 0:
                             log.error("path is blocked, cannot move")
                             return False
+                        if len(paths) == 1:
+                            continue
                         goal_xy = paths_3d[-1][:2]
                         actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
                         env_actions = []
@@ -926,6 +934,9 @@ class IsaacSimLanguageRobot(LangRobot):
                     goal_modified = self.ObstacleMap._xy_to_px(goal_xy)[0]
                     log.warning("Path is blocked, replanning")
                     paths, paths_3d = self.planning_path(start_modified,goal_modified)
+                    if len(paths)== 1:
+                        # already very close
+                        continue
                     actions = {'h1': {'move_along_path': [paths_3d]}} # paths should be [N ,3]
                     goal_xy = paths_3d[-1][:2]
                     log.info(f"moving from {start} to {goal_modified} on {paths}")
@@ -933,17 +944,17 @@ class IsaacSimLanguageRobot(LangRobot):
                     env_actions = []
                     env_actions.append(actions)
                     continue
-            if ((self.step-init_step) % 1000 == 0):
-                # end this loop
-                if self.subgoal is not None:
-                    if self.map.check_object(self.subgoal):
-                        log.info(f"Subgoal {self.subgoal} is reached at step {self.step}")
-                        self.eval_helper.add_action_func(f"Step:{self.step} Subgoal {self.subgoal} is reached")
-                        self.eval_helper.add_action_func(f"Step:{self.step}: Early break in move_to, successfully executed self.move_to({self.subgoal})")
-                        return True
+            # if ((self.step-init_step) % 1000 == 0):
+            #     # end this loop
+            #     if self.subgoal is not None:
+            #         if self.map.check_object(self.subgoal):
+            #             log.info(f"Subgoal {self.subgoal} is reached at step {self.step}")
+            #             self.eval_helper.add_action_func(f"Step:{self.step} Subgoal {self.subgoal} is reached")
+            #             self.eval_helper.add_action_func(f"Step:{self.step}: Early break in move_to, successfully executed self.move_to({self.subgoal})")
+            #             return True
 
-            if ((self.step-init_step) % 3000 == 0):
-                log.warning("Failed to reach the subgoal after 1000 steps")
+            if ((self.step-init_step) % 5000 == 0):
+                log.warning("Failed to reach the subgoal after 3000 steps")
                 goal = self.ultimate_goal
                 if(self.map.check_object(goal)):
                     self.move_to_object(goal)
@@ -995,19 +1006,19 @@ class IsaacSimLanguageRobot(LangRobot):
         self.turn(angle)
         return True
 
-    def move_to_end_of_the_hallway(self):
-        '''
-        1. 判断自己是否在hallway (move_to_room("hallway))
-        2. 若在，则直接走到尽头
-        3. 若不在，则走到一个frontier，拍个照,
-        '''
+    # def move_to_end_of_the_hallway(self):
+    #     '''
+    #     1. 判断自己是否在hallway (move_to_room("hallway))
+    #     2. 若在，则直接走到尽头
+    #     3. 若不在，则走到一个frontier，拍个照,
+    #     '''
 
-        room_pos, frontier_angle = self.map.get_room_pos("hallway")
-        self.move_to(room_pos)
-        angle = self.get_angle(frontier_angle)
-        self.turn(angle)
+    #     room_pos, frontier_angle = self.map.get_room_pos("hallway")
+    #     self.move_to(room_pos)
+    #     angle = self.get_angle(frontier_angle)
+    #     self.turn(angle)
 
-    def planning_path_v2(self, start,goal):
+    def planning_path_v2(self, start, goal):
         if np.linalg.norm(np.array(start) - np.array(goal)) < 2:
             log.info("起点和终点太近，直接返回")
             return [[start, goal]], [start, goal]
@@ -1351,10 +1362,16 @@ class IsaacSimLanguageRobot(LangRobot):
         else:
             if is_fall:
                 log.info("Robot falls down. Reset robot pose.")
-                self.eval_helper.add_action_func(f"Robot fall down.")
+                self.eval_helper.add_action_func(f"Robot fall down at step {self.step}")
+                if self.robot_reset == False:
+                    self.eval_helper.update_end_state('fall')
+                    raise RobotFallDown()
             if is_stuck:
                 log.info("Robot is stuck. Reset robot pose.")
-                self.eval_helper.add_action_func(f"Robot is stuck.")
+                self.eval_helper.add_action_func(f"Robot is stuck at step {self.step}")
+                if self.robot_reset == False:
+                    self.eval_helper.update_end_state('stuck')
+                    raise RobotStuck()
             
             # 使用最后一个有效的姿态
             random_position = self.randomly_pick_position_from_freemap()
@@ -1401,7 +1418,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 continue
             traj_obs.append(self.ObstacleMap._xy_to_px(episode['pos_list'][:,:2]))
 
-        self.eval_helper.display_trajectory(save_path = self.test_file_save_dir + '/trajectory.png', occupancy_map=self.ObstacleMap.nav_map_visual, traj_obs_list=traj_obs, gt_obs=gt_obs)
+        self.eval_helper.display_trajectory(save_path = self.test_file_save_dir + '/trajectory.png', occupancy_map=self.ObstacleMap.nav_map_visual, traj_obs_list=traj_obs, gt_obs=gt_obs,traj_vis = self.ObstacleMap._traj_vis)
 
     def move_to_frontier(self):
         '''
@@ -1546,9 +1563,19 @@ def main(config: DictConfig) -> None:
         for split in vln_config.datasets.splits:
 
             robot = IsaacSimLanguageRobot(config, sim_config, vln_config=vln_config, split=split)
-            last_scene_name = scan_trajectory_episode_pairs[start_idx][0]
             for scene_name, trajectory_id, episode_id in scan_trajectory_episode_pairs[start_idx:]: 
+                ''' (0) if the episode metric suggests retry, then retry the episode, else skip the episode '''
+
+                log_path = os.path.join(robot.test_dir, scene_name, f"id_{episode_id}","metric.json")
+                # if  robot.eval_helper.check_retry(log_path) is False:
+                #     continue
+
                 ''' (1) if the first episode: open the scene '''
+                current_idx = scan_trajectory_episode_pairs.index((scene_name, trajectory_id, episode_id))
+                if current_idx != start_idx:
+                    last_scene_name = scan_trajectory_episode_pairs[current_idx-1][0]
+                else:
+                    last_scene_name = scene_name
                 reset_scene =  (scene_name!= last_scene_name)
                 print("scene_name", scene_name, "last_scene_name", last_scene_name)
                 ''' (2) if the scene is changed, then save the last scan id '''
@@ -1556,11 +1583,12 @@ def main(config: DictConfig) -> None:
                     try:
                         # 确保父目录存在
                         os.makedirs(os.path.dirname(config.last_scan_file), exist_ok=True)
+
+                        if current_idx != len(scan_trajectory_episode_pairs)-1:
+                            with open(config.last_scan_file, 'w') as f:
+                                f.write(str(scan_trajectory_episode_pairs[current_idx][2]))
+                            log.info(f"Scene changed, prepare to run episode {episode_id}")
                         
-                        # 写入文件
-                        with open(config.last_scan_file, 'w') as f:
-                            f.write(str(episode_id))
-                        log.info(f"Successfully wrote scan {episode_id} to {config.last_scan_file}")
                     except Exception as e:
                         log.error(f"Unexpected error while writing file: {e}")
                     # sys.exit(1)
@@ -1573,10 +1601,9 @@ def main(config: DictConfig) -> None:
                 # else: only set the task and robot position
                 robot.map.init_categories(mp3dcat.copy())
                 # ! debuging
-                # parsed_instructions = ['self.move_forward(3)']
-                # gpt_ans = parse_spatial_instruction(robot.instruction)
-                # parsed_instructions = extract_self_methods(gpt_ans)
-                parsed_instructions =['self.move_forward(1)', "self.move_to_object('lamp')"]
+                gpt_ans = parse_spatial_instruction(robot.instruction)
+                parsed_instructions = extract_self_methods(gpt_ans)
+                # parsed_instructions =['self.turn(180)','self.move_forward(1)']
 
                 log.info(f"instruction: {robot.instruction}")
                 log.info(f"parsed instructions: {parsed_instructions}")
@@ -1587,15 +1614,11 @@ def main(config: DictConfig) -> None:
                 # check valid parsed instructions
                 valid_parsed_instruction = []
                 for action_name in parsed_instructions:
-                    try:
-                        if check_valid_parsed_instruction(action_name):
-                            valid_parsed_instruction.append(action_name)
-                    except Exception as e:
-                        log.warning(f"Invalid action name: {action_name}, {e}")
-                        robot.eval_helper.add_action_func(f"Invalid action name: {action_name}, {e}")
+                    if check_valid_parsed_instruction(action_name):
+                        valid_parsed_instruction.append(action_name)
                         
-                for idx in range(len(parsed_instructions) - 1, -1, -1):
-                    subgoal = parsed_instructions[idx]
+                for idx in range(len(valid_parsed_instruction) - 1, -1, -1):
+                    subgoal = valid_parsed_instruction[idx]
                     if not (('move_forward' in subgoal) or ('turn' in subgoal)):
                         robot.set_ultimate_goal(subgoal) #! self.move_to_object("obj")
                         skipped_i = idx
@@ -1606,55 +1629,62 @@ def main(config: DictConfig) -> None:
                     robot.warm_up(200)
                     robot.save_metric(state=False)
 
-                    #! for debuging
+                    robot.turn(360)
+                    # #! for debuging
                     # robot.turn(90)
                     # goal_obs = robot.ObstacleMap._xy_to_px(robot.eval_helper.goals[:,:2])
                     # robot.move_to(goal_obs[-1],'obs')
                     # break
                     ''' if the target is reached, then raise EarlyFound and stop the exploration'''
-                    for cat_i, subgoal in enumerate(parsed_instructions):
-                        if cat_i >= skip_flag:
-                            log.info(f"Executing {subgoal}") # "self.move_to_object('hallway')"
-                            try:
-                                robot.test_movement(subgoal)
-                                skip_flag = skip_flag + 1
-                            except EarlyFound as e:
-                                log.info(f"{e}. Found object early, stopping exploration.")
-                                skip_flag = skipped_i
-                                break # break from 'for'
-                    
-                    ''' execute the last spatial instruction'''
-                    for subgoal in parsed_instructions[skip_flag+1:]:
-                        log.info(f"Executing {subgoal}")
-                        robot.test_movement(subgoal)
+                    try:
+                        for cat_i, subgoal in enumerate(valid_parsed_instruction):
+                            if cat_i >= skip_flag:
+                                log.info(f"Executing {subgoal}") # "self.move_to_object('hallway')"
+                                try:
+                                    robot.test_movement(subgoal)
+                                    skip_flag = skip_flag + 1
+                                except EarlyFound as e:
+                                    log.info(f"{e}. Found object early, stopping exploration.")
+                                    skip_flag = skipped_i
+                                    break # break from 'for'
 
+                        ''' execute the last spatial instruction'''
+                        for subgoal in parsed_instructions[skip_flag+1:]:
+                            log.info(f"Executing {subgoal}")
+                            robot.test_movement(subgoal)
+                    except RobotFallDown as e:
+                        log.info(f"{e}. Robot falls down, stopping exploration.")
+                    except RobotStuck as e:
+                        log.info(f"{e}. Robot is stuck, stopping exploration.")
                     # robot.env.simulation_app.close()
-                    last_scene_name = scene_name
                     robot.eval_helper.add_pos(robot.agents.get_world_pose()[0])
                     robot.save_metric(state=True)
                     robot.clear_maps()
                     break # break from 'while simulator is running'
+                if idx != len(scan_trajectory_episode_pairs)-1:
+                    next_episode_id = scan_trajectory_episode_pairs[idx][2]
+                # 写入文件
+                    with open(config.last_scan_file, 'w') as f:
+                        f.write(str(next_episode_id))
 
     except Exception as e:
         log.error(f"Unexpected error: {e}")
         log.error("Traceback: %s", traceback.format_exc())
         ''' restart, and save the episode no matter it is finished or not'''
         if robot.env.simulation_app.is_running():
-            try:
-                robot.save_metric(state=False)
-                robot.clear_maps()
-                # 确保父目录存在
-                os.makedirs(os.path.dirname(config.last_scan_file), exist_ok=True)
-                
-                # write in the next episode
-                if idx != len(scan_trajectory_episode_pairs)-1:
-                    next_episode_id = scan_trajectory_episode_pairs[idx][2]
-                # 写入文件
-                    with open(config.last_scan_file, 'w') as f:
-                        f.write(str(next_episode_id))
-                    log.info(f"Error occurs, writing {next_episode_id} to {config.last_scan_file}")
-            except Exception as e:
-                log.error(f"Unexpected error while writing file: {e}")
+            robot.save_metric(state=False)
+            robot.clear_maps()
+            # 确保父目录存在
+            os.makedirs(os.path.dirname(config.last_scan_file), exist_ok=True)
+            
+            # write in the next episode
+            idx = scan_trajectory_episode_pairs.index((scene_name, trajectory_id, episode_id))
+            if idx != len(scan_trajectory_episode_pairs)-1:
+                next_episode_id = scan_trajectory_episode_pairs[idx+1][2]
+            # 写入文件
+                with open(config.last_scan_file, 'w') as f:
+                    f.write(str(next_episode_id))
+                log.info(f"Error occurs, writing {next_episode_id} to {config.last_scan_file}")
             # sys.exit(1)
             if robot.env is not None and robot.env.simulation_app.is_running():
                 robot.env.simulation_app.close()

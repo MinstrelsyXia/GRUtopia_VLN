@@ -606,8 +606,8 @@ class ObstacleMap:
         #     plt.imsave(obs_map_save_path, self._map)
         #     navigatable_map_save_path = os.path.join(self.save_dir,f'navigatable_map_{step}.jpg')
         #     plt.imsave(navigatable_map_save_path, self._navigable_map)
-        if not explore:
-            return
+        # if not explore:
+        #     return
 
         # Update the explored area
         # camera_position, camera_rotation = extract_camera_pos_zyxrot(camera_transform)

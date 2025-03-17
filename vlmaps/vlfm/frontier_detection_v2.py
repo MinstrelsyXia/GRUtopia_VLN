@@ -72,6 +72,11 @@ def detect_frontier_waypoints(
         explored_mask[full_map == 0] = 0
         frontiers = detect_frontiers(full_map, explored_mask, area_thresh)
         waypoints = frontier_waypoints(frontiers, xy)
+        if len(waypoints) == 0:
+            if len(frontiers) == 0:
+                return [],[]
+            else:
+                waypoints = np.array(frontiers)
         waypoints = waypoints[:,::-1]
         frontier_angles = []
         kernel_size = 3
@@ -141,6 +146,7 @@ def detect_frontiers(
     filtered_explored_mask = filter_out_small_unexplored(
         full_map, explored_mask, area_thresh
     )
+
     contours, _ = cv2.findContours(
         filtered_explored_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
     )

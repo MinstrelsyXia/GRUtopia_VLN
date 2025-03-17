@@ -19,7 +19,7 @@ robot_z: ${params.robot_z}
 depth_sample_rate: 50
 agent_radius: 0.25 #! identical to vln/configs/vln_cfg.yaml
 dilate_iter: 3
-area_thresh: 10000 #! not in use if vlmaps.vlfm.fill_small_holes is not used in obsatcle map update
+area_thresh: 3 #! not in use if vlmaps.vlfm.fill_small_holes is not used in obsatcle map update
 hole_area_thresh: 10000
 map_size: 100
 

@@ -223,7 +223,7 @@ import os
 from vlmaps.vlfm.obstacle_map_v2 import ObstacleMap
 
 
-main_dir = "/g0433_data/xiaxinyuan/dataset/sample_episodes_safe/s8pcmisQ38h/id_37"
+main_dir = "/ssd/xiaxinyuan/dataset/sample_episodes_safe/s8pcmisQ38h/id_37"
 pose = np.loadtxt(main_dir + "/poses.txt")
 
 pcd_save_dir = main_dir + '/pcd' 

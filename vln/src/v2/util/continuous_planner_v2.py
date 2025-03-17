@@ -123,19 +123,22 @@ class AStarPlanner:
 
         return angle_cost
     
-
     def find_nearest_free_node(self, obs_map, goal_node):
-        if obs_map[goal_node.x, goal_node.y] != 255:
+        # 确保使用整数坐标
+        x = int(round(goal_node.x))
+        y = int(round(goal_node.y))
+        
+        if obs_map[x, y] != 255:
             return goal_node  # Goal node is not in an obstacle
 
         free_nodes = np.argwhere(np.logical_and(obs_map != 255, obs_map != 0))
-        goal_position = np.array([goal_node.x, goal_node.y])
+        goal_position = np.array([x, y])
 
         distances = np.linalg.norm(free_nodes - goal_position, axis=1)
         nearest_free_node_index = np.argmin(distances)
         nearest_free_node = free_nodes[nearest_free_node_index]
 
-        new_goal_node = self.Node(nearest_free_node[0], nearest_free_node[1], 0.0, -1, 0)
+        new_goal_node = self.Node(int(nearest_free_node[0]), int(nearest_free_node[1]), 0.0, -1)
         return new_goal_node
     ############ ending addaption ############
     
@@ -165,6 +168,10 @@ class AStarPlanner:
             self.y_width = obs_map.shape[1]
             self.max_x = self.x_width
             self.max_y = self.y_width
+            sx = int(round(sx))
+            sy = int(round(sy))
+            gx = int(round(gx))
+            gy = int(round(gy))
             start_node = self.Node(sx,sy,0.0,-1)
             goal_node = self.Node(gx,gy,0.0,-1)
             motion = self.get_motion_model()
@@ -172,7 +179,7 @@ class AStarPlanner:
             if obs_map[goal_node.x, goal_node.y] == 255:
                 reason = 'goal_in_obstacle'
                 # return [], [], False, reason
-                new_goal_node = self.find_nearest_explored_free_node(obs_map, goal_node)
+                new_goal_node = self.find_nearest_free_node(obs_map, goal_node)
                 goal_node = new_goal_node
 
             open_set, closed_set = dict(), dict()

@@ -437,7 +437,7 @@ class TMP(VLMap):
         new_map[delta_map_coord[0]:(old_map.shape[0]+delta_map_coord[0]),delta_map_coord[1]:(old_map.shape[1]+delta_map_coord[1]),delta_map_coord[2]:(old_map.shape[2]+delta_map_coord[2])] = old_map
         return new_map
     
-    def _update_semantic_map(self,camera,rgb,depth,labels,step= 0,pointcloud=None,test_mode = True):
+    def _update_semantic_map(self,camera,rgb,depth,labels,step= 0,pointcloud=None,test_mode = False):
         '''
         build semantic map locally, given sync camera
         
@@ -448,6 +448,13 @@ class TMP(VLMap):
         grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
         # depth
         # depth[depth > max_depth] = 0
+        # save depth: depth is [h,w], 请归一化并保存为jpg
+        depth_vis = depth.copy()
+        depth_vis = depth_vis / depth_vis.max()
+        depth_vis = depth_vis * 255
+        depth_vis = np.expand_dims(depth_vis.astype(np.uint8), axis=2)
+        save_path = os.path.dirname(self.segmentation_dir) + f"/depth.jpg"
+        cv2.imwrite(save_path, depth_vis)
         # rgb
         rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
         # pose
@@ -456,7 +463,7 @@ class TMP(VLMap):
         pc_image = grid_2d_ds
         depth_ds = depth[grid_2d_ds[:, 1], grid_2d_ds[:, 0]]
         downsampled_cloud = camera.get_world_points_from_image_coords(grid_2d_ds, depth_ds)
-        visualize_pc(downsampled_cloud,headless=False,save_path="downsampled_cloud_original.pcd")
+        # visualize_pc(downsampled_cloud,headless=False,save_path="downsampled_cloud_original.pcd")
         if test_mode:
             grid_2d_ds = downsample_pc(grid_2d,downsample_rate)
             pc_image = grid_2d_ds
@@ -906,7 +913,7 @@ class TMP(VLMap):
         Check if an object exists in the map
         """
         pc_mask = self.index_map(name[0], with_init_cat=True)
-        if pc_mask is None or np.sum(pc_mask) < 10:
+        if pc_mask is None or np.sum(pc_mask) < 50:
             return False
         return True
 

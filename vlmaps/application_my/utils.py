@@ -18,6 +18,15 @@ class TooManySteps(Exception):
         self.message = message
         super().__init__(self.message)
 
+class RobotFallDown(Exception):
+    def __init__(self, message="Robot falls down"):
+        self.message = message
+        super().__init__(self.message)
+
+class RobotStuck(Exception):
+    def __init__(self, message="Robot stucks"):
+        self.message = message
+        super().__init__(self.message)
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -114,7 +123,8 @@ def check_valid_parsed_instruction(parsed_instruction):
         return True
         
     except Exception as e:
-        raise ValueError(f"指令解析错误: {str(e)}")
+        # raise ValueError(f"指令解析错误: {str(e)}")
+        return False
 
 ################### angle utils ########################
 
