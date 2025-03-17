@@ -19,6 +19,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
     
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
@@ -27,8 +28,11 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             dataloader:SamplePathKeyDataloader,
             aperture=200,
             max_step=25000,
+            update_light=False,
+            save_third_person_image=False
         ):
         super().__init__(
+            robot_name=robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -40,6 +44,9 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
         self.max_step = max_step
         self.robot_ankle_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['ankle_height']
 
+        self.update_light = update_light
+        self.save_third_person_image = save_third_person_image
+
     def execute_one_action(
         self,
         action,
@@ -49,6 +56,11 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
         fail_reason = None
         while not finish_state:
             self.update_timestamp()
+            # update light
+            if self.update_light:
+                robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                self.update_light_positions(robot_position) #TODO: 解决部分z轴照不到光的问题
+
             obs = self.env.step(actions=action, add_rgb_subframes=False, render=False)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             self.step += 1
@@ -58,7 +70,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                 break
             if self.step % 20 == 0:
                 robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-                is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+                is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
                 if is_fall:
                     fail_reason = "fall"
                     break
@@ -105,14 +117,15 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
             data_collector = DataCollector(
                 lmdb_path=self.dataloader.lmdb_path,
                 rank = self.dataloader.rank,
+                save_third_person_image= self.save_third_person_image
             )
             start_position = data['start_position']
             start_rotation = data['start_rotation']
             self.reset_robot(start_position, start_rotation)
-            self.warm_up(240)
+            obs = self.warm_up(240)
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
             robot_bottom_z = self.robot.get_ankle_height() - self.robot_ankle_height
-            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z)
+            is_fall = check_robot_fall(robot_position, robot_rotation, robot_bottom_z, height_threshold=self.fall_height_threshold)
             if is_fall:
                 progress_log_util.trace_end(
                     trajectory_id = path_key,
@@ -143,6 +156,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                             process=current_point_index / len(nav_path),
                             camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
                             robot_pose=self.task.get_robot_poses_without_offset(),
+                            robot_name=self.robot_name
                         )
                         data_collector.collect_action([0])
                         robot_position, _ = self.isaac_robot.get_world_pose()
@@ -160,7 +174,7 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                         result = result,
                     )
                     break
-                map_info = self.get_global_map(robot_height=1.55, dilation_iterations=2)
+                map_info = self.get_global_map(robot_height=self.robot_height, dilation_iterations=2, robot_name=self.robot_name)
                 camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
                 
                 robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
@@ -185,15 +199,17 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                 
                 action_index = 0
                 for action in action_list:
-                    env_action = [{'h1': {'move_by_descrete': [action]}}]
+                    env_action = [{self.robot_name: {'move_by_descrete': [action]}}]
                     data_collector.collect_observation_by_env(
                         env=self.env,
                         step=self.step,
                         process=current_point_index / len(nav_path),
                         camera_pose=self.task.get_camera_poses_without_offset('pano_camera_0'),
                         robot_pose=self.task.get_robot_poses_without_offset(),
+                        robot_name=self.robot_name,
                     )
                     data_collector.collect_action(action)
+                    # robot_position_0, robot_rotation_0 = self.task.get_robot_poses_without_offset() # !!! debug
                     action_success, fail_reason = self.execute_one_action(env_action,stuck_checker)
                     log.info(f"[scan:{scan}][path:{path_key}] finish one action[step:{self.step}][ {action_index + 1} / {len(action_list)} ][result:{fail_reason}] {describe_action(action)}")
                     if not action_success:
@@ -201,6 +217,14 @@ class DiscreteSampleSingleScanEnv(BaseSingleScanEnv):
                         result = fail_reason
                         break
                     robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
+                    # # !!! debug !!!
+                    # from omni.isaac.core.utils.rotations import quat_to_euler_angles
+                    # _, _, ori_yaw = quat_to_euler_angles(robot_rotation_0)
+                    # _, _, new_yaw = quat_to_euler_angles(robot_rotation)
+                    # ori_yaw = np.rad2deg(ori_yaw)
+                    # new_yaw = np.rad2deg(new_yaw)
+                    # print(f"ori_yaw: {ori_yaw}, new_yaw: {new_yaw}")
+                    
                     is_on_track = check_is_on_track(
                         robot_position=robot_position,
                         robot_rotation=robot_rotation,

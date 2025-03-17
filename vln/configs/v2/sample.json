@@ -1,18 +1,27 @@
 {
-    "name" : "sample_0124",
+    "name" : "20250214_sample_aliengo",
     "task_type" : "sample",
-    "sample_type":"continuous",
+    "robot_name": "aliengo",
+    "sample_type":"discrete",
     "dagger_percentage":0,
-    "ckpt_to_load" : "data/checkpoints/20250113_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger01/ckpts/ckpt.20.pth",
-    "image" : "w61_grutopia:v0.3",
-    "total_rank": 1000,
+    "ckpt_to_load" : "",
+    "image" : "w61_grutopia:v0.4",
+    "save_third_person_image": false,
+    "total_rank": 8,
     "retry_list":[],
-    "flash":false,
+    "flash": false,
     "device_map" : {
         "0":["0"],
-        "1":["1"]
+        "1":["1"],
+        "2":["2"],
+        "3":["3"],
+        "4":["4"],
+        "5":["5"],
+        "6":["6"],
+        "7":["7"]
     },
     "merge_config" : {
-        "data_0508":[1]
+        "data_0508":[8,9,10,11,12,13,14,15]
     }
 }
+

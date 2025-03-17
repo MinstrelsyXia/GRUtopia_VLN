@@ -5,19 +5,24 @@ from vln.src.v2.util.common import(
     create_robot_mask,
     freemap_to_accupancy_map,
     set_seed,
+    visualize_freemap,
 )
 import time
 import sys
-
+import json
+import os
+import torch
 class BaseSingleScanEnv:
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
             start_rotation,
             headless,
         ):
+        self.robot_name = robot_name
         self.sim_config = sim_config
         self.scene_asset_path = scene_asset_path
         self.start_position = start_position
@@ -28,22 +33,103 @@ class BaseSingleScanEnv:
         self.robot = None
         self.isaac_robot = None
         self.timestamp = time.time()
+        self.fall_height_threshold = self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
+        self.robot_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['robot_height']
+
+        # fall check
+        self.fall_height_threshold = self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
+        self.robot_height = self.sim_config.config_dict['tasks'][0]['robots'][0]['robot_height']
 
     def update_timestamp(self):
         self.timestamp = time.time()
         sys.stdout.flush()
+
+    def create_light(self):
+        from pxr import Gf, UsdLux, UsdGeom
+        import omni.usd
+        stage = omni.usd.get_context().get_stage()
+        distant_light = UsdLux.DistantLight.Define(stage, "/World/distant_light")
+        distant_light.CreateIntensityAttr(1000)
+        distant_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+
+        up_disk_light = UsdLux.DiskLight.Define(stage, "/World/up_disk_light")
+        up_disk_light.CreateIntensityAttr(self.sim_config.config_dict['tasks'][0]['disk_light_intensity']) 
+        up_disk_light.CreateRadiusAttr(50.0)
+        up_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+        UsdGeom.Xformable(up_disk_light).AddRotateXYZOp().Set(Gf.Vec3f(180.0, 0.0, 0.0))
+        self.up_disk_light = up_disk_light
+        self.up_disk_light_position = UsdGeom.Xformable(self.up_disk_light).AddTranslateOp()
+        
+        down_disk_light = UsdLux.DiskLight.Define(stage, "/World/down_disk_light")
+        down_disk_light.CreateIntensityAttr(self.sim_config.config_dict['tasks'][0]['disk_light_intensity'])
+        down_disk_light.CreateRadiusAttr(50.0)
+        down_disk_light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+        self.down_disk_light = down_disk_light
+        self.down_disk_light_position = UsdGeom.Xformable(self.down_disk_light).AddTranslateOp()
+
+    def reset_light_position(self, position):
+        from pxr import Gf
+        raise_light = 1
+        if self.robot_name == 'aliengo':
+           raise_light+= 0.55 
+        self.up_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   -position[2] - raise_light))
+        self.down_disk_light_position.Set(Gf.Vec3f(position[0],  position[1],   position[2] + raise_light))
     
+
     def load_scan_and_robot(self):
         self.sim_config.config.tasks[0].scene_asset_path = self.scene_asset_path
         self.sim_config.config.tasks[0].robots[0].position = self.start_position
         self.sim_config.config.tasks[0].robots[0].orientation = self.start_rotation
-        self.env = BaseEnv(self.sim_config, headless=self.headless, webrtc=False)
+        if self.dataloader.target_scan == 'sixth_floor':
+            self.json_path = self.dataloader.scene_config_file
+            with open(self.json_path, "r") as json_file:
+                lego_json_config = json.load(json_file)
+
+            self.lego_usd_root = lego_json_config["usd_model_root"]
+            self.lego_gs_root = lego_json_config["gs_model_root"]
+            self.lego_name_list = lego_json_config["model_list"]
+            self.lego_device_number = -1
+            self.lego_editable = True
+            self.env = BaseEnv(self.sim_config, headless=True, webrtc=False)
+            self.env.reset()
+            self.lego_xform_list = [] 
+            from omni.isaac.core.prims import XFormPrim
+            from omni.isaac.core.utils.prims import create_prim
+            from omni.isaac.core.utils.prims import get_prim_at_path
+            for lego_name in self.lego_name_list:
+                create_prim(usd_path=os.path.join(self.lego_usd_root, lego_name["usd_name"]), 
+                            prim_path="/World/" + lego_name["isaac_name"], 
+                            position=lego_name["init_position"], 
+                            orientation=lego_name["init_orientation"],
+                            scale=lego_name["init_scale"])
+                self.lego_xform_list.append(XFormPrim("/World/" + lego_name["isaac_name"]))
+                print("Create preset usd at /World/" + lego_name["isaac_name"])
+            create_prim("/World/light", "DistantLight")
+            print("Create preset light at /World/light")
+            # init camera renderer
+            self.set_3dgs_Cameras_renderer()
+        else:
+            self.env = BaseEnv(self.sim_config, headless=self.headless, webrtc=False)
         set_seed(0)
+        self.create_light()
         self.task = self.env._runner.current_tasks[list(self.env._runner.current_tasks.keys())[0]]
         self.robot = self.task.robots[list(self.task.robots.keys())[0]]
         self.isaac_robot = self.robot.isaac_robot
         self.topdown_global_map_camera = self.robot.sensors['topdown_camera_500']
-    
+
+    def set_3dgs_Cameras_renderer(self):
+        '''set 3dgs Cameras renderer'''
+        self.tasks = self.env._runner.current_tasks
+        self.robot_names = [list(task.robots.keys())[0] for task in self.tasks.values()]
+        self.task_names = list(self.tasks.keys())
+        sensor_idx = 0
+        device_number = torch.cuda.device_count()
+        for task_name, robot_name in zip(self.task_names,self.robot_names):
+            for sensor_name, sensor in self.tasks[task_name].robots[robot_name].sensors.items():
+                lego_device_number = sensor_idx % device_number
+                if sensor.config.type=='Camera_3dgs' and sensor.config.enable==True:
+                    sensor.set_renderer(self.lego_xform_list, self.lego_gs_root, self.lego_name_list, lego_device_number, self.lego_editable)
+                    sensor_idx +=1
     def reset_robot(
         self,
         position,
@@ -54,6 +140,7 @@ class BaseSingleScanEnv:
         self.isaac_robot.set_joint_velocities(np.zeros(len(self.isaac_robot.dof_names)))
         self.isaac_robot.set_joint_positions(np.zeros(len(self.isaac_robot.dof_names)))
         self.isaac_robot.set_joint_efforts(np.zeros(len(self.isaac_robot.dof_names)))
+        self.reset_light_position(position)
     
     def get_global_map(
         self,
@@ -61,6 +148,7 @@ class BaseSingleScanEnv:
         dilation_iterations=0,
         voxel_size=0.1,
         agent_radius=0.25,
+        robot_name='h1'
     ):
         # 获取 free_map
         min_height = robot_height
@@ -68,7 +156,13 @@ class BaseSingleScanEnv:
         data_info = self.topdown_global_map_camera.get_data()
         depth = np.array(data_info["depth"])
         flat_surface_mask = np.ones_like(depth, dtype=bool)
-        depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
+        if self.robot_name == 'h1':
+            depth_mask = ((depth >= min_height) & (depth < max_height)) | ((depth <= 0.5) & (depth > 0.02))
+        elif self.robot_name == 'aliengo':
+            base_height = self.robot.get_robot_base().get_world_pose()[0][2]
+            foot_height = self.robot.get_ankle_height()
+            min_height = base_height - foot_height + 0.05
+            depth_mask = ((depth >= min_height) & (depth < max_height))
         robot_mask = create_robot_mask(self.topdown_global_map_camera)
         free_map = np.zeros_like(depth, dtype=int)
         free_map[flat_surface_mask & depth_mask] = 1
@@ -80,13 +174,17 @@ class BaseSingleScanEnv:
             voxel_size=voxel_size,
             agent_radius=agent_radius,
         )
+        visualize_freemap(free_map, accupancy_map, save_path='logs/map0.png') # 20250211: debug
         return accupancy_map
     
     def warm_up(self, step_count):
         for _ in range(step_count - 1):
-            self.env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=False, render=False)
-        self.env.step(actions=[{'h1':{'stand_still': []}}], add_rgb_subframes=True, render=True)
+            self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=False, render=False)
+        obs = self.env.step(actions=[{self.robot_name:{'stand_still': []}}], add_rgb_subframes=True, render=True)
+        return obs
     
     def stop(self):
         if(hasattr(self.env, 'simulation_app')):
             self.env.simulation_app.close()
+    
+    

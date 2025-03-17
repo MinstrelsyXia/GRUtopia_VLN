@@ -1,16 +1,25 @@
 {
-    "name" : "eval_0124",
+    "name" : "20250221_h1_dpAction0.27_ckpt48_flash_eval",
+    "robot_name": "h1",
     "task_type" : "eval",
-    "ckpt_to_load" : "data/checkpoints/20250111_cma_height1.75/ckpts/ckpt.44_converted.pth",
-    "image" : "w61_grutopia:v0.3",
-    "total_rank": 100,
+    "ckpt_to_load" : "0",
+    "eval_cfg_file": "vln/configs/train/cma_dp_eval.yaml",
+    "image" : "w61_grutopia:v0.4",
+    "total_rank": 8,
     "retry_list":[],
-    "flash":true,
+    "flash": true,
+    "load_eval_subset": false,
     "device_map" : {
         "0":["0"],
-        "1":["1"]
+        "1":["1"],
+        "2":["2"],
+        "3":["3"],
+        "4":["4"],
+        "5":["5"],
+        "6":["6"],
+        "7":["7"]
     },
     "merge_config" : {
-        "data_0508":[1]
+        "data_0508":[8,9,10,11,12,13,14,15]
     }
 }

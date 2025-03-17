@@ -17,10 +17,11 @@ opencv-python
 matplotlib
 httpx
 toml
-pydantic==1.9.0
+pydantic==1.9.2
 scipy
 
 # pip install -e vln/src/models/diffusion_policy
+# pip install git+https://github.com/openai/CLIP.git
 
 # for navid
 accelerate==0.21.0

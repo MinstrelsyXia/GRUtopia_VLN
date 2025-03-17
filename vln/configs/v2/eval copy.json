@@ -1,0 +1,25 @@
+{
+    "name" : "20250220_h1_dp_ckpt40_eval",
+    "robot_name": "h1",
+    "task_type" : "eval",
+    "ckpt_to_load" : "0",
+    "eval_cfg_file": "vln/configs/train/cma_dp_eval.yaml",
+    "image" : "w61_grutopia:v0.5",
+    "total_rank": 8,
+    "retry_list":[],
+    "flash": false,
+    "load_eval_subset": false,
+    "device_map" : {
+        "0":["0"],
+        "1":["1"],
+        "2":["2"],
+        "3":["3"],
+        "4":["4"],
+        "5":["5"],
+        "6":["6"],
+        "7":["7"]
+    },
+    "merge_config" : {
+        "data_0508":[8,9,10,11,12,13,14,15]
+    }
+}

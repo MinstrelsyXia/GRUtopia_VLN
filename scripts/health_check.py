@@ -36,6 +36,14 @@ def init_timestamp(name,device_map):
             txn.put(f"timestamp_rank_{rank}".encode(), timestamp)
     database_write.close()
 
+def init_timestamp_by_rank(name,rank): 
+    rank=int(rank)
+    timestamp = msgpack_numpy.packb({"timestamp":time.time()}, use_bin_type=True)
+    database_write = get_database(name,readonly=False)
+    with database_write.begin(write=True) as txn:
+        txn.put(f"timestamp_rank_{rank}".encode(), timestamp)
+    database_write.close()
+
 def container_exist(name, rank):
     rank=int(rank)
     container_name = f"{name}_{rank:02}"
@@ -148,6 +156,7 @@ if __name__ == "__main__":
                 logger.info(f"[rank:{rank}] 长时间未响应，开始重启容器")
                 stop_container_if_exist(config, rank)
                 start_contianer_with_retry(config, rank, cfg_file)
+                init_timestamp_by_rank(name,rank)
                 logger.info(f"[rank:{rank}] 容器重启完成")
         
         # 所有 container 都被 kill 的情况下，停止该任务

@@ -89,6 +89,31 @@ class DaggerCMATrainer:
         self.action_stats = None
 
         self.show_tqdm = not self.config.train_quiet
+        
+        if self.config.MODEL.policy_name == "CMA_CLIP_Policy":
+            self.use_clip_encoders = True
+        else:
+            self.use_clip_encoders = False
+        
+        if self.use_clip_encoders:
+            self.use_bert = False
+            self.bert_tokenizer = None
+            self.is_clip_long = False
+            if config.MODEL.TEXT_ENCODER.type == 'roberta':
+                self.bert_tokenizer = BertTokenizer(
+                    max_length=config.MODEL.INSTRUCTION_ENCODER.max_length,
+                    load_model=config.MODEL.INSTRUCTION_ENCODER.load_model,
+                    device=self.device
+                )
+                self.use_bert = True
+            elif config.MODEL.TEXT_ENCODER.type == 'clip-long':
+                self.bert_tokenizer = longclip.tokenize
+                self.use_bert = True
+                self.is_clip_long = True
+        
+        if hasattr(self.config.MODEL, "TEXT_ENCODER"):
+            self.bert_tokenizer = longclip.tokenize
+            self.is_clip_long = True
 
         # Init the file_logger
         if self.config.run_type in ['train', 'preprocess_features']:
@@ -213,6 +238,8 @@ class DaggerCMATrainer:
                 is_distributed=is_distributed, 
                 rank=rank,
                 world_size=world_size,
+                
+                bert_tokenizer=self.bert_tokenizer
             )
             
             num_workers = 4 if not self.config.debug else 0
@@ -445,7 +472,20 @@ class DaggerCMATrainer:
             'prev_actions': prev_actions,
             'masks': not_done_masks
         }
-        logits, rnn_states_out = self.policy(batch)
+        
+        if self.use_clip_encoders:
+            # depth_return_x_before_fc = True if self.config.MODEL.IMAGE_ENCODER.DEPTH.bottleneck == 'resnet' else False
+            depth_return_x_before_fc = False
+            batch.update({
+                "need_img_extraction": True,
+                "img_mod": self.config.MODEL.IMAGE_ENCODER.RGB.img_mod,
+                'proj': self.config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+                'process_images': True,
+                'need_txt_extraction': True,
+                "depth_return_x_before_fc": depth_return_x_before_fc
+            })
+            
+        logits, rnn_states_out, progress_hat = self.policy(batch)
 
         # for train
         logits = logits.view(T, N, -1)
@@ -454,9 +494,18 @@ class DaggerCMATrainer:
             logits.permute(0, 2, 1), corrected_actions, reduction="none"
         )
         action_loss = ((weights * action_loss).sum(0) / weights.sum(0)).mean()
-
-        aux_mask = (weights > 0).view(-1)
-        aux_loss = aux_reduce(aux_mask, action_loss)
+        
+        # aux loss
+        aux_loss = torch.tensor(0)
+        if self.config.MODEL.PROGRESS_MONITOR.use:
+            progress_hat = progress_hat.view(T, N, -1).squeeze()
+            progress_gt = observations["progress"].view(T, N, -1).squeeze()
+            progress_loss = F.mse_loss(
+                progress_hat,
+                progress_gt.to(progress_hat.device),
+                reduction="none",
+            )
+            aux_loss =((weights * progress_loss).sum(0) / weights.sum(0)).mean()
 
         loss = action_loss + aux_loss
         loss = loss / loss_accumulation_scalar

@@ -16,10 +16,14 @@ from vln.src.v2.util.stuck_checker import StuckChecker
 from vln.src.models.init_policy import initialize_policy
 from vln.src.v2.util.data_collector import DataCollector
 
+from vln.src.models.LongCLIP.model import longclip
+from vln.src.models.utils.bert_token import BertTokenizer
+
 class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
     
     def __init__(
             self,
+            robot_name,
             sim_config:SimulatorConfig,
             scene_asset_path,
             start_position,
@@ -31,6 +35,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
             ckpt_name,
         ):
         super().__init__(
+            robot_name=robot_name,
             sim_config=sim_config,
             scene_asset_path=scene_asset_path,
             start_position=start_position,
@@ -56,10 +61,37 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         )
         self.policy = policy
 
+        if self.eval_config.MODEL.policy_name == "CMA_CLIP_Policy":
+            self.use_clip_encoders = True
+        else:
+            self.use_clip_encoders = False
+        
+        self.use_bert = False
+        self.bert_tokenizer = None
+        self.is_clip_long = False
+        if self.use_clip_encoders:
+            if self.eval_config.MODEL.TEXT_ENCODER.type == 'roberta':
+                self.bert_tokenizer = BertTokenizer(
+                    max_length=self.eval_config.MODEL.INSTRUCTION_ENCODER.max_length,
+                    load_model=self.eval_config.MODEL.INSTRUCTION_ENCODER.load_model,
+                    device=self.device
+                )
+                self.use_bert = True
+            elif self.eval_config.MODEL.TEXT_ENCODER.type == 'clip-long':
+                self.bert_tokenizer = longclip.tokenize
+                self.use_bert = True
+                self.is_clip_long = True
+        
+        if hasattr(self.eval_config.MODEL, 'TEXT_ENCODER'):
+            # use instr clip-long
+            self.bert_tokenizer = longclip.tokenize
+            self.use_bert = True
+            self.is_clip_long = True
+
 
     def topdown_snapshot(self):
         map_info = self.get_global_map(
-            robot_height=1.55,
+            robot_height=self.robot_height,
         )
         camera_pose = self.topdown_global_map_camera.get_world_pose()[0] - self.task._offset
         height, width = self.topdown_global_map_camera._camera._resolution
@@ -73,7 +105,7 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
         }
         return snapshot
 
-    def eval(self):
+    def eval(self, test_verbose=False):
         
         self.load_scan_and_robot()
         eval_path_key_list = self.dataloader.eval_path_key_list
@@ -105,13 +137,24 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
             stuck_checker = StuckChecker(self.task._offset,self.isaac_robot)
             # map_info = self.topdown_snapshot()
             robot_position, robot_rotation = self.task.get_robot_poses_without_offset()
-            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation)
+
+            if 'sub_instruction' in data:
+                sub_instr = data['sub_instruction']
+                sub_instr_tokens = data['sub_instruction_tokens']
+                max_instr_len = 100
+            else:
+                sub_instr = None
+                sub_instr_tokens = None
+                max_instr_len = 200
+            observations = get_obs(self.env, data['instruction'],robot_position,robot_rotation, sub_instr, sub_instr_tokens, robot_name=self.robot_name)
             observations = extract_instruction_tokens(
                 observations, 
                 #TODO:
-                bert_tokenizer=None,
-                is_clip_long=False
+                bert_tokenizer=self.bert_tokenizer,
+                is_clip_long=self.is_clip_long,
+                max_instr_len=max_instr_len
             )
+
             observations = batch_obs(observations, self.device)
             observations["steps"] = torch.from_numpy(np.array([0])).to(self.device)
             env_nums = 1
@@ -154,19 +197,37 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                     'prev_actions': prev_actions,
                     'masks': not_done_masks
                 }
+
+                if test_verbose:
+                    import matplotlib.pyplot as plt
+                    plt.imsave('logs/test0.jpg', observations[0]['rgb'].cpu().numpy())
+
+                if self.use_clip_encoders:
+                    batch.update({
+                        "need_img_extraction": True,
+                        "img_mod": self.eval_config.MODEL.IMAGE_ENCODER.RGB.img_mod,
+                        'proj': self.eval_config.MODEL.IMAGE_ENCODER.RGB.rgb_proj,
+                        'process_images': True,
+                        'need_txt_extraction': True,
+                        "depth_return_x_before_fc": False
+                    })
+
                 with torch.no_grad():
-                    actions, rnn_states = self.policy(batch)
+                    if self.use_clip_encoders:
+                        actions, rnn_states, _ = self.policy(batch)
+                    else:
+                        actions, rnn_states, _ = self.policy(batch)
                 prev_actions.copy_(actions)
                 if self.eval_config.EVAL.ACTION == 'descrete':
                     for bs_i, a in enumerate(actions):
                         if a == 0:
                             log.info(f"[split:{split}][scan:{scan}][trajectory_id_episode_id: {path_key}][stop!!!]")
                             action = [
-                                {'h1': {'stop': ['stop']}}
+                                {self.robot_name: {'stop': ['stop']}}
                             ]
                         else:
                             action = [
-                                {'h1': {'move_by_descrete': [a.item()]}}
+                                {self.robot_name: {'move_by_descrete': [a.item()]}}
                             ]
                 executor = ActionExecutor(
                     env=self.env, 
@@ -180,6 +241,9 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
 
                     statistic_info=statistic_info,
                     context=self,
+                    
+                    robot_name=self.robot_name,
+                    fall_height_threshold=self.sim_config.config_dict['tasks'][0]['robots'][0]['fall_height_threshold']
                 )
                 outputs = executor.env_step(actions = action)
                 outputs_dict = outputs['outputs_dict']
@@ -189,13 +253,20 @@ class DiscreteEvalSingleScanEnv(BaseSingleScanEnv):
                 statistic_info = executor.statistic_info
                 statistic_info.policy_step +=1
 
+                if 'sub_instruction' in data: # MLANet
+                    max_instr_len = 100
+                else:
+                    max_instr_len = 200
                 outputs_dict = extract_instruction_tokens(
                     outputs_dict,
                     #TODO: 
-                    bert_tokenizer=None,
-                    is_clip_long=False
+                    bert_tokenizer=self.bert_tokenizer,
+                    is_clip_long=self.is_clip_long,
+                    max_instr_len=max_instr_len
                 )
+                outputs_dict[0]['sub_instruction'] = sub_instr_tokens
                 observations = batch_obs(outputs_dict, self.device)
+
                 observations["steps"] = torch.from_numpy(np.array([0])).to(self.device)
                 not_done_masks = torch.tensor(
                     [[0] if done else [1] for done in dones],

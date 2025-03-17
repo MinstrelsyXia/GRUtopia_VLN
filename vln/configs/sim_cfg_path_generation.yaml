@@ -12,61 +12,115 @@ tasks:
   offset_size: 0.0
   light_on: true
   robots:
-  - name: h1
-    prim_path: "/World/h1"
-    type: "HumanoidRobot"
+  - name: aliengo
+    prim_path: "/World/aliengo"
+    type: "AliengoRobot"
     position: [0, 0, 0]
     scale: [1, 1, 1]
-    orientation: [1,0,0,0]
+    orientation: [0,0,0,0]
+    robot_height: 0.40 # for get free_map
     ankle_height: 0.0758
+    fall_height_threshold: 0.04
+    aperture: 200
     controller_params:
     - name: "move_by_speed"
     - name: "joint_controller"
     - name: "move_to_point"
     - name: "move_along_path"
     - name: "rotate"
+    - name: "move_with_keyboard"
+    # - name: "web_chat"
+    - name: "stand_still"
+    - name: "oracle_move_to_point"
+    - name: "oracle_move_along_path"
     - name: "move_to_point_by_pid"
+    - name: "move_along_speeds"
+    - name: "move_by_descrete"
     sensor_params:
+    - name: "camera"
+      enable: false
+      size: [640, 480]
+    - name: "tp_camera"
+      enable: false
+      size: [640, 480]
     - name: "pano_camera_0"
       enable: true
-      size: [640, 480]
-      camera_config:
-        - point_cloud
-    - name: "pano_camera_45"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_90"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_135"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_180"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_225"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_270"
-      enable: false
-      size: [256, 256]
-    - name: "pano_camera_315"
-      enable: false
-      size: [256, 256]
-    - name: "h1_pano_camera_debug"
-      enable: false
       size: [256, 256]
     - name: "topdown_camera_50"
       enable: true
       size: [500, 500]
-      camera_config: []
     - name: "topdown_camera_500"
       enable: true
       size: [500, 500]
-      camera_config: []
     - name: "tp_pointcloud"
       enable: True
       size: [64, 64]
       camera_config:
         - no_rgb
         - point_cloud
+  # - name: h1
+  #   prim_path: "/World/h1"
+  #   type: "HumanoidRobot"
+  #   position: [0, 0, 0]
+  #   scale: [1, 1, 1]
+  #   orientation: [1,0,0,0]
+  #   ankle_height: 0.0758
+  #   controller_params:
+  #   - name: "move_by_speed"
+  #   - name: "joint_controller"
+  #   - name: "move_to_point"
+  #   - name: "move_along_path"
+  #   - name: "rotate"
+  #   - name: "move_to_point_by_pid"
+  #   - name: "stand_still"
+  #   - name: "oracle_move_to_point"
+  #   - name: "oracle_move_along_path"
+  #   - name: "move_to_point_by_pid"
+  #   - name: "move_by_speed_vln"
+  #   - name: "move_along_speeds"
+  #   - name: "move_by_descrete"
+  #   sensor_params:
+  #   - name: "pano_camera_0"
+  #     enable: true
+  #     size: [256,256]
+  #     # size: [640,480]
+  #     camera_config:
+  #       - point_cloud
+  #   - name: "pano_camera_45"
+  #     enable: false
+  #     size: [256, 256]
+  #   - name: "pano_camera_90"
+  #     enable: false
+  #     size: [256, 256]
+  #   - name: "pano_camera_135"
+  #     enable: false
+  #     size: [256, 256]
+  #   - name: "pano_camera_180"
+  #     enable: false
+  #     size: [256, 256]
+  #   - name: "pano_camera_225"
+  #     enable: false
+  #     size: [256, 256]
+  #   - name: "pano_camera_270"
+  #     enable: false
+  #     size: [256, 256]
+  #   - name: "pano_camera_315"
+  #     enable: false
+  #     size: [256, 256]
+  #   - name: "h1_pano_camera_debug"
+  #     enable: false
+  #     size: [256, 256]
+  #   - name: "topdown_camera_50"
+  #     enable: true
+  #     size: [500, 500]
+  #     camera_config: []
+  #   - name: "topdown_camera_500"
+  #     enable: true
+  #     size: [500, 500]
+  #     camera_config: []
+  #   - name: "tp_pointcloud"
+  #     enable: True
+  #     size: [64, 64]
+  #     camera_config:
+  #       - no_rgb
+  #       - point_cloud

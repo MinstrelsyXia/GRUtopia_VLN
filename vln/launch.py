@@ -8,6 +8,7 @@ import threading
 import json
 import os
 from vln import PROJECT_ROOT_PATH
+from vln.src.v2.util.common import set_seed_normal
 
 def start_reading_threads(process):
     def read_output(stream):
@@ -58,13 +59,25 @@ if __name__ == "__main__":
     elif task_type == 'sample':
         key_prefix = 'sample_rank'
         task_file = "sample_one_scan.py"
+    elif task_type == 'sixth_floor':
+        key_prefix = 'sample_rank'
+        task_file = 'sample_one_scan.py'
+    elif task_type == 'sixth_floor_eval':
+        key_prefix = 'eval_rank'
+        task_file = 'eval_one_scan.py'
     else:
         print(f'unknown task_type: {task_type}')
         sys.exit()
     
+    set_seed_normal(0)
+
     round_count = 0
+    max_round_num = 5
     while True:
         round_count +=1
+        if round_count > max_round_num:
+            print(f"round_count > {max_round_num}, exit")
+            sys.exit()
 
         # 获取该rank 所有需要抓取的数据
         database = lmdb.open(f"{lmdb_path}/sample_data.lmdb", map_size=1 * 1024 * 1024 * 1024 * 1024, readonly=True, lock=False)
@@ -98,6 +111,6 @@ if __name__ == "__main__":
             stdout_thread.join()
             stderr_thread.join()
             exit_code = process.returncode
-            print(f"[round:{round_count}][scan:{scan}][exit_code:{exit_code}]")
+            print(f"[round:{round_count}][scan:{scan}][exit_code:{exit_code}]") 
                 
         time.sleep(60)

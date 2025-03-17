@@ -1,0 +1,20 @@
+{
+    "name" : "20250211_sixth_floor_sample",
+    "task_type" : "sixth_floor",
+    "scene_config_file": "/ssd/xiaxinyuan/code/w61-grutopia/thirdparty/landmark_isaacsim_interaction/json_configs/multi_model_sixthfloor.json",
+    "sample_type":"discrete",
+    "dagger_percentage":0.0,
+    "ckpt_to_load" : "data/checkpoints/20250121_cma_pm_train_torchGPU1_bs2_lr2.5e-4_controller_dagger02/ckpts/ckpt.10.pth",
+    "image" : "w61_grutopia:v0.4",
+    "total_rank": 3,
+    "retry_list":[],
+    "flash": false,
+    "device_map" : {
+        "0":["5"],
+        "1":["6"],
+        "2":["7"]
+    },
+    "merge_config" : {
+        "data_0508":[]
+    }
+}

@@ -90,6 +90,127 @@ class Camera(BaseSensor):
 
         return camera
 
+
+    def set_renderer(self, lego_xform_list ,lego_gs_root,lego_name_list,lego_device_number,lego_editable):
+        self.lego_xform_list = lego_xform_list
+                # Initialize 3DGS renderer
+        if lego_device_number <0:
+            self.device_number = torch.cuda.device_count() - 1
+        else:
+            self.device_number = lego_device_number
+        self.scgs_renderer = MultiModelSCGSRenderer(
+            model_root=lego_gs_root,
+            model_name_list=lego_name_list,
+            device_number=self.device_number,
+            editable=lego_editable
+        )
+        focal_length = self._camera.get_focal_length()*1000
+        fovx = self._camera.get_horizontal_fov()
+        fovy = self._camera.get_vertical_fov()  
+        self.scgs_renderer.set_camera_params(self.size[0], self.size[1], focal_length, focal_length, 0.01, 100.0,fovx,fovy)
+        
+
+    def get_pc(self,depth,cam_transform_matrix):
+        from vlmaps.application_my.utils import get_dummy_2d_grid, downsample_pc, visualize_pc
+        grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
+        pc = self._camera.get_world_points_from_image_coords(grid_2d, depth.flatten())
+        pc = downsample_pc(pc, 150)
+        return pc
+
+    def get_camera_params(self):
+        # width, height = self._camera.get_resolution()
+        # fx = self._camera.get_focal_length()
+        # fy = self._camera.get_focal_length()
+        # cx, cy = self._camera.get_horizontal_aperture(), self._camera.get_vertical_aperture()
+        # camera_intrinsic = np.array([
+        #     [554.25616,   0.     , 320.     ],
+        #     [  0.     , 554.25616, 240.     ],
+        #     [  0.     ,   0.     ,   1.     ]
+        # ])
+        camera_intrinsic = self._camera.get_camera_intrinsics()
+        #! self._camera.get_camera_intrinsics()
+        # 获取相机外参（位姿）
+        cam_transform_matrix = get_relative_transform(
+            get_prim_at_path(self._camera.prim_path), 
+            get_prim_at_path("/World")
+        )
+        camera_pos = cam_transform_matrix[:3, 3]
+        camera_rot = cam_transform_matrix[:3, :3]
+        
+        return camera_intrinsic, camera_pos, camera_rot
+
+    def create_pointcloud_from_rgbd(self, depth, rgb=None):
+        """从RGBD图像创建点云"""
+        # 获取相机参数
+        camera_intrinsic, camera_pos, camera_rot = self.get_camera_params()
+        
+        # 生成像素网格
+        height, width = depth.shape
+        v, u = np.meshgrid(range(height), range(width), indexing='ij')
+        v = v.reshape(-1)
+        u = u.reshape(-1)
+        z = depth.reshape(-1)
+        
+        # 过滤无效深度值
+        # valid_mask = z > 0
+        # u = u[valid_mask]
+        # v = v[valid_mask]
+        # z = z[valid_mask]
+        
+        # 反投影到相机坐标系
+        x = (u - camera_intrinsic[0,2]) * z / camera_intrinsic[0,0]
+        y = (v - camera_intrinsic[1,2]) * z / camera_intrinsic[1,1]
+        
+        # 组织相机坐标系下的点云
+        points_cam = np.stack([x, y, z], axis=1)
+        
+        # 转换到世界坐标系
+        points_world = (camera_rot @ points_cam.T).T + camera_pos
+        
+        # # 如果有RGB信息，添加颜色
+        # if rgb is not None:
+        #     colors = rgb.reshape(-1, 3)[valid_mask]
+        #     return points_world, colors
+        
+        return points_world
+    
+    def get_data(self, add_rgb_subframes=False, render=False):
+        """获取相机数据，包括RGB、深度图和点云"""
+        # if self has no attribute lego_xform_list, then return empty data
+        if not hasattr(self, 'lego_xform_list'):
+            return {}   
+        if self.config.enable:
+            rgb = {}
+            depth = {}
+            pc= {}
+            torch.cuda.empty_cache()
+            if add_rgb_subframes == True:
+                cam_transform_matrix = get_relative_transform(get_prim_at_path(self._camera.prim_path), get_prim_at_path("/World"))
+                with torch.no_grad():   
+                    self.scgs_renderer.update_editing_package(*get_xform_list_pose(self.lego_xform_list))
+                    scgs_rendering = self.scgs_renderer.minicam_render(cam_transform_matrix)
+                torch.cuda.empty_cache()
+                rgb = scgs_rendering['render'].detach().cpu().numpy()
+                rgb = np.transpose(rgb, (1, 2, 0))  # shape [H,W,3]
+                rgb = np.clip(rgb, 0, 1)
+                rgb = (rgb * 255).astype(np.uint8)
+                # rgb = rgb[:, :, ::-1]  # BGR to RGB
+                depth = scgs_rendering['depth'].detach().cpu().numpy()[0]    # shape：（H，W）
+                depth = depth * 100
+                # pc = self.get_pc(depth,cam_transform_matrix)
+            pc = self._camera.get_pointcloud()
+                # pc[:,2] = -pc[:,2]
+                # 利用cam_transform_matrix，将pc转换到世界坐标系
+                # pc = self.create_pointcloud_from_rgbd(depth, cam_transform_matrix)
+            
+            return {
+                'rgba': rgb,
+                'depth': depth,
+                'pointcloud': pc,
+                # 'pointcloud': self.depth_to_pointcloud(render_results['depth'])  # 如果需要点云
+            }
+        return {}
+    
     def sensor_init(self) -> None:
         """
         Initialize the camera sensor.

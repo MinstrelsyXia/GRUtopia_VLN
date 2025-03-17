@@ -70,7 +70,7 @@ class CMA_DP_Net(nn.Module):
             self.instruction_encoder = encoders.LanguageEncoder(text_encoder_config)
         
         # Init the RGB & depth encoder
-        self.image_encoder = encoders.ImageEncoder(self.model_config, self.model_config.IMAGE_ENCODER, observation_space, self.model_config.LORA)
+        self.image_encoder = encoders.ImageEncoder(self.model_config, self.model_config.IMAGE_ENCODER, observation_space, self.model_config.LORA, analysis_time=self.config.IL.analysis_time)
         
         # Init the cross-modal fusion network
         # try:
@@ -404,6 +404,9 @@ class CMA_DP_Net(nn.Module):
         text_embeds, txt_masks, text_cls_embeds = self.instruction_encoder(
             observations['instruction'], need_txt_extraction=need_txt_extraction
         ) 
+        if analysis_time:
+            end_time = time.time()
+            print(f"Time taken to encode text: {end_time - start_time:.2f} seconds")
                 
         '''2. Encoding previous actions and steps'''
         prev_actions_masks = prev_actions.float() * masks.unsqueeze(-1).float() # [bs, act_length, 3]
@@ -423,8 +426,13 @@ class CMA_DP_Net(nn.Module):
         #     prev_action_embeds = prev_action_embeds.reshape(batch_size, -1) # use the stacked prev_action_embeds!
         
         '''3. Encoding images'''
+        if analysis_time:
+            start_time = time.time()
         rgb_depth_embeds = self.image_encoder(observations['stack_rgb'], observations['stack_depth'], prev_action_embeds=prev_action_embeds, use_stack=self.model_config.IMAGE_ENCODER.use_stack, img_mod=self.model_config.IMAGE_ENCODER.RGB.img_mod)
         rgb_patch_num = observations['stack_rgb'].shape[1]
+        if analysis_time:
+            end_time = time.time()
+            print(f"Time taken to encode images: {end_time - start_time:.2f} seconds")
 
         '''4. Update GRU'''
         # GPU inputs: [rgb_depth_embeds, latest_prev_act_embeds, imu_embeds]
@@ -468,6 +476,8 @@ class CMA_DP_Net(nn.Module):
         # his_txt_attn_probs = his_txt_attn_probs[:,0,:]
 
         # 6.2 Current img features combine with the text features
+        if analysis_time:
+            start_time = time.time()
         rgb_depth_his_embeds = torch.cat((rgb_depth_embeds, state), dim=1)
         try:
             img_txt_embeds, img_txt_attn_probs = self.img_txt_cross_encoder(rgb_depth_his_embeds, text_embeds, q_masks=masks, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
@@ -475,6 +485,9 @@ class CMA_DP_Net(nn.Module):
             print(e)
             img_txt_embeds, img_txt_attn_probs = self.img_txt_cross_encoder(rgb_depth_his_embeds, text_embeds, q_masks=masks, kv_masks=txt_masks, output_attentions=True,do_self_attn=do_self_attn)
         img_txt_attn_probs = img_txt_attn_probs[:,0,:]
+        if analysis_time:
+            end_time = time.time()
+            print(f"Time taken to encode cross-modal features: {end_time - start_time:.2f} seconds")
 
         # 6.3 Current text features combine with the historical img features
         # txt_his_embeds, txt_hit_attn_probs = self.txt_img_cross_encoder(text_embeds, state.unsqueeze(1), q_masks=txt_masks, kv_masks=masks, output_attentions=True,do_self_attn=do_self_attn)
@@ -482,7 +495,12 @@ class CMA_DP_Net(nn.Module):
 
         # 6.4 Current text features combine with the current img features
         if self.model_config.CROSS_MODAL_ENCODER.txt_to_img:
+            if analysis_time:
+                start_time = time.time()    
             txt_img_embeds, txt_img_attn_probs = self.txt_img_cross_encoder(text_embeds, rgb_depth_his_embeds, q_masks=txt_masks, kv_masks=None, output_attentions=True,do_self_attn=do_self_attn) # kv_masks set to be None since there is no mask for imgs
+            if analysis_time:
+                end_time = time.time()
+                print(f"Time taken to encode text cross-modal features: {end_time - start_time:.2f} seconds")
             fused_update_txt_embeds = txt_img_embeds
         else:
             fused_update_txt_embeds = text_embeds
@@ -728,7 +746,9 @@ class CMA_DP_Net(nn.Module):
                     #     cond_mask = None # TODO
                     y_cond = None
                     y_cond_mask = None
-                    
+                
+                if analysis_time:
+                    start_time = time.time()
                 noise_pred = self.action_dp_pred_net(
                     sample=noisy_action.float(), 
                     timestep=timesteps,
@@ -737,7 +757,9 @@ class CMA_DP_Net(nn.Module):
                     cond_mask=cond_mask,
                     y_cond=y_cond,
                     y_cond_mask=y_cond_mask)
-                
+                if analysis_time:
+                    end_time = time.time()
+                    print(f"Time taken to diffusion pred noise: {end_time - start_time:.2f} seconds")
             elif self.dp_type == 'resnet_unet':
                 # Predict the noise residual
                 if self.use_local_cond:
@@ -924,17 +946,36 @@ class CMA_DP_Net(nn.Module):
                                 actions[bs_idx].append(action_spaces['stop'])
                                 stop = True
                                 continue
-                        elif stop_mode == 'progress':
+                        elif stop_mode in ['progress', 'stop_progress']:
                             stop_flag = False
                             steps = None # !!! 
-                            if steps is not None:
-                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                                (steps[bs_idx] > 5 and abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
+                            if stop_mode == 'stop_progress':
+                                stop_flag = stop_pm_pred[bs_idx].item() > self.config.EVAL.stop_progress_threshold
                             else:
-                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                                    (abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
-                            # stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold) or\
-                            #     (abs(diffusion_output[bs_idx][step_idx][0]) < 3e-1 and abs(diffusion_output[bs_idx][step_idx][1]) < 3e-1 and abs(diffusion_output[bs_idx][step_idx][2]) < 3e-1)
+                                stop_flag = (pm_pred[bs_idx].item() > self.config.EVAL.pm_threshold)
+
+                            '''一次actions为stop就对应位置stop'''
+                            # if steps is not None:
+                            #     stop_flag = stop_flag or\
+                            #     (steps[bs_idx] > 5 and abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
+                            # else:
+                            #     stop_flag = stop_flag or\
+                            #         (abs(un_actions[bs_idx][step_idx][0]) < 1e-1 and abs(un_actions[bs_idx][step_idx][1]) < 1e-1 and abs(un_actions[bs_idx][step_idx][2]) < 1e-1)
+                            
+                            '''连续N次stop即stop'''
+                            M_stops = 3
+                            if step_idx + M_stops < len(un_actions_nocumsum[0]):  # Make sure we have enough steps ahead
+                                consecutive_stops = True
+                                for i in range(M_stops):  # Check current and next M steps
+                                    curr_action = un_actions_nocumsum[0][step_idx+i]
+                                    if not (abs(curr_action[0]) < 1e-1 and \
+                                        abs(curr_action[1]) < 1e-1 and \
+                                        abs(curr_action[2]) < 1e-1):
+                                        consecutive_stops = False
+                                        break
+                                
+                                if consecutive_stops or stop_flag:
+                                    stop_flag = True
 
                             if stop_flag:
                                 actions[bs_idx].append(action_spaces['stop'])
@@ -1085,7 +1126,7 @@ class CMA_DP_Net(nn.Module):
         step = batch['step']
         episode_ids = batch['episode_ids']
 
-        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'])
+        noise_pred, dist_pred, rnn_states_out, noise, diffusion_output, progress_pred, denoise_action_list, stop_progress_pred = self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], sample_classifier_free_guidance=batch['sample_cls_free_guidance'])
 
         # prev_actions = diffusion_output[:,:self.model_config.len_traj_act]
         if batch['denoise_action'] and batch['num_sample'] > 1:         
@@ -1238,7 +1279,7 @@ class CMA_DP_Net(nn.Module):
                     batch['observations']['stack_rgb'][cls_free_mask] = torch.zeros_like(batch['observations']['stack_rgb'][cls_free_mask])
                     batch['observations']['stack_depth'][cls_free_mask] = torch.zeros_like(batch['observations']['stack_depth'][cls_free_mask])
 
-            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'], batch['need_txt_extraction'])
+            return self.pred_actions(batch['observations'], batch['rnn_states'], batch['prev_actions'], batch['masks'], batch['add_noise_to_action'], batch['denoise_action'], batch['num_sample'], batch['train_cls_free_guidance'], batch['sample_cls_free_guidance'], batch['need_txt_extraction'], analysis_time)
 
         elif mode == "act":
             return self.act(batch)

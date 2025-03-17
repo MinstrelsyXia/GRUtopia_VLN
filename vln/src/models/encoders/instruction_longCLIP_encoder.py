@@ -32,6 +32,12 @@ class InstructionLongCLIPEncoder(nn.Module):
             for name, param in self.text_transformer.named_parameters():
                 param.requires_grad = False
         
+        if hasattr(config, 'update_text_encoder_last_layer') and config.update_text_encoder_last_layer:
+            # 更新最后一层
+            for name, param in self.text_transformer.named_parameters():
+                if 'transformer.resblocks.11' in name:
+                    param.requires_grad = True
+        
         self.use_qformer = config.use_qformer
         if self.use_qformer:
             bert_config = PretrainedConfig.from_pretrained('bert-base-uncased')

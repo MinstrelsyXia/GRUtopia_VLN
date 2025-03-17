@@ -54,6 +54,51 @@ robots:
     - right_ankle_joint
     - left_elbow_joint
     - right_elbow_joint
+  - name: "move_by_speed_vln"
+    type: VLNHumanoidMoveBySpeedController
+    policy_weights_path: assets/policy/weights/h1_loco_jit_policy.pt
+    joint_names:
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - torso_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_ankle_joint
+    - right_ankle_joint
+    - left_elbow_joint
+    - right_elbow_joint
+  - name: "joint_controller"
+    type: JointController
+    joint_names:
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - torso_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_ankle_joint
+    - right_ankle_joint
+    - left_elbow_joint
+    - right_elbow_joint
   - name: "move_to_point"
     type: "MoveToPointBySpeedController"
     forward_speed: 1.5
@@ -112,6 +157,19 @@ robots:
     Kd_angular: 0.05
     sub_controllers:
     - name: move_by_speed
+  - name: "move_along_speeds"
+    type: MoveAlongSpeedsController
+    steps_per_speed: 50
+    sub_controllers:
+    - name: move_by_speed
+  - name: "move_by_descrete"
+    type: DescreteController
+    steps_per_action: 50
+    forward_distance: 0.25
+    rotation_angle: 15.0
+    sub_controllers:
+    - name: move_by_speed
+
   sensors:
   - name: "camera"
     type: "Camera"
@@ -127,7 +185,7 @@ robots:
     type: "Camera_3dgs"
     prim_path: "torso_link/h1_pano_camera_0"
   - name: "topdown_camera_50"
-    type: "Camera_3dgs"
+    type: "Camera"
     prim_path: "topdown_camera_50"
   - name: "topdown_camera_500"
     type: "Camera"
@@ -160,10 +218,12 @@ robots:
 
 
 - type: "HumanoidRobotVLNEval"
-  usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_500.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_500.usd"
+  usd_path: ""
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
+  usd_path: "assets/robots/h1/h1_invisible_1121.usd"
   gains: [0.0, 0.0]
   controllers:
   - name: "move_by_speed"
@@ -372,3 +432,131 @@ robots:
   - name: "pano_camera_315"
     type: "Camera"
     prim_path: "torso_link/h1_pano_camera_315"
+
+
+- type: "AliengoRobot"
+  usd_path: "assets/robots/aliengo/aliengo_vln_camera.usd"
+  gains: [0., 0., 0., 0.]
+  controllers:
+  - name: "move_by_speed" 
+    type: AliengoMoveBySpeedController
+    policy_weights_path: assets/policy/weights/aliengo_loco_model_4000.pt
+    joint_names:
+    - FL_hip_joint
+    - FR_hip_joint
+    - RL_hip_joint
+    - RR_hip_joint
+    - FL_thigh_joint
+    - FR_thigh_joint
+    - RL_thigh_joint
+    - RR_thigh_joint
+    - FL_calf_joint
+    - FR_calf_joint
+    - RL_calf_joint
+    - RR_calf_joint
+  - name: "joint_controller"
+    type: JointController
+    joint_names:
+    - FL_hip_joint
+    - FR_hip_joint
+    - RL_hip_joint
+    - RR_hip_joint
+    - FL_thigh_joint
+    - FR_thigh_joint
+    - RL_thigh_joint
+    - RR_thigh_joint
+    - FL_calf_joint
+    - FR_calf_joint
+    - RL_calf_joint
+    - RR_calf_joint
+  - name: "move_to_point"
+    type: "MoveToPointBySpeedController"
+    forward_speed: 1.5
+    rotation_speed: 2.0
+    threshold: 0.15
+    sub_controllers:
+    - name: move_by_speed
+  - name: "move_along_path"
+    type: MoveAlongPathPointsController
+    forward_speed: 1.5
+    rotation_speed: 2.0
+    threshold: 0.15
+    sub_controllers:
+    # - name: move_to_point
+    - name: move_to_point_by_pid
+  - name: "rotate"
+    type: RotateController
+    rotation_speed: 2.0
+    threshold: 0.02
+    sub_controllers:
+    - name: move_by_speed
+  - name: "move_with_keyboard"
+    type: MoveWithKeyboardController
+    forward_speed: 1.0
+    rotation_speed: 1.0
+    lateral_speed: 1.0
+    sub_controllers:
+    - name: move_by_speed
+  - name: web_chat
+    type: WebChatboxController
+  - name: stand_still
+    type: StandStillController
+    sub_controllers:
+    - name: move_by_speed
+  - name: recover
+    type: RecoverController
+    recover_height: 1.0
+    sub_controllers:
+    - name: joint_controller
+  - name: oracle_move_to_point
+    type: OracleMoveToPointController
+  - name: oracle_move_along_path
+    type: OracleMoveAlongPathPointsController
+    threshold: 0.1
+    sub_controllers:
+    - name: oracle_move_to_point
+  - name: move_to_point_by_pid
+    type: PIDSpeedController
+    max_forward_speed: 2.0
+    max_rotation_speed: 4.0
+    threshold: 0.15
+    Kp_linear: 1.5
+    Ki_linear: 0.0
+    Kd_linear: 0.01
+    Kp_angular: 2.5
+    Ki_angular: 0.0
+    Kd_angular: 0.05
+    sub_controllers:
+    - name: move_by_speed
+  - name: "move_along_speeds"
+    type: MoveAlongSpeedsController
+    steps_per_speed: 80
+    sub_controllers:
+    - name: move_by_speed
+  - name: "move_by_descrete"
+    type: DescreteController
+    steps_per_action: 50
+    forward_distance: 0.25
+    rotation_angle: 15.0
+    sub_controllers:
+    - name: move_by_speed
+
+  sensors:
+  - name: "camera"
+    type: "Camera"
+    prim_path: "trunk/Camera"
+  - name: "tp_camera"
+    type: "Camera"
+    prim_path: "torso_link/Camera"
+  - name: "tp_pointcloud"
+    type: "Camera_3dgs"
+    prim_path: "logo_link/Camera_pointcloud"
+  - name: "pano_camera_0"
+    type: "Camera_3dgs"
+    prim_path: "trunk/vln_camera_0"
+  - name: "topdown_camera_50"
+    type: "Camera"
+    prim_path: "topdown_camera_50"
+  - name: "topdown_camera_500"
+    type: "Camera"
+    prim_path: "topdown_camera_500"

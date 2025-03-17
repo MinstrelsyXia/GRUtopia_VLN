@@ -1,4 +1,5 @@
 import os,sys
+import re
 import torch
 import numpy as np
 from gym import spaces
@@ -17,9 +18,18 @@ def get_policy(policy_name):
     elif policy_name == "CMA_Policy":
         from vln.src.models.cma_policy import CMANet
         return CMANet
+    elif policy_name == "CMA_CLIP_Policy":
+        from vln.src.models.cma_clip_policy import CMA_CLIP_Net
+        return CMA_CLIP_Net
     elif policy_name == 'DP_noRNN_Policy':
         from vln.src.models.dp_policy_noRNN import CMA_DP_noRNN_Net
         return CMA_DP_noRNN_Net
+    elif policy_name == 'Seq2SeqPolicy':
+        from vln.src.models.seq2seq_policy import Seq2SeqNet
+        return Seq2SeqNet
+    elif policy_name == 'MLAPolicy':
+        from vln.src.models.mla_policy import MLANet
+        return MLANet
     else:
         raise ValueError(f"Policy {policy_name} not found")
 
@@ -118,16 +128,11 @@ def initialize_policy(
             new_state_dict = {}
             # Iterate through the state dictionary items
             for k, v in state_dict.items():
-                # Check if the key includes 'module.'
-                if 'module.' in k:
-                    # Handle the key by stripping 'module.' if necessary or perform any required operation
-                    new_key = k.replace('module.', '')
-                    new_state_dict[new_key] = v
-                if 'net.' in k: # this is for loading the cma policy from habitat
-                    new_key = k.replace('net.', '')
-                    new_state_dict[new_key] = v
-                else:
-                    new_state_dict[k] = v
+                new_key = k.replace('module.', '')
+                if config.MODEL.policy_name != 'CMA_DP_ImgMultiPatch_Policy':
+                    new_key = new_key.replace('net.', '') # this is for cma policy
+                new_key = new_key.replace('actor_critic.','') # this is for MLANet ppo
+                new_state_dict[new_key] = v
             del state_dict[k]  # Remove the old key with 'module.'
                     
             incompatible_keys, _= self_policy.load_state_dict(new_state_dict,

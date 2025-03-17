@@ -1,10 +1,27 @@
 import os,sys
 import argparse
 import numpy as np
+import torch
+import json
+import gzip
+import copy
+import glob
+import cv2
+
+import yacs.config
+
+import numpy as np
+import torch
+
+from PIL import Image
+from torch import Size, Tensor
+from torch import nn as nn
+
+from collections import defaultdict
 from scipy.spatial.transform import Rotation as R
 
 from grutopia.core.util.log import log
-import torch
+
 from typing import (
     Any,
     DefaultDict,
@@ -15,7 +32,7 @@ from typing import (
     Tuple,
     Union,
 )
-from yacs.config import CfgNode
+
 from vln.src.utils.tensor_dict import TensorDict
 
 def euler_angles_to_quat(angles, degrees=False):
@@ -68,15 +85,6 @@ def compute_rel_orientations(prev_position, current_position, return_quat=False)
     else:
         return np.array([0, 0, yaw])
 
-def get_diff_beween_two_quat(w1,w2):
-    a1 = quat_to_euler_angles(w1)
-    a2 = quat_to_euler_angles(w2)
-    diff = (a1-a2)/180.0*np.pi
-    diff = (diff + np.pi) % (2 * np.pi) - np.pi  # 将差值归一化到 -π 到 π
-    return np.linalg.norm(diff)
-
-
-
 def dict_to_namespace(d):
     ns = argparse.Namespace()
     for key, value in d.items():
@@ -85,71 +93,6 @@ def dict_to_namespace(d):
         setattr(ns, key, value)
     return ns
 
-
-
-def get_dummy_2d_grid(width,height):
-    # Generate a meshgrid of pixel coordinates
-    x = np.arange(width)
-    y = np.arange(height)
-    xx, yy = np.meshgrid(x, y)
-
-    # Flatten the meshgrid arrays to correspond to the flattened depth map
-    xx_flat = xx.flatten()
-    yy_flat = yy.flatten()
-
-    # Combine the flattened x and y coordinates into a 2D array of points
-    points_2d = np.vstack((xx_flat, yy_flat)).T  # Shape will be (N, 2), where N = height * width
-    return points_2d
-
-def downsample_pc(pc, depth_sample_rate):
-    '''
-    INput: points:(N,3); rate:downsample rate:int
-    Output: downsampled_points:(N/rate,3)
-    '''
-    # np.random.seed(42)
-    shuffle_mask = np.arange(pc.shape[0])
-    np.random.shuffle(shuffle_mask)
-    shuffle_mask = shuffle_mask[::depth_sample_rate]
-    pc = pc[shuffle_mask,:]
-    return pc
-
-import open3d as o3d
-def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
-    # 设置无头渲染
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()  # 创建一个不可见的窗口
-    ctr = vis.get_view_control()
-
-    # 设定特定的视角
-    ctr.set_front([0, 0, -1])  # 设置相机朝向正面
-    ctr.set_lookat([0, 0, 0])  # 设置相机目标点为原点
-    ctr.set_up([0, 0, 1])   
-    # 创建点云对象
-    # pcd = o3d.geometry.PointCloud()
-    # pcd.points = o3d.utility.Vector3dVector(pc)
-    vis.add_geometry(pcd)
-    vis.update_geometry(pcd)
-    vis.poll_events()
-    vis.update_renderer()
-
-    # 捕获当前视图并保存为图像
-    vis.capture_screen_image(save_path)
-    vis.destroy_window()
-              
-def visualize_pc(pcd,headless,save_path = 'pc.jpg'):
-    '''
-    pcd:     after:    pcd_global = o3d.geometry.PointCloud()
-    pcd_global.points = o3d.utility.Vector3dVector(points_3d)
-    '''
-    if headless==True:
-        save_point_cloud_image(pcd,save_path=save_path)
-        return
-    else:
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-    size=1.0, origin=[0, 0, 0]) 
-        o3d.io.write_point_cloud("point_cloud.pcd", pcd)
-        o3d.io.write_triangle_mesh("coordinate_frame.ply", coordinate_frame)
-        return
 def extract_best_eval_results(log_file, split):
     results = {'best_spl':-1, 'best_sr':-1, 
                'best_spl_index':0, 'best_sr_index':0, 
@@ -518,7 +461,10 @@ def load_dataset(dataset_root_dir, split, logger=None):
         for item in data["episodes"]:
             item["start_position"] = [item["start_position"][0], -item["start_position"][2], item["start_position"][1]]
             item["start_rotation"] = [-item["start_rotation"][3], item["start_rotation"][0], item["start_rotation"][2], -item["start_rotation"][1]] # [x,y,z,-w] => [w,x,y,z]
-            item["scan"] = item["scene_id"].split("/")[1]
+            if '/' in item["scene_id"]: # for sixth floor dataset   
+                item["scan"] = item["scene_id"].split("/")[1]
+            else:
+                item["scan"] = item["scene_id"]
             item["c_reference_path"] = []
             if "reference_path" in item.keys():
                 for path in item["reference_path"]:
@@ -637,7 +583,12 @@ def batch_obs(
 
     for obs in observations:
         for sensor in obs:
-            batch[sensor].append(torch.as_tensor(obs[sensor]))
+            if obs[sensor] is not None:
+                if type(obs[sensor]) == np.ndarray:
+                    data = obs[sensor].copy()
+                else:
+                    data = obs[sensor]
+                batch[sensor].append(torch.as_tensor(data))
 
     batch_t: TensorDict = TensorDict()
 
@@ -663,7 +614,7 @@ def save_video(VIDEO_DIR, total_rgb_list, split, ep_id, checkpoint_index, spl, i
     video_writer.release()
     print(f"Save video to {video_path}")
 
-class Config(CfgNode):
+class Config(yacs.config.CfgNode):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, new_allowed=True)
 
@@ -685,3 +636,10 @@ def namespace_to_dict(namespace):
         else:
             result[key] = value
     return result
+
+def get_config(exp_config, opts):
+    config = Config()
+    config.merge_from_file(exp_config)
+    if opts:
+        config.merge_from_list(opts)
+    return config

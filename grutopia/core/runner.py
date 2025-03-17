@@ -91,8 +91,8 @@ class SimulatorRunner:
         if self.render_trigger > self.render_interval:
             self.render_trigger = 0
         
-        if add_rgb_subframes:
-            rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
+        # if add_rgb_subframes:
+        #     rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False) # !!!
 
         if analysis_time:
             world_step_start_time = time.time()
@@ -115,6 +115,7 @@ class SimulatorRunner:
         if analysis_time:
             get_obs_time = time.time() - start_time
             log.info(f"get_obs time: {get_obs_time:.4f}s")
+
 
         for npc in self.npc:
             try:
