@@ -350,8 +350,8 @@ if navigator_type == 'astar':
             get_grad=True
         )
         # only update points, do not plan path
-        # if k < 14:
-        #     continue
+        if k < 14:
+            continue
         start_px = my_map._xy_to_px(camera_position)[0]
         
         # from get_frontier:
@@ -359,6 +359,8 @@ if navigator_type == 'astar':
         if len(frontiers) == 0:
             frontiers = np.array([my_map.get_random_free_point()])[0]
             print("error")
+            pos = frontiers
+            goal_px = my_map._xy_to_px(pos)[0]
         else:
             # randomly pick a frontier:
             # frontier in world coord
@@ -366,12 +368,14 @@ if navigator_type == 'astar':
             idx = np.random.randint(0,num)
             pos = frontiers[idx]
             goal_px = my_map._xy_to_px(pos)[0]
+            test_frontier = np.array([19.0,0.0])
+            goal_px = my_map._xy_to_px(test_frontier)[0]
 
         accupancy_map = my_map.freemap_to_accupancy_map()
         
         # path, find_flag,_ = my_nav.planning(start[0], start[1], goal_xy[0], goal_xy[1],obs_map = accupancy_map,coord = 'obs')
 
-        goal_px = my_map.get_forward_pos_v2(start_px, camera_yaw[2], 3.0)
+        # goal_px = my_map.get_forward_pos_v2(start_px, camera_yaw[2], 3.0)
         path = my_nav.plan_to(start_px, goal_px, vis = True, navigable_map_visual=navigable_map_visual,obs_map = accupancy_map)
 
         # if find_flag == False:

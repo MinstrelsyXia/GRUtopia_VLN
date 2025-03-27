@@ -97,9 +97,9 @@ class ObstacleMap:
         
         occupancy_map[self._map == 1] = 255
         if add_dilation:
-            for i in range(1, self._dilate_iters+1):
+            for i in range(1, self._dilate_iters+2):
                 ob_mask = np.logical_and(occupancy_map!=0, occupancy_map!=2)
-                expanded_ob_mask = binary_dilation(ob_mask, structure=self.dilation_structure, iterations=self._dilate_iters)
+                expanded_ob_mask = binary_dilation(ob_mask, structure=self.dilation_structure, iterations=1)
                 occupancy_map[expanded_ob_mask&(np.logical_or(occupancy_map==0,occupancy_map==2))] = 255 - i*10
         return occupancy_map
 

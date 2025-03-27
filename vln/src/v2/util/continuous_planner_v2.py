@@ -54,9 +54,11 @@ class AStarPlanner:
         Take full map start (row, col) and full map goal (row, col) as input
         Return a list of full map path points (row, col) as the palnned path
         """
-        if self._check_if_start_in_graph_obstacle(start,obs_map):
+        # if self._check_if_start_in_graph_obstacle(start,obs_map):
             # self._rebuild_visgraph(start, vis)
-            new_goal = self.find_nearest_free_node(obs_map, start)
+        # new_start = self.find_nearest_free_node(obs_map, start)
+        # new_goal = self.find_nearest_free_node(obs_map, goal)
+        
         paths,_,_ = self.planning(start[0], start[1], goal[0], goal[1], obs_map)
         # paths = self.shift_path(paths, self.rowmin, self.colmin)
         # Remove duplicates while preserving order
@@ -123,9 +125,19 @@ class AStarPlanner:
 
         return angle_cost
     
+    def find_valid_path(self, obs_map, path):
+        valid_path = []
+        for point in path:
+            row, col = point
+            state = obs_map[int(row)][int(col)]
+            if state != 0 and state !=255:
+                valid_path.append(point)
+            else:
+                break
+        return valid_path
 
     def find_nearest_free_node(self, obs_map, goal_node):
-        if obs_map[goal_node.x, goal_node.y] != 255:
+        if obs_map[goal_node.x, goal_node.y] != 255 and obs_map[goal_node.x, goal_node.y] != 0:
             return goal_node  # Goal node is not in an obstacle
 
         free_nodes = np.argwhere(np.logical_and(obs_map != 255, obs_map != 0))
@@ -169,11 +181,11 @@ class AStarPlanner:
             goal_node = self.Node(gx,gy,0.0,-1)
             motion = self.get_motion_model()
             reason = None
-            if obs_map[goal_node.x, goal_node.y] == 255:
-                reason = 'goal_in_obstacle'
-                # return [], [], False, reason
-                new_goal_node = self.find_nearest_free_node(obs_map, goal_node)
-                goal_node = new_goal_node
+            # if obs_map[goal_node.x, goal_node.y] == 255 or obs_map[goal_node.x, goal_node.y]==0:
+            #     reason = 'goal_in_obstacle'
+            #     # return [], [], False, reason
+            #     new_goal_node = self.find_nearest_free_node(obs_map, goal_node)
+            #     goal_node = new_goal_node
 
             open_set, closed_set = dict(), dict()
             open_set[self.calc_grid_index(start_node)] = start_node
@@ -247,7 +259,9 @@ class AStarPlanner:
             # log.warning(f"Path planning results only contain {len(points_list)} points.")
             points = []
             points.append((gx, gy))
-        self.vis_whole_path(obs_map, 'tmp/whole_path.png', [points], for_llm=True, vis_latest_path=True,start_position = [sx,sy])
+        
+        explorable_points = self.find_valid_path(obs_map, points)
+        self.vis_whole_path(obs_map, 'tmp/whole_path.png', [explorable_points], for_llm=True, vis_latest_path=True,start_position = [sx,sy])
         points = np.array(points)
         return points, find_flag, reason
 
