@@ -127,20 +127,20 @@ def parse_object_goal_instruction(language_instr):
     Parse language instruction into a series of landmarks
     Example: "first go to the kitchen and then go to the toilet" -> ["kitchen", "toilet"]
     """
-    from openai import OpenAI
-
+    from openai import AzureOpenAI
     try:
-        with open('api_key/boyue_api.txt', 'r', encoding='utf-8') as file:
+        with open('api_key/azure_api_key.txt', 'r', encoding='utf-8') as file:
             api_key = file.read().strip()
     except FileNotFoundError as e:
         print(f"Error: {e}")
         raise
-    client = OpenAI(
-            api_key=api_key,
-            base_url="http://35.220.164.252:3888/v1"
-        )
+    client =AzureOpenAI(
+                api_key=api_key,
+                api_version='2024-02-15-preview',
+                azure_endpoint='https://gpt-4o-pjm.openai.azure.com/'
+            )
     response = client.chat.completions.create(
-        model="gpt-4o-2024-11-20",
+        model="gpt-4o",
         messages=[
             {
                 "role": "user",
@@ -211,7 +211,7 @@ def parse_object_goal_instruction(language_instr):
                 "content": language_instr
             }
         ],
-        max_tokens=100,
+        max_tokens=300,
     )
 
     text = response.choices[0].message.content
@@ -370,9 +370,9 @@ robot.move_forward(3)
 def parse_spatial_instruction(language_instr):
     import openai
 
-    from openai import OpenAI
+    from openai import AzureOpenAI
     try:
-        with open('api_key/boyue_key.txt', 'r', encoding='utf-8') as file:
+        with open('api_key/azure_api_key.txt', 'r', encoding='utf-8') as file:
             api_key = file.read().strip()
     except FileNotFoundError as e:
         print(f"Error: {e}")
@@ -382,12 +382,13 @@ def parse_spatial_instruction(language_instr):
     instructions_list = [language_instr]
     results = ""
     for lang in instructions_list:
-        client = OpenAI(
-            api_key=api_key,
-            base_url="http://35.220.164.252:3888/v1"
-        )
+        client =AzureOpenAI(
+                    api_key=api_key,
+                    api_version='2024-02-15-preview',
+                    azure_endpoint='https://gpt-4o-pjm.openai.azure.com/'
+                )
         response = client.chat.completions.create(
-            model="gpt-4o-2024-11-20",
+            model="gpt-4o",
             messages=[
                 # 1. basic explanation of atomic operations
                 {"role": "user", "content": "move a bit to the right of the refrigerator"},
@@ -609,7 +610,7 @@ class Vlm_gpt4o:
             # )
         else:
             # 读取普通OpenAI的API密钥
-            self.api_key = self._read_api_key('api_key/boyue_key.txt')
+            self.api_key = self._read_api_key('api_key/api_key.txt')
             # 初始化OpenAI实例
             self.vlm = OpenAI(api_key=self.api_key)
             self.embedding = self.vlm

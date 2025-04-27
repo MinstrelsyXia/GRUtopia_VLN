@@ -21,7 +21,7 @@ import pickle
 import time
 from vlmaps.vlmaps.robot.lang_robot import LangRobot
 from vlmaps.vlmaps.dataloader.isaacsim_dataloader import VLMapsDataloaderHabitat
-# from vlmaps.vlmaps.navigator.navigator import Navigator
+from vlmaps.vlmaps.navigator.navigator import Navigator
 
 from vln.src.v2.util.continuous_planner_v2 import AStarPlanner
 from vlmaps.vlmaps.controller.discrete_nav_controller import DiscreteNavController
@@ -45,7 +45,7 @@ from grutopia.core.util.log import log
 from grutopia.core.util.container import is_in_container
 from vln.src.dataset.data_utils import load_data,load_scene_usd
 
-from vln.src.utils.utils import  compute_rel_orientations,visualize_pc,get_diff_beween_two_quat
+from vln.src.utils.utils import  compute_rel_orientations,get_diff_beween_two_quat
 
 
 
@@ -438,8 +438,12 @@ class IsaacSimLanguageRobot(LangRobot):
         # low_bound = - tenth_largest_value+ camera_position[2]
         # upper_bound = - tenth_smallest_value + camera_position[2]
         # pc_filtered = pc[(-0.9 < (camera_position[2]-pc[:,2])) & ((camera_position[2]-pc[:,2]) < 0.8)]
-        pc_filtered = pc[(0 < (camera_position[2]-pc[:,2])) & ((camera_position[2]-pc[:,2]) < 0.6)]
-        # print("check floor and ceiling", np.min(camera_position[2]-pc_filtered[2,:]),np.max(camera_position[2]-pc_filtered[2,:]))
+        robot_ankle = (self.env._runner.current_tasks[self.task_name].robots[self.robot_name]._robot_right_ankle.get_world_pose()[0][2]+self.env._runner.current_tasks[self.task_name].robots[self.robot_name]._robot_left_ankle.get_world_pose()[0][2])/2
+        max_height = self.camera.get_world_pose()[0][2]
+        pc_filtered = pc[(pc[:,2]> robot_ankle+0.1) & (pc[:,2] < max_height-0.1)]
+
+        # filter those whose dist > 5:
+        pc_filtered = pc_filtered[np.linalg.norm(pc_filtered[:,:2]-camera_position[:2],axis=1) < 5]
         self.ObstacleMap.update_map_with_pc(
             pc_filtered,
             camera_position=camera_position,
@@ -924,7 +928,7 @@ class IsaacSimLanguageRobot(LangRobot):
                 log.info(f"Step {self.step}: In obstacle map coord, present at {start_modified}, need to navigate to {goal_modified}")
 
 
-            if (self.step % 1000 == 0):
+            if (self.step % 200 == 0):
                 # check whether path is blocked
 
                 if self.nav.check_path_blocked(start_modified, goal_modified, self.ObstacleMap._navigable_map):
@@ -1600,11 +1604,12 @@ def main(config: DictConfig) -> None:
                 # for the following episodes: if the new scene id is different from the last one, then use reset_scene()
                 set_seed(2025)
                 # else: only set the task and robot position
-                robot.map.init_categories(mp3dcat.copy())
+                robot.map.init_categories(mp3dcat.copy()) 
                 # ! debuging
-                gpt_ans = parse_spatial_instruction(robot.instruction)
-                parsed_instructions = extract_self_methods(gpt_ans)
-                # parsed_instructions =['self.turn(180)','self.move_forward(1)']
+                # gpt_ans = parse_spatial_instruction(robot.instruction)
+
+                # parsed_instructions = extract_self_methods(gpt_ans)
+                parsed_instructions =["self.move_to_object('oven')", 'self.turn(-90)', "self.move_to_object('lattice gate')", 'self.turn(90)', "self.move_to_object('office')", "self.move_to_object('desk')"]
 
                 log.info(f"instruction: {robot.instruction}")
                 log.info(f"parsed instructions: {parsed_instructions}")

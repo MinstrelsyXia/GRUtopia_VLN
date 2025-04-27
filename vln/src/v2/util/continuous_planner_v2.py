@@ -91,7 +91,7 @@ class AStarPlanner:
         
         for point in line_points:
             row, col = point
-            if obs_map[row][col] == 0:  # 0 indicates a blocked cell
+            if obs_map[row][col] == 1:  # 0 indicates a blocked cell
                 return False
         return True
         
@@ -253,7 +253,7 @@ class AStarPlanner:
         points_list = list(zip(rx, ry))
 
         if len(points_list) > 1:
-            points = self.simplify_path(points_list)
+            points = self.simplify_path(points_list, tolerance=0.01, obs_map=obs_map)
             points.append((gx, gy))
         else:
             # log.warning(f"Path planning results only contain {len(points_list)} points.")
@@ -381,13 +381,86 @@ class AStarPlanner:
 
         return motion
 
-    def simplify_path(self, points, tolerance=0.01):
-        ''' The tolerance sets sampling distance. The smaller the tolerance, the more points in the simplified line.
+    # def simplify_path(self, points, tolerance=0.01):
+    #     ''' The tolerance sets sampling distance. The smaller the tolerance, the more points in the simplified line.
+    #     '''
+    #     line = LineString(points)
+    #     simplified_line = line.simplify(tolerance, preserve_topology=False)
+    #     return list(simplified_line.coords)
+
+    def simplify_path(self, points, tolerance=0.01, obs_map=None):
         '''
+        简化路径，同时确保简化后的点不在障碍物中
+        
+        Args:
+            points: 原始路径点列表
+            tolerance: 简化容差，越小保留的点越多
+            obs_map: 障碍物地图，用于检查点是否可行
+            
+        Returns:
+            简化后且无障碍的路径点列表
+        '''
+        # 如果没有提供障碍物地图，使用原始的简化方法
+        if obs_map is None:
+            line = LineString(points)
+            simplified_line = line.simplify(tolerance, preserve_topology=False)
+            return list(simplified_line.coords)
+        
+        # 第一步：使用LineString进行基本简化
         line = LineString(points)
         simplified_line = line.simplify(tolerance, preserve_topology=False)
-        return list(simplified_line.coords)
-    
+        simplified_points = list(simplified_line.coords)
+        
+        # 第二步：检查简化后的路径上所有点是否都可行
+        valid_points = [points[0]]  # 始终保留起点
+        
+        for i in range(1, len(simplified_points)):
+            current_point = simplified_points[i]
+            x, y = int(current_point[0]), int(current_point[1])
+            
+            # 检查当前点是否在地图范围内且不是障碍物
+            if (0 <= x < self.max_x and 0 <= y < self.max_y and 
+                obs_map[x][y] != 255 and obs_map[x][y] != 0):
+                # 检查当前点与上一个有效点之间的连线是否穿过障碍物
+                prev_point = valid_points[-1]
+                line_points = bresenham_line(prev_point[0], prev_point[1], x, y)
+                
+                is_path_valid = True
+                for lx, ly in line_points:
+                    if (0 <= lx < self.max_x and 0 <= ly < self.max_y and 
+                        (obs_map[lx][ly] == 255 or obs_map[lx][ly] == 0)):
+                        is_path_valid = False
+                        break
+                
+                if is_path_valid:
+                    valid_points.append(current_point)
+                else:
+                    # 如果连线不可行，尝试添加原始路径中的中间点
+                    idx_start = points.index(prev_point) if prev_point in points else 0
+                    idx_current = -1
+                    
+                    # 找到当前简化点在原始路径中的最近点
+                    min_dist = float('inf')
+                    for j, p in enumerate(points):
+                        if j <= idx_start:
+                            continue
+                        dist = math.hypot(p[0] - current_point[0], p[1] - current_point[1])
+                        if dist < min_dist:
+                            min_dist = dist
+                            idx_current = j
+                    
+                    # 添加原始路径中的中间点，直到找到可行路径
+                    for j in range(idx_start + 1, idx_current + 1):
+                        ox, oy = int(points[j][0]), int(points[j][1])
+                        if (0 <= ox < self.max_x and 0 <= oy < self.max_y and 
+                            obs_map[ox][oy] != 255 and obs_map[ox][oy] != 0):
+                            valid_points.append(points[j])
+        
+        # 确保终点被包含
+        if points[-1] not in valid_points:
+            valid_points.append(points[-1])
+            
+        return valid_points
     ########### visualize utils ##############
     def visualize_init(self):
         """

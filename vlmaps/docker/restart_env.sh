@@ -20,11 +20,11 @@ do
         LAST_SCAN=$(cat $LAST_SCAN_FILE)
         echo "GPU ${GPU_IDX}: Resuming from scan: $LAST_SCAN"
         # 在后台运行 Python 脚本
-        nohup python $SCRIPT_PATH config-name=vlmap_dataset_cfg resume_scan=$LAST_SCAN episode_file=$GPU_LIST_FILE last_scan_file=$LAST_SCAN_FILE > python_output_${GPU_IDX}.log 2>&1 & 
+        nohup python $SCRIPT_PATH --config-name vlmap_dataset_cfg resume_scan=$LAST_SCAN episode_file=$GPU_LIST_FILE last_scan_file=$LAST_SCAN_FILE > python_output_${GPU_IDX}.log 2>&1 & 
         PID=$!
     else
         echo "GPU ${GPU_IDX}: Starting fresh run"
-        nohup python $SCRIPT_PATH config-name=vlmap_dataset_cfg episode_file=$GPU_LIST_FILE last_scan_file=$LAST_SCAN_FILE > python_output_${GPU_IDX}.log 2>&1 &
+        nohup python $SCRIPT_PATH --config-name vlmap_dataset_cfg episode_file=$GPU_LIST_FILE last_scan_file=$LAST_SCAN_FILE > python_output_${GPU_IDX}.log 2>&1 &
         PID=$!
     fi
 

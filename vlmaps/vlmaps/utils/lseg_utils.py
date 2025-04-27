@@ -122,7 +122,7 @@ def  get_lseg_feat(
         plt.close(fig)
         print(f'rgb image saved to {save_path}')
         # save fig alone
-        mask.save(new_save_path)
+        # mask.save(new_save_path)
     else:
         print(f'no visualize')
     return outputs, pred

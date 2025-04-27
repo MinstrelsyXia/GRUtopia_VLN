@@ -2,8 +2,8 @@ export PYTHONPATH="/ssd/xiaxinyuan/code/w61-grutopia/thirdparty/landmark_isaacsi
 
 # 定义设备映射并严格限制
 declare -A device_map
-device_map[0]="4"    # rank 0 只能使用 GPU 2,3
-device_map[1]="5"    # rank 1 只能使用 GPU 4,5
+device_map[0]="6"    # rank 0 只能使用 GPU 2,3
+device_map[1]="7"    # rank 1 只能使用 GPU 4,5
 # device_map[2]="6,7"    # rank 2 只能使用 GPU 6,7
 
 conda activate isaacsim
