@@ -250,6 +250,10 @@ class IsaacSimSpatialGoalNavigationTask():
         if data['end_state'] != 'Finished':
             # clear the log files:
             # os.remove(os.path.dirname(log_file))
+            import shutil
+            log_dir = os.path.dirname(log_file)
+            if os.path.isdir(log_dir):
+                shutil.rmtree(log_dir)
             return True
         return False
         

@@ -4,8 +4,8 @@ robots:
   # usd_path: "GRUtopia/assets/robots/h1/h1_vln_pano_cameras.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
   # usd_path: "/ssd/huangwensi/GRUtopia/assets/robots/h1/h1.usd"
-  # usd_path: "assets/robots/h1/h1_invisible_1121.usd"
-  usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
+  usd_path: "assets/robots/h1/h1_invisible_1121.usd"
+  # usd_path: "assets/robots/h1/h1_vln_pano_cameras.usd"
 
   gains: [0.0, 0.0]
   controllers:
@@ -223,7 +223,8 @@ robots:
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud_300.usd"
   # usd_path: "assets/robots/h1/h1_vln_pano_pointcloud.usd"
   # usd_path: "assets/robots/h1/h1_camera_pointcloud.usd"
-  usd_path: "assets/robots/h1/test.usd"
+  # usd_path: "assets/robots/h1/test.usd"
+  usd_path: "assets/robots/h1/h1_invisible_1121.usd"
   gains: [0.0, 0.0]
   controllers:
   - name: "move_by_speed"

@@ -935,7 +935,7 @@ class IsaacSimLanguageRobot(LangRobot):
                     current_pos = self.agents.get_world_pose()[0][:2]
                     start = self.ObstacleMap._xy_to_px(current_pos)[0]
                     start_modified = [start[0],start[1]]
-                    goal_xy = env_actions[0]['h1']['move_along_path'][0][-1]
+                    goal_xy = env_actions[0]['h1']['move_along_path'][0][-1][:2]
                     goal_modified = self.ObstacleMap._xy_to_px(goal_xy)[0]
                     log.warning("Path is blocked, replanning")
                     paths, paths_3d = self.planning_path(start_modified,goal_modified)
@@ -1424,6 +1424,7 @@ class IsaacSimLanguageRobot(LangRobot):
             traj_obs.append(self.ObstacleMap._xy_to_px(episode['pos_list'][:,:2]))
 
         self.eval_helper.display_trajectory(save_path = self.test_file_save_dir + '/trajectory.png', occupancy_map=self.ObstacleMap.nav_map_visual, traj_obs_list=traj_obs, gt_obs=gt_obs,traj_vis = self.ObstacleMap._traj_vis)
+        # clear log files: delete *.hdf5 file
 
     def move_to_frontier(self):
         '''
@@ -1572,8 +1573,8 @@ def main(config: DictConfig) -> None:
                 ''' (0) if the episode metric suggests retry, then retry the episode, else skip the episode '''
 
                 log_path = os.path.join(robot.test_dir, scene_name, f"id_{episode_id}","metric.json")
-                # if  robot.eval_helper.check_retry(log_path) is False:
-                #     continue
+                if  robot.eval_helper.check_retry(log_path) is False:
+                    continue
 
                 ''' (1) if the first episode: open the scene '''
                 current_idx = scan_trajectory_episode_pairs.index((scene_name, trajectory_id, episode_id))
@@ -1672,6 +1673,8 @@ def main(config: DictConfig) -> None:
                 # 写入文件
                     with open(config.last_scan_file, 'w') as f:
                         f.write(str(next_episode_id))
+                else:
+                    robot.env.simulation_app.close()
 
     except Exception as e:
         log.error(f"Unexpected error: {e}")
