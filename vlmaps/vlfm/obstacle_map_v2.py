@@ -457,7 +457,22 @@ class ObstacleMap:
         pixel_height = max(self.size, int(np.ceil(pixel_height / 100) * 100))
         
         if need_update or pixel_width > self._map.shape[0] or pixel_height > self._map.shape[1]:
-            # 更新边界值
+            # 保存旧的边界值
+            old_pcd_min = self.pcd_min.copy()
+
+            # 计算原地图的世界坐标
+            old_map_world_coords = np.array([
+                old_pcd_min,
+                old_pcd_min + np.array([
+                    self._map.shape[0] / self.pixels_per_meter,
+                    self._map.shape[1] / self.pixels_per_meter
+                ])
+            ])
+
+            # 直接计算而不调用_xy_to_px
+            old_map_pixels = ((old_map_world_coords - new_pcd_min) * self.pixels_per_meter).astype(int)
+
+            # 然后再更新pcd_min和pcd_max
             self.pcd_min = new_pcd_min
             self.pcd_max = new_pcd_max
             
@@ -468,16 +483,16 @@ class ObstacleMap:
         
             
             # 计算原地图对应的世界坐标范围
-            old_map_world_coords = np.array([
-                old_pcd_min,  # 原地图左下角
-                old_pcd_min + np.array([  # 原地图右上角
-                    self._map.shape[0] / self.pixels_per_meter,
-                    self._map.shape[1] / self.pixels_per_meter
-                ])
-            ])
+            # old_map_world_coords = np.array([
+            #     old_pcd_min,  # 原地图左下角
+            #     old_pcd_min + np.array([  # 原地图右上角
+            #         self._map.shape[0] / self.pixels_per_meter,
+            #         self._map.shape[1] / self.pixels_per_meter
+            #     ])
+            # ])
             
             # 计算原地图在新地图中的像素位置
-            old_map_pixels = self._xy_to_px(old_map_world_coords)
+            # old_map_pixels = self._xy_to_px(old_map_world_coords)
             
             # 计算原地图在新地图中的范围
             dst_x_start = max(0, old_map_pixels[0, 0])
@@ -707,6 +722,17 @@ class ObstacleMap:
             self._area_thresh_in_pixels,
             get_grad=get_grad
         )
+        # guarantee frontier is int:
+        if isinstance(frontiers, list):
+            if len(frontiers) > 0:
+                frontiers = np.array(frontiers)
+            else:
+                # 如果列表为空，创建一个空的2D数组
+                frontiers = np.array([], dtype=np.int32).reshape(0, 2)
+        
+        # 现在安全地转换类型
+        if len(frontiers) > 0:  # 确保不是空数组
+            frontiers = frontiers.astype(np.int32)
         return frontiers, frontiers_angles
 
     def _path_is_blocked(self, path):

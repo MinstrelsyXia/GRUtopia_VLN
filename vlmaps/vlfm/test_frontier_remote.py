@@ -355,7 +355,7 @@ if navigator_type == 'astar':
         start_px = my_map._xy_to_px(camera_position)[0]
         
         # from get_frontier:
-        frontiers = my_map.frontiers # array of waypoints
+        frontiers = my_map._frontiers_px # array of waypoints
         if len(frontiers) == 0:
             frontiers = np.array([my_map.get_random_free_point()])[0]
             print("error")
@@ -364,15 +364,29 @@ if navigator_type == 'astar':
         else:
             # randomly pick a frontier:
             # frontier in world coord
+            # np.random.seed(0)
             num = frontiers.shape[0]
             idx = np.random.randint(0,num)
-            pos = frontiers[idx]
-            goal_px = my_map._xy_to_px(pos)[0]
-            test_frontier = np.array([19.0,0.0])
-            goal_px = my_map._xy_to_px(test_frontier)[0]
+            goal_px = frontiers[idx]
+            # goal_px = my_map._xy_to_px(pos)[0]
+            # test_frontier = np.array([19.0,0.0])
+            # goal_px = my_map._xy_to_px(test_frontier)[0]
+            # TODO: randomly pick a point inside the obstacle:
+            obstacle_points = np.where(my_map._map == 1)
+            if len(obstacle_points[0]) > 0:
+                # 如果有障碍物点，随机选择一个
+                random_idx = np.random.randint(0, len(obstacle_points[0]))
+                obstacle_x = obstacle_points[0][random_idx]
+                obstacle_y = obstacle_points[1][random_idx]
+                goal_px = np.array([obstacle_x, obstacle_y])
+                
+
+                
+
 
         accupancy_map = my_map.freemap_to_accupancy_map()
         
+
         # path, find_flag,_ = my_nav.planning(start[0], start[1], goal_xy[0], goal_xy[1],obs_map = accupancy_map,coord = 'obs')
 
         # goal_px = my_map.get_forward_pos_v2(start_px, camera_yaw[2], 3.0)

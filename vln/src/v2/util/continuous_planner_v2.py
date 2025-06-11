@@ -20,7 +20,7 @@ class AStarPlanner:
         self, 
         map_width=500, 
         map_height=500, 
-        max_step=10000,
+        max_step=20000,
         trajectory_visualizer: TrajectoryVisualizer = None,
     ):
         """
@@ -83,17 +83,23 @@ class AStarPlanner:
         return False
     
     
-    def check_path_blocked(self,start, goal, obs_map):
+    def check_path_blocked(self, start, goal, obs_map):
         '''
         start, goal: (row, col) in full map
         obs_map: 2D list or array representing the map, where 0 is obstacle and 1 is free
         '''
+        map_height, map_width = obs_map.shape
         goal = [int(goal[0]), int(goal[1])]
         line_points = bresenham_line(start[0], start[1], goal[0], goal[1])
         
         for point in line_points:
             row, col = point
-            if obs_map[row][col] == 0:  # 0 indicates a free cell
+            # 检查点是否在地图边界内
+            if 0 <= row < map_height and 0 <= col < map_width:
+                if obs_map[row][col] == 0:  # 0 indicates a free cell
+                    return True
+            else:
+                # 如果点超出边界，认为路径被阻塞
                 return True
         return False
         
@@ -127,7 +133,8 @@ class AStarPlanner:
 
         return angle_cost
     
-    def   find_valid_path(self, obs_map, path):
+    def find_valid_path(self, obs_map, path):
+        # return path
         """查找有效路径段"""
         if len(path) == 0:
             return []
@@ -161,10 +168,10 @@ class AStarPlanner:
         return valid_path
 
     def find_nearest_free_node(self, obs_map, goal_node):
-        if obs_map[goal_node.x, goal_node.y] != 255 and obs_map[goal_node.x, goal_node.y] != 0:
+        if obs_map[goal_node.x, goal_node.y] < 255 and obs_map[goal_node.x, goal_node.y] > 0:
             return goal_node  # Goal node is not in an obstacle
 
-        free_nodes = np.argwhere(np.logical_and(obs_map != 255, obs_map != 0))
+        free_nodes = np.argwhere(np.logical_and(obs_map < 255, obs_map > 0))
         goal_position = np.array([goal_node.x, goal_node.y])
 
         distances = np.linalg.norm(free_nodes - goal_position, axis=1)
@@ -174,7 +181,103 @@ class AStarPlanner:
         new_goal_node = self.Node(nearest_free_node[0], nearest_free_node[1], 0.0, -1)
         return new_goal_node
     ############ ending addaption ############
+
+    def _get_map_cost(self, x: int, y: int, obs_map: np.ndarray) -> float:
+        """
+        根据地图的值获取一个点的环境代价值
+        """
+        if not (0 <= x < self.x_width and 0 <= y < self.y_width):
+            return float('inf') # 越界视为无穷大代价
+
+        map_val = obs_map[x, y]
+
+        if map_val == 255: # 障碍物
+            return float('inf') # 绝对不可通行
+        elif map_val == 0: # 未探索区域
+            return 240.0 # 高昂的代价，但可以通行
+        # Dilated area (others) and free area (2)
+        # 假设膨胀区域的值就是其代价，而安全区代价为0
+        # 为了让算法更倾向于走中心，可以给安全区一个极小的代价，如1
+        return float(map_val) if map_val != 2 else 1.0
     
+    def planning_v2(self, sx: int, sy: int, gx: int, gy: int, obs_map: np.ndarray, min_final_meter: float = 1.0) -> tuple[np.ndarray, bool, str]:
+        """
+        重构后的 A* 路径搜索
+        """
+        self.x_width, self.y_width = obs_map.shape
+        self.max_x, self.max_y = self.x_width, self.y_width
+        
+        start_node = self.Node(sx, sy, 0.0, -1)
+        goal_node = self.Node(gx, gy, 0.0, -1)
+        motion = self.get_motion_model()
+        
+        open_set, closed_set = dict(), dict()
+        reason = "Path Found"
+
+        ############ 修正 1: 增强对非法目标的鲁棒性 ############
+        if not self.verify_node(gx, gy, obs_map):
+            reason = 'Goal in obstacle'
+            # 此处可以调用 find_nearest_free_node 来寻找替代目标点
+            # 为了简化，我们暂时让其在目标无效时直接失败并返回空路径
+            return np.array([]), False, reason
+
+        open_set[self.calc_grid_index(start_node)] = start_node
+        
+        # 权重，用于平衡环境代价和距离启发函数的相对重要性
+        # 可以根据需要进行调整
+        w_env = 0.5 
+
+        step = 0
+        final_node = None
+        while step < self.max_step and open_set:
+            step += 1
+            
+            ############ 修正 2: 正确使用 f(n) = g(n) + h(n) 选择节点 ############
+            # g(n) = open_set[o].cost
+            # h(n) = self.calc_heuristic(...)
+            c_id = min(open_set, key=lambda o: open_set[o].cost + self.calc_heuristic(open_set[o], goal_node))
+            current = open_set.pop(c_id)
+            
+            if self.calc_heuristic(current, goal_node) <= min_final_meter:
+                final_node = goal_node
+                final_node.parent_index = current.parent_index
+                final_node.cost = current.cost
+                break
+
+            closed_set[c_id] = current
+
+            for move_x, move_y, move_cost in motion:
+                x, y = current.x + move_x, current.y + move_y
+
+                if not self.verify_node(x, y, obs_map):
+                    continue
+                    
+                n_id = (y - self.min_y) * self.x_width + (x - self.min_x)
+                if n_id in closed_set:
+                    continue
+
+                ############ 修正 3: 合理且清晰的代价计算 ############
+                # g(n) = g(parent) + move_cost + env_penalty
+                env_cost = self._get_map_cost(x, y, obs_map)
+                g_cost = current.cost + move_cost + w_env * env_cost
+
+                if n_id not in open_set or g_cost < open_set[n_id].cost:
+                    open_set[n_id] = self.Node(x, y, g_cost, c_id)
+
+        if final_node is None:
+            find_flag = False
+            reason = 'Open set empty or max step reached'
+            # 如果找不到路径，返回空
+            return np.array([]), find_flag, reason
+
+        # 路径重建
+        rx, ry = self.calc_final_path(final_node, closed_set)
+        points = np.array(list(zip(rx, ry)))
+        
+        return points, True, reason
+
+
+
     def planning(self, sx, sy, gx, gy, obs_map, min_final_meter=1, use_new_cost=True,coord = 'obs') -> tuple[list[tuple[float, float]], bool]:
         """
         A star path search
@@ -223,7 +326,7 @@ class AStarPlanner:
             if len(open_set) == 0:
                 reason = 'open_set_empty'
                 break
-            c_id = min(open_set,key=lambda o: open_set[o].cost)
+            c_id = min(open_set, key=lambda o: open_set[o].cost + self.calc_heuristic(open_set[o], goal_node))
             current = open_set[c_id]
             to_final_dis = self.calc_heuristic(current, goal_node)
             if to_final_dis <= min_final_meter:
@@ -417,88 +520,6 @@ class AStarPlanner:
 
         return motion
 
-    # def simplify_path(self, points, tolerance=0.01):
-    #     ''' The tolerance sets sampling distance. The smaller the tolerance, the more points in the simplified line.
-    #     '''
-    #     line = LineString(points)
-    #     simplified_line = line.simplify(tolerance, preserve_topology=False)
-    #     return list(simplified_line.coords)
-
-    # def simplify_path(self, points, tolerance=0.01, obs_map=None):
-    #     '''
-    #     简化路径，同时确保简化后的点不在障碍物中
-        
-    #     Args:
-    #         points: 原始路径点列表
-    #         tolerance: 简化容差，越小保留的点越多
-    #         obs_map: 障碍物地图，用于检查点是否可行
-            
-    #     Returns:
-    #         简化后且无障碍的路径点列表
-    #     '''
-    #     # 如果没有提供障碍物地图，使用原始的简化方法
-    #     if obs_map is None:
-    #         line = LineString(points)
-    #         simplified_line = line.simplify(tolerance, preserve_topology=False)
-    #         return list(simplified_line.coords)
-        
-    #     # 第一步：使用LineString进行基本简化
-    #     line = LineString(points)
-    #     simplified_line = line.simplify(tolerance, preserve_topology=False)
-    #     simplified_points = list(simplified_line.coords)
-        
-    #     # 第二步：检查简化后的路径上所有点是否都可行
-    #     valid_points = [points[0]]  # 始终保留起点
-        
-    #     for i in range(1, len(simplified_points)):
-    #         current_point = simplified_points[i]
-    #         x, y = int(current_point[0]), int(current_point[1])
-            
-    #         # 检查当前点是否在地图范围内且不是障碍物
-    #         if (0 <= x < self.max_x and 0 <= y < self.max_y and 
-    #             obs_map[x][y] != 255 and obs_map[x][y] != 0):
-    #             # 检查当前点与上一个有效点之间的连线是否穿过障碍物
-    #             prev_point = valid_points[-1]
-    #             line_points = bresenham_line(prev_point[0], prev_point[1], x, y)
-                
-    #             is_path_valid = True
-    #             for lx, ly in line_points:
-    #                 if (0 <= lx < self.max_x and 0 <= ly < self.max_y and 
-    #                     (obs_map[lx][ly] == 255 or obs_map[lx][ly] == 0)):
-    #                     is_path_valid = False
-    #                     break
-                
-    #             if is_path_valid:
-    #                 valid_points.append(current_point)
-    #             else:
-    #                 # 如果连线不可行，尝试添加原始路径中的中间点
-    #                 idx_start = points.index(prev_point) if prev_point in points else 0
-    #                 idx_current = -1
-                    
-    #                 # 找到当前简化点在原始路径中的最近点
-    #                 min_dist = float('inf')
-    #                 for j, p in enumerate(points):
-    #                     if j <= idx_start:
-    #                         continue
-    #                     dist = math.hypot(p[0] - current_point[0], p[1] - current_point[1])
-    #                     if dist < min_dist:
-    #                         min_dist = dist
-    #                         idx_current = j
-                    
-    #                 # 添加原始路径中的中间点，直到找到可行路径
-    #                 for j in range(idx_start + 1, idx_current + 1):
-    #                     ox, oy = int(points[j][0]), int(points[j][1])
-    #                     if (0 <= ox < self.max_x and 0 <= oy < self.max_y and 
-    #                         obs_map[ox][oy] != 255 and obs_map[ox][oy] != 0):
-    #                         valid_points.append(points[j])
-        
-    #     # 确保终点被包含
-    #     if points[-1] not in valid_points:
-    #         valid_points.append(points[-1])
-            
-    #     return valid_points
-
-
     def simplify_path(self, points, tolerance=0.01, obs_map=None):
         '''
         优化版简化路径函数，减少点数同时确保路径无障碍
@@ -511,262 +532,258 @@ class AStarPlanner:
         Returns:
             简化后且无障碍的路径点列表
         '''
-        if obs_map is None: # Use internal if available, for convenience
-            obs_map = self.obs_map_data
-
-        # If no points or too few points, or no obs_map, return as is or basic simplify
-        if not points or len(points) <= 2:
-            if obs_map is None and points and len(points) > 2 : # Fallback if no obs_map
-                 # This import would be at the top of the file
-                 from shapely.geometry import LineString 
-                 line = LineString(points)
-                 simplified_line = line.simplify(tolerance, preserve_topology=False)
-                 return list(simplified_line.coords)
-            return points # Return original if obs_map is also None or too few points
-
-        # 1. 首先进行初步简化以减少点数 (Shapely LineString assumed)
-        # Ensure you have shapely installed: pip install shapely
+        # return points
+        # 1. 检查输入有效性
+        if obs_map is None:  # 使用内部地图（如果可用）
+            obs_map = getattr(self, 'obs_map_data', None)
+            
+        # 处理点列表为空或只有一个点的情况
+        if not points:
+            return []
+        if isinstance(points, np.ndarray) and points.size == 0:
+            return []
+        if len(points) < 2:
+            return list(points)
+            
+        # 2. 预处理点列表，过滤无效点
+        valid_input_points = []
+        for p in points:
+            if not isinstance(p, (list, tuple, np.ndarray)) or len(p) < 2:
+                continue
+            if isinstance(p, np.ndarray) and (np.isnan(p).any() or np.isinf(p).any()):
+                continue
+            valid_input_points.append((float(p[0]), float(p[1])))  # 统一转换为元组
+        
+        # 如果过滤后没有有效点或只有一个点
+        if not valid_input_points:
+            return []
+        if len(valid_input_points) < 2:
+            return valid_input_points
+        
+        # 3. 简化路径
         try:
             from shapely.geometry import LineString
-        except ImportError:
-            print("Shapely library is not installed. Skipping initial simplification.")
-            simplified_points = list(points) # Use original points if Shapely is not available
-        else:
-            line = LineString(points)
+            line = LineString(valid_input_points)
             simplified_line = line.simplify(tolerance, preserve_topology=False)
             simplified_points = list(simplified_line.coords)
-            if not simplified_points: # Handle case where simplification results in no points
-                simplified_points = [points[0], points[-1]] if len(points) >=2 else list(points)
-
-
-        # 2. 自适应路径检查和修复
-        if not simplified_points: # If simplification somehow failed
-             return [points[0], points[-1]] if len(points) >=2 else list(points)
-
-        valid_points = [points[0]]  # 始终保留起点 (original start point)
+            
+            # 处理简化后没有点的情况
+            if not simplified_points:
+                # 回退到起点和终点
+                return [valid_input_points[0], valid_input_points[-1]]
+                
+        except Exception as e:
+            print(f"路径简化错误: {e}")
+            # 回退到原始有效点
+            return valid_input_points
         
-        # Ensure the first point of simplified_points aligns with points[0] or is valid
-        # For simplicity, we assume simplified_points[0] is close to points[0]
-        # If simplified_points[0] is not points[0], we might need to adjust valid_points initialization
-        # or ensure the first point of simplified_points is itself valid.
-        # Let's use the first point from the original path as the guaranteed start.
-
-        for i in range(len(simplified_points)): # Iterate through all simplified points including the first
+        # 4. 自适应路径检查和修复
+        valid_points = [valid_input_points[0]]  # 始终保留起点
+        
+        for i in range(len(simplified_points)):
             current_point_tuple = simplified_points[i]
+            
+            # 跳过重复点
+            if valid_points and math.isclose(current_point_tuple[0], valid_points[-1][0]) and \
+            math.isclose(current_point_tuple[1], valid_points[-1][1]):
+                continue
+                
             x_coord, y_coord = int(current_point_tuple[0]), int(current_point_tuple[1])
             
-            # Check if current_point_tuple is valid (not an obstacle cell)
-            current_point_is_valid_cell = (
-                0 <= x_coord < self.max_x and 
-                0 <= y_coord < self.max_y and 
-                obs_map[x_coord][y_coord] != 255 and 
-                obs_map[x_coord][y_coord] != 0
-            )
+            # 检查点是否有效（不是障碍物）
+            if 0 <= x_coord < self.max_x and 0 <= y_coord < self.max_y:
+                current_point_is_valid_cell = (
+                    obs_map[x_coord][y_coord] < 240 and 
+                    obs_map[x_coord][y_coord] > 0
+                )
+            else:
+                current_point_is_valid_cell = False
             
-            # If current_point_tuple is in an obstacle, try to find a nearby valid cell
+            # 如果点在障碍物上，尝试在周围找一个有效点
             if not current_point_is_valid_cell:
-                found_valid_replacement_for_current = False
-                # Search 5x5 (or other defined range)
-                for dx_search in range(-2, 3): 
+                found_valid_replacement = False
+                for dx_search in range(-2, 3):
                     for dy_search in range(-2, 3):
-                        if dx_search == 0 and dy_search == 0: continue # Skip self
+                        if dx_search == 0 and dy_search == 0:
+                            continue
                         nx, ny = x_coord + dx_search, y_coord + dy_search
                         if (0 <= nx < self.max_x and 0 <= ny < self.max_y and 
-                            obs_map[nx][ny] != 255 and obs_map[nx][ny] != 0):
-                            current_point_tuple = (float(nx), float(ny)) # Update current_point_tuple
-                            x_coord, y_coord = nx, ny # Update integer coords for checks
+                            obs_map[nx][ny] < 240 and obs_map[nx][ny] > 0):
+                            current_point_tuple = (float(nx), float(ny))
+                            x_coord, y_coord = nx, ny
                             current_point_is_valid_cell = True
-                            found_valid_replacement_for_current = True
+                            found_valid_replacement = True
                             break
-                    if found_valid_replacement_for_current:
+                    if found_valid_replacement:
                         break
                 
-                # If no valid replacement found nearby, skip this simplified point
+                # 如果周围没有找到有效点，跳过这个点
                 if not current_point_is_valid_cell:
-                    continue 
+                    continue
             
-            # current_point_tuple is now guaranteed to be a valid cell or was skipped.
-            # Ensure we don't add duplicate points if current_point_tuple is same as last valid_point
-            if valid_points and \
-               math.isclose(current_point_tuple[0], valid_points[-1][0]) and \
-               math.isclose(current_point_tuple[1], valid_points[-1][1]):
-                continue
-
             prev_point_tuple = valid_points[-1]
             
-            # Check direct line from prev_point_tuple to current_point_tuple
+            # 检查直线连接是否有效
             line_segment_points = bresenham_line(
                 int(prev_point_tuple[0]), int(prev_point_tuple[1]), 
-                x_coord, y_coord # Use integer coords of (potentially adjusted) current_point_tuple
+                x_coord, y_coord
             )
+            
             is_direct_segment_valid = True
             for lx, ly in line_segment_points:
                 if not (0 <= lx < self.max_x and 0 <= ly < self.max_y and 
-                        (obs_map[lx][ly] != 255 and obs_map[lx][ly] != 0)): # Check if point is on obstacle
+                        obs_map[lx][ly] < 240 and obs_map[lx][ly] > 0):
                     is_direct_segment_valid = False
                     break
             
             if is_direct_segment_valid:
                 valid_points.append(current_point_tuple)
             else:
-                # Path prev_point_tuple -> current_point_tuple is blocked. Try to repair.
-                # Find corresponding indices in the original path (this part is heuristic)
-                original_idx_start = 0
-                original_idx_end = len(points) - 1
-                
-                # Find prev_point_tuple in original path (approximate)
-                min_dist_start = float('inf')
-                for j, p_orig in enumerate(points):
-                    dist = math.hypot(p_orig[0] - prev_point_tuple[0], p_orig[1] - prev_point_tuple[1])
-                    if dist < min_dist_start:
-                        min_dist_start = dist
-                        original_idx_start = j
-                
-                # Find current_point_tuple in original path (approximate)
-                min_dist_end = float('inf')
-                for j, p_orig in enumerate(points):
-                    # Search from original_idx_start onwards for efficiency, assuming order
-                    if j < original_idx_start: continue 
-                    dist = math.hypot(p_orig[0] - current_point_tuple[0], p_orig[1] - current_point_tuple[1])
-                    if dist < min_dist_end:
-                        min_dist_end = dist
-                        original_idx_end = j
-                
-                # Ensure start < end
-                if original_idx_start > original_idx_end:
-                    original_idx_start, original_idx_end = original_idx_end, original_idx_start
-                if original_idx_start == original_idx_end and original_idx_end < len(points) -1 :
-                    original_idx_end +=1 # Ensure there's a range if possible
-                elif original_idx_start == original_idx_end and original_idx_start > 0:
-                     original_idx_start -=1
-
-
-                intermediate_nodes = self.find_valid_midpoints(
-                    points, original_idx_start, original_idx_end, 
-                    prev_point_tuple, current_point_tuple, obs_map
-                )
-                
-                if intermediate_nodes:
-                    # intermediate_nodes form a valid chain from prev_point_tuple to current_point_tuple
-                    # (implicitly, prev_point_tuple -> intermediate_nodes[0] is fine,
-                    #  and intermediate_nodes[-1] -> current_point_tuple is fine)
-                    valid_points.extend(intermediate_nodes)
-                    # current_point_tuple itself was already validated (current_point_is_valid_cell)
-                    # and is the target of the chain from find_valid_midpoints
-                    valid_points.append(current_point_tuple) 
-                else:
-                    # FIX: If find_valid_midpoints returns empty, it failed to find a repair.
-                    # Do not add current_point_tuple as the path to it is blocked.
-                    # The path will continue from prev_point_tuple to the *next* simplified point.
-                    pass 
-        
-        # Ensure the original endpoint is included if it's valid and different from the last point
-        if points and len(points) > 0:
-            original_end_point = points[-1]
-            oex, oey = int(original_end_point[0]), int(original_end_point[1])
-            is_original_end_point_valid_cell = (
-                0 <= oex < self.max_x and 0 <= oey < self.max_y and
-                obs_map[oex][oey] != 255 and obs_map[oex][oey] != 0
-            )
-
-            if valid_points and is_original_end_point_valid_cell:
-                last_added_point = valid_points[-1]
-                if not (math.isclose(last_added_point[0], original_end_point[0]) and \
-                        math.isclose(last_added_point[1], original_end_point[1])):
+                # 连接被阻挡，尝试修复
+                try:
+                    # 在原始路径中找到对应的索引
+                    original_idx_start = 0
+                    original_idx_end = len(valid_input_points) - 1
                     
-                    # Check path from last_added_point to original_end_point
-                    line_to_original_end = bresenham_line(
-                        int(last_added_point[0]), int(last_added_point[1]),
+                    # 找到prev_point在原始路径中的最近点
+                    min_dist_start = float('inf')
+                    for j, p_orig in enumerate(valid_input_points):
+                        dist = math.hypot(p_orig[0] - prev_point_tuple[0], p_orig[1] - prev_point_tuple[1])
+                        if dist < min_dist_start:
+                            min_dist_start = dist
+                            original_idx_start = j
+                    
+                    # 找到current_point在原始路径中的最近点
+                    min_dist_end = float('inf')
+                    for j, p_orig in enumerate(valid_input_points[original_idx_start:], original_idx_start):
+                        dist = math.hypot(p_orig[0] - current_point_tuple[0], p_orig[1] - current_point_tuple[1])
+                        if dist < min_dist_end:
+                            min_dist_end = dist
+                            original_idx_end = j
+                    
+                    # 确保start < end
+                    if original_idx_start > original_idx_end:
+                        original_idx_start, original_idx_end = original_idx_end, original_idx_start
+                    if original_idx_start == original_idx_end:
+                        if original_idx_end < len(valid_input_points) - 1:
+                            original_idx_end += 1
+                        elif original_idx_start > 0:
+                            original_idx_start -= 1
+                    
+                    # 获取中间点
+                    intermediate_nodes = self.find_valid_midpoints(
+                        valid_input_points, original_idx_start, original_idx_end, 
+                        prev_point_tuple, current_point_tuple, obs_map
+                    )
+                    
+                    if intermediate_nodes:
+                        valid_points.extend(intermediate_nodes)
+                        valid_points.append(current_point_tuple)
+                except Exception as e:
+                    print(f"路径修复错误: {e}")
+                    # 出错时继续处理下一个点
+                    continue
+        
+        # 5. 确保包含原始终点（如果有效）
+        if valid_input_points:
+            original_end_point = valid_input_points[-1]
+            oex, oey = int(original_end_point[0]), int(original_end_point[1])
+            
+            # 检查终点是否有效
+            is_end_point_valid = (
+                0 <= oex < self.max_x and 0 <= oey < self.max_y and
+                obs_map[oex][oey] < 240 and obs_map[oex][oey] > 0
+            )
+            
+            # 如果终点有效且不在当前路径中，尝试添加
+            if valid_points and is_end_point_valid:
+                last_point = valid_points[-1]
+                if not (math.isclose(last_point[0], original_end_point[0]) and 
+                        math.isclose(last_point[1], original_end_point[1])):
+                    
+                    # 检查直接连接是否可行
+                    line_to_end = bresenham_line(
+                        int(last_point[0]), int(last_point[1]),
                         oex, oey
                     )
-                    can_connect_to_original_end = True
-                    for lx, ly in line_to_original_end:
+                    
+                    can_connect_to_end = True
+                    for lx, ly in line_to_end:
                         if not (0 <= lx < self.max_x and 0 <= ly < self.max_y and
-                                (obs_map[lx][ly] != 255 and obs_map[lx][ly] != 0)):
-                            can_connect_to_original_end = False
+                                obs_map[lx][ly] < 240 and obs_map[lx][ly] > 0):
+                            can_connect_to_end = False
                             break
                     
-                    if can_connect_to_original_end:
+                    if can_connect_to_end:
                         valid_points.append(original_end_point)
-                    else:
-                        # Try to repair path to original_end_point
-                        # This is a simplified version, could use find_valid_midpoints again if complex
-                        # For now, if direct fails, we might end up not reaching exact original endpoint
-                        # if it's separated by an obstacle from the current valid path end.
-                        # A more robust solution might involve a dedicated call to find_valid_midpoints
-                        # to connect valid_points[-1] to original_end_point.
-                        pass # Cannot connect, path might end slightly short of original goal.
-            elif not valid_points and is_original_end_point_valid_cell: # e.g. if all simplified points were skipped
-                 valid_points.append(original_end_point)
-
-
-        # 4. 最后一次清理 - 移除冗余点 (collinear points on a clear path)
+            
+            # 如果路径为空但终点有效，至少添加终点
+            elif not valid_points and is_end_point_valid:
+                valid_points.append(original_end_point)
+        
+        # 6. 清理冗余点
         if len(valid_points) > 2:
             final_cleaned_path = [valid_points[0]]
             i = 1
+            
             while i < len(valid_points) - 1:
                 pt_a = final_cleaned_path[-1]
-                pt_b = valid_points[i] # Candidate for removal
+                pt_b = valid_points[i]
                 pt_c = valid_points[i+1]
                 
-                # Check if pt_a can connect directly to pt_c
-                line_ac_points = bresenham_line(
+                # 检查是否可以直接从pt_a连接到pt_c
+                line_ac = bresenham_line(
                     int(pt_a[0]), int(pt_a[1]), 
                     int(pt_c[0]), int(pt_c[1])
                 )
-                is_ac_path_valid = True
-                for lx, ly in line_ac_points:
+                
+                is_ac_valid = True
+                for lx, ly in line_ac:
                     if not (0 <= lx < self.max_x and 0 <= ly < self.max_y and 
-                            (obs_map[lx][ly] != 255 and obs_map[lx][ly] != 0)):
-                        is_ac_path_valid = False
+                            obs_map[lx][ly] < 240 and obs_map[lx][ly] > 0):
+                        is_ac_valid = False
                         break
                 
-                if is_ac_path_valid:
-                    # pt_b is redundant, skip it. The next point to check against final_cleaned_path[-1] will be pt_c
-                    # Effectively, we are checking if we can extend from final_cleaned_path[-1] to valid_points[i+1]
-                    # The loop structure needs adjustment for proper removal.
-                    # A better way for cleanup:
-                    i += 1 # Move to check the next point as pt_b in the next iteration
-                           # This means pt_b (current valid_points[i]) is kept for now.
-                           # The original logic was: if valid, pop(i), else i++.
-                           # This can be tricky. Let's use a safer build-up for final_cleaned_path.
+                if is_ac_valid:
+                    # 可以跳过pt_b
+                    i += 1
                 else:
-                    # Cannot remove pt_b, so add it.
+                    # 必须保留pt_b
                     final_cleaned_path.append(pt_b)
                     i += 1
             
-            # Add the last point
-            if len(valid_points) > 0 : # Check if valid_points is not empty
-                 if not final_cleaned_path or \
-                    not (math.isclose(final_cleaned_path[-1][0], valid_points[-1][0]) and \
-                         math.isclose(final_cleaned_path[-1][1], valid_points[-1][1])):
-                    final_cleaned_path.append(valid_points[-1])
+            # 添加最后一个点
+            if valid_points and not final_cleaned_path:
+                final_cleaned_path.append(valid_points[-1])
+            elif valid_points and not (math.isclose(final_cleaned_path[-1][0], valid_points[-1][0]) and 
+                                    math.isclose(final_cleaned_path[-1][1], valid_points[-1][1])):
+                final_cleaned_path.append(valid_points[-1])
             
-            valid_points = final_cleaned_path
-
-        # Ensure at least start and end if possible
-        if not valid_points and points:
-            if len(points) == 1: return [points[0]]
-            if len(points) >= 2:
-                # Simplified logic: just return original start and end if everything else failed
-                # but ideally, check their validity and connection
-                start_p = points[0]
-                end_p = points[-1]
-                sx_int, sy_int = int(start_p[0]), int(start_p[1])
-                ex_int, ey_int = int(end_p[0]), int(end_p[1])
-
-                start_valid = (0 <= sx_int < self.max_x and 0 <= sy_int < self.max_y and obs_map[sx_int][sy_int] != 255 and obs_map[sx_int][sy_int] != 0)
-                end_valid = (0 <= ex_int < self.max_x and 0 <= ey_int < self.max_y and obs_map[ex_int][ey_int] != 255 and obs_map[ex_int][ey_int] != 0)
-
-                if start_valid and end_valid:
-                    return [start_p, end_p]
-                elif start_valid:
-                    return [start_p]
-                elif end_valid:
-                    return [end_p]
-                else:
-                    return [] # Cannot even provide valid start/end
-
+            return final_cleaned_path
+        
+        # 处理边界情况
+        if not valid_points and valid_input_points:
+            # 如果无法构建有效路径，至少返回原始起点和终点（如果有效）
+            if len(valid_input_points) == 1:
+                return [valid_input_points[0]]
+            
+            start_p = valid_input_points[0]
+            end_p = valid_input_points[-1]
+            sx, sy = int(start_p[0]), int(start_p[1])
+            ex, ey = int(end_p[0]), int(end_p[1])
+            
+            start_valid = (0 <= sx < self.max_x and 0 <= sy < self.max_y and 
+                        obs_map[sx][sy] < 240 and obs_map[sx][sy] > 0)
+            end_valid = (0 <= ex < self.max_x and 0 <= ey < self.max_y and 
+                        obs_map[ex][ey] < 240 and obs_map[ex][ey] > 0)
+            
+            if start_valid and end_valid:
+                return [start_p, end_p]
+            elif start_valid:
+                return [start_p]
+            elif end_valid:
+                return [end_p]
+            
         return valid_points
 
     def find_valid_midpoints(self, points, start_idx, end_idx, start_node_tuple, end_node_tuple, obs_map):
@@ -785,7 +802,7 @@ class AStarPlanner:
         is_direct_path_clear = True
         for lx_direct, ly_direct in line_direct_segment:
             if not (0 <= lx_direct < self.max_x and 0 <= ly_direct < self.max_y and
-                    obs_map[lx_direct][ly_direct] != 255 and obs_map[lx_direct][ly_direct] != 0):
+                    obs_map[lx_direct][ly_direct] < 240 and obs_map[lx_direct][ly_direct] > 0):
                 is_direct_path_clear = False
                 break
         if is_direct_path_clear:
@@ -825,7 +842,7 @@ class AStarPlanner:
                     
                     nmx, nmy = mx_orig + dx_mid_search, my_orig + dy_mid_search
                     if (0 <= nmx < self.max_x and 0 <= nmy < self.max_y and
-                        obs_map[nmx][nmy] != 255 and obs_map[nmx][nmy] != 0):
+                        obs_map[nmx][nmy] < 240 and obs_map[nmx][nmy] > 0):
                         point_to_insert_in_chain = (float(nmx), float(nmy)) # Use float for consistency
                         found_valid_substitute_mid = True
                         break
@@ -941,7 +958,7 @@ class AStarPlanner:
         
         # 绘制起始点
         if start_position is not None:
-            ax.plot(start_position[1], start_position[0], "ob", markersize=8,
+            ax.plot(start_position[1], start_position[0], "ob", markersize=4,
                     label=f"start position (0):({start_position[0]:.2f},{start_position[1]:.2f})")
             if for_llm:
                 ax.text(start_position[1]-0.5, start_position[0]+0.5, '0', 
@@ -958,7 +975,7 @@ class AStarPlanner:
             # 绘制路径点
             if i > 0:
                 point = points[0]
-                ax.plot(point[1], point[0], "ob", markersize=8,
+                ax.plot(point[1], point[0], "ob", markersize=4,
                         label=f"visited waypoint ({i}):({point[0]:.2f},{point[1]:.2f})")
                 if for_llm:
                     ax.text(point[1], point[0], str(i), 
@@ -967,12 +984,12 @@ class AStarPlanner:
             # 绘制路径线
             x_coords = [point[1] for point in points]
             y_coords = [point[0] for point in points]
-            ax.plot(x_coords, y_coords, "-r", linewidth=2)
+            ax.plot(x_coords, y_coords, "-r", linewidth=1)
         
         # 绘制终点
         if len(whole_points) >= 1 and len(whole_points[-1]) >= 1:
             end_point = whole_points[-1][-1]
-            ax.plot(end_point[1], end_point[0], "ob", markersize=8,
+            ax.plot(end_point[1], end_point[0], "ob", markersize=4,
                     label=f"current position ({len(whole_points)}):({end_point[0]:.2f},{end_point[1]:.2f})")
             if for_llm:
                 ax.text(end_point[1], end_point[0], str(len(whole_points)), 

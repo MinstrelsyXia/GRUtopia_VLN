@@ -677,7 +677,9 @@ class IsaacSimLanguageRobot(LangRobot):
                     if found == True:
                         break
                     else:
-                        raise TooManySteps
+                        # raise TooManySteps
+                        log.warning(f"Robot cannot reach {action_name} in 10000 steps, stopping exploration")
+                        break
             except NameError as e:
                 print(f"Instruction GPT parsed {action_name} doesn't exist: {e}, following next instruction")
                 break
@@ -800,7 +802,7 @@ class IsaacSimLanguageRobot(LangRobot):
             self.turn(60)
             
 
-    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 0.3,subgoal = None) -> List[str]:
+    def move_to(self, pos: Tuple[float, float], type = 'sem',threshold = 0.8,subgoal = None) -> List[str]:
         """Move the robot to the position on the obstacle map
             based on accurate localization in the environment
             with falls and movements
@@ -883,6 +885,14 @@ class IsaacSimLanguageRobot(LangRobot):
             # # log.info(f'action now {actions}')
             self.env.step(actions=env_actions)
             #! check whether robot falls first, then update map
+            if (self.step >= 30000):
+                log.warning("Failed to reach the subgoal after 3000 steps")
+                goal = self.ultimate_goal
+                if(self.map.check_object(goal)):
+                    self.move_to_object(goal)
+                    self.eval_helper.add_action_func(f"Step:{self.step}: Goal {goal} is reached early")
+                    raise EarlyFound(f"Goal {goal} is reached early")
+
             if (self.step % 200 == 0):
                 while True:
                     reset_robot = self.check_and_reset_robot(cur_iter=self.step, update_freemap=False, verbose=self.vln_config.test_verbose)
@@ -1273,7 +1283,7 @@ class IsaacSimLanguageRobot(LangRobot):
     def _retrive_robot_stuck_check(self):
         self.agent_last_pose = None
 
-    def check_robot_stuck(self, cur_iter, max_iter=300, threshold=0.3):
+    def check_robot_stuck(self, cur_iter, max_iter=2500, threshold=0.3):
         ''' Check if the robot is stuck
         '''
         is_stuck = False
@@ -1607,10 +1617,10 @@ def main(config: DictConfig) -> None:
                 # else: only set the task and robot position
                 robot.map.init_categories(mp3dcat.copy()) 
                 # ! debuging
-                # gpt_ans = parse_spatial_instruction(robot.instruction)
+                gpt_ans = parse_spatial_instruction(robot.instruction)
 
-                # parsed_instructions = extract_self_methods(gpt_ans)
-                parsed_instructions =["self.move_to_object('oven')", 'self.turn(-90)', "self.move_to_object('lattice gate')", 'self.turn(90)', "self.move_to_object('office')", "self.move_to_object('desk')"]
+                parsed_instructions = extract_self_methods(gpt_ans)
+                # parsed_instructions =["self.move_to_object('oven')", 'self.turn(-90)', "self.move_to_object('lattice gate')", 'self.turn(90)', "self.move_to_object('office')", "self.move_to_object('desk')"]
 
                 log.info(f"instruction: {robot.instruction}")
                 log.info(f"parsed instructions: {parsed_instructions}")

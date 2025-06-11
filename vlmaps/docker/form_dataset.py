@@ -227,29 +227,29 @@ def split_dataset_for_multi_gpu(data_dir, gpu_num, output_dir=None, max_num = 15
     return gpu_data
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='处理数据集')
+    parser = argparse.ArgumentParser(description='deal with dataset')
     parser.add_argument('--action', type=str, choices=['load', 'split'], default='load',
-                      help='执行的操作: load=加载JSON文件, split=分割数据集')
+                      help='Executed Movement: load=load json file, split=split dataset')
     parser.add_argument('--json_file', type=str,
                       default='/ssd/xiaxinyuan/dataset/grutopia10/gather_data/val_unseen_gather_data.json',
-                      help='JSON文件路径')
+                      help='json file route')
     parser.add_argument('--data_split', type=str, default='val_unseen',
-                      help='数据集分割名称')
+                      help='splited dataset')
     parser.add_argument('--target_dir', type=str, default='vlmaps/docker/valid_paths/r2r/',
-                      help='输出目录')
+                      help='target output')
     parser.add_argument('--gpu_num', type=int, default=2,
-                      help='GPU数量')
+                      help='GPU num')
     
     args = parser.parse_args()
     
     if args.action == 'load':
         episodes = load_json_file(args.json_file, args.data_split, args.target_dir)
-        print(f"共导出 {len(episodes)} 个场景轨迹")
+        print(f"Processed {len(episodes)} trajectories")
     elif args.action == 'split':
         data_dir = os.path.join(args.target_dir, args.data_split)
         output_dir = os.path.join(args.target_dir, f"multi_gpu_{args.gpu_num}")
         gpu_data = split_dataset_for_multi_gpu(data_dir, args.gpu_num, output_dir)
-        print(f"已将数据分割到 {args.gpu_num} 个GPU：")
+        print(f"Split the dataset to {args.gpu_num} gpus")
         for i, data in enumerate(gpu_data):
-            print(f"GPU {i}: {len(data)}条数据")
+            print(f"GPU {i}: {len(data)} data")
 
