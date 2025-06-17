@@ -51,9 +51,12 @@ def visualize_heatmap_3d(pc: np.ndarray, heatmap: np.ndarray, rgb: np.ndarray, t
     visualize_rgb_map_3d(pc, heat_rgb,save_path)
 
 
-def pool_3d_label_to_2d(mask_3d: np.ndarray, grid_pos: np.ndarray, gs: int) -> np.ndarray:
+def pool_3d_label_to_2d(mask_3d: np.ndarray, grid_pos: np.ndarray, gs: int, add_floor = False, min_height = 80, max_height = 100) -> np.ndarray:
     mask_2d = np.zeros((gs, gs), dtype=bool)
     for i, pos in enumerate(grid_pos):
+        if add_floor:
+            if pos[2] < min_height or pos[2] > max_height:
+                continue
         row, col, h = pos
         mask_2d[row, col] = mask_3d[i] or mask_2d[row, col]
 

@@ -2,7 +2,7 @@
 
 # 配置参数
 
-DATA_DIR="/ssd/xiaxinyuan/code/VLN/VLNCE/R2R_VLNCE_v1-3"
+DATA_DIR="/ssd/xiaxinyuan/code/VLN/VLNCE/R2R_VLNCE_v1-3_corrected"
 # add date+hour+minute
 
 CACHE_ROOT="/ssd/xiaxinyuan/docker"

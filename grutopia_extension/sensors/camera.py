@@ -80,7 +80,7 @@ class Camera(BaseSensor):
         if "rgba" in data_type:
             rep.orchestrator.step(rt_subframes=10, delta_time=0.0, pause_timeline=False) # !!!
             output_data["rgba"] = self._camera.get_rgba()
-            rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
+            # rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
         if "depth" in data_type:
             output_data["depth"] = self._camera.get_depth()
         if "pointcloud" in data_type: 

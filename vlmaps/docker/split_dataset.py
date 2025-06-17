@@ -48,9 +48,9 @@ def load_and_split_data(data_dir, num_of_gpus, splits,file_name):
                 split_data[gpu_id].append((scene_id,item['trajectory_id'],item['episode_id']))
                 # print(scene_id,item['trajectory_id'],item['episode_id'])
 
-    #! never sort the split_data by the scene_id
-    # for i in range(num_of_gpus):
-    #     split_data[i].sort(key=lambda x: x[0])
+    #! sort the split_data by the scene_id
+    for i in range(num_of_gpus):
+        split_data[i].sort(key=lambda x: x[0])
     return split_data
 
 def save_split_data(split_data, output_dir, gpu_list):

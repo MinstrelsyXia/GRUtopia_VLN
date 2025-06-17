@@ -18,6 +18,15 @@ class TooManySteps(Exception):
         self.message = message
         super().__init__(self.message)
 
+class RobotFallDown(Exception):
+    def __init__(self, message="Robot falls down"):
+        self.message = message
+        super().__init__(self.message)
+
+class RobotStuck(Exception):
+    def __init__(self, message="Robot stucks"):
+        self.message = message
+        super().__init__(self.message)
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -114,7 +123,8 @@ def check_valid_parsed_instruction(parsed_instruction):
         return True
         
     except Exception as e:
-        raise ValueError(f"指令解析错误: {str(e)}")
+        # raise ValueError(f"指令解析错误: {str(e)}")
+        return False
 
 ################### angle utils ########################
 
@@ -267,13 +277,17 @@ def visualize_visgraph_and_path(G, path_vg, save_path='visgraph_with_path.png'):
     # visualize_visgraph_and_path(G, path_vg, save_path='tmp/visgraph_with_path_output.png')
 
 def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
+    # if point cloud type is not o3d.geometry.PointCloud, convert it to o3d.geometry.PointCloud
     import open3d as o3d
+    if not isinstance(pcd, o3d.geometry.PointCloud):
+        pcd = o3d.geometry.PointCloud(pcd)
+
     # 设置无头渲染
     vis = o3d.visualization.Visualizer()
     vis.create_window()  # 创建一个不可见的窗口
     ctr = vis.get_view_control()
 
-    # 设定特定的��角
+    # 设定特定的角
     ctr.set_front([0, 0, -1])  # 设置相机朝向正面
     ctr.set_lookat([0, 0, 0])  # 设置相机目标点为原点
     ctr.set_up([0, 0, 1])   
@@ -289,20 +303,30 @@ def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
     vis.capture_screen_image(save_path)
     vis.destroy_window()
               
-def visualize_pc(pcd,headless=False,save_path = 'pc.jpg'):
+def visualize_pc(pcd, headless=False, save_path='pc.png'):
     '''
-    pcd:     after:    pcd_global = o3d.geometry.PointCloud()
-    pcd_global.points = o3d.utility.Vector3dVector(points_3d)
+    pcd: 可以是 open3d.geometry.PointCloud 或 numpy.ndarray
     '''
     import open3d as o3d
-    if headless==True:
-        save_point_cloud_image(pcd,save_path=save_path)
+    import numpy as np
+    
+    # 处理输入类型
+    if isinstance(pcd, np.ndarray):
+        # 过滤无效点并转换为open3d格式
+        valid_points = pcd[np.isfinite(pcd).all(axis=1)]
+        points = o3d.utility.Vector3dVector(valid_points)
+        pcd = o3d.geometry.PointCloud(points)
+    elif not isinstance(pcd, o3d.geometry.PointCloud):
+        raise TypeError("pcd must be either numpy.ndarray or open3d.geometry.PointCloud")
+
+    if headless:
+        save_point_cloud_image(pcd, save_path=save_path)
         return
     else:
         coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-    size=1.0, origin=[0, 0, 0]) 
-        o3d.io.write_point_cloud("point_cloud.pcd", pcd)
-        o3d.io.write_triangle_mesh("coordinate_frame.ply", coordinate_frame)
+            size=1.0, origin=[0, 0, 0])
+        o3d.io.write_point_cloud(save_path, pcd)
+        # o3d.io.write_triangle_mesh("coordinate_frame.ply", coordinate_frame)
         return
 
 def get_dummy_2d_grid(width,height):

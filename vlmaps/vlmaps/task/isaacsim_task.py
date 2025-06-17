@@ -33,7 +33,7 @@ import traceback
 #     ne = np.linalg.norm(current_position[:2] - goal_position[:2])
 #     metrics['NE'] = ne 
     
-#     # 计算Success Rate (SR) - 是���到达目标点
+#     # 计算Success Rate (SR) - 是否到达目标点
 #         # 成功阈值通常设为3米
 #     success = ne < self.success_distance
 #     metrics['success'] = float(success)
@@ -92,9 +92,9 @@ import traceback
 
 
 class IsaacSimSpatialGoalNavigationTask():
-    def __init__(self,config):
+    def __init__(self,config,log_path):
         self.config = config
-        
+        self.log_path = log_path
 
 
     def add_action_func(self,action_func):
@@ -235,12 +235,37 @@ class IsaacSimSpatialGoalNavigationTask():
 
         self.metrics = metrics
 
-    
+    def update_end_state(self,state):
+        if 'end_state' not in self.metrics:
+            self.metrics['end_state'] = state
+
+    def check_retry(self,  log_file):
+        if not os.path.exists(log_file):
+            return True
+        data = json.load(open(log_file))
+        action_funcs = data['action_funcs']
+        for action in action_funcs:
+            if 'stuck' in action or 'fall down' in action:
+                return True
+        if data['end_state'] != 'Finished':
+            # clear the log files:
+            # os.remove(os.path.dirname(log_file))
+            return True
+        return False
+        
+
     def save_single_task_metric(
         self,
         save_path: Union[Path, str],
+        state: False
     ):
+
+        if state == True:
+            self.update_end_state('Finished')
+        else:
+            self.update_end_state('Other errors, checking log')
         results_dict = self.metrics
+        results_dict["log_path"] = self.log_path
         results_dict["episode_id"] = self.episode_id
         results_dict["scan"] = self.scan
         # results_dict["num_subgoals"] = self.n_subgoals_in_task
@@ -254,7 +279,7 @@ class IsaacSimSpatialGoalNavigationTask():
         with open(save_path, "w") as f:
             json.dump(results_dict, f, indent=4)
     
-    def display_trajectory(self, save_path: str, occupancy_map: np.ndarray, 
+    def display_trajectory_waste(self, save_path: str, occupancy_map: np.ndarray, 
                            traj_obs_list: List[np.ndarray], gt_obs: np.ndarray) -> None:
         """在占用栅格地图上绘制轨迹
         
@@ -265,6 +290,12 @@ class IsaacSimSpatialGoalNavigationTask():
             gt_obs: 参考轨迹点数组 shape=(N,2)
         """
         # 确保输入是numpy数组
+        if occupancy_map is None:
+            print("No occupancy map")
+            return
+        elif occupancy_map.size == 0:
+            print("occupancy map is empty")
+            return
         if not isinstance(occupancy_map, np.ndarray):
             occupancy_map = np.array(occupancy_map)
 
@@ -289,13 +320,16 @@ class IsaacSimSpatialGoalNavigationTask():
             (255, 0, 255)    # 紫色
         ]
         # 绘制参考轨迹
+        gt_obs_cv2 = gt_obs[::-1]
+        traj_obs_list_cv2 = [traj_obs[::-1] for traj_obs in traj_obs_list]
         if len(gt_obs) > 1:
             for i in range(len(gt_obs) - 1):
-                pt1 = tuple(gt_obs[i])
-                pt2 = tuple(gt_obs[i + 1])
+                pt1 = tuple(gt_obs_cv2[i].astype(int))  # 确保点坐标是整数
+                pt2 = tuple(gt_obs_cv2[i + 1].astype(int))
                 cv2.line(vis_map, pt1, pt2, (255, 0, 0), 1, cv2.LINE_AA)  # 参考轨迹始终为蓝色
+
         # 绘制每个episode的轨迹
-        for idx, traj_obs in enumerate(traj_obs_list):
+        for idx, traj_obs in enumerate(traj_obs_list_cv2):
             # 确保traj_obs是二维数组
             if traj_obs.ndim == 1:
                 traj_obs = traj_obs.reshape(-1, 2)
@@ -307,23 +341,54 @@ class IsaacSimSpatialGoalNavigationTask():
             # 绘制实际轨迹
             if len(traj_obs) > 1:
                 for i in range(len(traj_obs) - 1):
-                    pt1 = tuple(traj_obs[i])
-                    pt2 = tuple(traj_obs[i + 1])
+                    pt1 = tuple(traj_obs[i].astype(int))  # 确保点坐标是整数
+                    pt2 = tuple(traj_obs[i + 1].astype(int))
                     cv2.line(vis_map, pt1, pt2, color, 1, cv2.LINE_AA)
-
-                # # 绘制起始点（绿色空心圆）
-                # if len(traj_obs) > 0:
-                #     start_point = tuple(traj_obs[0])
-                #     cv2.circle(vis_map, start_point, radius=2, color=color, 
-                #                thickness=1, lineType=cv2.LINE_AA)
-
-                # # 绘制终点（蓝色空心圆）
-                # if len(traj_obs) > 0:
-                #     end_point = tuple(traj_obs[-1])
-                #     cv2.circle(vis_map, end_point, radius=2, color=color, 
-                #                thickness=1, lineType=cv2.LINE_AA)
-
-
 
         # 保存图像
         cv2.imwrite(save_path, vis_map)
+
+
+    def display_trajectory(self, save_path: str, occupancy_map: np.ndarray, 
+                           traj_obs_list: List[np.ndarray], gt_obs: np.ndarray, traj_vis = None
+                           ) -> None:
+        """在占用栅格地图上绘制轨迹
+        
+        Args:
+            save_path: 保存图片路径
+            occupancy_map: 占用栅格地图,灰度图
+            traj_obs_list: 实际轨迹点数组列表，每个元素为shape=(N,2)
+            gt_obs: 参考轨迹点数组 shape=(N,2)
+        """
+        # 确保输入是numpy数组
+        if occupancy_map is None:
+            print("No occupancy map")
+            return
+        elif occupancy_map.size == 0:
+            print("occupancy map is empty")
+            return
+        if not isinstance(occupancy_map, np.ndarray):
+            occupancy_map = np.array(occupancy_map)
+        
+        # 确保gt_obs是二维数组
+        if gt_obs.ndim == 1:
+            gt_obs = gt_obs.reshape(-1, 2)
+        gt_obs = gt_obs.astype(np.int32)
+
+        # 定义颜色列表 (BGR格式)
+        colors = [
+            (0,  0, 255),   # 红色
+            (0, 165, 255),   # 橙色
+            (0, 255, 255),   # 黄色
+            (0, 255, 0),     # 绿色
+            (255, 255, 0),   # 青色
+            (255, 0, 0),     # 蓝色
+            (255, 0, 255)    # 紫色
+        ]
+        # 绘制参考轨迹
+        img = traj_vis.draw_path(occupancy_map,gt_obs,colors[5])
+        for idx, traj_obs in enumerate(traj_obs_list):
+            img = traj_vis.draw_path(img,traj_obs,colors[idx % len(colors)])
+
+        # 保存图像
+        cv2.imwrite(save_path, img)

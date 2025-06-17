@@ -163,9 +163,10 @@ class LangRobot:
         self.eval_helper.add_action_func(f"Step:{self.step}: turn absolute {angle_deg}")
         self._set_nav_curr_pose()
         delta_deg = angle_deg - self.curr_ang_deg_on_map
-        # actions_list = self.turn(delta_deg)
-        self.turn(delta_deg)
-        # self.recorded_actions_list.extend(actions_list)
+        actions_list = self.turn(delta_deg)
+        if not hasattr(self, "recorded_actions_list"):
+            self.recorded_actions_list = []
+        self.recorded_actions_list.extend(actual_actions_list)
         self.eval_helper.add_action_func(f"Step:{self.step}: successfully turn absolute {angle_deg}")
 
     def face(self, name: str):

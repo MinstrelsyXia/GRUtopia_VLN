@@ -1,0 +1,25 @@
+r1Q1Z4BcV1o,111,7,Turn around and then proceed to your left.  Enter large room that looks like a lobby.  Head left towards stairway.  Then take another left into large dining hall. 
+r1Q1Z4BcV1o,111,8,Walk past the water fountain and turn left. Walk to the doorway directly across from the stairs.  Stop in the doorway. 
+r1Q1Z4BcV1o,111,9,Go towards the water fountain and turn left.  Walk into the big room and go to the left again and into a banquet hall.  Stand near the door and wait. 
+kEZ7cmS4wCh,185,20,Walk straight into the living room passing the chair and the couch and taking a left behind the couch and past the dining room table and up the stairs into the entry way stopping on the third tile from the left at the top step. 
+kEZ7cmS4wCh,185,21,Walk between the couch and the window.  Turn left and walk towards the stairway.  Go up the three steps and when you get to the top, wait. 
+E9uDoFAP3SH,339,29,Turn around and go down the entranceway, heading toward the staircase. Turn to your left and walk past the staircase to the open door way. Stop near the front of the doorway to the hall. 
+E9uDoFAP3SH,339,30,Go to the bottom of the staircase, go to the entrance of first room to the left of the staircase, wait by the chair. 
+dhjEzFoUFzH,355,32,Go left down the hall. Continue to the stairs. 
+r47D5H71a5s,356,34,Move through pool room door into the sitting area. Move straight through sitting area. Move through door into hallway, turn right, move straight forward down hallway into the locker room. Wait inside locker room. 
+r47D5H71a5s,356,35,Exit the pool area and walk toward the stairs, enter the hallway to the slight right past the chair, turn right and enter the third door on the left, wait by the lockers. 
+r47D5H71a5s,356,36,Make a left and walk past the stair case. Walk into the doorway that is next to the short lamp. Make a right and walk past the framed wall art into the locker room. 
+8WUmhLawc2A,519,43,Walk through the door and around the table. Turn left and walk to the end of the kitchen bar. Turn right and walk around the chair. Turn left and walk into the small hallway then go into the bedroom. 
+8WUmhLawc2A,519,44,Walk down the hall. Turn right at the table. Turn left between the couch and the kitchen area. Go past the chair into the hall and go through the doorway on the right. Go left of the family photos into the bedroom. Stop just inside the doorway. 
+8WUmhLawc2A,519,45,Go straight towards the kitchen and turn right after the kitchen table.  Walk towards the end table and turn left to walk behind the couch with the kitchen island on your left. Keep going straight beyond the chair on your right.  Facing the pictures on the wall go right, down the hall to the door at the end and walk into the bedroom. 
+mJXqzFtmKg4,570,49,Walk passed the kitchen table. Turn around the table and walk passed the counter with bar stools. Walk down the hall and stop near the bathroom entrance. 
+mJXqzFtmKg4,570,51,turn right towards hallway out of kitchen in hallway turn right to bathroom, stop in doorway facing sink. 
+8WUmhLawc2A,595,52,Walk straight toward the wall. As you approach the wall, veer to the left, toward the bedroom. Stop by the entrance to the bedroom. 
+8WUmhLawc2A,595,53,Walk past the living room into small hall area. Enter the bedroom straight ahead and wait in the doorway. 
+8WUmhLawc2A,595,54,walk past the living room into the hallway. take a left then walk into the bedroom and wait by the bed. 
+uNb9QFRL6hY,619,55,Turn 180 degrees so that the sunken seating area is on your left and the stairs going up are to your right. Proceed forward a short distance in the direction of the double doors, passing two arm-less white chairs. Stop just after passing the second white chair and before you enter the room with the double doors. There will be an opening leading to a dining area directly to the right and a seating area with white chairs and a circular coffee table directly to the left. Stop. 
+uNb9QFRL6hY,619,56,With the stairs on your right walk down the hallway.walk past the chair on the left and walk towards the hallway. Stop at the last set of stairs halfway past the stairs. 
+uNb9QFRL6hY,619,57,Turn around.  Walk down the hall, past the stairs, past the chair.  Stop right there.  Wait. 
+S9hNv5qa7GM,734,61,With the couch on your right go forward past the table and loves eta and take a right to go around the piano and take a left into the hallway on the left of the stairs if you are facing the stairs and stop in the doorway just inside the hall. 
+S9hNv5qa7GM,734,63,Walk toward the piano. Turn right at the piano, then turn left before the stairs and wait in the doorway. 
+rPc6DW4iMge,757,65,Move forward along the window into the living room, continue in front of the fire place towards the other side of the room, turn right at the sliding door, then turn left, stop after once outside. 

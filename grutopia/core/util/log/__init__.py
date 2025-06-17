@@ -31,11 +31,12 @@ with open(config_path, 'r') as f:
     config = LogConfig(**(toml.loads(f.read())['log']))
 
 # Generate a unique log filename
+pid = os.getpid()
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 log_dir = os.path.join("logs/grutopia")
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
-unique_log_filename = os.path.join(log_dir, f'_log_{timestamp}.txt')
+unique_log_filename = os.path.join(log_dir, f'{pid}_log_{timestamp}.txt')
 config.filename = unique_log_filename
 
 # Initialize the logger with the updated configuration

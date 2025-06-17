@@ -21,6 +21,9 @@ from typing import List
 class ObstacleMap(BaseMap):
     """Generates two maps; one representing the area that the robot has explored so far,
     and another representing the obstacles that the robot has seen so far.
+    self._map: 1-obstacle
+    self._navigable_map: 1-freemap, 0-obstacle(dilated_version)
+    self.explored_area: 1-explored, 0-unexplored
     """
 
     _map_dtype: np.dtype = np.dtype(bool)
@@ -76,17 +79,17 @@ class ObstacleMap(BaseMap):
     
     def get_forward_pos(self, curr_pos: List[float], curr_angle: float, meters: float) -> List[float]:
         '''
-        优化版本的 get_forward_pos，使用向量化操作提升性能
+        在已探索区域中找到指定方向上最远的可达点，确保路径上所有点都是已探索的
         
         Args:
-            curr_pos: 在 xyz 坐标系中的当前位置
-            curr_angle_deg: 在 xyz 坐标系中的角度(度)
+            curr_pos: 在地图坐标系中的当前位置 [i, j]
+            curr_angle: 在地图坐标系中的角度(弧度)
             meters: 前进距离(米)
         
         Returns:
-            List[float]: 新位置坐标 [i, j]
+            List[float]: 新位置坐标 [i, j]，返回路径上最远的已探索点
         '''
-        i, j = curr_pos
+        i, j = curr_pos[1], curr_pos[0]
         rad = curr_angle
         pix = int(meters * self.pixels_per_meter)
         
@@ -94,11 +97,10 @@ class ObstacleMap(BaseMap):
         cos_rad = np.cos(rad)
         sin_rad = np.sin(rad)
         
-        # 生成路径上的所有点
+        #! 生成路径上的所有点 确认 sin/cos
         steps = np.arange(pix)
-        path_i = i + steps * cos_rad
-        path_j = j + steps * sin_rad
-        
+        path_i = i + steps * sin_rad
+        path_j = j + steps * cos_rad
         # 将坐标转换为整数
         path_i = path_i.astype(np.int32)
         path_j = path_j.astype(np.int32)
@@ -118,6 +120,7 @@ class ObstacleMap(BaseMap):
         valid_i = path_i[mask]
         valid_j = path_j[mask]
         
+<<<<<<< HEAD
         # 检查路径上的障碍物
         obstacles = self._map[valid_i, valid_j]
         obstacle_indices = np.where(obstacles == 1)[0]
@@ -135,6 +138,22 @@ class ObstacleMap(BaseMap):
         target_i = i + pix * cos_rad
         target_j = j + pix * sin_rad
         return [target_i, target_j]
+=======
+        # 检查路径上的点是否在已探索区域内
+        explored = self.explored_area[valid_i, valid_j]
+        explored_indices = np.where(explored == 1)[0]
+        
+        if len(explored_indices) == 0:
+            return [i, j]  # 如果没有已探索点，返回当前位置
+        
+        # 找到最远的已探索点的索引
+        last_explored_idx = explored_indices[-1]
+        
+        # 返回最远的已探索点
+        return [valid_j[last_explored_idx], valid_i[last_explored_idx]]
+    
+    
+>>>>>>> origin/xxy_vlmap_new
     
     def clear_robot_surrounding(self, robot_pos, robot_radius, num_points=36):
         '''
@@ -224,7 +243,7 @@ class ObstacleMap(BaseMap):
             # Populate topdown map with obstacle locations
             xy_points = obstacle_cloud[:, :2]
             pixel_points = self._xy_to_px(xy_points) #! didn't align with semantic map
-            
+
             self._map[pixel_points[:, 1], pixel_points[:, 0]] = 1
 
             

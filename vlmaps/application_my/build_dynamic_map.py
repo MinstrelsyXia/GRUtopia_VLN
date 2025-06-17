@@ -1,5 +1,3 @@
-
-
 # from vln.src.local_nav.sementic_map import BEVSemMap
 # identical to semantic map/main.py
 import os, sys ,re
@@ -439,11 +437,12 @@ class TMP(VLMap):
         new_map[delta_map_coord[0]:(old_map.shape[0]+delta_map_coord[0]),delta_map_coord[1]:(old_map.shape[1]+delta_map_coord[1]),delta_map_coord[2]:(old_map.shape[2]+delta_map_coord[2])] = old_map
         return new_map
     
-    def _update_semantic_map(self,camera,rgb,depth,labels,step= 0 ):
+    def _update_semantic_map(self,camera,rgb,depth,labels,step= 0,pointcloud=None,test_mode = False):
         '''
         build semantic map locally, given sync camera
         
         '''
+        #! old version of camera
         max_depth = 10
         downsample_rate = 150
         grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
@@ -453,7 +452,6 @@ class TMP(VLMap):
         rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
         # pose
         camera_position, camera_orientation = camera.get_world_pose()
-
         grid_2d_ds = downsample_pc(grid_2d,downsample_rate)
         pc_image = grid_2d_ds
         depth_ds = depth[grid_2d_ds[:, 1], grid_2d_ds[:, 0]]
@@ -550,7 +548,7 @@ class TMP(VLMap):
         mask = np.zeros_like(depth)
         mask[pc_image[:, 1], pc_image[:, 0]] = 1
         max_depth = np.max(depth[mask==1])
-        visualize_naive_occupancy_map(occupied_ids, save_path = "occupancy.jpg")
+        visualize_naive_occupancy_map(occupied_ids, save_path = "tmp/occupancy.jpg")
         return pc,max_depth
 
 
@@ -900,7 +898,7 @@ class TMP(VLMap):
         Check if an object exists in the map
         """
         pc_mask = self.index_map(name[0], with_init_cat=True)
-        if pc_mask is None or np.sum(pc_mask) < 10:
+        if pc_mask is None or np.sum(pc_mask) < 50:
             return False
         return True
 

@@ -220,23 +220,24 @@ def euler_angles_to_quat(euler_angles: np.ndarray, degrees: bool = False, extrin
 
 
 import os
-from vlmaps.vlfm.obstacle_map import ObstacleMap
+from vlmaps.vlfm.obstacle_map_v2 import ObstacleMap
 
 
-main_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes_safe/s8pcmisQ38h/id_37"
+main_dir = "/ssd/xiaxinyuan/dataset/sample_episodes_safe/s8pcmisQ38h/id_37"
 pose = np.loadtxt(main_dir + "/poses.txt")
-save_dir = "/ssd/xiaxinyuan/code/w61-grutopia/logs/sample_episodes_safe_2/s8pcmisQ38h/id_37"
-pcd_save_dir = save_dir + '/pcd'
+
+pcd_save_dir = main_dir + '/pcd' 
 pcd_files = [f for f in os.listdir(pcd_save_dir) if f.endswith(".npy")]
 
-
+save_dir = 'tmp'
 my_map = ObstacleMap(
     min_height= 0.1,
     max_height= 1.7,
     agent_radius=0.25,
     pixels_per_meter=10,
     log_image_dir=save_dir,
-    dilate_iters= 1
+    dilate_iters= 1,
+    size = 100
 )
 
 k = 0 
@@ -278,13 +279,26 @@ def get_angle(pose, frontier_point, coord = 'xy'):
 
 
 from vlmaps.vlmaps.navigator.navigator import Navigator
-from vln.src.local_nav.path_planner import AStarPlanner
+# from vln.src.local_nav.path_planner import AStarPlanner
+from vln.src.v2.util.continuous_planner_v2 import AStarPlanner
 import yaml
 import time
 import cv2
-# navigator_type = 'astar'
-navigator_type = 'visgraph'
+navigator_type = 'astar'
+# navigator_type = 'visgraph'
 
+def planning_path(self, start, goal, obs_map, navigable_map_visual):
+    '''
+    Input:
+        start: (x,y) in obs coord
+        goal: (x,y) in obs coord
+    Output:
+        paths: list of (x,y) in obs coord
+        paths_3d: list of (x,y,z) in real coord
+    '''
+    accupancy_map = self.ObstacleMap.freemap_to_accupancy_map()
+    # self.nav.planning(start[0], start[1], goal[0], goal[1], obs_map = accupancy_map, navigable_map_visual = self.ObstacleMap.navigable_map_visual, coord = 'obs')
+    self.nav.plan_to(start, goal, vis = True, navigable_map_visual=navigable_map_visual,obs_map = accupancy_map)
 
 if navigator_type == 'astar':
 
@@ -296,9 +310,11 @@ if navigator_type == 'astar':
         def __init__(self, map_grid_num):
             self.llms = self.LLMS(map_grid_num)
     args = Args(map_grid_num=30)
-    my_nav = AStarPlanner(args= args, map_width = 1000, map_height = 1000,show_animation=True, verbose = True,max_step=1000)
+    # my_nav = AStarPlanner(args= args, map_width = 1000, map_height = 1000,show_animation=True, verbose = True,max_step=1000)
+    my_nav = AStarPlanner(map_width = 200, map_height= 200,trajectory_visualizer=my_map._traj_vis)
     goal = (pose[-1,0],pose[-1,1])
     for k in range(len(pcd_files)):
+
         start_time = time.time()
         # from update obstacle map
         pcd = np.load(pcd_save_dir + '/'+pcd_files[k])
@@ -326,46 +342,49 @@ if navigator_type == 'astar':
         navigable_map_visual = my_map.update_map_with_pc(
             pc= pcd_new,
             camera_position = camera_position,
-            camera_orientation= camera_yaw+np.pi/2,
+            camera_orientation= camera_yaw,
             max_depth = 11,
             topdown_fov= 60.0/180.0*np.pi,
             step = k,
-            verbose=True
+            verbose=True,
+            get_grad=True
         )
-        #! camera_yaw+np.pi/2
-        rows, cols = np.where(my_map._navigable_map == 0)
-        min_row = np.max(np.min(rows)-1,0)
-        min_col = np.max(np.min(cols)-1,0)
-
-        start = my_map._xy_to_px(np.array([[camera_position[0],camera_position[1]]]))[0]
+        # only update points, do not plan path
+        if k < 14:
+            continue
+        start_px = my_map._xy_to_px(camera_position)[0]
         
         # from get_frontier:
         frontiers = my_map.frontiers # array of waypoints
         if len(frontiers) == 0:
             frontiers = np.array([my_map.get_random_free_point()])[0]
             print("error")
+            pos = frontiers
+            goal_px = my_map._xy_to_px(pos)[0]
         else:
             # randomly pick a frontier:
             # frontier in world coord
             num = frontiers.shape[0]
             idx = np.random.randint(0,num)
             pos = frontiers[idx]
-            
-            # goal = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
-            goal_xy = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+            goal_px = my_map._xy_to_px(pos)[0]
+            test_frontier = np.array([19.0,0.0])
+            goal_px = my_map._xy_to_px(test_frontier)[0]
 
+        accupancy_map = my_map.freemap_to_accupancy_map()
+        
+        # path, find_flag,_ = my_nav.planning(start[0], start[1], goal_xy[0], goal_xy[1],obs_map = accupancy_map,coord = 'obs')
 
-        # goal_xy = my_map._xy_to_px(np.array([goal]))[0]
-        # path = my_nav.plan_to([start[1],start[0]], [goal_xy[1],goal_xy[0]], vis = True,navigable_map_visual=my_map.nav_map_visual)
-        path, find_flag = my_nav.planning(start[0], start[1], goal_xy[0], goal_xy[1], img_save_path = 'tmp/astar_planning.jpg',obs_map = (1-my_map._navigable_map.T==0))
+        # goal_px = my_map.get_forward_pos_v2(start_px, camera_yaw[2], 3.0)
+        path = my_nav.plan_to(start_px, goal_px, vis = True, navigable_map_visual=navigable_map_visual,obs_map = accupancy_map)
 
-        if find_flag == False:
-            continue
+        # if find_flag == False:
+        #     continue
         
         end_time = time.time()
         elapsed_time = end_time - start_time
         print(f"Iteration {k} took {elapsed_time:.2f} seconds")
-
+        print('next')
         # path = np.array(path)
         # path = [path[:,1], path[:,0]]
 
@@ -420,6 +439,10 @@ else:
                             vis = True)
         start = my_map._xy_to_px(np.array([[camera_position[0],camera_position[1]]]))[0]
         
+        #! test get_froward_pos:
+        pos = my_map.get_forward_pos(start, camera_yaw[2]+np.pi/2, 3.0)
+        print(pos)
+        my_nav.plan_to([start[1],start[0]], [pos[1],pos[0]], vis = True, navigable_map_visual=my_map.nav_map_visual)
         # # from get_frontier:
         # frontiers = my_map.frontiers # array of waypoints
         # if len(frontiers) == 0:
@@ -450,35 +473,35 @@ else:
         # print(f"moving from {start} to {goal_xy} on {paths}")
         # print(f'moving from {camera_position} to {pos} on {paths_3d}')
         
-                
-        pos = my_map.frontiers[0]
-        goal_uv = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
-        # visualize
-        visual = my_map.nav_map_visual
-        cv2.circle(visual, (start[0], start[1]), 2, (0, 255, 0), -1)
-        cv2.circle(visual, (goal_uv[0], goal_uv[1]), 2, (0, 0, 255), -1)
-        cv2.line(visual, (start[0], start[1]), (goal_uv[0], goal_uv[1]), (255, 0, 0), 1)
-        cv2.imwrite('visual.jpg', visual)
+        #! test angle
+        # pos = my_map.frontiers[0]
+        # goal_uv = my_map._xy_to_px(np.array([[pos[0],pos[1]]]))[0]
+        # # visualize
+        # visual = my_map.nav_map_visual
+        # cv2.circle(visual, (start[0], start[1]), 2, (0, 255, 0), -1)
+        # cv2.circle(visual, (goal_uv[0], goal_uv[1]), 2, (0, 0, 255), -1)
+        # cv2.line(visual, (start[0], start[1]), (goal_uv[0], goal_uv[1]), (255, 0, 0), 1)
+        # cv2.imwrite('visual.jpg', visual)
 
 
-        # test 'xy'
+        # # test 'xy'
 
-        angle_xy = get_angle(pose[k], pos, coord = 'xy')
-        # current_angle: 71.04363815037209, target_rotation: 54.40349958240953
-        print(f"angle_xy: {angle_xy}")
+        # angle_xy = get_angle(pose[k], pos, coord = 'xy')
+        # # current_angle: 71.04363815037209, target_rotation: 54.40349958240953
+        # print(f"angle_xy: {angle_xy}")
 
-        # test 'uv'
+        # # test 'uv'
 
-        angle_uv = get_angle(pose[k], goal_uv, coord = 'uv')
-        print(f"angle_uv: {angle_uv}")
-        # current_angle: 161.0436381503721, target_rotation: 144.46232220802563
+        # angle_uv = get_angle(pose[k], goal_uv, coord = 'uv')
+        # print(f"angle_uv: {angle_uv}")
+        # # current_angle: 161.0436381503721, target_rotation: 144.46232220802563
 
-        print(my_map._p_angle_to_xyz(angle_uv),angle_xy)
-        print(my_map._angle_p_to_xyz(angle_xy),angle_uv)
+        # print(my_map._p_angle_to_xyz(angle_uv),angle_xy)
+        # print(my_map._angle_p_to_xyz(angle_xy),angle_uv)
 
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"Iteration {k} took {elapsed_time:.2f} seconds")
+        # end_time = time.time()
+        # elapsed_time = end_time - start_time
+        # print(f"Iteration {k} took {elapsed_time:.2f} seconds")
 
 
 
