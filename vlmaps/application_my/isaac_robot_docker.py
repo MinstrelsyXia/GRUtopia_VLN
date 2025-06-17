@@ -54,7 +54,7 @@ from vln.src.local_nav.BEVmap import BEVMap
 
 from vlmaps.vlmaps.map.map import Map
 
-from vlmaps.application_my.utils import NotFound, EarlyFound, TooManySteps, RobotFallDown, RobotStuck, extract_parameters, extract_self_methods, visualize_subgoal_images, check_valid_parsed_instruction
+from vlmaps.application_my.utils import NotFound, EarlyFound, TooManySteps, RobotFallDown, RobotStuck, extract_parameters, extract_self_methods, check_valid_parsed_instruction
 
 import logging
 import traceback
@@ -134,7 +134,6 @@ class IsaacSimLanguageRobot(LangRobot):
         self.vis = False
 
         # self.nav = Navigator()
-
         self.controller = DiscreteNavController(self.config["params"]["controller_config"])
 
         # from data_utils: init agents
@@ -843,7 +842,6 @@ class IsaacSimLanguageRobot(LangRobot):
             position = self.agents.get_world_pose()[0][:2]
             start = self.ObstacleMap._xy_to_px(np.array([[position[0],position[1]]]))[0]
         
-
         # nav should be built on obstacle map; 
         # !
         # self.nav.build_visgraph(self.ObstacleMap._navigable_map,
@@ -1145,7 +1143,6 @@ class IsaacSimLanguageRobot(LangRobot):
                     log.info(f"Step {self.step}: Present at {self.quat_to_euler_angles(current_orientation)[2]}, need to navigate to {rotation_goal}")
                     #! fall down check
 
-
         if check_frontier:
             return frontier_image_dict
         return True
@@ -1288,10 +1285,10 @@ class IsaacSimLanguageRobot(LangRobot):
         '''
         is_stuck = False
         if self.agent_last_pose is None:
-            # 初始化时，当前姿态就是有效姿态
-            # self.agent_last_valid_pose = self.get_agent_pose()[0]
+            self.agent_last_valid_pose = self.get_agent_pose()[0]
             self.agent_last_pose, self.agent_last_rotation = self.get_agent_pose()
-            # self.agent_last_valid_rotation = self.agent_last_rotation
+            self.agent_last_valid_pose = self.agent_last_pose
+            self.agent_last_valid_rotation = self.agent_last_rotation
             self.stuck_threshold = 0
             self.stuck_last_iter = cur_iter
             return is_stuck
@@ -1303,8 +1300,11 @@ class IsaacSimLanguageRobot(LangRobot):
         if (cur_iter - self.stuck_last_iter) >= max_iter:
             if self.stuck_threshold < threshold:
                 is_stuck = True
-            self.stuck_threshold = 0
-            self.stuck_last_iter = cur_iter
+            else:
+                self.stuck_threshold = 0
+                self.stuck_last_iter = cur_iter
+                self.agent_last_valid_pose = current_pose
+                self.agent_last_valid_rotation = current_rotation
 
         self.agent_last_pose = current_pose
         self.agent_last_rotation = current_rotation

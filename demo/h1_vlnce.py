@@ -29,35 +29,6 @@ parser.add_argument("--test_verbose", action="store_true", default=False)
 parser.add_argument("--wait", action="store_true", default=False)
 args = parser.parse_args()
 
-file_path = './GRUtopia/demo/configs/h1_vlnce.yaml'
-sim_config = SimulatorConfig(file_path)
-
-def euler_angles_to_quat(angles):
-    """
-    Convert Euler angles (roll, pitch, yaw) to quaternion.
-
-    Args:
-        angles (list or np.array): Euler angles [roll, pitch, yaw] in degrees.
-
-    Returns:
-        np.array: Quaternion [x, y, z, w].
-    """
-    r = R.from_euler('xyz', angles, degrees=True)
-    return r.as_quat()
-
-def quat_to_euler_angles(quat):
-    """
-    Convert quaternion to Euler angles (roll, pitch, yaw).
-
-    Args:
-        quat (list or np.array): Quaternion [x, y, z, w].
-
-    Returns:
-        np.array: Euler angles [roll, pitch, yaw] in degrees.
-    """
-    r = R.from_quat(quat)
-    angles = r.as_euler('xyz', degrees=True)
-    return angles
 # file_path = './GRUtopia/demo/configs/h1_vlnce.yaml'
 file_path = './demo/configs/h1_locomotion_vlnce.yaml'
 sim_config = SimulatorConfig(file_path)

@@ -448,13 +448,6 @@ class TMP(VLMap):
         grid_2d =  get_dummy_2d_grid(depth.shape[1],depth.shape[0])
         # depth
         # depth[depth > max_depth] = 0
-        # save depth: depth is [h,w], 请归一化并保存为jpg
-        depth_vis = depth.copy()
-        depth_vis = depth_vis / depth_vis.max()
-        depth_vis = depth_vis * 255
-        depth_vis = np.expand_dims(depth_vis.astype(np.uint8), axis=2)
-        save_path = os.path.dirname(self.segmentation_dir) + f"/depth.jpg"
-        cv2.imwrite(save_path, depth_vis)
         # rgb
         rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
         # pose
@@ -463,15 +456,7 @@ class TMP(VLMap):
         pc_image = grid_2d_ds
         depth_ds = depth[grid_2d_ds[:, 1], grid_2d_ds[:, 0]]
         downsampled_cloud = camera.get_world_points_from_image_coords(grid_2d_ds, depth_ds)
-        # visualize_pc(downsampled_cloud,headless=False,save_path="downsampled_cloud_original.pcd")
-        if test_mode:
-            grid_2d_ds = downsample_pc(grid_2d,downsample_rate)
-            pc_image = grid_2d_ds
-            downsampled_cloud = pointcloud[grid_2d_ds[:, 1] * depth.shape[1] + grid_2d_ds[:, 0]]
-            visualize_pc(downsampled_cloud,headless=False,save_path="downsampled_cloud_test.pcd")
-        # 去掉包含inf或nan的行
-        valid_mask = ~np.any(np.isnan(downsampled_cloud) | np.isinf(downsampled_cloud), axis=1)
-        downsampled_cloud = downsampled_cloud[valid_mask]
+        downsampled_cloud = downsampled_cloud[np.isfinite(downsampled_cloud).all(axis=1)]
         # point_to_consider = downsampled_cloud = self.convert_world_to_map(downsampled_cloud)
         point_to_consider = downsampled_cloud
         # adjusted_coords = (downsampled_cloud[:, :2]/self.voxel_size + [self.quadtree_width/2, self.quadtree_height/2]).astype(int) 

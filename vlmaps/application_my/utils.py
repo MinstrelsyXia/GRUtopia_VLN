@@ -356,4 +356,29 @@ def downsample_pc(pc, depth_sample_rate):
     return pc
 
 
+def save_point_cloud_image(pcd, save_path="point_cloud.jpg"):
+    import open3d as o3d
+    # 设置无头渲染
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()  # 创建一个不可见的窗口
+    ctr = vis.get_view_control()
+
+    # 设定特定的视角
+    ctr.set_front([0, 0, -1])  # 设置相机朝向正面
+    ctr.set_lookat([0, 0, 0])  # 设置相机目标点为原点
+    ctr.set_up([0, 0, 1])   
+    # 创建点云对象
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(pc)
+    vis.add_geometry(pcd)
+    vis.update_geometry(pcd)
+    vis.poll_events()
+    vis.update_renderer()
+
+    # 捕获当前视图并保存为图像
+    vis.capture_screen_image(save_path)
+    vis.destroy_window()
+
+
+
 

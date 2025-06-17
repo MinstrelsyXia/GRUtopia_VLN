@@ -13,7 +13,6 @@ from vlmaps.vlfm.fog_of_war import reveal_fog_of_war, get_current_angle
 from vlmaps.vlfm.base_map import BaseMap
 import os
 from typing import List
-
 # from depth_camera_filtering import filter_depth
 # from agent_utils.geometry_utils import extract_camera_pos_zyxrot, get_extrinsic_matrix, get_world_points_from_image_coords
 # from agent_utils.img_utils import fill_small_holes
@@ -98,7 +97,7 @@ class ObstacleMap(BaseMap):
         cos_rad = np.cos(rad)
         sin_rad = np.sin(rad)
         
-        # 生成路径上的所有点
+        #! 生成路径上的所有点 确认 sin/cos
         steps = np.arange(pix)
         path_i = i + steps * sin_rad
         path_j = j + steps * cos_rad

@@ -10,4 +10,3 @@ vln_cfg_file: "vln/configs/vln_cfg_vlmap_grutopia10.yaml"
 save_obs: false
 windows_head: false
 windows_head_type: show
-
