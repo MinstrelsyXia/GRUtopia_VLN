@@ -14,7 +14,7 @@ import json
 import torch
 import torchvision
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 import numpy as np
@@ -83,7 +83,7 @@ class sixth_floor_scene:
 
 json_path = "thirdparty/landmark_isaacsim_interaction/json_configs/multi_model_sixthfloor.json"
 img_path = "thirdparty/landmark_isaacsim_interaction/rendered_imgs/"
-file_path = '/ssd/xiaxinyuan/code/w61-grutopia/vln/configs/sim_cfg_path_generation.yaml'
+file_path = '/cpfs/user/xiaxinyuan/code/aliyun/GRUtopia_VLN/vln/configs/sim_cfg_path_generation.yaml'
 device_number = 0
 save_dir = os.path.join(img_path, "sixth_floor")
 rgb_save_dir = os.path.join(save_dir, "rgb")
@@ -111,7 +111,7 @@ from omegaconf import DictConfig
 
 ### create a robot:
 # path = [(1.0, 0.0, 0.0), (1.0, 1.0, 0.0), (3.0, 4.0, 0.0)]
-episode_path = '/ssd/xiaxinyuan/code/w61-grutopia/path_generation/test.json'
+episode_path = '/cpfs/user/xiaxinyuan/code/aliyun/GRUtopia_VLN/path_generation/test.json'
 data = json.load(open(episode_path, 'r'))
 path = np.array(data['camera_trajectory'])
 path[:,2] += 0.1

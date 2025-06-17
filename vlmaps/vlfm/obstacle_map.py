@@ -120,25 +120,6 @@ class ObstacleMap(BaseMap):
         valid_i = path_i[mask]
         valid_j = path_j[mask]
         
-<<<<<<< HEAD
-        # 检查路径上的障碍物
-        obstacles = self._map[valid_i, valid_j]
-        obstacle_indices = np.where(obstacles == 1)[0]
-        
-        if len(obstacle_indices) > 0:
-            # 找到第一个障碍物前的位置
-            first_obstacle = obstacle_indices[0]
-            if first_obstacle > 0:
-                # 返回障碍物前0.1米的位置
-                safe_index = max(0, first_obstacle - int(0.1 / self.pixels_per_meter))
-                return [valid_i[safe_index], valid_j[safe_index]]
-            return [i, j]  # 如果第一个点就是障碍物，返回当前位置
-        
-        # 如果没有障碍物，返回目标位置
-        target_i = i + pix * cos_rad
-        target_j = j + pix * sin_rad
-        return [target_i, target_j]
-=======
         # 检查路径上的点是否在已探索区域内
         explored = self.explored_area[valid_i, valid_j]
         explored_indices = np.where(explored == 1)[0]
@@ -153,7 +134,6 @@ class ObstacleMap(BaseMap):
         return [valid_j[last_explored_idx], valid_i[last_explored_idx]]
     
     
->>>>>>> origin/xxy_vlmap_new
     
     def clear_robot_surrounding(self, robot_pos, robot_radius, num_points=36):
         '''
