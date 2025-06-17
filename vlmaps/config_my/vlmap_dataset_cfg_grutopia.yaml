@@ -1,0 +1,34 @@
+defaults:
+  - data_paths: grutopia10
+  - map_config: vlmap_dataset
+  - params: issacsim_test
+  - vln_config: grutopia10_dataset
+  
+  - _self_
+nav:
+  valid_range: 1
+  vis: True
+  tasks_per_scene: 20
+
+episode_id: 100 #! unique id for all trajectory
+trajectory_id: 5
+
+
+# indexing params
+decay_rate: 0.01
+index_2d: True
+init_categories: True
+from_scratch: True # no need to load in vlmap
+online: True # needn't load from rgbs/depths
+find_frontier_type: vlmap # or closest
+episode_file: vlmaps/docker/test/0.txt
+last_scan_file: vlmaps/docker/last_scan_0.txt
+resume_scan: null
+
+hydra:
+  job_logging:
+    root:
+      level: ERROR
+  hydra_logging:
+    root:
+      level: ERROR

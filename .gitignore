@@ -17,11 +17,10 @@ images/
 results/
 logs/
 logs_docker/
-<<<<<<< HEAD
 logs_docker_room/
-=======
+
 *.hdf5
->>>>>>> 0682f0b83aee6bfadb259e0e726b462c10f86962
+
 tmp/
 tmp2/
 logs_docker_1213/
@@ -31,8 +30,7 @@ GRUtopia/logs/
 # .vscode/
 test/
 outputs/
-=======
->>>>>>> a04a10d4ab813ea3232c9ad5539adffa29cd27c3
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -69,6 +67,7 @@ tmp*/
 api_key/
 .auto-run-docker/
 vlmaps/vlmaps/lseg/checkpoints/
+thirdparty/
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.

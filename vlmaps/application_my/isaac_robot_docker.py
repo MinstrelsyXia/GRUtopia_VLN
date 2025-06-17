@@ -20,8 +20,8 @@ from scipy.ndimage import binary_closing, binary_dilation, gaussian_filter
 import pickle
 import time
 from vlmaps.vlmaps.robot.lang_robot import LangRobot
-from vlmaps.vlmaps.dataloader.isaacsim_dataloader import VLMapsDataloaderHabitat
-from vlmaps.vlmaps.navigator.navigator import Navigator
+# from vlmaps.vlmaps.dataloader.isaacsim_dataloader import VLMapsDataloaderHabitat
+# from vlmaps.vlmaps.navigator.navigator import Navigator
 
 from vln.src.v2.util.continuous_planner_v2 import AStarPlanner
 from vlmaps.vlmaps.controller.discrete_nav_controller import DiscreteNavController

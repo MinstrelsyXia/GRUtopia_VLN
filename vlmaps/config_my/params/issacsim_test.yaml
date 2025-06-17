@@ -23,28 +23,6 @@ sim_setting:
   lidar_fov: 360
   depth_img_for_lidar_n: 20
   img_save_dir: "/tmp"
-# map_config:
-#   grid_size: ${params.gs}
-#   cell_size: ${params.cs}
-#   dilate_iter: 5
-#   gaussian_sigma: 1.0
-#   potential_obstacle_names:
-#     - "chair"
-#     - "wall"
-#     - "wall above the door"
-#     - "table"
-#     - "window"
-#     - "floor"
-#     - "stairs"
-#     - "other"
-#   obstacle_names:
-#     - "wall"
-#     - "chair"
-#     - "table"
-#     - "window"
-#     - "stairs"
-#     - "other"
-#   categories: "mp3d" # "mp3d", "ai2thor"
 sound_map_config:
   map_type: "wav2clip" # "clap" "audioclip" "wav2clip"
   detect_mode: "retrieval" # "classification" "retrieval"

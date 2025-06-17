@@ -43,7 +43,7 @@ dash-table==5.0.0
 debugpy @ file:///croot/debugpy_1690905042057/work
 decorator==4.4.2
 defusedxml==0.7.1
-detectron2 @ git+https://github.com/facebookresearch/detectron2.git@c69939aa85460e8135f40bce908a6cddaa73065f
+# detectron2 @ git+https://github.com/facebookresearch/detectron2.git@c69939aa85460e8135f40bce908a6cddaa73065f
 diffusers==0.32.2
 distlib==0.3.8
 distro==1.9.0

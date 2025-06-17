@@ -3,6 +3,12 @@ from typing import Dict
 import numpy as np
 import omni.replicator.core as rep
 from omni.isaac.sensor import Camera as i_Camera
+from omni.isaac.core import World
+from omni.isaac.core.utils.prims import create_prim
+from omni.isaac.core.utils.prims import get_prim_at_path
+from omni.isaac.core.utils.transformations import get_relative_transform
+from omni.isaac.sensor import Camera
+from omni.isaac.core.prims import XFormPrim
 from pxr import Usd, UsdGeom
 
 from grutopia.core.robot.robot import BaseRobot, Scene
@@ -10,6 +16,7 @@ from grutopia.core.robot.robot_model import SensorModel
 from grutopia.core.robot.sensor import BaseSensor
 from grutopia.core.util import log
 
+import torch
 import carb.settings
 
 class FineCamera(i_Camera):
@@ -51,21 +58,46 @@ class FineCamera(i_Camera):
                                                               device=self._device,
                                                               indexed=True)
         return self._backend_utils.matmul(r_u_transform_converted, self._backend_utils.inverse(world_w_cam_u_T))
+    
+    def get_camera_pose(self):
+        """获取准确的相机位姿"""
+        # 使用get_relative_transform获取相对于世界坐标系的变换
+        cam_transform_matrix = get_relative_transform(
+            get_prim_at_path(self._camera.prim_path), 
+            get_prim_at_path("/World")
+        )
+        return cam_transform_matrix
+    
 
+from thirdparty.landmark_isaacsim_interaction.scgs_renderer import MultiModelSCGSRenderer
+def get_xform_list_pose(model_xform_list):
+    translations = []
+    rotations = []
+    scales = []
+    for model_xform in model_xform_list:
+        model_pose = model_xform.get_world_pose()
+        model_scale = model_xform.get_world_scale()
+        translations.append(model_pose[0])
+        rotations.append(model_pose[1])
+        scales.append(model_scale)
+    return translations, rotations, scales
 
-@BaseSensor.register('Camera')
-class Camera(BaseSensor):
-    """
-    wrap of isaac sim's Camera class
-    """
+@BaseSensor.register('Camera_3dgs')
+class Camera_3dgs(BaseSensor):
+    """Camera controller for 3DGS rendering."""
 
-    def __init__(self, config: SensorModel, robot: BaseRobot, name: str = None, scene: Scene = None):
-        super().__init__(config, robot, scene)
-        self.pointcloud_camera = None
-        self.pointcloud_anno = None
+    def __init__(self, config: SensorModel, robot: BaseRobot,name:str = None, scene: Scene = None) -> None:
+        """Initialize Camera_3dgs controller.
+        
+        Args:
+            config: Camera configuration
+            robot: Robot instance
+            scene: Scene instance
+        """
+        super().__init__(config=config, robot=robot, scene=scene)
         self.name = name
-        self.size = (320, 240)
         self._camera = self.create_camera()
+
 
     def create_camera(self) -> i_Camera:
         """Create an isaac-sim camera object.
@@ -218,42 +250,6 @@ class Camera(BaseSensor):
         if self.config.enable:
             self._camera.initialize()
             self._camera.add_distance_to_image_plane_to_frame()
-
-    def get_data(self, add_rgb_subframes=False) -> Dict:
-        if self.config.enable:
-            rgba = {}
-            depth = {}
-            pointcloud = {}
-            if self.config.camera_config is None or 'no_rgb' not in self.config.camera_config:
-                if add_rgb_subframes:
-                    rep.orchestrator.step(rt_subframes=2, delta_time=0.0, pause_timeline=False)
-                rgba = self._camera.get_rgba()
-                
-            if add_rgb_subframes:
-                rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
-            depth = self._camera.get_depth()
-            if self.config.camera_config and 'point_cloud' in self.config.camera_config:
-                pointcloud = self._camera.get_pointcloud()
-            return {'rgba': rgba, 'pointcloud': pointcloud, 'depth': depth}
-        return {}
-    
-    def get_camera_data(self, data_type: list) -> Dict:
-        output_data = {}
-        # if "bbox" in data_type:
-        #     output_data["bbox"] = self._camera.get_bbox()
-        if "rgba" in data_type:
-            rep.orchestrator.step(rt_subframes=10, delta_time=0.0, pause_timeline=False) # !!!
-            output_data["rgba"] = self._camera.get_rgba()
-            rep.orchestrator.step(rt_subframes=0, delta_time=0.0, pause_timeline=False)
-        if "depth" in data_type:
-            output_data["depth"] = self._camera.get_depth()
-        if "pointcloud" in data_type: 
-            output_data["pointcloud"] = self._camera.get_pointcloud()
-        # if "normals" in data_type: 
-        #     output_data["normals"] = self._camera.get_normals()
-        # if "camera_params" in data_type:
-        #     output_data["camera_params"] = self._camera.get_camera_params()
-        return output_data
 
     def reset(self):
         del self._camera
