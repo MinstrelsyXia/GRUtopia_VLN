@@ -14,8 +14,8 @@ import json
 import torch
 import torchvision
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+# os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 import numpy as np
 import hydra
@@ -99,9 +99,9 @@ os.makedirs(pano_rgb_save_dir, exist_ok=True)
 
 ### load data
 my_world = sixth_floor_scene(json_path=json_path, sim_config_path=file_path, device_number=device_number)
-my_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['pano_camera_0']
-debug_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['h1_pano_camera_debug']
-pano_camera = my_world.env._runner.current_tasks['vln_0'].robots['h1_0'].sensors['topdown_camera_50']
+my_camera = my_world.env._runner.current_tasks['vln_0'].robots['aliengo_0'].sensors['pano_camera_0']
+# debug_camera = my_world.env._runner.current_tasks['vln_0'].robots['aliengo_0'].sensors['h1_pano_camera_debug']
+pano_camera = my_world.env._runner.current_tasks['vln_0'].robots['aliengo_0'].sensors['topdown_camera_50']
 my_camera.set_renderer(my_world.lego_xform_list,my_world.lego_gs_root,my_world.lego_name_list,my_world.lego_device_number,my_world.lego_editable)
 # pano_camera.set_renderer(my_world.lego_xform_list,my_world.lego_gs_root,my_world.lego_name_list,my_world.lego_device_number,my_world.lego_editable)
 
@@ -161,8 +161,15 @@ while my_world.env.simulation_app.is_running():
         # pano_depth = pano_data['depth']
         # pano_pcd = pano_data['pointcloud']
         # use torchvision to save image
-        cv2.imwrite(rgb_save_path, rgb_save)
+        # cv2.imwrite(rgb_save_path, rgb_save)
+        # torchvision.utils.save_image(torch.tensor(rgb_save), rgb_save_path)
+
+        rgb_save = np.transpose(rgb, (2, 0, 1)).astype(np.float32)  
+        # 确保数值在 0-1 范围内
+        if rgb_save.max() > 1.0:
+            rgb_save = rgb_save / 255.0
         torchvision.utils.save_image(torch.tensor(rgb_save), rgb_save_path)
+        
         torchvision.utils.save_image(torch.tensor(depth), depth_save_path)
         pcd_o3d = o3d.geometry.PointCloud()
         pcd_o3d.points = o3d.utility.Vector3dVector(pcd)

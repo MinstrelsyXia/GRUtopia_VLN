@@ -18,7 +18,7 @@ from grutopia.core.util import log
 
 import torch
 import carb.settings
-
+import cv2
 class FineCamera(i_Camera):
 
     def get_render_product(self):
@@ -139,7 +139,7 @@ class Camera_3dgs(BaseSensor):
         focal_length = self._camera.get_focal_length()*1000
         fovx = self._camera.get_horizontal_fov()
         fovy = self._camera.get_vertical_fov()  
-        self.scgs_renderer.set_camera_params(self.size[0], self.size[1], focal_length, focal_length, 0.01, 100.0,fovx,fovy)
+        self.scgs_renderer.set_camera_params(image_width = self.size[0], image_height=self.size[1], fl_x = focal_length, fl_y = focal_length, znear = 0.01,zfar = 100)
         
 
     def get_pc(self,depth,cam_transform_matrix):
@@ -228,7 +228,11 @@ class Camera_3dgs(BaseSensor):
                 rgb = (rgb * 255).astype(np.uint8)
                 # rgb = rgb[:, :, ::-1]  # BGR to RGB
                 depth = scgs_rendering['depth'].detach().cpu().numpy()[0]    # shape：（H，W）
-                depth = depth * 100
+                if rgb.shape[0] == 240:
+                    # interpolate rgb to [480,640,3], depth to (480,640)
+                    rgb = cv2.resize(rgb, (640, 480))
+                    depth = cv2.resize(depth, (640, 480))
+                # depth = depth * 100
                 # pc = self.get_pc(depth,cam_transform_matrix)
             pc = self._camera.get_pointcloud()
                 # pc[:,2] = -pc[:,2]
@@ -258,3 +262,5 @@ class Camera_3dgs(BaseSensor):
     
     def get_world_pose(self):
         return self._camera.get_world_pose()
+
+

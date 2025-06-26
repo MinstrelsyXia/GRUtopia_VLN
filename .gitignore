@@ -6,7 +6,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.run
 # Distribution / packaging
 .Python
 build/
@@ -155,12 +155,9 @@ docs/en/_build
 logs/
 logs_docker/
 logs_docker_room/
-<<<<<<< HEAD
 
 *.hdf5
 
-=======
->>>>>>> sixth_floor_branch
 tmp/
 tmp2/
 logs_docker_1213/
@@ -170,12 +167,7 @@ GRUtopia/logs/
 # .vscode/
 test/
 outputs/
-<<<<<<< HEAD
-
-=======
-thirdparty/
 src/hloc/
->>>>>>> sixth_floor_branch
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

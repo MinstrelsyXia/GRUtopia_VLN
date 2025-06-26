@@ -58,7 +58,7 @@ tasks:
       enable: false
       size: [640, 480]
     - name: "tp_pointcloud"
-      enable: True
+      enable: true
       size: [64, 64]
       camera_config:
         - no_rgb
